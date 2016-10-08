@@ -201,32 +201,3 @@ class RPC(object):
 
             self.logger.info('sleeping 1 second and trying again...')
             await asyncio.sleep(1)
-
-        # for addr in [
-        #         # '1dice8EMZmqKvrGE4Qc9bUFf9PX3xaYDp',
-        #         # '1HYBcza9tVquCCvCN1hUZkYT9RcM6GfLot',
-        #         # '1BNwxHGaFbeUBitpjy2AsKpJ29Ybxntqvb',
-        #         # '1ARanTkswPiVM6tUEYvbskyqDsZpweiciu',
-        #         # '1VayNert3x1KzbpzMGt2qdqrAThiRovi8',
-        #         # '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-        #         # '1XPTgDRhN8RFnzniWCddobD9iKZatrvH4',
-        #         # '153h6eE6xRhXuN3pE53gWVfXacAtfyBF8g',
-        # ]:
-        #     print('Address: ', addr)
-        #     hash160 = coin.address_to_hash160(addr)
-        #     utxos = self.db.get_utxos(hash160)
-        #     for n, utxo in enumerate(utxos):
-        #         print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
-        #               .format(n, bytes(reversed(utxo.tx_hash)).hex(),
-        #                       utxo.tx_pos, utxo.height, utxo.value))
-
-        # for addr in [
-        #         '19k8nToWwMGuF4HkNpzgoVAYk4viBnEs5D',
-        #         '1HaHTfmvoUW6i6nhJf8jJs6tU4cHNmBQHQ',
-        #         '1XPTgDRhN8RFnzniWCddobD9iKZatrvH4',
-        # ]:
-        #     print('Address: ', addr)
-        #     hash160 = coin.address_to_hash160(addr)
-        #     for n, (tx_hash, height) in enumerate(self.db.get_history(hash160)):
-        #         print('History #{:d}: hash: {} height: {:d}'
-        #               .format(n + 1, bytes(reversed(tx_hash)).hex(), height))
