@@ -433,27 +433,41 @@ class DB(object):
 
         return tx_hash, height
 
+    @staticmethod
+    def resolve_limit(limit):
+        if limit is None:
+            return -1
+        assert isinstance(limit, int) and limit >= 0
+        return limit
+
+    def get_history(self, hash160, limit=1000):
+        '''Generator that returns an unpruned, sorted list of (tx_hash,
+        height) tuples of transactions that touched the address,
+        earliest in the blockchain first.  Includes both spending and
+        receiving transactions.  By default yields at most 1000 entries.
+        Set limit to None to get them all.
+        '''
+        limit = self.resolve_limit(limit)
+        prefix = b'H' + hash160
+        for key, hist in self.db.iterator(prefix=prefix):
+            a = array.array('I')
+            a.frombytes(hist)
+            for tx_num in a:
+                if limit == 0:
+                    return
+                yield self.get_tx_hash(tx_num)
+                limit -= 1
+
     def get_balance(self, hash160):
         '''Returns the confirmed balance of an address.'''
-        utxos = self.get_utxos(hash_160)
-        return sum(utxo.value for utxo in utxos)
+        return sum(utxo.value for utxo in self.get_utxos(hash_160, limit=None))
 
-    def get_history(self, hash160):
-        '''Returns an unpruned, sorted list of (tx_hash, height) tuples of
-        transactions that touched the address, earliest in the
-        blockchain first.  Includes both spending and receiving
-        transactions.
+    def get_utxos(self, hash160, limit=1000):
+        '''Generator that yields all UTXOs for an address sorted in no
+        particular order.  By default yields at most 1000 entries.
+        Set limit to None to get them all.
         '''
-        prefix = b'H' + hash160
-        a = array.array('I')
-        for key, hist in self.db.iterator(prefix=prefix):
-            a.frombytes(hist)
-        return [self.get_tx_hash(tx_num) for tx_num in a]
-
-    def get_utxos(self, hash160):
-        '''Returns all UTXOs for an address sorted such that the earliest
-        in the blockchain comes first.
-        '''
+        limit = self.resolve_limit(limit)
         unpack = struct.unpack
         prefix = b'u' + hash160
         utxos = []
@@ -461,10 +475,15 @@ class DB(object):
             (tx_pos, ) = unpack('<H', k[-2:])
 
             for n in range(0, len(v), 12):
+                if limit == 0:
+                    return
                 (tx_num, ) = unpack('<I', v[n:n+4])
                 (value, ) = unpack('<Q', v[n+4:n+12])
                 tx_hash, height = self.get_tx_hash(tx_num)
-                utxos.append(UTXO(tx_num, tx_pos, tx_hash, height, value))
+                yield UTXO(tx_num, tx_pos, tx_hash, height, value)
+                limit -= 1
 
-        # Sorted by height and block position.
-        return sorted(utxos)
+    def get_utxos_sorted(self, hash160):
+        '''Returns all the UTXOs for an address sorted by height and
+        position in the block.'''
+        return sorted(self.get_utxos(hash160, limit=None))
