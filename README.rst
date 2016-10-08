@@ -83,7 +83,7 @@ Future/TODO
 - investigating leveldb space / speed tradeoffs
 - seeking out further efficiencies.  ElectrumX is CPU bound; it would not
   surprise me if there is a way to cut CPU load by 10-20% more.  To squeeze
-  more out would probably require some things to move to C or C++.
+  even more out would probably require some things to move to C or C++.
 
 Once I get round to writing the server part, I will add DoS
 protections if necessary to defend against requests for large
@@ -92,7 +92,7 @@ could smoothly serve the whole history of the biggest Satoshi dice
 address with minimal negative impact on other connections; we shall
 have to see.  If the requestor is running Electrum client I am
 confident that it would collapse under the load far more quickly that
-the server would; it is very inefficeint at handling large wallets
+the server would; it is very inefficient at handling large wallets
 and histories.
 
 

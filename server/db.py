@@ -439,10 +439,10 @@ class DB(object):
         return sum(utxo.value for utxo in utxos)
 
     def get_history(self, hash160):
-        '''Returns a sorted list of (tx_hash, height) tuples of transactions
-        that touched the address, earliest in the blockchain first.
-        Only includes outputs that have been spent.  Other
-        transactions will be in the UTXO set.
+        '''Returns an unpruned, sorted list of (tx_hash, height) tuples of
+        transactions that touched the address, earliest in the
+        blockchain first.  Includes both spending and receiving
+        transactions.
         '''
         prefix = b'H' + hash160
         a = array.array('I')
