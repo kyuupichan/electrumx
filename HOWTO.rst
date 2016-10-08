@@ -140,7 +140,7 @@ wall-time::
   150,000        35m           4m 30s       0.2 GB
   180,000        1h 5m         9m           0.4 GB
   245,800        3h            1h 30m       2.7 GB
-  290,000        13h 15m                    3.3 GB
+  290,000        13h 15m       3h 5m        3.3 GB
 
 Machine A: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU, 8GB
 RAM and a DragonFlyBSD HAMMER fileystem on an SSD.  It requests blocks
