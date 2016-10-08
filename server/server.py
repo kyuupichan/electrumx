@@ -15,11 +15,11 @@ from server.db import DB
 
 class Server(object):
 
-    def __init__(self, env, loop):
+    def __init__(self, env):
         self.env = env
         self.db = DB(env)
         self.rpc = RPC(env)
-        self.block_cache = BlockCache(env, self.db, self.rpc, loop)
+        self.block_cache = BlockCache(env, self.db, self.rpc)
 
     def async_tasks(self):
         return [
@@ -32,7 +32,7 @@ class BlockCache(object):
     '''Requests blocks ahead of time from the daemon.  Serves them
     to the blockchain processor.'''
 
-    def __init__(self, env, db, rpc, loop):
+    def __init__(self, env, db, rpc):
         self.logger = logging.getLogger('BlockCache')
         self.logger.setLevel(logging.INFO)
 
@@ -47,6 +47,8 @@ class BlockCache(object):
         self.blocks = []
         self.recent_sizes = []
         self.ave_size = 0
+
+        loop = asyncio.get_event_loop()
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
                                     partial(self.on_signal, signame))
