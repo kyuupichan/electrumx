@@ -137,10 +137,13 @@ wall-time::
 
                  Machine A     Machine B    DB + Metadata
   100,000        2m            30s          0  (unflushed)
-  150,000        35m           4m 30s       0.2 GB
-  180,000        1h 5m         9m           0.4 GB
-  245,800        3h
-  290,000        13h 15m                    3.3 GB
+  150,000        35m           4m 30s       0.2 GiB
+  180,000        1h 5m         9m           0.4 GiB
+  245,800        3h            1h 30m       2.7 GiB
+  290,000        13h 15m       3h 5m        3.3 GiB
+  307,000        17h 16m       3h 50m       4.1 GiB
+  343,000                      6h 54m       6.0 GiB
+  386,600                      17h 07m      7.0 GiB
 
 Machine A: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU, 8GB
 RAM and a DragonFlyBSD HAMMER fileystem on an SSD.  It requests blocks
@@ -218,7 +221,6 @@ You can see the logs usefully like so::
 
 Here is typical log output on startup::
 
-
   2016-10-08 14:46:48.088516500 Launching ElectrumX server...
   2016-10-08 14:46:49.145281500 INFO:root:ElectrumX server starting
   2016-10-08 14:46:49.147215500 INFO:root:switching current directory to /var/nohist/server-test
@@ -257,7 +259,7 @@ After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
 is harmless; I intend to fix this soon by yielding whilst flushing.
 
-You may see one or two logs about ambiguous UTXOs or hash160s::
+You may see one or two logs about UTXOs or hash160 key collisions::
 
     2016-10-08 07:24:34.068609500 INFO:DB:UTXO compressed key collision at height 252943 utxo 115cc1408e5321636675a8fcecd204661a6f27b4b7482b1b7c4402ca4b94b72f / 1
 
