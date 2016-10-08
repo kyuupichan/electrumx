@@ -1,0 +1,19 @@
+Thanks to Thomas Voegtlin for creating the Electrum software and
+infrastructure and for maintaining it so diligently.  Electrum is the
+probably the best desktop Bitcoin wallet solution for most users.  My
+faith in it is such that I use Electrum software to store most of my
+Bitcoins.
+
+Whilst the vast majority of the code here is my own original work and
+includes some new ideas, it is very clear that the general structure
+and concept are those of Electrum.  Some parts of the code and ideas
+of Electrum, some of which it itself took from other projects such as
+Abe and pywallet, remain.  Thanks to the authors of all the software
+this is derived from.
+
+Thanks to Daniel Bernstein for daemontools and other software, and to
+Matthew Dillon for DragonFlyBSD.  They are both deeply inspirational
+people.
+
+And of course, thanks to Satoshi for the wonderful creation that is
+Bitcoin.

@@ -1,0 +1,2 @@
+#!/bin/sh
+exec multilog t s500000 n10 /path/to/log/dir
