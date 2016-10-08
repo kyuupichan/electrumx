@@ -1,4 +1,4 @@
-# See the file "COPYING" for information about the copyright
+# See the file "LICENSE" for information about the copyright
 # and warranty status of this software.
 
 

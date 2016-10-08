@@ -247,7 +247,7 @@ this:
 
 These are just informational messages about addresses that have very
 large histories that are generated as those histories are being
-written outt.  After the flush has completed a few stats are printed
+written out.  After the flush has completed a few stats are printed
 about cache hits, the number of writes and deletes, and the number of
 writes that were elided by the cache::
 
@@ -261,7 +261,7 @@ You may see one or two logs about ambiguous UTXOs or hash160s::
 
     2016-10-08 07:24:34.068609500 INFO:DB:UTXO compressed key collision at height 252943 utxo 115cc1408e5321636675a8fcecd204661a6f27b4b7482b1b7c4402ca4b94b72f / 1
 
-These are an informational message about artefact of the compression
+These are informational messages about an artefact of the compression
 scheme ElectrumX uses and are harmless.  However, if you see more than
 a handful of these, particularly close together, something is very
 wrong and your DB is probably corrupt.
