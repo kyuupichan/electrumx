@@ -37,6 +37,9 @@ def main():
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')
+        balance = db.get_balance(hash160)
+        print('Balance: {} {}'.format(coin.decimal_value(balance),
+                                      coin.SHORTNAME))
 
 if __name__ == '__main__':
     main()

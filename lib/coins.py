@@ -2,6 +2,7 @@
 # and warranty status of this software.
 
 
+from decimal import Decimal
 import inspect
 import sys
 
@@ -20,6 +21,7 @@ class Coin(object):
     # Not sure if these are coin-specific
     HEADER_LEN = 80
     DEFAULT_RPC_PORT = 8332
+    VALUE_PER_COIN = 100000000
 
     @staticmethod
     def coins():
@@ -130,6 +132,10 @@ class Coin(object):
         assert isinstance(block, memoryview)
         d = Deserializer(block[cls.HEADER_LEN:])
         return d.read_block()
+
+    @classmethod
+    def decimal_value(cls, value):
+        return Decimal(value) / cls.VALUE_PER_COIN
 
 
 class Bitcoin(Coin):

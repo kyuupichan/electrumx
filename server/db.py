@@ -460,7 +460,7 @@ class DB(object):
 
     def get_balance(self, hash160):
         '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hash_160, limit=None))
+        return sum(utxo.value for utxo in self.get_utxos(hash160, limit=None))
 
     def get_utxos(self, hash160, limit=1000):
         '''Generator that yields all UTXOs for an address sorted in no
