@@ -100,9 +100,8 @@ Database Format
 ===============
 
 The database and metadata formats of ElectrumX are very likely to
-change in the future.  If so old DBs would not be usable.  However it
-should be easy to write short Python script to do any necessary
-conversions in-place without having to start afresh.
+change in the future which will render old DBs unusable.  For now I do
+not intend to provide converters as the rate of flux is high.
 
 
 Miscellany
