@@ -198,9 +198,9 @@ class DB(object):
                 else:
                     batch.put(key, value)
                     writes += 1
-                if n % 1000 == 0:
-                    pct = n // len(self.write_cache) * 100
-                    self.logger.info('{:d} {:d}% done...'.format(n, pct))
+                if n % 20000 == 0:
+                    pct = n * 100 // len(self.write_cache)
+                    self.logger.info('U {:d} {:d}% done...'.format(n, pct))
 
             self.flush_history()
 
@@ -248,9 +248,9 @@ class DB(object):
                                          .format(addr, idx))
                     self.db.put(key, v[n:n + HIST_ENTRY_LEN])
 
-            if m % 1000 == 0:
-                pct = m // len(self.history) * 100
-                self.logger.info('{:d} {:d}% done...'.format(m, pct))
+            if m % 20000 == 0:
+                pct = m * 100 // len(self.history)
+                self.logger.info('H {:d} {:d}% done...'.format(m, pct))
 
         self.history = defaultdict(list)
 
