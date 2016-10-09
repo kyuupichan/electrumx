@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import signal
+import time
 from functools import partial
 
 import aiohttp
@@ -73,7 +74,15 @@ class BlockCache(object):
         self.logger.info('catching up, block cache limit {:d}MB...'
                          .format(self.cache_limit))
 
+        last_log = 0
         while await self.maybe_prefill():
+            now = time.time()
+            if now > last_log + 15:
+                last_log = now
+                self.logger.info('prefilled blocks to height {:,d} '
+                                 'daemon height: {:,d}'
+                                 .format(self.fetched_height,
+                                         self.daemon_height))
             await asyncio.sleep(1)
 
         if not self.stop:
@@ -108,7 +117,6 @@ class BlockCache(object):
             if not count or self.stop:
                 return False  # Done catching up
 
-#            self.logger.info('requesting {:,d} blocks'.format(count))
             first = self.fetched_height + 1
             param_lists = [[height] for height in range(first, first + count)]
             hashes = await self.rpc.rpc_multi('getblockhash', param_lists)
@@ -128,11 +136,6 @@ class BlockCache(object):
             blocks = [memoryview(bytes.fromhex(block)) for block in blocks]
             # Reverse order and place at front of list
             self.blocks = list(reversed(blocks)) + self.blocks
-
-            self.logger.info('prefilled {:,d} blocks to height {:,d} '
-                             'daemon height: {:,d} block cache size: {:,d}'
-                             .format(count, self.fetched_height,
-                                     self.daemon_height, self.cache_used()))
 
             # Keep 50 most recent block sizes for fetch count estimation
             sizes = [len(block) for block in blocks]
