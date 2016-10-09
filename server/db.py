@@ -191,13 +191,16 @@ class DB(object):
         with self.db.write_batch(transaction=True) as batch:
             # Flush the state, then the cache, then the history
             self.put_state()
-            for key, value in self.write_cache.items():
+            for n, (key, value) in enumerate(self.write_cache.items()):
                 if value is None:
                     batch.delete(key)
                     deletes += 1
                 else:
                     batch.put(key, value)
                     writes += 1
+                if n % 20000 == 0:
+                    pct = n * 100 // len(self.write_cache)
+                    self.logger.info('U {:d} {:d}% done...'.format(n, pct))
 
             self.flush_history()
 
@@ -220,7 +223,7 @@ class DB(object):
         # Drop any None entry
         self.history.pop(None, None)
 
-        for hash160, hist in self.history.items():
+        for m, (hash160, hist) in enumerate(self.history.items()):
             prefix = b'H' + hash160
             for key, v in self.db.iterator(reverse=True, prefix=prefix,
                                            fill_cache=False):
@@ -244,6 +247,10 @@ class DB(object):
                         self.logger.info('address {} hist moving to idx {:d}'
                                          .format(addr, idx))
                     self.db.put(key, v[n:n + HIST_ENTRY_LEN])
+
+            if m % 20000 == 0:
+                pct = m * 100 // len(self.history)
+                self.logger.info('H {:d} {:d}% done...'.format(m, pct))
 
         self.history = defaultdict(list)
 
