@@ -33,7 +33,7 @@ def main():
         n = None
         for n, utxo in enumerate(db.get_utxos(hash168, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
-                  .format(n, bytes(reversed(utxo.tx_hash)).hex(),
+                  .format(n + 1, bytes(reversed(utxo.tx_hash)).hex(),
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')
