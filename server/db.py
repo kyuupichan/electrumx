@@ -490,7 +490,7 @@ class DB(object):
         '''Returns the approximate size of the cache, in MB.'''
         utxo_MB = ((len(self.utxo_cache.cache) + len(self.utxo_cache.db_cache))
                    * 100 // 1048576)
-        hist_MB = (len(self.history) * 48 + self.history_size * 4) // 1048576
+        hist_MB = (len(self.history) * 48 + self.history_size * 20) // 1048576
         if self.height % 200 == 0:
             self.logger.info('cache size at height {:,d}: '
                              'UTXOs: {:,d} MB history: {:,d} MB'
