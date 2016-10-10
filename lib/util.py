@@ -5,24 +5,6 @@
 import sys
 
 
-class Log(object):
-    '''Logging base class'''
-
-    VERBOSE = True
-
-    def diagnostic_name(self):
-        return self.__class__.__name__
-
-    def log(self, *msgs):
-        if Log.VERBOSE:
-            print('[{}]: '.format(self.diagnostic_name()), *msgs,
-                  file=sys.stdout, flush=True)
-
-    def log_error(self, *msg):
-        print('[{}]: ERROR: {}'.format(self.diagnostic_name()), *msgs,
-              file=sys.stderr, flush=True)
-
-
 # Method decorator.  To be used for calculations that will always
 # deliver the same result.  The method cannot take any arguments
 # and should be accessed as an attribute.

@@ -23,21 +23,21 @@ def main():
         limit = 10
     for addr in sys.argv[argc:]:
         print('Address: ', addr)
-        hash160 = coin.address_to_hash160(addr)
+        hash168 = coin.address_to_hash168(addr)
         n = None
-        for n, (tx_hash, height) in enumerate(db.get_history(hash160, limit)):
+        for n, (tx_hash, height) in enumerate(db.get_history(hash168, limit)):
             print('History #{:d}: hash: {} height: {:d}'
                   .format(n + 1, bytes(reversed(tx_hash)).hex(), height))
         if n is None:
             print('No history')
         n = None
-        for n, utxo in enumerate(db.get_utxos(hash160, limit)):
+        for n, utxo in enumerate(db.get_utxos(hash168, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
                   .format(n, bytes(reversed(utxo.tx_hash)).hex(),
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')
-        balance = db.get_balance(hash160)
+        balance = db.get_balance(hash168)
         print('Balance: {} {}'.format(coin.decimal_value(balance),
                                       coin.SHORTNAME))
 
