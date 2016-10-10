@@ -95,10 +95,6 @@ class UTXOCache(object):
         self.cache_hits = 0
         self.db_deletes = 0
 
-    def size_MB(self):
-        '''Returns the approximate size of the cache, in MB.'''
-        return (len(self.cache) + len(self.db_cache)) * 100 // 1048576
-
     def add_many(self, tx_hash, tx_num, txouts):
         '''Add a sequence of UTXOs to the cache, return the set of hash168s
         seen.
@@ -122,8 +118,8 @@ class UTXOCache(object):
             hash168s.add(hash168)
             key = tx_hash + pack('<H', idx)
             if key in self.cache:
-                logging.info('duplicate tx hash {}'
-                             .format(bytes(reversed(tx_hash)).hex()))
+                self.logger.info('duplicate tx hash {}'
+                                 .format(bytes(reversed(tx_hash)).hex()))
 
             # b''.join avoids this: https://bugs.python.org/issue13298
             self.cache[key] = b''.join(
@@ -490,6 +486,23 @@ class DB(object):
             file_pos += size
         self.tx_hashes = []
 
+    def cache_MB(self):
+        '''Returns the approximate size of the cache, in MB.'''
+        utxo_MB = ((len(self.utxo_cache.cache) + len(self.utxo_cache.db_cache))
+                   * 100 // 1048576)
+        hist_MB = (len(self.history) * 48 + self.history_size * 4) // 1048576
+        if self.height % 200 == 0:
+            self.logger.info('cache size at height {:,d}: '
+                             'UTXOs: {:,d} MB history: {:,d} MB'
+                             .format(self.height, utxo_MB, hist_MB))
+            self.logger.info('cache entries: UTXOs: {:,d}/{:,d} '
+                             'history: {:,d}/{:,d}'
+                             .format(len(self.utxo_cache.cache),
+                                     len(self.utxo_cache.db_cache),
+                                     len(self.history),
+                                     self.history_size))
+        return utxo_MB + hist_MB
+
     def process_block(self, block):
         self.headers.append(block[:self.coin.HEADER_LEN])
 
@@ -507,8 +520,7 @@ class DB(object):
             self.process_tx(tx_hash, tx)
 
         # Flush if we're getting full
-        hist_MB = self.history_size * 4 // 1048576
-        if self.utxo_cache.size_MB() + hist_MB > self.flush_MB:
+        if self.cache_MB() > self.flush_MB:
             self.flush()
 
     def process_tx(self, tx_hash, tx):
