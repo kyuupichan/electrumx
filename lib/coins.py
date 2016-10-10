@@ -16,7 +16,7 @@ class CoinError(Exception):
 
 
 class Coin(object):
-    '''Base class of coin hierarchy'''
+    '''Base class of coin hierarchy.'''
 
     # Not sure if these are coin-specific
     HEADER_LEN = 80
@@ -52,59 +52,67 @@ class Coin(object):
         raise CoinError("version bytes unrecognised")
 
     @classmethod
-    def address_to_hash160(cls, addr):
-        '''Returns a hash160 given an address'''
+    def address_to_hash168(cls, addr):
+        '''Return a 21-byte hash given an address.
+
+        This is the hash160 prefixed by the address version byte.
+        '''
         result = Base58.decode_check(addr)
         if len(result) != 21:
             raise CoinError('invalid address: {}'.format(addr))
-        return result[1:]
+        return result
 
     @classmethod
     def P2PKH_address_from_hash160(cls, hash_bytes):
-        '''Returns a P2PKH address given a public key'''
+        '''Return a P2PKH address given a public key.'''
         assert len(hash_bytes) == 20
         payload = bytes([cls.P2PKH_VERBYTE]) + hash_bytes
         return Base58.encode_check(payload)
 
     @classmethod
     def P2PKH_address_from_pubkey(cls, pubkey):
-        '''Returns a coin address given a public key'''
+        '''Return a coin address given a public key.'''
         return cls.P2PKH_address_from_hash160(hash160(pubkey))
 
     @classmethod
     def P2SH_address_from_hash160(cls, pubkey_bytes):
-        '''Returns a coin address given a public key'''
+        '''Return a coin address given a public key.'''
         assert len(hash_bytes) == 20
         payload = bytes([cls.P2SH_VERBYTE]) + hash_bytes
         return Base58.encode_check(payload)
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
-        '''Returns the P2SH address for an M of N multisig transaction.  Pass
-        the N pubkeys of which M are needed to sign it.  If generating
-        an address for a wallet, it is the caller's responsibility to
-        sort them to ensure order does not matter for, e.g., wallet
-        recovery.'''
+        '''Return the P2SH address for an M of N multisig transaction.
+
+        Pass the N pubkeys of which M are needed to sign it.  If
+        generating an address for a wallet, it is the caller's
+        responsibility to sort them to ensure order does not matter
+        for, e.g., wallet recovery.
+        '''
         script = cls.pay_to_multisig_script(m, pubkeys)
         payload = bytes([cls.P2SH_VERBYTE]) + hash160(pubkey_bytes)
         return Base58.encode_check(payload)
 
     @classmethod
     def pay_to_multisig_script(cls, m, pubkeys):
-        '''Returns a P2SH multisig script for an M of N multisig
-        transaction.'''
+        '''Return a P2SH script for an M of N multisig transaction.'''
         return ScriptPubKey.multisig_script(m, pubkeys)
 
     @classmethod
     def pay_to_pubkey_script(cls, pubkey):
-        '''Returns a pubkey script that pays to pubkey.  The input is the
-        raw pubkey bytes (length 33 or 65).'''
+        '''Return a pubkey script that pays to a pubkey.
+
+        Pass the raw pubkey bytes (length 33 or 65).
+        '''
         return ScriptPubKey.P2PK_script(pubkey)
 
     @classmethod
     def pay_to_address_script(cls, address):
-        '''Returns a pubkey script that pays to pubkey hash.  Input is the
-        address (either P2PKH or P2SH) in base58 form.'''
+        '''Return a pubkey script that pays to a pubkey hash.
+
+        Pass the address (either P2PKH or P2SH) in base58 form.
+        '''
         raw = Base58.decode_check(address)
 
         # Require version byte plus hash160.
@@ -121,7 +129,7 @@ class Coin(object):
 
     @classmethod
     def prvkey_WIF(privkey_bytes, compressed):
-        "The private key encoded in Wallet Import Format"
+        "Return the private key encoded in Wallet Import Format."
         payload = bytearray([cls.WIF_BYTE]) + privkey_bytes
         if compressed:
             payload.append(0x01)

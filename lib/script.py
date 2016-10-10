@@ -131,20 +131,20 @@ class ScriptPubKey(object):
     TO_P2SH_OPS = [OpCodes.OP_HASH160, -1, OpCodes.OP_EQUAL]
     TO_PUBKEY_OPS = [-1, OpCodes.OP_CHECKSIG]
 
-    def __init__(self, script, coin, kind, hash160, pubkey=None):
+    def __init__(self, script, coin, kind, hash168, pubkey=None):
         self.script = script
         self.coin = coin
         self.kind = kind
-        self.hash160 = hash160
+        self.hash168 = hash168
         if pubkey:
             self.pubkey = pubkey
 
     @cachedproperty
     def address(self):
         if self.kind == ScriptPubKey.TO_P2SH:
-            return self.coin.P2SH_address_from_hash160(self.hash160)
+            return self.coin.P2SH_address_from_hash160(self.hash168[1:])
         if self.hash160:
-            return self.coin.P2PKH_address_from_hash160(self.hash160)
+            return self.coin.P2PKH_address_from_hash160(self.hash168[1:])
         return ''
 
     @classmethod
@@ -163,14 +163,17 @@ class ScriptPubKey(object):
         ops, datas = Script.get_ops(script)
 
         if Script.match_ops(ops, cls.TO_ADDRESS_OPS):
-            return cls(script, coin, cls.TO_ADDRESS, datas[2])
+            return cls(script, coin, cls.TO_ADDRESS,
+                       bytes([coin.P2PKH_VERBYTE]) + datas[2])
 
         if Script.match_ops(ops, cls.TO_P2SH_OPS):
-            return cls(script, coin, cls.TO_P2SH, datas[1])
+            return cls(script, coin, cls.TO_P2SH,
+                       bytes([coin.P2SH_VERBYTE]) + datas[1])
 
         if Script.match_ops(ops, cls.TO_PUBKEY_OPS):
             pubkey = datas[0]
-            return cls(script, coin, cls.TO_PUBKEY, hash160(pubkey), pubkey)
+            return cls(script, coin, cls.TO_PUBKEY,
+                       bytes([coin.P2PKH_VERBYTE]) + hash160(pubkey), pubkey)
 
         raise ScriptError('unknown script pubkey pattern')
 

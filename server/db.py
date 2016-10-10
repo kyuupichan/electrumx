@@ -256,56 +256,56 @@ class DB(object):
         self.history.pop(None, None)
 
         flush_id = struct.pack('>H', self.flush_count)
-        for hash160, hist in self.history.items():
-            key = b'H' + hash160 + flush_id
+        for hash168, hist in self.history.items():
+            key = b'H' + hash168 + flush_id
             batch.put(key, array.array('I', hist).tobytes())
 
         self.history = defaultdict(list)
 
-    def get_hash160(self, tx_hash, idx, delete=True):
+    def get_hash168(self, tx_hash, idx, delete=True):
         key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + struct.pack('<H', idx)
         data = self.get(key)
         if data is None:
             return None
 
-        if len(data) == 24:
+        if len(data) == 25:
             if delete:
                 self.delete(key)
-            return data[:20]
+            return data[:21]
 
-        assert len(data) % 24 == 0
+        assert len(data) % 25 == 0
         self.hcolls += 1
         if self.hcolls % 1000 == 0:
-            self.logger.info('{} total hash160 compressed key collisions'
+            self.logger.info('{} total hash168 compressed key collisions'
                              .format(self.hcolls))
-        for n in range(0, len(data), 24):
-            (tx_num, ) = struct.unpack('<I', data[n+20:n+24])
+        for n in range(0, len(data), 25):
+            (tx_num, ) = struct.unpack('<I', data[n+21 : n+25])
             my_hash, height = self.get_tx_hash(tx_num)
             if my_hash == tx_hash:
                 if delete:
-                    self.put(key, data[:n] + data[n + 24:])
-                return data[n:n+20]
-        else:
-            raise Exception('could not resolve hash160 collision')
+                    self.put(key, data[:n] + data[n+25:])
+                return data[n : n+21]
+
+        raise Exception('could not resolve hash168 collision')
 
     def spend_utxo(self, prevout):
-        hash160 = self.get_hash160(prevout.hash, prevout.n)
-        if hash160 is None:
+        hash168 = self.get_hash168(prevout.hash, prevout.n)
+        if hash168 is None:
             # This indicates a successful spend of a non-standard script
             # self.logger.info('ignoring spend of non-standard UTXO {}/{:d} '
             #                  'at height {:d}'
             #                  .format(bytes(reversed(prevout.hash)).hex(),
             #                          prevout.n, self.height))
             return None
-
-        key = (b'u' + hash160 + prevout.hash[:UTXO_TX_HASH_LEN]
+        key = (b'u' + hash168 + prevout.hash[:UTXO_TX_HASH_LEN]
                + struct.pack('<H', prevout.n))
         data = self.get(key)
         if data is None:
+            # Uh-oh, this should not happen.  It may be recoverable...
             self.logger.error('found no UTXO for {} / {:d} key {}'
                              .format(bytes(reversed(prevout.hash)).hex(),
                                      prevout.n, bytes(key).hex()))
-            return hash160
+            return hash168
 
         if len(data) == 12:
             (tx_num, ) = struct.unpack('<I', data[:4])
@@ -324,35 +324,35 @@ class DB(object):
             data = data[:n] + data[n + 12:]
             self.put(key, data)
 
-        return hash160
+        return hash168
 
     def put_utxo(self, tx_hash, idx, txout):
         pk = ScriptPubKey.from_script(txout.pk_script, self.coin)
-        if not pk.hash160:
+        if not pk.hash168:
             return None
 
         pack = struct.pack
         idxb = pack('<H', idx)
         txcb = pack('<I', self.tx_count)
 
-        # First write the hash160 lookup
+        # First write the hash168 lookup
         key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + idxb
-        # b'' avoids this annoyance: https://bugs.python.org/issue13298
-        value = b''.join([pk.hash160, txcb])
+        # b''.join avoids this: https://bugs.python.org/issue13298
+        value = b''.join((pk.hash168, txcb))
         prior_value = self.get(key)
         if prior_value:   # Should almost never happen
             value += prior_value
         self.put(key, value)
 
         # Next write the UTXO
-        key = b'u' + pk.hash160 + tx_hash[:UTXO_TX_HASH_LEN] + idxb
+        key = b'u' + pk.hash168 + tx_hash[:UTXO_TX_HASH_LEN] + idxb
         value = txcb + pack('<Q', txout.value)
         prior_value = self.get(key)
         if prior_value:   # Should almost never happen
             value += prior_value
         self.put(key, value)
 
-        return pk.hash160
+        return pk.hash168
 
     def open_file(self, filename, truncate=False, create=False):
         try:
@@ -420,16 +420,16 @@ class DB(object):
             self.flush()
 
     def process_tx(self, tx_hash, tx):
-        hash160s = set()
+        hash168s = set()
         if not tx.is_coinbase:
             for txin in tx.inputs:
-                hash160s.add(self.spend_utxo(txin.prevout))
+                hash168s.add(self.spend_utxo(txin.prevout))
 
         for idx, txout in enumerate(tx.outputs):
-            hash160s.add(self.put_utxo(tx_hash, idx, txout))
+            hash168s.add(self.put_utxo(tx_hash, idx, txout))
 
-        for hash160 in hash160s:
-            self.history[hash160].append(self.tx_count)
+        for hash168 in hash168s:
+            self.history[hash168].append(self.tx_count)
 
         self.tx_count += 1
 
@@ -458,7 +458,7 @@ class DB(object):
         assert isinstance(limit, int) and limit >= 0
         return limit
 
-    def get_history(self, hash160, limit=1000):
+    def get_history(self, hash168, limit=1000):
         '''Generator that returns an unpruned, sorted list of (tx_hash,
         height) tuples of transactions that touched the address,
         earliest in the blockchain first.  Includes both spending and
@@ -466,7 +466,7 @@ class DB(object):
         Set limit to None to get them all.
         '''
         limit = self.resolve_limit(limit)
-        prefix = b'H' + hash160
+        prefix = b'H' + hash168
         for key, hist in self.db.iterator(prefix=prefix):
             a = array.array('I')
             a.frombytes(hist)
@@ -476,18 +476,18 @@ class DB(object):
                 yield self.get_tx_hash(tx_num)
                 limit -= 1
 
-    def get_balance(self, hash160):
+    def get_balance(self, hash168):
         '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hash160, limit=None))
+        return sum(utxo.value for utxo in self.get_utxos(hash168, limit=None))
 
-    def get_utxos(self, hash160, limit=1000):
+    def get_utxos(self, hash168, limit=1000):
         '''Generator that yields all UTXOs for an address sorted in no
         particular order.  By default yields at most 1000 entries.
         Set limit to None to get them all.
         '''
         limit = self.resolve_limit(limit)
         unpack = struct.unpack
-        prefix = b'u' + hash160
+        prefix = b'u' + hash168
         utxos = []
         for k, v in self.db.iterator(prefix=prefix):
             (tx_pos, ) = unpack('<H', k[-2:])
@@ -501,7 +501,7 @@ class DB(object):
                 yield UTXO(tx_num, tx_pos, tx_hash, height, value)
                 limit -= 1
 
-    def get_utxos_sorted(self, hash160):
+    def get_utxos_sorted(self, hash168):
         '''Returns all the UTXOs for an address sorted by height and
         position in the block.'''
-        return sorted(self.get_utxos(hash160, limit=None))
+        return sorted(self.get_utxos(hash168, limit=None))
