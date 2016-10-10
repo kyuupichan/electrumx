@@ -1,8 +1,9 @@
 # See the file "LICENSE" for information about the copyright
 # and warranty status of this software.
 
-
+import array
 import sys
+from collections import Container, Mapping
 
 
 # Method decorator.  To be used for calculations that will always
@@ -24,6 +25,46 @@ class cachedproperty(object):
         raise AttributeError('cannot set {} on {}'
                              .format(self.f.__name__, obj))
 
+
+def deep_getsizeof(obj):
+    """Find the memory footprint of a Python object.
+
+    Based on from code.tutsplus.com: http://goo.gl/fZ0DXK
+
+    This is a recursive function that drills down a Python object graph
+    like a dictionary holding nested dictionaries with lists of lists
+    and tuples and sets.
+
+    The sys.getsizeof function does a shallow size of only. It counts each
+    object inside a container as pointer only regardless of how big it
+    really is.
+
+    :param o: the object
+
+    :return:
+    """
+
+    ids = set()
+
+    def size(o):
+        if id(o) in ids:
+            return 0
+
+        r = sys.getsizeof(o)
+        ids.add(id(o))
+
+        if isinstance(o, (str, bytes, bytearray, array.array)):
+            return r
+
+        if isinstance(o, Mapping):
+            return r + sum(size(k) + size(v) for k, v in o.items())
+
+        if isinstance(o, Container):
+            return r + sum(size(x) for x in o)
+
+        return r
+
+    return size(obj)
 
 def chunks(items, size):
     for i in range(0, len(items), size):

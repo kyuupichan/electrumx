@@ -137,7 +137,6 @@ class Coin(object):
 
     @classmethod
     def read_block(cls, block):
-        assert isinstance(block, memoryview)
         d = Deserializer(block[cls.HEADER_LEN:])
         return d.read_block()
 

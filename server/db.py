@@ -45,10 +45,10 @@ class UTXOCache(object):
       Key:    TX_HASH + TX_IDX           (32 + 2 = 34 bytes)
       Value:  HASH168 + TX_NUM + VALUE   (21 + 4 + 8 = 33 bytes)
 
-    That's 67 bytes of raw data.  Assume 100 bytes per UTXO accounting
-    for Python datastructure overhead, then perhaps 20 million UTXOs
-    can fit in 2GB of RAM.  There are approximately 42 million UTXOs
-    on bitcoin mainnet at height 433,000.
+    That's 67 bytes of raw data.  Python dictionary overhead means
+    each entry actually uses about 187 bytes of memory.  So almost
+    11.5 million UTXOs can fit in 2GB of RAM.  There are approximately
+    42 million UTXOs on bitcoin mainnet at height 433,000.
 
     Semantics:
 
@@ -80,6 +80,7 @@ class UTXOCache(object):
     tx_num is stored to resolve them.  The collision rate is around
     0.02% for the hash168 table, and almost zero for the UTXO table
     (there are around 100 collisions in the whole bitcoin blockchain).
+
     '''
 
     def __init__(self, parent, db, coin):
@@ -290,6 +291,7 @@ class DB(object):
 
         self.coin = env.coin
         self.flush_MB = env.flush_MB
+        self.next_cache_check = 0
         self.logger.info('flushing after cache reaches {:,d} MB'
                          .format(self.flush_MB))
 
@@ -298,7 +300,7 @@ class DB(object):
         # Unflushed items.  Headers and tx_hashes have one entry per block
         self.headers = []
         self.tx_hashes = []
-        self.history = defaultdict(list)
+        self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
 
         db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
@@ -432,13 +434,12 @@ class DB(object):
         flush_id = struct.pack('>H', self.flush_count)
         for hash168, hist in self.history.items():
             key = b'H' + hash168 + flush_id
-            batch.put(key, array.array('I', hist).tobytes())
+            batch.put(key, hist.tobytes())
 
-        self.logger.info('flushed {:,d} history entries ({:,d} MB)...'
-                         .format(self.history_size,
-                                 self.history_size * 4 // 1048576))
+        self.logger.info('flushed {:,d} history entries in {:,d} addrs...'
+                         .format(self.history_size, len(self.history)))
 
-        self.history = defaultdict(list)
+        self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
 
     def open_file(self, filename, truncate=False, create=False):
@@ -488,20 +489,24 @@ class DB(object):
 
     def cache_MB(self):
         '''Returns the approximate size of the cache, in MB.'''
-        utxo_MB = ((len(self.utxo_cache.cache) + len(self.utxo_cache.db_cache))
-                   * 100 // 1048576)
-        hist_MB = (len(self.history) * 48 + self.history_size * 20) // 1048576
-        if self.height % 200 == 0:
-            self.logger.info('cache size at height {:,d}: '
-                             'UTXOs: {:,d} MB history: {:,d} MB'
-                             .format(self.height, utxo_MB, hist_MB))
-            self.logger.info('cache entries: UTXOs: {:,d}/{:,d} '
-                             'history: {:,d}/{:,d}'
-                             .format(len(self.utxo_cache.cache),
-                                     len(self.utxo_cache.db_cache),
-                                     len(self.history),
-                                     self.history_size))
-        return utxo_MB + hist_MB
+        # Good average estimates
+        utxo_cache_size = len(self.utxo_cache.cache) * 187
+        db_cache_size = len(self.utxo_cache.db_cache) * 105
+        hist_cache_size = len(self.history) * 180 + self.history_size * 4
+        utxo_MB = (db_cache_size + utxo_cache_size) // 1048576
+        hist_MB = hist_cache_size // 1048576
+        cache_MB = utxo_MB + hist_MB
+
+        self.logger.info('cache entries: UTXO: {:,d} DB: {:,d} '
+                         'hist count: {:,d} hist size: {:,d}'
+                         .format(len(self.utxo_cache.cache),
+                                 len(self.utxo_cache.db_cache),
+                                 len(self.history),
+                                 self.history_size))
+        self.logger.info('cache size at height {:,d}: {:,d}MB  '
+                         '(UTXOs {:,d}MB hist {:,d}MB)'
+                         .format(self.height, cache_MB, utxo_MB, hist_MB))
+        return cache_MB
 
     def process_block(self, block):
         self.headers.append(block[:self.coin.HEADER_LEN])
@@ -519,9 +524,12 @@ class DB(object):
         for tx_hash, tx in zip(tx_hashes, txs):
             self.process_tx(tx_hash, tx)
 
-        # Flush if we're getting full
-        if self.cache_MB() > self.flush_MB:
-            self.flush()
+        # Check if we're getting full and time to flush?
+        now = time.time()
+        if now > self.next_cache_check:
+            self.next_cache_check = now + 60
+            if self.cache_MB() > self.flush_MB:
+                self.flush()
 
     def process_tx(self, tx_hash, tx):
         cache = self.utxo_cache
