@@ -507,6 +507,7 @@ class DB(object):
             self.process_tx(tx_hash, tx)
 
         # Flush if we're getting full
+        hist_MB = self.history_size * 4 // 1048576
         if self.utxo_cache.size_MB() + hist_MB > self.flush_MB:
             self.flush()
 
