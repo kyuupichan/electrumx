@@ -323,21 +323,26 @@ class DB(object):
                          .format(self.flush_MB))
 
     def open_db(self, coin):
-        self.headers_file = self.open_file('headers', True)
-        self.txcount_file = self.open_file('txcount', True)
-        is_new = self.headers_file.seek(0, 2) == 0
-        if is_new != (self.txcount_file.seek(0, 2) == 0):
-            raise self.Error('just one metadata file is zero-length')
-
         db_name = '{}-{}'.format(coin.NAME, coin.NET)
-        db = plyvel.DB(db_name, create_if_missing=is_new,
-                       error_if_exists=is_new, compression=None)
+        is_new = False
+        try:
+            db = plyvel.DB(db_name, create_if_missing=False,
+                           error_if_exists=False, compression=None)
+        except:
+            db = plyvel.DB(db_name, create_if_missing=True,
+                           error_if_exists=True, compression=None)
+            is_new = True
+
         if is_new:
             self.logger.info('created new database {}'.format(db_name))
             self.flush_state(db)
         else:
             self.logger.info('successfully opened database {}'.format(db_name))
             self.read_state(db)
+
+        self.headers_file = self.open_file('headers', is_new)
+        self.txcount_file = self.open_file('txcount', is_new)
+
         return db
 
     def flush_state(self, batch):

@@ -125,7 +125,7 @@ class BlockCache(object):
                 return False
 
             # Convert hex string to bytes and put in memoryview
-            blocks = [memoryview(bytes.fromhex(block)) for block in blocks]
+            blocks = [bytes.fromhex(block) for block in blocks]
             # Reverse order and place at front of list
             self.blocks = list(reversed(blocks)) + self.blocks
 
