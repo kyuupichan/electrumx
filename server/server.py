@@ -43,7 +43,7 @@ class BlockCache(object):
         # Cache target size is in MB.  Has little effect on sync time.
         self.cache_limit = 10
         self.daemon_height = 0
-        self.fetched_height = db.db_height
+        self.fetched_height = db.height
         # Blocks stored in reverse order.  Next block is at end of list.
         self.blocks = []
         self.recent_sizes = []
