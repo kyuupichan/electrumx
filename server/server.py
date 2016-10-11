@@ -74,18 +74,7 @@ class BlockCache(object):
         self.logger.info('catching up, block cache limit {:d}MB...'
                          .format(self.cache_limit))
 
-        last_log = 0
-        prior_height = self.db.height
         while await self.maybe_prefill():
-            now = time.time()
-            count = self.fetched_height - prior_height
-            if now > last_log + 15 and count:
-                last_log = now
-                prior_height = self.fetched_height
-                self.logger.info('prefilled {:,d} blocks to height {:,d} '
-                                 'daemon height: {:,d}'
-                                 .format(count, self.fetched_height,
-                                         self.daemon_height))
             await asyncio.sleep(1)
 
         if not self.stop:
