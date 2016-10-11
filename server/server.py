@@ -64,11 +64,11 @@ class BlockCache(object):
         while not self.stop:
             await asyncio.sleep(1)
             while self.blocks:
-                self.db.process_block(self.blocks.pop())
+                self.db.process_block(self.blocks.pop(), self.daemon_height)
                 # Release asynchronous block fetching
                 await asyncio.sleep(0)
 
-        self.db.flush()
+        self.db.flush_all(self.daemon_height)
 
     async def catch_up(self):
         self.logger.info('catching up, block cache limit {:d}MB...'

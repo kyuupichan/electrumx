@@ -26,11 +26,11 @@ UTXO_TX_HASH_LEN = 4
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
 
-def to_4_bytes(value):
-    return struct.pack('<I', value)
+def formatted_time(t):
+    t = int(t)
+    return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
+        t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
 
-def from_4_bytes(b):
-    return struct.unpack('<I', b)[0]
 
 class UTXOCache(object):
     '''An in-memory UTXO cache, representing all changes to UTXO state
@@ -316,9 +316,9 @@ class DB(object):
         # Log state
         self.logger.info('{}/{} height: {:,d} tx count: {:,d} '
                          'flush count: {:,d} sync time: {}'
-                         .format(self.coin.NAME, self.coin.NET,
-                                 self.height, self.tx_count,
-                                 self.flush_count, self.formatted_wall_time()))
+                         .format(self.coin.NAME, self.coin.NET, self.height,
+                                 self.tx_count, self.flush_count,
+                                 formatted_time(self.wall_time)))
         self.logger.info('flushing after cache reaches {:,d} MB'
                          .format(self.flush_MB))
 
@@ -368,13 +368,7 @@ class DB(object):
         self.flush_count = state['flush_count']
         self.wall_time = state['wall_time']
 
-    def formatted_wall_time(self):
-        wall_time = int(self.wall_time)
-        return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
-            wall_time // 86400, (wall_time % 86400) // 3600,
-            (wall_time % 3600) // 60, wall_time % 60)
-
-    def flush_all(self):
+    def flush_all(self, daemon_height):
         '''Flush out all cached state.'''
         flush_start = time.time()
         last_flush = self.last_flush
@@ -404,17 +398,19 @@ class DB(object):
         self.flush_state(self.db)
 
         flush_time = int(self.last_flush - flush_start)
-        self.logger.info('flushed in {:,d}s to height {:,d} tx count {:,d} '
-                         'flush count {:,d}'
-                         .format(flush_time, self.height, self.tx_count,
-                                 self.flush_count))
+        self.logger.info('flush #{:,d} to height {:,d} took {:,d}s'
+                         .format(self.flush_count, self.height, flush_time))
 
+        # Roughly 2500 tx/block at end
         txs_per_sec = int(self.tx_count / self.wall_time)
         this_txs_per_sec = int(tx_diff / (self.last_flush - last_flush))
-        self.logger.info('tx/s since genesis: {:,d} since last flush: {:,d} '
-                         'sync time {}'
-                         .format(txs_per_sec, this_txs_per_sec,
-                                 self.formatted_wall_time()))
+        eta = (daemon_height - self.height) * 2500 / (this_txs_per_sec + 0.01)
+        self.logger.info('txs: {:,d}  tx/sec since genesis: {:,d}, '
+                         'since last flush: {:,d}'
+                         .format(self.tx_count, txs_per_sec, this_txs_per_sec))
+        self.logger.info('sync time: {}  ETA: {}'
+                         .format(formatted_time(self.wall_time),
+                                 formatted_time(eta)))
 
     def flush_to_fs(self):
         '''Flush the things stored on the filesystem.'''
@@ -486,7 +482,7 @@ class DB(object):
             file_pos += size
         self.tx_hashes = []
 
-    def cache_MB(self):
+    def cache_MB(self, daemon_height):
         '''Returns the approximate size of the cache, in MB.'''
         # Good average estimates
         utxo_cache_size = len(self.utxo_cache.cache) * 187
@@ -496,18 +492,19 @@ class DB(object):
         hist_MB = hist_cache_size // 1048576
         cache_MB = utxo_MB + hist_MB
 
-        self.logger.info('cache entries: UTXO: {:,d} DB: {:,d} '
-                         'hist count: {:,d} hist size: {:,d}'
+        self.logger.info('cache stats at height {:,d}  daemon height: {:,d}'
+                         .format(self.height, daemon_height))
+        self.logger.info('  entries: UTXO: {:,d}  DB: {:,d}  '
+                         'hist count: {:,d}  hist size: {:,d}'
                          .format(len(self.utxo_cache.cache),
                                  len(self.utxo_cache.db_cache),
                                  len(self.history),
                                  self.history_size))
-        self.logger.info('cache size at height {:,d}: {:,d}MB  '
-                         '(UTXOs {:,d}MB hist {:,d}MB)'
-                         .format(self.height, cache_MB, utxo_MB, hist_MB))
+        self.logger.info('  size: {:,d}MB  (UTXOs {:,d}MB hist {:,d}MB)'
+                         .format(cache_MB, utxo_MB, hist_MB))
         return cache_MB
 
-    def process_block(self, block):
+    def process_block(self, block, daemon_height):
         self.headers.append(block[:self.coin.HEADER_LEN])
 
         tx_hashes, txs = self.coin.read_block(block)
@@ -527,8 +524,8 @@ class DB(object):
         now = time.time()
         if now > self.next_cache_check:
             self.next_cache_check = now + 60
-            if self.cache_MB() > self.flush_MB:
-                self.flush_all()
+            if self.cache_MB(daemon_height) > self.flush_MB:
+                self.flush_all(daemon_height)
 
     def process_tx(self, tx_hash, tx):
         cache = self.utxo_cache
