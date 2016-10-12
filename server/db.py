@@ -413,7 +413,8 @@ class DB(object):
             tx_est = (daemon_height - self.height) * self.coin.TX_PER_BLOCK
         else:
             tx_est = ((daemon_height - self.coin.TX_COUNT_HEIGHT)
-                      * self.coin.TX_PER_BLOCK + self.coin.TX_COUNT)
+                      * self.coin.TX_PER_BLOCK
+                      + (self.coin.TX_COUNT - self.tx_count))
 
         self.logger.info('txs: {:,d}  tx/sec since genesis: {:,d}, '
                          'since last flush: {:,d}'
