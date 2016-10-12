@@ -379,7 +379,7 @@ class DB(object):
         last_flush = self.last_flush
         tx_diff = self.tx_count - self.db_tx_count
         height_diff = self.height - self.db_height
-        self.logger.info('starting flush {:,d} txs and {:,d} blocks'
+        self.logger.info('flushing cache: {:,d} transactions and {:,d} blocks'
                          .format(tx_diff, height_diff))
 
         # Write out the files to the FS before flushing to the DB.  If
@@ -406,16 +406,21 @@ class DB(object):
         self.logger.info('flush #{:,d} to height {:,d} took {:,d}s'
                          .format(self.flush_count, self.height, flush_time))
 
-        # Roughly 2500 tx/block at end
+        # Log handy stats
         txs_per_sec = int(self.tx_count / self.wall_time)
-        this_txs_per_sec = int(tx_diff / (self.last_flush - last_flush))
-        eta = (daemon_height - self.height) * 2500 / (this_txs_per_sec + 0.01)
+        this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
+        if self.height > self.coin.TX_COUNT_HEIGHT:
+            tx_est = (daemon_height - self.height) * self.coin.TX_PER_BLOCK
+        else:
+            tx_est = ((daemon_height - self.coin.TX_COUNT_HEIGHT)
+                      * self.coin.TX_PER_BLOCK + self.coin.TX_COUNT)
+
         self.logger.info('txs: {:,d}  tx/sec since genesis: {:,d}, '
                          'since last flush: {:,d}'
                          .format(self.tx_count, txs_per_sec, this_txs_per_sec))
         self.logger.info('sync time: {}  ETA: {}'
                          .format(formatted_time(self.wall_time),
-                                 formatted_time(eta)))
+                                 formatted_time(tx_est / this_txs_per_sec)))
 
     def flush_to_fs(self):
         '''Flush the things stored on the filesystem.'''
@@ -479,7 +484,7 @@ class DB(object):
         while cursor < len(hashes):
             file_num, offset = divmod(file_pos, self.tx_hash_file_size)
             size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
-            filename = 'hashes{:05d}'.format(file_num)
+            filename = 'hashes{:04d}'.format(file_num)
             with self.open_file(filename, create=True) as f:
                 f.seek(offset)
                 f.write(hashes[cursor:cursor + size])
@@ -487,7 +492,7 @@ class DB(object):
             file_pos += size
         self.tx_hashes = []
 
-    def cache_MB(self, daemon_height):
+    def cache_size(self, daemon_height):
         '''Returns the approximate size of the cache, in MB.'''
         # Good average estimates
         utxo_cache_size = len(self.utxo_cache.cache) * 187
@@ -529,7 +534,7 @@ class DB(object):
         now = time.time()
         if now > self.next_cache_check:
             self.next_cache_check = now + 60
-            if self.cache_MB(daemon_height) > self.flush_MB:
+            if self.cache_size(daemon_height) > self.flush_MB:
                 self.flush_all(daemon_height)
 
     def process_tx(self, tx_hash, tx):
