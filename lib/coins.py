@@ -156,6 +156,9 @@ class Bitcoin(Coin):
     WIF_BYTE = 0x80
     GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
                   b'4ff763ae46a2a6c172b3f1b60a8ce26f')
+    TX_COUNT = 109611638
+    TX_COUNT_HEIGHT = 398055
+    TX_PER_BLOCK = 2000
 
 class BitcoinTestnet(Coin):
     NAME = "Bitcoin"
