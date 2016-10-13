@@ -285,7 +285,7 @@ class DB(object):
 
         # Meta
         self.tx_hash_file_size = 16 * 1024 * 1024
-        self.flush_MB = env.flush_MB
+        self.cache_MB = env.cache_MB
         self.next_cache_check = 0
         self.last_flush = time.time()
         self.coin = env.coin
@@ -320,7 +320,7 @@ class DB(object):
                                  self.tx_count, self.flush_count,
                                  formatted_time(self.wall_time)))
         self.logger.info('flushing after cache reaches {:,d} MB'
-                         .format(self.flush_MB))
+                         .format(self.cache_MB))
 
     def open_db(self, coin):
         db_name = '{}-{}'.format(coin.NAME, coin.NET)
@@ -379,7 +379,7 @@ class DB(object):
         last_flush = self.last_flush
         tx_diff = self.tx_count - self.db_tx_count
         height_diff = self.height - self.db_height
-        self.logger.info('flushing cache: {:,d} transactions and {:,d} blocks'
+        self.logger.info('starting flush of {:,d} transactions, {:,d} blocks'
                          .format(tx_diff, height_diff))
 
         # Write out the files to the FS before flushing to the DB.  If
@@ -440,7 +440,7 @@ class DB(object):
             key = b'H' + hash168 + flush_id
             batch.put(key, hist.tobytes())
 
-        self.logger.info('flushed {:,d} history entries in {:,d} addrs...'
+        self.logger.info('{:,d} history entries in {:,d} addrs'
                          .format(self.history_size, len(self.history)))
 
         self.history = defaultdict(partial(array.array, 'I'))
@@ -495,12 +495,16 @@ class DB(object):
 
     def cache_size(self, daemon_height):
         '''Returns the approximate size of the cache, in MB.'''
-        # Good average estimates
+        # Good average estimates based on traversal of subobjects and
+        # requesting size from Python (see deep_getsizeof).  For
+        # whatever reason Python O/S mem usage is typically +30% or
+        # more, so we scale our already bloated object sizes.
+        one_MB = int(1048576 / 1.3)
         utxo_cache_size = len(self.utxo_cache.cache) * 187
         db_cache_size = len(self.utxo_cache.db_cache) * 105
         hist_cache_size = len(self.history) * 180 + self.history_size * 4
-        utxo_MB = (db_cache_size + utxo_cache_size) // 1048576
-        hist_MB = hist_cache_size // 1048576
+        utxo_MB = (db_cache_size + utxo_cache_size) // one_MB
+        hist_MB = hist_cache_size // one_MB
         cache_MB = utxo_MB + hist_MB
 
         self.logger.info('cache stats at height {:,d}  daemon height: {:,d}'
@@ -535,7 +539,7 @@ class DB(object):
         now = time.time()
         if now > self.next_cache_check:
             self.next_cache_check = now + 60
-            if self.cache_size(daemon_height) > self.flush_MB:
+            if self.cache_size(daemon_height) > self.cache_MB:
                 self.flush_all(daemon_height)
 
     def process_tx(self, tx_hash, tx):
