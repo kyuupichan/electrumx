@@ -28,6 +28,8 @@ def main_loop():
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(asyncio.gather(*tasks))
+    except asyncio.CancelledError:
+        logging.warning('task cancelled; asyncio event loop closing')
     finally:
         loop.close()
 
