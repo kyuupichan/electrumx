@@ -400,8 +400,9 @@ class DB(object):
             self.logger.info('flushing UTXOs: {:,d} txs and {:,d} blocks'
                              .format(self.tx_count - self.db_tx_count,
                                      self.height - self.db_height))
-
             self.flush_to_fs()
+        else:
+            self.logger.info('commencing history flush')
 
         with self.db.write_batch(transaction=True) as batch:
             if flush_utxos:
