@@ -163,11 +163,11 @@ class BlockCache(object):
                 if not any(errs):
                     return tuple(item['result'] for item in result)
                 if any(err.get('code') == -28 for err in errs):
-                    msg = 'daemon still warming up...'
-                    secs = 10
+                    msg = 'daemon still warming up.'
+                    secs = 30
                 else:
                     msg = 'daemon errors: {}'.format(errs)
-                    secs = 1
+                    secs = 3
 
             self.logger.error('{}.  Sleeping {:d}s and trying again...'
                               .format(msg, secs))
