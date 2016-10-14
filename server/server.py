@@ -79,7 +79,7 @@ class BlockCache(object):
             self.logger.info('caught up to height {:d}'
                              .format(self.daemon_height))
         finally:
-            self.db.flush_all(self.daemon_height)
+            self.db.flush(self.daemon_height, True)
 
     def cache_used(self):
         return sum(len(block) for block in self.blocks)
@@ -163,11 +163,11 @@ class BlockCache(object):
                 if not any(errs):
                     return tuple(item['result'] for item in result)
                 if any(err.get('code') == -28 for err in errs):
-                    msg = 'daemon still warming up...'
-                    secs = 10
+                    msg = 'daemon still warming up.'
+                    secs = 30
                 else:
                     msg = 'daemon errors: {}'.format(errs)
-                    secs = 1
+                    secs = 3
 
             self.logger.error('{}.  Sleeping {:d}s and trying again...'
                               .format(msg, secs))
