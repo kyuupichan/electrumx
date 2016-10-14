@@ -79,7 +79,7 @@ class BlockCache(object):
             self.logger.info('caught up to height {:d}'
                              .format(self.daemon_height))
         finally:
-            self.db.flush_all(self.daemon_height)
+            self.db.flush(self.daemon_height, True)
 
     def cache_used(self):
         return sum(len(block) for block in self.blocks)
