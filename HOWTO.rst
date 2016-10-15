@@ -6,10 +6,10 @@ successfully on MaxOSX and DragonFlyBSD.  It won't run out-of-the-box
 on Windows, but the changes required to make it do so should be
 small - patches welcome.
 
-+ Python3  ElectrumX makes heavy use of asyncio so version >=3.5 is required
-+ plyvel   Python interface to LevelDB.  I am using plyvel-0.9.
-+ aiohttp  Python library for asynchronous HTTP.  ElectrumX uses it for
-           communication with the daemon.  I am using aiohttp-0.21.
++ Python3:  ElectrumX makes heavy use of asyncio so version >=3.5 is required
++ plyvel:   Python interface to LevelDB.  I am using plyvel-0.9.
++ aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
+            communication with the daemon.  I am using aiohttp-0.21.
 
 While not requirements for running ElectrumX, it is intended to be run
 with supervisor software such as Daniel Bernstein's daemontools, or
@@ -22,9 +22,9 @@ for someone used to either.
 When building the database form the genesis block, ElectrumX has to
 flush large quantities of data to disk and to leveldb.  You will have
 a much nicer experience if the database directory is on an SSD than on
-an HDD.  Currently to around height 430,000 of the Bitcoin blockchain
+an HDD.  Currently to around height 434,000 of the Bitcoin blockchain
 the final size of the leveldb database, and other ElectrumX file
-metadata comes to around 15GB.  Leveldb needs a bit more for brief
+metadata comes to just over 17GB.  Leveldb needs a bit more for brief
 periods, and the block chain is only getting longer, so I would
 recommend having at least 30-40GB free space.
 
@@ -137,10 +137,7 @@ rough wall-time::
 
 Machine A: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU, 8GB
 RAM and a DragonFlyBSD HAMMER fileystem on an SSD.  It requests blocks
-over the LAN from a bitcoind on machine B.  FLUSH_SIZE: I changed it
-several times between 1 and 5 million during the sync which causes the
-above stats to be a little approximate.  Initial FLUSH_SIZE was 1
-million and first flush at height 126,538.
+over the LAN from a bitcoind on machine B.
 
 Machine B: a late 2012 iMac running El-Capitan 10.11.6, 2.9GHz
 quad-core Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on
@@ -230,6 +227,6 @@ Flushes can take many minutes and look like this::
 
 After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
-is harmless; I intend to fix this soon by yielding whilst flushing.
+is harmless.
 
 The ETA is just a guide and can be quite volatile.
