@@ -290,11 +290,10 @@ class DB(object):
 
         # Meta
         self.tx_hash_file_size = 16 * 1024 * 1024
-        self.cache_MB = env.cache_MB
+        self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
         self.last_flush = time.time()
-        self.last_flush_tx_count = 0
         self.coin = env.coin
 
         # Chain state (initialize to genesis in case of new DB)
@@ -307,8 +306,8 @@ class DB(object):
 
         # Open DB and metadata files.  Record some of its state.
         self.db = self.open_db(self.coin)
-        self.tx_count = self.db_tx_count
-        self.height = self.db_height
+        self.tx_count = self.fs_tx_count = self.db_tx_count
+        self.height = self.fs_height = self.db_height
 
         # Caches to be flushed later.  Headers and tx_hashes have one
         # entry per block
@@ -318,7 +317,6 @@ class DB(object):
         self.history_size = 0
         self.utxo_cache = UTXOCache(self, self.db, self.coin)
         self.tx_counts = array.array('I')
-
         self.txcount_file.seek(0)
         self.tx_counts.fromfile(self.txcount_file, self.height + 1)
 
@@ -330,8 +328,8 @@ class DB(object):
                                  self.tx_count, self.flush_count,
                                  self.utxo_flush_count,
                                  formatted_time(self.wall_time)))
-        self.logger.info('flushing all after cache reaches {:,d} MB'
-                         .format(self.cache_MB))
+        self.logger.info('flushing UTXO cache at {:,d} MB'
+                         .format(self.utxo_MB))
         self.logger.info('flushing history cache at {:,d} MB'
                          .format(self.hist_MB))
 
@@ -373,8 +371,6 @@ class DB(object):
         self.flush_count = state['flush_count']
         self.utxo_flush_count = state['utxo_flush_count']
         self.wall_time = state['wall_time']
-        self.last_flush_tx_count = self.db_tx_count
-        self.last_flush = time.time()
 
     def delete_excess_history(self, db):
         '''Clear history flushed since the most recent UTXO flush.'''
@@ -403,6 +399,43 @@ class DB(object):
             self.flush_state(batch)
         self.logger.info('deletion complete')
 
+    def flush_to_fs(self):
+        '''Flush the things stored on the filesystem.'''
+        # First the headers
+        headers = b''.join(self.headers)
+        header_len = self.coin.HEADER_LEN
+        self.headers_file.seek((self.fs_height + 1) * header_len)
+        self.headers_file.write(headers)
+        self.headers_file.flush()
+        self.headers = []
+
+        # Then the tx counts
+        self.txcount_file.seek((self.fs_height + 1) * self.tx_counts.itemsize)
+        self.txcount_file.write(self.tx_counts[self.fs_height + 1:
+                                               self.height + 1])
+        self.txcount_file.flush()
+
+        # Finally the hashes
+        hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
+        assert len(hashes) % 32 == 0
+        assert self.tx_hash_file_size % 32 == 0
+        cursor = 0
+        file_pos = self.fs_tx_count * 32
+        while cursor < len(hashes):
+            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
+            filename = 'hashes{:04d}'.format(file_num)
+            with self.open_file(filename, create=True) as f:
+                f.seek(offset)
+                f.write(hashes[cursor:cursor + size])
+            cursor += size
+            file_pos += size
+        self.tx_hashes = []
+
+        self.fs_height = self.height
+        self.fs_tx_count = self.tx_count
+        os.sync()
+
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
         now = time.time()
@@ -419,6 +452,15 @@ class DB(object):
         }
         batch.put(b'state', repr(state).encode('ascii'))
 
+    def flush_utxos(self, batch):
+        self.logger.info('flushing UTXOs: {:,d} txs and {:,d} blocks'
+                         .format(self.tx_count - self.db_tx_count,
+                                 self.height - self.db_height))
+        self.utxo_cache.flush(batch)
+        self.utxo_flush_count = self.flush_count
+        self.db_tx_count = self.tx_count
+        self.db_height = self.height
+
     def flush(self, daemon_height, flush_utxos=False):
         '''Flush out cached state.
 
@@ -426,27 +468,19 @@ class DB(object):
         flush_start = time.time()
         last_flush = self.last_flush
 
-        if flush_utxos:
-            # Write out the files to the FS before flushing to the DB.
-            # If the DB transaction fails, the files being too long
-            # doesn't matter.  But if writing the files fails we do
-            # not want to have updated the DB.  Flush state last as it
-            # reads the wall time.
-            self.logger.info('flushing UTXOs: {:,d} txs and {:,d} blocks'
-                             .format(self.tx_count - self.db_tx_count,
-                                     self.height - self.db_height))
-            self.flush_to_fs()
-        else:
-            self.logger.info('commencing history flush')
+        # Write out the files to the FS before flushing to the DB.  If
+        # the DB transaction fails, the files being too long doesn't
+        # matter.  But if writing the files fails we do not want to
+        # have updated the DB.
+        self.logger.info('commencing history flush')
+        self.flush_to_fs()
 
         with self.db.write_batch(transaction=True) as batch:
-            # History first - fast and frees memory
+            # History first - fast and frees memory.  Flush state last
+            # as it reads the wall time.
             self.flush_history(batch)
             if flush_utxos:
-                self.utxo_cache.flush(batch)
-                self.utxo_flush_count = self.flush_count
-                self.db_tx_count = self.tx_count
-                self.db_height = self.height
+                self.flush_utxos(batch)
             self.flush_state(batch)
             self.logger.info('committing transaction...')
 
@@ -459,8 +493,7 @@ class DB(object):
                          .format(self.flush_count, self.height, flush_time))
 
         # Log handy stats
-        tx_diff = self.tx_count - self.last_flush_tx_count
-        self.last_flush_tx_count = self.tx_count
+        tx_diff = self.tx_count - self.fs_tx_count
         txs_per_sec = int(self.tx_count / self.wall_time)
         this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
         if self.height > self.coin.TX_COUNT_HEIGHT:
@@ -476,13 +509,6 @@ class DB(object):
         self.logger.info('sync time: {}  ETA: {}'
                          .format(formatted_time(self.wall_time),
                                  formatted_time(tx_est / this_txs_per_sec)))
-
-    def flush_to_fs(self):
-        '''Flush the things stored on the filesystem.'''
-        self.write_headers()
-        self.write_tx_counts()
-        self.write_tx_hashes()
-        os.sync()
 
     def flush_history(self, batch):
         # Drop any None entry
@@ -514,39 +540,6 @@ class DB(object):
         self.headers_file.seek(height * header_len)
         return self.headers_file.read(count * header_len)
 
-    def write_headers(self):
-        headers = b''.join(self.headers)
-        header_len = self.coin.HEADER_LEN
-        assert len(headers) % header_len == 0
-        self.headers_file.seek((self.db_height + 1) * header_len)
-        self.headers_file.write(headers)
-        self.headers_file.flush()
-        self.headers = []
-
-    def write_tx_counts(self):
-        self.txcount_file.seek((self.db_height + 1) * self.tx_counts.itemsize)
-        self.txcount_file.write(self.tx_counts[self.db_height + 1:
-                                               self.height + 1])
-        self.txcount_file.flush()
-
-    def write_tx_hashes(self):
-        hash_blob = b''.join(itertools.chain(*self.tx_hashes))
-        assert len(hash_blob) % 32 == 0
-        assert self.tx_hash_file_size % 32 == 0
-        hashes = memoryview(hash_blob)
-        cursor = 0
-        file_pos = self.db_tx_count * 32
-        while cursor < len(hashes):
-            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
-            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
-            filename = 'hashes{:04d}'.format(file_num)
-            with self.open_file(filename, create=True) as f:
-                f.seek(offset)
-                f.write(hashes[cursor:cursor + size])
-            cursor += size
-            file_pos += size
-        self.tx_hashes = []
-
     def cache_sizes(self, daemon_height):
         '''Returns the approximate size of the cache, in MB.'''
         # Good average estimates based on traversal of subobjects and
@@ -559,7 +552,6 @@ class DB(object):
         hist_cache_size = len(self.history) * 180 + self.history_size * 4
         utxo_MB = (db_cache_size + utxo_cache_size) // one_MB
         hist_MB = hist_cache_size // one_MB
-        cache_MB = utxo_MB + hist_MB
 
         self.logger.info('cache stats at height {:,d}  daemon height: {:,d}'
                          .format(self.height, daemon_height))
@@ -570,8 +562,8 @@ class DB(object):
                                  len(self.history),
                                  self.history_size))
         self.logger.info('  size: {:,d}MB  (UTXOs {:,d}MB hist {:,d}MB)'
-                         .format(cache_MB, utxo_MB, hist_MB))
-        return cache_MB, hist_MB
+                         .format(utxo_MB + hist_MB, utxo_MB, hist_MB))
+        return utxo_MB, hist_MB
 
     def process_block(self, block, daemon_height):
         self.headers.append(block[:self.coin.HEADER_LEN])
@@ -593,9 +585,9 @@ class DB(object):
         now = time.time()
         if now > self.next_cache_check:
             self.next_cache_check = now + 60
-            cache_MB, hist_MB = self.cache_sizes(daemon_height)
-            if cache_MB >= self.cache_MB or hist_MB >= self.hist_MB:
-                self.flush(daemon_height, cache_MB >= self.cache_MB)
+            utxo_MB, hist_MB = self.cache_sizes(daemon_height)
+            if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
+                self.flush(daemon_height, utxo_MB >= self.utxo_MB)
 
     def process_tx(self, tx_hash, tx):
         cache = self.utxo_cache
@@ -618,8 +610,8 @@ class DB(object):
         height = bisect_right(self.tx_counts, tx_num)
 
         # Is this on disk or unflushed?
-        if height > self.db_height:
-            tx_hashes = self.tx_hashes[height - (self.db_height + 1)]
+        if height > self.fs_height:
+            tx_hashes = self.tx_hashes[height - (self.fs_height + 1)]
             tx_hash = tx_hashes[tx_num - self.tx_counts[height - 1]]
         else:
             file_pos = tx_num * 32
