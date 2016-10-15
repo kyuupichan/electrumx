@@ -11,5 +11,28 @@ connecting to the daemon, or you must specify RPC_HOST, RPC_USER,
 RPC_PASSWORD and optionally RPC_PORT (it defaults appropriately for
 the coin and network otherwise).
 
-The other environment variables are all optional and will adopt sensible defaults if not
-specified.
+The other environment variables are all optional and will adopt
+sensible defaults if not specified.
+
+Your performance might change by tweaking these cache settings.  Cache
+size is only checked roughly every minute, so the caches can grow
+beyond the specified size.  Also the Python process is often quite a
+bit bigger than the combine cache size, because of Python overhead and
+also because leveldb can consume quite a lot of memory during UTXO
+flushing.  So these are rough numbers only:
+
+HIST_MB - amount of history cache, in MB, to retain before flushing to
+          disk.  Default is 250; probably no benefit being much larger
+          as history is append-only and not searched.
+
+CACHE_MB- amount of UTXO and history cache, in MB, to retain before
+          flushing to disk.  Default is 1000.  This may be too large
+          for small boxes or too small for machines with lots of RAM.
+          Larger caches generally perform better as there is
+          significant searching of the UTXO cache during indexing.
+          However, I don't see much benefit in my tests pushing this
+          beyond 2000, and in fact beyond there performance begins to
+          fall.  My machine has 24GB RAM; the slow down is probably
+          because of leveldb caching and Python GC effects.  However
+          this may be very dependent on hardware and you may have
+          different results.
