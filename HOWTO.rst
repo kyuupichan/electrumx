@@ -144,8 +144,7 @@ million and first flush at height 126,538.
 
 Machine B: a late 2012 iMac running El-Capitan 10.11.6, 2.9GHz
 quad-core Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on
-the same machine.  FLUSH_SIZE of 10 million.  First flush at height
-195,146.
+the same machine.  HIST_MB of 400, CACHE_MB of 2,000.
 
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
