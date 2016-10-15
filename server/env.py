@@ -20,7 +20,7 @@ class Env(object):
         network = self.default('NETWORK', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.db_dir = self.required('DB_DIRECTORY')
-        self.cache_MB = self.integer('CACHE_MB', 1000)
+        self.utxo_MB = self.integer('UTXO_MB', 1000)
         self.hist_MB = self.integer('HIST_MB', 250)
         self.rpc_url = self.build_rpc_url()
 
