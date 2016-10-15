@@ -2,16 +2,13 @@
 # and warranty status of this software.
 
 import asyncio
-import json
 import logging
-import os
 import signal
 import time
 from functools import partial
 
-import aiohttp
-
 from server.db import DB
+from server.rpc import ElectrumRPCServer
 
 
 class Server(object):
@@ -20,15 +17,39 @@ class Server(object):
         self.env = env
         self.db = DB(env)
         self.block_cache = BlockCache(env, self.db)
-        self.tasks = [
-            asyncio.ensure_future(self.block_cache.catch_up()),
-            asyncio.ensure_future(self.block_cache.process_cache()),
-        ]
+        self.rpc_server = ElectrumRPCServer(self)
 
+        # Signal handlers
         loop = asyncio.get_event_loop()
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
                                     partial(self.on_signal, signame))
+
+        coros = self.rpc_server.tasks(env.electrumx_rpc_port)
+        coros += [self.block_cache.catch_up(),
+                  self.block_cache.process_cache()]
+        self.tasks = [asyncio.ensure_future(coro) for coro in coros]
+
+    async def handle_rpc_getinfo(self, params):
+        return None, {
+            'blocks': self.db.height,
+            'peers': 0,
+            'sessions': 0,
+            'watched': 0,
+            'cached': 0,
+        }
+
+    async def handle_rpc_sessions(self, params):
+        return None, []
+
+    async def handle_rpc_numsessions(self, params):
+        return None, 0
+
+    async def handle_rpc_peers(self, params):
+        return None, []
+
+    async def handle_rpc_banner_update(self, params):
+        return None, 'FIXME'
 
     def on_signal(self, signame):
         logging.warning('received {} signal, preparing to shut down'
@@ -150,8 +171,7 @@ class BlockCache(object):
         data = json.dumps(payload)
         while True:
             try:
-                async with aiohttp.request('POST', self.rpc_url,
-                                           data = data)  as resp:
+                async with aiohttp.post(self.rpc_url, data = data) as resp:
                     result = await resp.json()
             except asyncio.CancelledError:
                 raise

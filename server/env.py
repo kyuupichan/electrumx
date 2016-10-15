@@ -22,6 +22,7 @@ class Env(object):
         self.db_dir = self.required('DB_DIRECTORY')
         self.utxo_MB = self.integer('UTXO_MB', 1000)
         self.hist_MB = self.integer('HIST_MB', 250)
+        self.electrumx_rpc_port = self.integer('ELECTRUMX_RPC_PORT', 8000)
         self.rpc_url = self.build_rpc_url()
 
     def default(self, envvar, default):
