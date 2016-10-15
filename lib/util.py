@@ -29,7 +29,7 @@ class cachedproperty(object):
 def deep_getsizeof(obj):
     """Find the memory footprint of a Python object.
 
-    Based on from code.tutsplus.com: http://goo.gl/fZ0DXK
+    Based on code from code.tutsplus.com: http://goo.gl/fZ0DXK
 
     This is a recursive function that drills down a Python object graph
     like a dictionary holding nested dictionaries with lists of lists
@@ -38,10 +38,6 @@ def deep_getsizeof(obj):
     The sys.getsizeof function does a shallow size of only. It counts each
     object inside a container as pointer only regardless of how big it
     really is.
-
-    :param o: the object
-
-    :return:
     """
 
     ids = set()
@@ -65,6 +61,7 @@ def deep_getsizeof(obj):
         return r
 
     return size(obj)
+
 
 def chunks(items, size):
     for i in range(0, len(items), size):

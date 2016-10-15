@@ -467,6 +467,7 @@ class DB(object):
         History is always flushed.  UTXOs are flushed if flush_utxos.'''
         flush_start = time.time()
         last_flush = self.last_flush
+        tx_diff = self.tx_count - self.fs_tx_count
 
         # Write out the files to the FS before flushing to the DB.  If
         # the DB transaction fails, the files being too long doesn't
@@ -493,7 +494,6 @@ class DB(object):
                          .format(self.flush_count, self.height, flush_time))
 
         # Log handy stats
-        tx_diff = self.tx_count - self.fs_tx_count
         txs_per_sec = int(self.tx_count / self.wall_time)
         this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
         if self.height > self.coin.TX_COUNT_HEIGHT:
