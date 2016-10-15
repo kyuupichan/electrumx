@@ -107,8 +107,8 @@ You can see its logs with::
     tail -F /path/to/log/dir/current | tai64nlocal
 
 
-Progress
-========
+Sync Progress
+=============
 
 Speed indexing the blockchain depends on your hardware of course.  As
 Python is single-threaded most of the time only 1 core is kept busy.
@@ -120,30 +120,20 @@ may even be beneficial to have the daemon on a separate machine so the
 machine doing the indexing is focussing on the one task and not the
 wider network.
 
-The FLUSH_SIZE environment variable is an upper bound on how much
-unflushed data is cached before writing to disk + leveldb.  The
-default is 4 million items, which is probably fine unless your
-hardware is quite poor.  If you've got a really fat machine with lots
-of RAM, 10 million or even higher is likely good (I used 10 million on
-Machine B below without issue so far).  A higher number will have
-fewer flushes and save your disk thrashing, but you don't want it so
-high your machine is swapping.  If your machine loses power all
-synchronization since the previous flush is lost.
+The HIST_MB and CACHE_MB environment variables control cache sizes
+before they spill to disk; see the NOTES file under samples/scripts.
 
-When syncing, ElectrumX is CPU bound over 70% of the time, with the
-rest being bursts of disk activity whilst flushing.  Here is my
-experience with the current codebase, to given heights and rough
-wall-time::
+Here is my experience with the current codebase, to given heights and
+rough wall-time::
 
                  Machine A     Machine B    DB + Metadata
-  100,000        2m            30s          0  (unflushed)
-  150,000        35m           4m 30s       0.2 GiB
-  180,000        1h 5m         9m           0.4 GiB
-  245,800        3h            1h 30m       2.7 GiB
-  290,000        13h 15m       3h 5m        3.3 GiB
-  307,000        17h 16m       3h 50m       4.1 GiB
-  343,000                      6h 54m       6.0 GiB
-  386,600                      17h 07m      7.0 GiB
+  180,000                       7m 10s       0.4 GiB
+  245,800                       1h 00m       2.7 GiB
+  290,000                       1h 56m       3.3 GiB
+  343,000                       3h 56m       6.0 GiB
+  386,000                       7h 28m       7.0 GiB
+  404,000                       9h 41m
+  434,369                      14h 38m      17.1 GiB
 
 Machine A: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU, 8GB
 RAM and a DragonFlyBSD HAMMER fileystem on an SSD.  It requests blocks
@@ -156,10 +146,6 @@ Machine B: a late 2012 iMac running El-Capitan 10.11.6, 2.9GHz
 quad-core Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on
 the same machine.  FLUSH_SIZE of 10 million.  First flush at height
 195,146.
-
-Transactions processed per second seems to gradually decrease over
-time but this statistic is not currently logged and I've not looked
-closely.
 
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
@@ -184,19 +170,11 @@ with the intent that, to the extent this atomicity guarantee holds,
 the database should not get corrupted even if the ElectrumX process if
 forcibly killed or there is loss of power.  The worst case is losing
 unflushed in-memory blockchain processing and having to restart from
-the state as of the prior successfully completed flush.
+the state as of the prior successfully completed UTXO flush.
 
-During development I have terminated ElectrumX processes in various
-ways and at random times, and not once have I had any corruption as a
-result of doing so.  Mmy only DB corruption has been through buggy
-code.  If you do have any database corruption as a result of
-terminating the process without modifying the code I would be very
-interested in hearing details.
-
-I have heard about corruption issues with electrum-server.  I cannot
-be sure but with a brief look at the code it does seem that if
-interrupted at the wrong time the databases it uses could become
-inconsistent.
+If you do have any database corruption as a result of terminating the
+process (without modifying the code) I would be interested in the
+details.
 
 Once the process has terminated, you can start it up again with::
 
@@ -211,7 +189,6 @@ same service directory, such as a testnet or altcoin server.  See the
 man pages of these various commands for more information.
 
 
-
 Understanding the Logs
 ======================
 
@@ -221,49 +198,38 @@ You can see the logs usefully like so::
 
 Here is typical log output on startup::
 
-  2016-10-08 14:46:48.088516500 Launching ElectrumX server...
-  2016-10-08 14:46:49.145281500 INFO:root:ElectrumX server starting
-  2016-10-08 14:46:49.147215500 INFO:root:switching current directory to /var/nohist/server-test
-  2016-10-08 14:46:49.150765500 INFO:DB:using flush size of 1,000,000 entries
-  2016-10-08 14:46:49.156489500 INFO:DB:created new database Bitcoin-mainnet
-  2016-10-08 14:46:49.157531500 INFO:DB:flushing to levelDB 0 txs and 0 blocks to height -1 tx count: 0
-  2016-10-08 14:46:49.158640500 INFO:DB:flushed. Cache hits: 0/0 writes: 5 deletes: 0 elided: 0 sync: 0d 00h 00m 00s
-  2016-10-08 14:46:49.159508500 INFO:RPC:using RPC URL http://user:pass@192.168.0.2:8332/
-  2016-10-08 14:46:49.167352500 INFO:BlockCache:catching up, block cache limit 10MB...
-  2016-10-08 14:46:49.318374500 INFO:BlockCache:prefilled 10 blocks to height 10 daemon height: 433,401 block cache size: 2,150
-  2016-10-08 14:46:50.193962500 INFO:BlockCache:prefilled 4,000 blocks to height 4,010 daemon height: 433,401 block cache size: 900,043
-  2016-10-08 14:46:51.253644500 INFO:BlockCache:prefilled 4,000 blocks to height 8,010 daemon height: 433,401 block cache size: 1,600,613
-  2016-10-08 14:46:52.195633500 INFO:BlockCache:prefilled 4,000 blocks to height 12,010 daemon height: 433,401 block cache size: 2,329,325
+  2016-10-14 20:22:10.747808500 Launching ElectrumX server...
+  2016-10-14 20:22:13.032415500 INFO:root:ElectrumX server starting
+  2016-10-14 20:22:13.032633500 INFO:root:switching current directory to /Users/neil/server-btc
+  2016-10-14 20:22:13.038495500 INFO:DB:created new database Bitcoin-mainnet
+  2016-10-14 20:22:13.038892500 INFO:DB:Bitcoin/mainnet height: -1 tx count: 0 flush count: 0 utxo flush count: 0 sync time: 0d 00h 00m 00s
+  2016-10-14 20:22:13.038935500 INFO:DB:flushing all after cache reaches 2,000 MB
+  2016-10-14 20:22:13.038978500 INFO:DB:flushing history cache at 400 MB
+  2016-10-14 20:22:13.039076500 INFO:BlockCache:using RPC URL http://user:password@192.168.0.2:8332/
+  2016-10-14 20:22:13.039796500 INFO:BlockCache:catching up, block cache limit 10MB...
+  2016-10-14 20:22:14.092192500 INFO:DB:cache stats at height 0  daemon height: 434,293
+  2016-10-14 20:22:14.092243500 INFO:DB:  entries: UTXO: 1  DB: 0  hist count: 1  hist size: 1
+  2016-10-14 20:22:14.092288500 INFO:DB:  size: 0MB  (UTXOs 0MB hist 0MB)
+  2016-10-14 20:22:32.302394500 INFO:UTXO:duplicate tx hash d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599
+  2016-10-14 20:22:32.310441500 INFO:UTXO:duplicate tx hash e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468
+  2016-10-14 20:23:14.094855500 INFO:DB:cache stats at height 125,278  daemon height: 434,293
+  2016-10-14 20:23:14.095026500 INFO:DB:  entries: UTXO: 191,155  DB: 0  hist count: 543,455  hist size: 1,394,187
+  2016-10-14 20:23:14.095028500 INFO:DB:  size: 172MB  (UTXOs 44MB hist 128MB)
 
-Under normal operation these prefill messages repeat fairly regularly.
-Occasionally (depending on how big your FLUSH_SIZE environment
-variable was set, and your hardware, this could be anything from every
-5 minutes to every hour) you will get a flush to disk that begins with:
+Under normal operation these cache stats repeat roughly every minute.
+Flushes can take many minutes and look like this::
 
-    2016-10-08 06:34:20.841563500 INFO:DB:flushing to levelDB 828,190 txs and 3,067 blocks to height 243,982 tx count: 20,119,669
-
-During the flush, which can take many minutes, you may see logs like
-this:
-
-    2016-10-08 12:20:08.558750500 INFO:DB:address 1dice7W2AicHosf5EL3GFDUVga7TgtPFn hist moving to idx 3000
-
-These are just informational messages about addresses that have very
-large histories that are generated as those histories are being
-written out.  After the flush has completed a few stats are printed
-about cache hits, the number of writes and deletes, and the number of
-writes that were elided by the cache::
-
-    2016-10-08 06:37:41.035139500 INFO:DB:flushed. Cache hits: 3,185,958/192,336 writes: 781,526 deletes: 465,236 elided: 3,185,958 sync: 0d 06h 57m 03s
+  2016-10-14 21:30:29.085479500 INFO:DB:flushing UTXOs: 22,910,848 txs and 254,753 blocks
+  2016-10-14 21:32:05.383413500 INFO:UTXO:UTXO cache adds: 55,647,862 spends: 48,751,219
+  2016-10-14 21:32:05.383460500 INFO:UTXO:UTXO DB adds: 6,875,315 spends: 0. Collisions: hash168: 268 UTXO: 0
+  2016-10-14 21:32:07.056008500 INFO:DB:6,982,386 history entries in 1,708,991 addrs
+  2016-10-14 21:32:08.169468500 INFO:DB:committing transaction...
+  2016-10-14 21:33:17.644296500 INFO:DB:flush #11 to height 254,752 took 168s
+  2016-10-14 21:33:17.644357500 INFO:DB:txs: 22,910,848  tx/sec since genesis: 5,372, since last flush: 3,447
+  2016-10-14 21:33:17.644536500 INFO:DB:sync time: 0d 01h 11m 04s  ETA: 0d 11h 22m 42s
 
 After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
 is harmless; I intend to fix this soon by yielding whilst flushing.
 
-You may see one or two logs about UTXOs or hash160 key collisions::
-
-    2016-10-08 07:24:34.068609500 INFO:DB:UTXO compressed key collision at height 252943 utxo 115cc1408e5321636675a8fcecd204661a6f27b4b7482b1b7c4402ca4b94b72f / 1
-
-These are informational messages about an artefact of the compression
-scheme ElectrumX uses and are harmless.  However, if you see more than
-a handful of these, particularly close together, something is very
-wrong and your DB is probably corrupt.
+The ETA is just a guide and can be quite volatile.

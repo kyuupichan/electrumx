@@ -41,11 +41,12 @@ Implementation
 
 ElectrumX does not currently do any pruning.  With luck it may never
 become necessary.  So how does it achieve a much more compact database
-than Electrum server, which throws away a lot of information?  And
-sync faster to boot?
+than Electrum server, which prunes a lot of hisory, and also sync
+faster?
 
 All of the following likely play a part:
 
+- aggressive caching and batching of DB writes
 - more compact representation of UTXOs, the mp address index, and
   history.  Electrum server stores full transaction hash and height
   for all UTXOs.  In its pruned history it does the same.  ElectrumX
@@ -58,32 +59,22 @@ All of the following likely play a part:
   disk rather than in levelDB.  It would be nice to do this for histories
   but I cannot think how they could be easily indexable on a filesystem.
 - avoiding unnecessary or redundant computations
-- more efficient memory usage - through more compact data structures and
-  and judicious use of memoryviews
-- big caches (controlled via FLUSH_SIZE)
+- more efficient memory usage
 - asyncio and asynchronous prefetch of blocks.  With luck ElectrumX
   will have no need of threads or locking primitives
 - because it prunes electrum-server needs to store undo information,
   ElectrumX should does not need to store undo information for
   blockchain reorganisations (note blockchain reorgs are not yet
   implemented in ElectrumX)
-- finally electrum-server maintains a patricia tree of UTXOs.  My
-  understanding is this is for future features and not currently
-  required.  It's unclear precisely how this will be used or what
-  could replace or duplicate its functionality in ElectrumX.  Since
-  ElectrumX stores all necessary blockchain metadata some solution
-  should exist.
 
 
-Future/TODO
-===========
+Roadmap
+=======
 
-- handling blockchain reorgs
-- handling client connections (heh!)
-- investigating leveldb space / speed tradeoffs
-- seeking out further efficiencies.  ElectrumX is CPU bound; it would not
-  surprise me if there is a way to cut CPU load by 10-20% more.  To squeeze
-  even more out would probably require some things to move to C or C++.
+- test a few more performance improvement ideas
+- handle blockchain reorgs
+- handle client connections
+- potentially move some functionality to C or C++
 
 Once I get round to writing the server part, I will add DoS
 protections if necessary to defend against requests for large

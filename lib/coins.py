@@ -137,7 +137,6 @@ class Coin(object):
 
     @classmethod
     def read_block(cls, block):
-        assert isinstance(block, memoryview)
         d = Deserializer(block[cls.HEADER_LEN:])
         return d.read_block()
 
@@ -157,6 +156,9 @@ class Bitcoin(Coin):
     WIF_BYTE = 0x80
     GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
                   b'4ff763ae46a2a6c172b3f1b60a8ce26f')
+    TX_COUNT = 142791895
+    TX_COUNT_HEIGHT = 420976
+    TX_PER_BLOCK = 1600
 
 class BitcoinTestnet(Coin):
     NAME = "Bitcoin"
