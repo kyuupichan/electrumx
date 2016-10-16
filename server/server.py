@@ -2,10 +2,12 @@
 # and warranty status of this software.
 
 import asyncio
+import json
 import logging
 import signal
-import time
 from functools import partial
+
+import aiohttp
 
 from server.db import DB
 from server.rpc import ElectrumRPCServer
