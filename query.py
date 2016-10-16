@@ -8,6 +8,7 @@ import sys
 
 from server.env import Env
 from server.db import DB
+from lib.hash import hash_to_str
 
 
 def main():
@@ -27,13 +28,13 @@ def main():
         n = None
         for n, (tx_hash, height) in enumerate(db.get_history(hash168, limit)):
             print('History #{:d}: hash: {} height: {:d}'
-                  .format(n + 1, bytes(reversed(tx_hash)).hex(), height))
+                  .format(n + 1, hash_to_str(tx_hash), height))
         if n is None:
             print('No history')
         n = None
         for n, utxo in enumerate(db.get_utxos(hash168, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
-                  .format(n + 1, bytes(reversed(utxo.tx_hash)).hex(),
+                  .format(n + 1, hash_to_str(utxo.tx_hash),
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')

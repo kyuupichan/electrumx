@@ -3,76 +3,134 @@
 
 import asyncio
 import json
-import logging
 import signal
+import traceback
 from functools import partial
 
 import aiohttp
 
 from server.db import DB
-from server.rpc import ElectrumRPCServer
+from server.protocol import ElectrumX, LocalRPC
+from lib.hash import sha256, hash_to_str, Base58
+from lib.util import LoggedClass
 
 
-class Server(object):
+class Controller(LoggedClass):
 
     def __init__(self, env):
+        super().__init__()
         self.env = env
         self.db = DB(env)
         self.block_cache = BlockCache(env, self.db)
-        self.rpc_server = ElectrumRPCServer(self)
+        self.servers = []
+        self.sessions = set()
+        self.addresses = {}
+        self.jobs = set()
+        self.peers = {}
+
+    def start(self, loop):
+        env = self.env
+
+        protocol = partial(LocalRPC, self)
+        if env.rpc_port is not None:
+            host = 'localhost'
+            rpc_server = loop.create_server(protocol, host, env.rpc_port)
+            self.servers.append(loop.run_until_complete(rpc_server))
+            self.logger.info('RPC server listening on {}:{:d}'
+                             .format(host, env.rpc_port))
+
+        protocol = partial(ElectrumX, self, env)
+        if env.tcp_port is not None:
+            tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
+            self.servers.append(loop.run_until_complete(tcp_server))
+            self.logger.info('TCP server listening on {}:{:d}'
+                             .format(env.host, env.tcp_port))
+
+        if env.ssl_port is not None:
+            ssl_server = loop.create_server(protocol, env.host, env.ssl_port)
+            self.servers.append(loop.run_until_complete(ssl_server))
+            self.logger.info('SSL server listening on {}:{:d}'
+                             .format(env.host, env.ssl_port))
+
+        coros = [
+            self.reap_jobs(),
+            self.block_cache.catch_up(),
+            self.block_cache.process_cache()
+        ]
+
+        self.tasks = [asyncio.ensure_future(coro) for coro in coros]
 
         # Signal handlers
-        loop = asyncio.get_event_loop()
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
                                     partial(self.on_signal, signame))
 
-        coros = self.rpc_server.tasks(env.electrumx_rpc_port)
-        coros += [self.block_cache.catch_up(),
-                  self.block_cache.process_cache()]
-        self.tasks = [asyncio.ensure_future(coro) for coro in coros]
+        return self.tasks
 
-    async def handle_rpc_getinfo(self, params):
-        return None, {
-            'blocks': self.db.height,
-            'peers': 0,
-            'sessions': 0,
-            'watched': 0,
-            'cached': 0,
-        }
+    def stop(self):
+        for server in self.servers:
+            server.close()
 
-    async def handle_rpc_sessions(self, params):
-        return None, []
+    def add_session(self, session):
+        self.sessions.add(session)
 
-    async def handle_rpc_numsessions(self, params):
-        return None, 0
+    def remove_session(self, session):
+        self.sessions.remove(session)
 
-    async def handle_rpc_peers(self, params):
-        return None, []
+    def add_job(self, coro):
+        '''Queue a job for asynchronous processing.'''
+        self.jobs.add(asyncio.ensure_future(coro))
 
-    async def handle_rpc_banner_update(self, params):
-        return None, 'FIXME'
+    async def reap_jobs(self):
+        while True:
+            jobs = set()
+            for job in self.jobs:
+                if job.done():
+                    try:
+                        job.result()
+                    except Exception as e:
+                        traceback.print_exc()
+                else:
+                    jobs.add(job)
+            self.logger.info('reaped {:d} jobs, {:d} jobs pending'
+                             .format(len(self.jobs) - len(jobs), len(jobs)))
+            self.jobs = jobs
+            await asyncio.sleep(5)
 
     def on_signal(self, signame):
-        logging.warning('received {} signal, preparing to shut down'
-                        .format(signame))
+        self.logger.warning('received {} signal, preparing to shut down'
+                            .format(signame))
         for task in self.tasks:
             task.cancel()
 
-    def async_tasks(self):
-        return self.tasks
+    def address_status(self, hash168):
+        '''Returns status as 32 bytes.'''
+        status = self.addresses.get(hash168)
+        if status is None:
+            status = ''.join(
+                '{}:{:d}:'.format(hash_to_str(tx_hash), height)
+                for tx_hash, height in self.db.get_history(hash168)
+            )
+            if status:
+                status = sha256(status.encode())
+            self.addresses[hash168] = status
+
+        return status
+
+    def get_peers(self):
+        '''Returns a dictionary of IRC nick to (ip, host, ports) tuples, one
+        per peer.'''
+        return self.peers
 
 
-class BlockCache(object):
+class BlockCache(LoggedClass):
     '''Requests blocks ahead of time from the daemon.  Serves them
     to the blockchain processor.'''
 
     def __init__(self, env, db):
-        self.logger = logging.getLogger('BlockCache')
-        self.logger.setLevel(logging.INFO)
-
+        super().__init__()
         self.db = db
-        self.rpc_url = env.rpc_url
+        self.daemon_url = env.daemon_url
         # Cache target size is in MB.  Has little effect on sync time.
         self.cache_limit = 10
         self.daemon_height = 0
@@ -82,7 +140,7 @@ class BlockCache(object):
         self.recent_sizes = []
         self.ave_size = 0
 
-        self.logger.info('using RPC URL {}'.format(self.rpc_url))
+        self.logger.info('using daemon URL {}'.format(self.daemon_url))
 
     async def process_cache(self):
         while True:
@@ -173,7 +231,7 @@ class BlockCache(object):
         data = json.dumps(payload)
         while True:
             try:
-                async with aiohttp.post(self.rpc_url, data = data) as resp:
+                async with aiohttp.post(self.daemon_url, data = data) as resp:
                     result = await resp.json()
             except asyncio.CancelledError:
                 raise

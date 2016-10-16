@@ -6,16 +6,29 @@
 import argparse
 import asyncio
 import json
+from functools import partial
 from os import environ
 
-import aiohttp
 
+class RPCClient(asyncio.Protocol):
 
-async def send(url, payload):
-    data = json.dumps(payload)
+    def __init__(self, loop):
+        self.loop = loop
 
-    async with aiohttp.post(url, data = data) as resp:
-        return await resp.json()
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def connection_lost(self, exc):
+        self.loop.stop()
+
+    def send(self, payload):
+        data = json.dumps(payload) + '\n'
+        self.transport.write(data.encode())
+
+    def data_received(self, data):
+        payload = json.loads(data.decode())
+        self.transport.close()
+        print(json.dumps(payload, indent=4, sort_keys=True))
 
 
 def main():
@@ -30,17 +43,19 @@ def main():
     if args.port is None:
         args.port = int(environ.get('ELECTRUMX_RPC_PORT', 8000))
 
-    url = 'http://127.0.0.1:{:d}/'.format(args.port)
     payload = {'method': args.command[0], 'params': args.command[1:]}
-    task = send(url, payload)
 
     loop = asyncio.get_event_loop()
+    proto_factory = partial(RPCClient, loop)
+    coro = loop.create_connection(proto_factory, 'localhost', args.port)
     try:
-        result = loop.run_until_complete(task)
+        transport, protocol = loop.run_until_complete(coro)
+        protocol.send(payload)
+        loop.run_forever()
+    except OSError:
+        print('error connecting - is ElectrumX running?')
     finally:
         loop.close()
-
-    print(result)
 
 
 if __name__ == '__main__':
