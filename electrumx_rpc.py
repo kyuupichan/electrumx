@@ -20,11 +20,11 @@ async def send(url, payload):
 
 def main():
     '''Send the RPC command to the server and print the result.'''
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--port', metavar='port_num', type=int,
-                        help='specify the RPC port number')
+    parser = argparse.ArgumentParser('Send electrumx an RPC command' )
+    parser.add_argument('-p', '--port', metavar='port_num', type=int,
+                        help='RPC port number')
     parser.add_argument('command', nargs='*', default=[],
-                        help='send a command to the server')
+                        help='command to send')
     args = parser.parse_args()
 
     if args.port is None:
