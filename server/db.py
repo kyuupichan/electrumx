@@ -128,9 +128,7 @@ class UTXOCache(object):
             #    self.logger.info('duplicate tx hash {}'
             #                     .format(bytes(reversed(tx_hash)).hex()))
 
-            # b''.join avoids this: https://bugs.python.org/issue13298
-            self.cache[key] = b''.join(
-                (hash168, tx_numb, pack('<Q', txout.value)))
+            self.cache[key] = hash168 + tx_numb + pack('<Q', txout.value)
 
         return hash168s
 
@@ -141,7 +139,7 @@ class UTXOCache(object):
         '''
         # Fast track is it's in the cache
         pack = struct.pack
-        key = b''.join((prevout.hash, pack('<H', prevout.n)))
+        key = prevout.hash + pack('<H', prevout.n)
         value = self.cache.pop(key, None)
         if value:
             self.cache_hits += 1

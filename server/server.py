@@ -136,7 +136,7 @@ class BlockCache(object):
             blocks = await self.send_vector('getblock', param_lists)
             self.fetched_height += count
 
-            # Convert hex string to bytes and put in memoryview
+            # Convert hex string to bytes
             blocks = [bytes.fromhex(block) for block in blocks]
             # Reverse order and place at front of list
             self.blocks = list(reversed(blocks)) + self.blocks
