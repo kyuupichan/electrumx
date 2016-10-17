@@ -148,6 +148,20 @@ class ElectrumX(JSONRPC):
         net_info = await self.BC.send_single('getnetworkinfo')
         return net_info['relayfee']
 
+    async def handle_blockchain_transaction_get(self, params):
+        if len(params) != 1:
+            raise Error(Error.BAD_REQUEST,
+                        'params should contain a transaction hash')
+        tx_hash = params[0]
+        return await self.BC.send_single('getrawtransaction', (tx_hash, 0))
+
+    async def handle_blockchain_transaction_get_merkle(self, params):
+        if len(params) != 2:
+            raise Error(Error.BAD_REQUEST,
+                        'params should contain a transaction hash and height')
+        tx_hash, height = params
+        return await self.controller.get_merkle(tx_hash, height)
+
     async def handle_server_banner(self, params):
         '''Return the server banner.'''
         banner = 'Welcome to Electrum!'

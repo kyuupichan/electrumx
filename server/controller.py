@@ -11,7 +11,8 @@ import aiohttp
 
 from server.db import DB
 from server.protocol import ElectrumX, LocalRPC
-from lib.hash import sha256, hash_to_str, Base58
+from lib.hash import (sha256, double_sha256, hash_to_str,
+                      Base58, hex_str_to_hash)
 from lib.util import LoggedClass
 
 
@@ -116,6 +117,29 @@ class Controller(LoggedClass):
 
         return status
 
+    async def get_merkle(self, tx_hash, height):
+        '''tx_hash is a hex string.'''
+        daemon_send = self.block_cache.send_single
+        block_hash = await daemon_send('getblockhash', (height,))
+        block = await daemon_send('getblock', (block_hash, True))
+        tx_hashes = block['tx']
+        # This will throw if the tx_hash is bad
+        pos = tx_hashes.index(tx_hash)
+
+        idx = pos
+        hashes = [hex_str_to_hash(txh) for txh in tx_hashes]
+        merkle_branch = []
+        while len(hashes) > 1:
+            if len(hashes) & 1:
+                hashes.append(hashes[-1])
+            idx = idx - 1 if (idx & 1) else idx + 1
+            merkle_branch.append(hash_to_str(hashes[idx]))
+            idx //= 2
+            hashes = [double_sha256(hashes[n] + hashes[n + 1])
+                      for n in range(0, len(hashes), 2)]
+
+        return {"block_height": height, "merkle": merkle_branch, "pos": pos}
+
     def get_peers(self):
         '''Returns a dictionary of IRC nick to (ip, host, ports) tuples, one
         per peer.'''
@@ -126,6 +150,9 @@ class BlockCache(LoggedClass):
     them to the blockchain processor.  Coordinates backing up in case of
     block chain reorganisations.
     '''
+
+    class DaemonError:
+        pass
 
     def __init__(self, env, db):
         super().__init__()
@@ -165,7 +192,10 @@ class BlockCache(LoggedClass):
         '''Loops forever polling for more blocks.'''
         self.logger.info('prefetching blocks...')
         while True:
-            await self.maybe_prefetch()
+            try:
+                await self.maybe_prefetch()
+            except self.DaemonError:
+                pass
             await asyncio.sleep(2)
 
     def cache_used(self):
@@ -246,7 +276,7 @@ class BlockCache(LoggedClass):
                     secs = 30
                 else:
                     msg = 'daemon errors: {}'.format(errs)
-                    secs = 3
+                    raise self.DaemonError(msg)
 
             self.logger.error('{}.  Sleeping {:d}s and trying again...'
                               .format(msg, secs))
