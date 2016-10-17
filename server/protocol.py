@@ -100,11 +100,12 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
 
 class ElectrumX(JSONRPC):
+    '''A TCP server that handles incoming Electrum connections.'''
 
-    def __init__(self, controller, env):
+    def __init__(self, controller, db, daemon, env):
         super().__init__(controller)
-        self.BC = controller.block_cache
-        self.db = controller.db
+        self.db = db
+        self.daemon = daemon
         self.env = env
         self.addresses = set()
         self.subscribe_headers = False
@@ -134,7 +135,7 @@ class ElectrumX(JSONRPC):
         return status.hex() if status else None
 
     async def handle_blockchain_estimatefee(self, params):
-        result = await self.BC.send_single('estimatefee', params)
+        result = await self.daemon.send_single('estimatefee', params)
         return result
 
     async def handle_blockchain_headers_subscribe(self, params):
@@ -145,7 +146,7 @@ class ElectrumX(JSONRPC):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to this daemon's memory pool.
         '''
-        net_info = await self.BC.send_single('getnetworkinfo')
+        net_info = await self.daemon.send_single('getnetworkinfo')
         return net_info['relayfee']
 
     async def handle_blockchain_transaction_get(self, params):
@@ -153,7 +154,7 @@ class ElectrumX(JSONRPC):
             raise Error(Error.BAD_REQUEST,
                         'params should contain a transaction hash')
         tx_hash = params[0]
-        return await self.BC.send_single('getrawtransaction', (tx_hash, 0))
+        return await self.daemon.send_single('getrawtransaction', (tx_hash, 0))
 
     async def handle_blockchain_transaction_get_merkle(self, params):
         if len(params) != 2:
@@ -196,6 +197,7 @@ class ElectrumX(JSONRPC):
 
 
 class LocalRPC(JSONRPC):
+    '''A local TCP RPC server for querying status.'''
 
     async def handle_getinfo(self, params):
         return {
