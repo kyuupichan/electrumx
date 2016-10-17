@@ -310,17 +310,17 @@ class FSCache(LoggedClass):
             raise
 
     def process_block(self, block):
-        '''Process a new block.'''
+        '''Process a new block and return (header, tx_hashes, txs)'''
         assert len(self.tx_counts) == self.height + 1 + len(self.headers)
 
-        tx_hashes, txs = self.coin.read_block(block)
+        triple = header, tx_hashes, txs = self.coin.read_block(block)
 
         # Cache the new header, tx hashes and cumulative tx count
-        self.headers.append(block[:self.coin.HEADER_LEN])
+        self.headers.append(header)
         self.tx_hashes.append(tx_hashes)
         self.tx_counts.append(self.tx_count + len(txs))
 
-        return tx_hashes, txs
+        return triple
 
     def flush(self, new_height, new_tx_count):
         '''Flush the things stored on the filesystem.'''
@@ -431,6 +431,9 @@ class DB(LoggedClass):
     class Error(Exception):
         pass
 
+    class ChainError(Exception):
+        pass
+
     def __init__(self, env):
         super().__init__()
 
@@ -447,7 +450,7 @@ class DB(LoggedClass):
         self.flush_count = 0
         self.utxo_flush_count = 0
         self.wall_time = 0
-        self.tip = self.coin.GENESIS_HASH
+        self.tip = b'\0' * 32
 
         # Open DB and metadata files.  Record some of its state.
         self.db = self.open_db(self.coin)
@@ -654,8 +657,15 @@ class DB(LoggedClass):
     def process_block(self, block, daemon_height):
         # We must update the fs_cache before calling process_tx() as
         # it uses the fs_cache for tx hash lookup
-        tx_hashes, txs = self.fs_cache.process_block(block)
+        header, tx_hashes, txs = self.fs_cache.process_block(block)
+        prev_hash, header_hash = self.coin.header_hashes(header)
+        if prev_hash != self.tip:
+            raise self.ChainError('trying to build header with prev_hash {} '
+                                  'on top of tip with hash {}'
+                                  .format(hash_to_str(prev_hash),
+                                          hash_to_str(self.tip)))
 
+        self.tip = header_hash
         self.height += 1
         for tx_hash, tx in zip(tx_hashes, txs):
             self.process_tx(tx_hash, tx)

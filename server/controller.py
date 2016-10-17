@@ -260,7 +260,7 @@ class BlockCache(LoggedClass):
         data = json.dumps(payload)
         while True:
             try:
-                async with aiohttp.post(self.daemon_url, data = data) as resp:
+                async with aiohttp.post(self.daemon_url, data=data) as resp:
                     result = await resp.json()
             except asyncio.CancelledError:
                 raise

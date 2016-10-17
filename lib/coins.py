@@ -6,7 +6,7 @@ from decimal import Decimal
 import inspect
 import sys
 
-from lib.hash import Base58, hash160
+from lib.hash import Base58, hash160, double_sha256
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer
 
@@ -136,9 +136,16 @@ class Coin(object):
         return Base58.encode_check(payload)
 
     @classmethod
+    def header_hashes(cls, header):
+        '''Given a header return the previous block hash and the current block
+        hash.'''
+        return header[4:36], double_sha256(header)
+
+    @classmethod
     def read_block(cls, block):
-        d = Deserializer(block[cls.HEADER_LEN:])
-        return d.read_block()
+        '''Read a block and return (header, tx_hashes, txs)'''
+        header, rest = block[:cls.HEADER_LEN], block[cls.HEADER_LEN:]
+        return (header, ) + Deserializer(rest).read_block()
 
     @classmethod
     def decimal_value(cls, value):
