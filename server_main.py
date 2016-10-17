@@ -26,7 +26,9 @@ def main_loop():
     #loop.set_debug(True)
 
     controller = Controller(env)
-    tasks = controller.start(loop)
+    controller.start(loop)
+
+    tasks = asyncio.Task.all_tasks(loop)
     try:
         loop.run_until_complete(asyncio.gather(*tasks))
     except asyncio.CancelledError:
