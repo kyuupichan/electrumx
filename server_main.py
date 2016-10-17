@@ -9,7 +9,7 @@ import os
 import traceback
 
 from server.env import Env
-from server.server import Server
+from server.controller import Controller
 
 
 def main_loop():
@@ -22,15 +22,17 @@ def main_loop():
     logging.info('switching current directory to {}'.format(env.db_dir))
     os.chdir(env.db_dir)
 
-    server = Server(env)
-    tasks = server.async_tasks()
-
     loop = asyncio.get_event_loop()
+    #loop.set_debug(True)
+
+    controller = Controller(env)
+    tasks = controller.start(loop)
     try:
         loop.run_until_complete(asyncio.gather(*tasks))
     except asyncio.CancelledError:
         logging.warning('task cancelled; asyncio event loop closing')
     finally:
+        controller.stop()
         loop.close()
 
 

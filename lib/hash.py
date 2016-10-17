@@ -31,6 +31,13 @@ def hash160(x):
     return ripemd160(sha256(x))
 
 
+def hash_to_str(x):
+    '''Converts a big-endian binary hash to a little-endian hex string, as
+    shown in block explorers, etc.
+    '''
+    return bytes(reversed(x)).hex()
+
+
 class InvalidBase58String(Exception):
     pass
 

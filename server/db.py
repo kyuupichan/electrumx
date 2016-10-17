@@ -7,16 +7,16 @@ import itertools
 import os
 import struct
 import time
-from binascii import hexlify, unhexlify
 from bisect import bisect_right
 from collections import defaultdict, namedtuple
 from functools import partial
-import logging
 
 import plyvel
 
-from lib.coins import Bitcoin
 from lib.script import ScriptPubKey
+from lib.util import LoggedClass
+from lib.hash import hash_to_str
+
 
 # History can hold approx. 65536 * HIST_ENTRIES_PER_KEY entries
 HIST_ENTRIES_PER_KEY = 1024
@@ -25,14 +25,13 @@ ADDR_TX_HASH_LEN = 4
 UTXO_TX_HASH_LEN = 4
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
-
 def formatted_time(t):
     t = int(t)
     return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
         t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
 
 
-class UTXOCache(object):
+class UTXOCache(LoggedClass):
     '''An in-memory UTXO cache, representing all changes to UTXO state
     since the last DB flush.
 
@@ -85,8 +84,7 @@ class UTXOCache(object):
     '''
 
     def __init__(self, parent, db, coin):
-        self.logger = logging.getLogger('UTXO')
-        self.logger.setLevel(logging.INFO)
+        super().__init__()
         self.parent = parent
         self.coin = coin
         self.cache = {}
@@ -126,7 +124,7 @@ class UTXOCache(object):
             # d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599
             #if key in self.cache:
             #    self.logger.info('duplicate tx hash {}'
-            #                     .format(bytes(reversed(tx_hash)).hex()))
+            #                     .format(hash_to_str(tx_hash)))
 
             self.cache[key] = hash168 + tx_numb + pack('<Q', txout.value)
 
@@ -160,7 +158,7 @@ class UTXOCache(object):
         if data is None:
             # Uh-oh, this should not happen...
             self.logger.error('found no UTXO for {} / {:d} key {}'
-                             .format(bytes(reversed(prevout.hash)).hex(),
+                             .format(hash_to_str(prevout.hash),
                                      prevout.n, bytes(key).hex()))
             return hash168
 
@@ -194,7 +192,7 @@ class UTXOCache(object):
             # Assuming the DB is not corrupt, this indicates a
             # successful spend of a non-standard script
             # self.logger.info('ignoring spend of non-standard UTXO {} / {:d}'
-            #                  .format(bytes(reversed(tx_hash)).hex(), idx)))
+            #                  .format(hash_to_str(tx_hash), idx)))
             return None
 
         if len(data) == 25:
@@ -277,14 +275,13 @@ class UTXOCache(object):
         self.adds = self.cache_hits = self.db_deletes = 0
 
 
-class DB(object):
+class DB(LoggedClass):
 
     class Error(Exception):
         pass
 
     def __init__(self, env):
-        self.logger = logging.getLogger('DB')
-        self.logger.setLevel(logging.INFO)
+        super().__init__()
 
         # Meta
         self.tx_hash_file_size = 16 * 1024 * 1024
@@ -293,6 +290,7 @@ class DB(object):
         self.next_cache_check = 0
         self.last_flush = time.time()
         self.coin = env.coin
+        self.current_header = None
 
         # Chain state (initialize to genesis in case of new DB)
         self.db_height = -1
@@ -358,7 +356,7 @@ class DB(object):
 
     def read_state(self, db):
         state = db.get(b'state')
-        state = ast.literal_eval(state.decode('ascii'))
+        state = ast.literal_eval(state.decode())
         if state['genesis'] != self.coin.GENESIS_HASH:
             raise self.Error('DB genesis hash {} does not match coin {}'
                              .format(state['genesis_hash'],
@@ -448,7 +446,7 @@ class DB(object):
             'utxo_flush_count': self.utxo_flush_count,
             'wall_time': self.wall_time,
         }
-        batch.put(b'state', repr(state).encode('ascii'))
+        batch.put(b'state', repr(state).encode())
 
     def flush_utxos(self, batch):
         self.logger.info('flushing UTXOs: {:,d} txs and {:,d} blocks'
@@ -675,3 +673,27 @@ class DB(object):
         '''Returns all the UTXOs for an address sorted by height and
         position in the block.'''
         return sorted(self.get_utxos(hash168, limit=None))
+
+    def encode_header(self):
+        if self.height == -1:
+            return None
+        header = self.read_headers(self.height, 1)
+        unpack = struct.unpack
+        version, = unpack('<I', header[:4])
+        timestamp, bits, nonce = unpack('<III', header[68:80])
+
+        return {
+            'block_height': self.height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce,
+        }
+
+    def get_current_header(self):
+        # FIXME: clear current_header on new block
+        if self.current_header is None:
+            self.current_header = self.encode_header()
+        return self.current_header
