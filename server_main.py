@@ -25,8 +25,8 @@ def main_loop():
     loop = asyncio.get_event_loop()
     #loop.set_debug(True)
 
-    controller = Controller(env)
-    controller.start(loop)
+    controller = Controller(loop, env)
+    controller.start()
 
     tasks = asyncio.Task.all_tasks(loop)
     try:

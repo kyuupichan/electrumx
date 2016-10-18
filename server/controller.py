@@ -16,12 +16,13 @@ from lib.util import LoggedClass
 
 class Controller(LoggedClass):
 
-    def __init__(self, env):
+    def __init__(self, loop, env):
         '''Create up the controller.
 
         Creates DB, Daemon and BlockCache instances.
         '''
         super().__init__()
+        self.loop = loop
         self.env = env
         self.db = DB(env)
         self.daemon = Daemon(env.daemon_url)
@@ -32,9 +33,10 @@ class Controller(LoggedClass):
         self.jobs = set()
         self.peers = {}
 
-    def start(self, loop):
+    def start(self):
         '''Prime the event loop with asynchronous servers and jobs.'''
         env = self.env
+        loop = self.loop
 
         if False:
             protocol = partial(LocalRPC, self)
@@ -69,18 +71,18 @@ class Controller(LoggedClass):
         # Signal handlers
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
-                                    partial(self.on_signal, loop, signame))
+                                    partial(self.on_signal, signame))
 
     def stop(self):
         '''Close the listening servers.'''
         for server in self.servers:
             server.close()
 
-    def on_signal(self, loop, signame):
+    def on_signal(self, signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
         self.logger.warning('received {} signal, preparing to shut down'
                             .format(signame))
-        for task in asyncio.Task.all_tasks(loop):
+        for task in asyncio.Task.all_tasks(self.loop):
             task.cancel()
 
     def add_session(self, session):
