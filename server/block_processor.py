@@ -25,6 +25,10 @@ def formatted_time(t):
         t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
 
 
+class ChainError(Exception):
+    pass
+
+
 class Prefetcher(LoggedClass):
     '''Prefetches blocks (in the forward direction only).'''
 
@@ -92,46 +96,10 @@ class BlockProcessor(LoggedClass):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, db, daemon):
+    def __init__(self, env, daemon):
         super().__init__()
-        self.db = db
+
         self.daemon = daemon
-        self.prefetcher = Prefetcher(daemon, db.height)
-
-    def coros(self):
-        return [self.start(), self.prefetcher.start()]
-
-    def flush_db(self):
-        self.db.flush(self.daemon.cached_height(), True)
-
-    async def start(self):
-        '''Loop forever processing blocks in the appropriate direction.'''
-        try:
-            while True:
-                blocks = await self.prefetcher.get_blocks()
-                for block in blocks:
-                    self.db.process_block(block, self.daemon.cached_height())
-                    # Release asynchronous block fetching
-                    await asyncio.sleep(0)
-
-                if self.db.height == self.daemon.cached_height():
-                    self.logger.info('caught up to height {:d}'
-                                     .format(self.db_height))
-                    self.flush_db()
-        finally:
-            self.flush_db()
-
-
-class DB(LoggedClass):
-
-    class Error(Exception):
-        pass
-
-    class ChainError(Exception):
-        pass
-
-    def __init__(self, env):
-        super().__init__()
 
         # Meta
         self.utxo_MB = env.utxo_MB
@@ -159,6 +127,7 @@ class DB(LoggedClass):
         self.history_size = 0
         self.utxo_cache = UTXOCache(self, self.db, self.coin)
         self.fs_cache = FSCache(self.coin, self.height, self.tx_count)
+        self.prefetcher = Prefetcher(daemon, self.height)
 
         # Redirected member func
         self.get_tx_hash = self.fs_cache.get_tx_hash
@@ -176,6 +145,26 @@ class DB(LoggedClass):
         self.logger.info('flushing history cache at {:,d} MB'
                          .format(self.hist_MB))
 
+    def coros(self):
+        return [self.start(), self.prefetcher.start()]
+
+    async def start(self):
+        '''Loop forever processing blocks in the appropriate direction.'''
+        try:
+            while True:
+                blocks = await self.prefetcher.get_blocks()
+                for block in blocks:
+                    self.process_block(block)
+                    # Release asynchronous block fetching
+                    await asyncio.sleep(0)
+
+                if self.height == self.daemon.cached_height():
+                    self.logger.info('caught up to height {:d}'
+                                     .format(self_height))
+                    self.flush(True)
+        finally:
+            if self.daemon.cached_height() is not None:
+                self.flush(True)
 
     def open_db(self, coin):
         db_name = '{}-{}'.format(coin.NAME, coin.NET)
@@ -198,7 +187,7 @@ class DB(LoggedClass):
         state = db.get(b'state')
         state = ast.literal_eval(state.decode())
         if state['genesis'] != self.coin.GENESIS_HASH:
-            raise self.Error('DB genesis hash {} does not match coin {}'
+            raise ChainError('DB genesis hash {} does not match coin {}'
                              .format(state['genesis_hash'],
                                      self.coin.GENESIS_HASH))
         self.db_height = state['height']
@@ -215,7 +204,7 @@ class DB(LoggedClass):
         if diff == 0:
             return
         if diff < 0:
-            raise self.Error('DB corrupt: flush_count < utxo_flush_count')
+            raise ChainError('DB corrupt: flush_count < utxo_flush_count')
 
         self.logger.info('DB not shut down cleanly.  Scanning for most '
                          'recent {:,d} history flushes'.format(diff))
@@ -260,7 +249,7 @@ class DB(LoggedClass):
         self.db_tx_count = self.tx_count
         self.db_height = self.height
 
-    def flush(self, daemon_height, flush_utxos=False):
+    def flush(self, flush_utxos=False):
         '''Flush out cached state.
 
         History is always flushed.  UTXOs are flushed if flush_utxos.'''
@@ -291,6 +280,7 @@ class DB(LoggedClass):
                          .format(self.flush_count, self.height, flush_time))
 
         # Log handy stats
+        daemon_height = self.daemon.cached_height()
         txs_per_sec = int(self.tx_count / self.wall_time)
         this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
         if self.height > self.coin.TX_COUNT_HEIGHT:
@@ -325,7 +315,7 @@ class DB(LoggedClass):
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
 
-    def cache_sizes(self, daemon_height):
+    def cache_sizes(self):
         '''Returns the approximate size of the cache, in MB.'''
         # Good average estimates based on traversal of subobjects and
         # requesting size from Python (see deep_getsizeof).  For
@@ -339,7 +329,7 @@ class DB(LoggedClass):
         hist_MB = hist_cache_size // one_MB
 
         self.logger.info('cache stats at height {:,d}  daemon height: {:,d}'
-                         .format(self.height, daemon_height))
+                         .format(self.height, self.daemon.cached_height()))
         self.logger.info('  entries: UTXO: {:,d}  DB: {:,d}  '
                          'hist addrs: {:,d}  hist size: {:,d}'
                          .format(len(self.utxo_cache.cache),
@@ -350,16 +340,16 @@ class DB(LoggedClass):
                          .format(utxo_MB + hist_MB, utxo_MB, hist_MB))
         return utxo_MB, hist_MB
 
-    def process_block(self, block, daemon_height):
+    def process_block(self, block):
         # We must update the fs_cache before calling process_tx() as
         # it uses the fs_cache for tx hash lookup
         header, tx_hashes, txs = self.fs_cache.process_block(block)
         prev_hash, header_hash = self.coin.header_hashes(header)
         if prev_hash != self.tip:
-            raise self.ChainError('trying to build header with prev_hash {} '
-                                  'on top of tip with hash {}'
-                                  .format(hash_to_str(prev_hash),
-                                          hash_to_str(self.tip)))
+            raise ChainError('trying to build header with prev_hash {} '
+                             'on top of tip with hash {}'
+                             .format(hash_to_str(prev_hash),
+                                     hash_to_str(self.tip)))
 
         self.tip = header_hash
         self.height += 1
@@ -370,9 +360,9 @@ class DB(LoggedClass):
         now = time.time()
         if now > self.next_cache_check:
             self.next_cache_check = now + 60
-            utxo_MB, hist_MB = self.cache_sizes(daemon_height)
+            utxo_MB, hist_MB = self.cache_sizes()
             if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
-                self.flush(daemon_height, utxo_MB >= self.utxo_MB)
+                self.flush(utxo_MB >= self.utxo_MB)
 
     def process_tx(self, tx_hash, tx):
         cache = self.utxo_cache

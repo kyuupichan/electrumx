@@ -7,7 +7,7 @@ import traceback
 from functools import partial
 
 from server.daemon import Daemon, DaemonError
-from server.block_processor import BlockProcessor, DB
+from server.block_processor import BlockProcessor
 from server.protocol import ElectrumX, LocalRPC
 from lib.hash import (sha256, double_sha256, hash_to_str,
                       Base58, hex_str_to_hash)
@@ -24,9 +24,8 @@ class Controller(LoggedClass):
         super().__init__()
         self.loop = loop
         self.env = env
-        self.db = DB(env)
         self.daemon = Daemon(env.daemon_url)
-        self.block_processor = BlockProcessor(self.db, self.daemon)
+        self.block_processor = BlockProcessor(env, self.daemon)
         self.servers = []
         self.sessions = set()
         self.addresses = {}
@@ -112,10 +111,9 @@ class Controller(LoggedClass):
         '''Returns status as 32 bytes.'''
         status = self.addresses.get(hash168)
         if status is None:
-            status = ''.join(
-                '{}:{:d}:'.format(hash_to_str(tx_hash), height)
-                for tx_hash, height in self.db.get_history(hash168)
-            )
+            history = self.block_processor.get_history(hash168)
+            status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
+                             for tx_hash, height in history)
             if status:
                 status = sha256(status.encode())
             self.addresses[hash168] = status
@@ -148,3 +146,16 @@ class Controller(LoggedClass):
         '''Returns a dictionary of IRC nick to (ip, host, ports) tuples, one
         per peer.'''
         return self.peers
+
+    def height(self):
+        return self.block_processor.height
+
+    def get_current_header(self):
+        return self.block_processor.get_current_header()
+
+    def get_history(self, hash168):
+        history = self.block_processor.get_history(hash168, limit=None)
+        return [
+            {'tx_hash': hash_to_str(tx_hash), 'height': height}
+            for tx_hash, height in history
+        ]

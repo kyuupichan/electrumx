@@ -102,9 +102,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 class ElectrumX(JSONRPC):
     '''A TCP server that handles incoming Electrum connections.'''
 
-    def __init__(self, controller, db, daemon, env):
+    def __init__(self, controller, daemon, env):
         super().__init__(controller)
-        self.db = db
         self.daemon = daemon
         self.env = env
         self.addresses = set()
@@ -123,11 +122,7 @@ class ElectrumX(JSONRPC):
 
     async def handle_blockchain_address_get_history(self, params):
         hash168 = self.params_to_hash168(params)
-        history = [
-            {'tx_hash': hash_to_str(tx_hash), 'height': height}
-            for tx_hash, height in self.db.get_history(hash168, limit=None)
-        ]
-        return history
+        return self.controller.get_history(hash168)
 
     async def handle_blockchain_address_subscribe(self, params):
         hash168 = self.params_to_hash168(params)
@@ -140,7 +135,7 @@ class ElectrumX(JSONRPC):
 
     async def handle_blockchain_headers_subscribe(self, params):
         self.subscribe_headers = True
-        return self.db.get_current_header()
+        return self.controller.get_current_header()
 
     async def handle_blockchain_relayfee(self, params):
         '''The minimum fee a low-priority tx must pay in order to be accepted
@@ -201,7 +196,7 @@ class LocalRPC(JSONRPC):
 
     async def handle_getinfo(self, params):
         return {
-            'blocks': self.controller.db.height,
+            'blocks': self.controller.height(),
             'peers': len(self.controller.get_peers()),
             'sessions': len(self.controller.sessions),
             'watched': sum(len(s.addresses) for s in self.controller.sessions
