@@ -164,14 +164,13 @@ class BlockCache(LoggedClass):
         self.daemon = daemon
         # Target cache size.  Has little effect on sync time.
         self.target_cache_size = 10 * 1024 * 1024
-        self.daemon_height = 0
         self.fetched_height = db.height
         self.queue = asyncio.Queue()
         self.queue_size = 0
         self.recent_sizes = [0]
 
     def flush_db(self):
-        self.db.flush(self.daemon_height, True)
+        self.db.flush(self.daemon.cached_height(), True)
 
     async def process_blocks(self):
         try:
@@ -179,13 +178,13 @@ class BlockCache(LoggedClass):
                 blocks, total_size = await self.queue.get()
                 self.queue_size -= total_size
                 for block in blocks:
-                    self.db.process_block(block, self.daemon_height)
+                    self.db.process_block(block, self.daemon.cached_height())
                     # Release asynchronous block fetching
                     await asyncio.sleep(0)
 
-                if self.db.height == self.daemon_height:
+                if self.db.height == self.daemon.cached_height():
                     self.logger.info('caught up to height {:d}'
-                                     .format(self.daemon_height))
+                                     .format(self.db_height))
                     self.flush_db()
         finally:
             self.flush_db()
@@ -210,26 +209,19 @@ class BlockCache(LoggedClass):
 
     async def maybe_prefetch(self):
         '''Prefetch blocks if there are any to prefetch.'''
-        daemon = self.daemon
         while self.queue_size < self.target_cache_size:
             # Keep going by getting a whole new cache_limit of blocks
-            self.daemon_height = await daemon.send_single('getblockcount')
-            max_count = min(self.daemon_height - self.fetched_height, 4000)
+            daemon_height = await self.daemon.height()
+            max_count = min(daemon_height - self.fetched_height, 4000)
             count = min(max_count, self.prefill_count(self.target_cache_size))
             if not count:
                 break
 
             first = self.fetched_height + 1
-            param_lists = [[height] for height in range(first, first + count)]
-            hashes = await daemon.send_vector('getblockhash', param_lists)
+            hashes = await self.daemon.block_hex_hashes(first, count)
+            blocks = await self.daemon.raw_blocks(hashes)
 
-            # Hashes is an array of hex strings
-            param_lists = [(h, False) for h in hashes]
-            blocks = await daemon.send_vector('getblock', param_lists)
             self.fetched_height += count
-
-            # Convert hex string to bytes
-            blocks = [bytes.fromhex(block) for block in blocks]
             sizes = [len(block) for block in blocks]
             total_size = sum(sizes)
             self.queue.put_nowait((blocks, total_size))

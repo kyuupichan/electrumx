@@ -23,6 +23,7 @@ class Daemon(LoggedClass):
     def __init__(self, url):
         super().__init__()
         self.url = url
+        self._height = None
         self.logger.info('connecting to daemon at URL {}'.format(url))
 
     async def send_single(self, method, params=None):
@@ -33,14 +34,18 @@ class Daemon(LoggedClass):
         return result
 
     async def send_many(self, mp_pairs):
-        payload = [{'method': method, 'params': params}
-                   for method, params in mp_pairs]
-        return await self.send(payload)
+        if mp_pairs:
+            payload = [{'method': method, 'params': params}
+                       for method, params in mp_pairs]
+            return await self.send(payload)
+        return []
 
     async def send_vector(self, method, params_list):
-        payload = [{'method': method, 'params': params}
-                   for params in params_list]
-        return await self.send(payload)
+        if params_list:
+            payload = [{'method': method, 'params': params}
+                       for params in params_list]
+            return await self.send(payload)
+        return []
 
     async def send(self, payload):
         assert isinstance(payload, (tuple, list))
@@ -68,3 +73,26 @@ class Daemon(LoggedClass):
             self.logger.error('{}.  Sleeping {:d}s and trying again...'
                               .format(msg, secs))
             await asyncio.sleep(secs)
+
+    async def block_hex_hashes(self, first, count):
+        '''Return the hex hashes of count block starting at height first.'''
+        param_lists = [[height] for height in range(first, first + count)]
+        return await self.send_vector('getblockhash', param_lists)
+
+    async def raw_blocks(self, hex_hashes):
+        '''Return the raw binary blocks with the given hex hashes.'''
+        param_lists = [(h, False) for h in hex_hashes]
+        blocks = await self.send_vector('getblock', param_lists)
+        # Convert hex string to bytes
+        return [bytes.fromhex(block) for block in blocks]
+
+    async def height(self):
+        '''Query the daemon for its current height.'''
+        self._height = await self.send_single('getblockcount')
+        return self._height
+
+    def cached_height(self):
+        '''Return the cached daemon height.
+
+        If the daemon has not been queried yet this returns None.'''
+        return self._height
