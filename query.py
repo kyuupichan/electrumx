@@ -7,7 +7,7 @@ import os
 import sys
 
 from server.env import Env
-from server.db import DB
+from server.block_processor import DB
 from lib.hash import hash_to_str
 
 

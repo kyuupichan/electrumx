@@ -7,8 +7,7 @@ import traceback
 from functools import partial
 
 from server.daemon import Daemon, DaemonError
-from server.block_processor import BlockProcessor
-from server.db import DB
+from server.block_processor import BlockProcessor, DB
 from server.protocol import ElectrumX, LocalRPC
 from lib.hash import (sha256, double_sha256, hash_to_str,
                       Base58, hex_str_to_hash)
