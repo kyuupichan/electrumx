@@ -9,8 +9,8 @@ from bisect import bisect_right
 from collections import namedtuple
 
 from lib.script import ScriptPubKey
-from lib.util import LoggedClass
-from lib.hash import hash_to_str
+from lib.util import chunks, LoggedClass
+from lib.hash import double_sha256, hash_to_str
 
 
 # History can hold approx. 65536 * HIST_ENTRIES_PER_KEY entries
@@ -285,6 +285,8 @@ class FSCache(LoggedClass):
         self.headers_file = self.open_file('headers', is_new)
         self.txcount_file = self.open_file('txcount', is_new)
 
+        # tx_counts[N] has the cumulative number of txs at the end of
+        # height N.  So tx_counts[0] is 1 - the genesis coinbase
         self.tx_counts = array.array('I')
         self.txcount_file.seek(0)
         self.tx_counts.fromfile(self.txcount_file, self.height + 1)
@@ -302,33 +304,33 @@ class FSCache(LoggedClass):
                 return open(filename, 'wb+')
             raise
 
-        return self.tx_counts[self.height] if self.tx_counts else 0
-
-    def process_block(self, block):
-        '''Process a new block and return (header, tx_hashes, txs)'''
-        assert len(self.tx_counts) == self.height + 1 + len(self.headers)
-
-        triple = header, tx_hashes, txs = self.coin.read_block(block)
+    def advance_block(self, header, tx_hashes, txs):
+        '''Update the FS cache for a new block.'''
+        prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
 
         # Cache the new header, tx hashes and cumulative tx count
         self.headers.append(header)
         self.tx_hashes.append(tx_hashes)
-        prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
         self.tx_counts.append(prior_tx_count + len(txs))
 
-        return triple
+    def backup_block(self, block):
+        '''Revert a block and return (header, tx_hashes, txs)'''
+        pass
 
     def flush(self, new_height, new_tx_count):
-        '''Flush the things stored on the filesystem.'''
+        '''Flush the things stored on the filesystem.
+        The arguments are passed for sanity check assertions only.'''
         self.logger.info('flushing to file system')
 
-        block_count = len(self.headers)
-        assert self.height + block_count == new_height
-        assert len(self.tx_hashes) == block_count
-        assert len(self.tx_counts) == self.height + 1 + block_count
-        assert new_tx_count == self.tx_counts[-1] if self.tx_counts else 0
+        blocks_done = len(self.headers)
         prior_tx_count = self.tx_counts[self.height] if self.height >= 0 else 0
-        tx_diff = new_tx_count - prior_tx_count
+        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+        txs_done = cur_tx_count - prior_tx_count
+
+        assert self.height + blocks_done == new_height
+        assert cur_tx_count == new_tx_count
+        assert len(self.tx_hashes) == blocks_done
+        assert len(self.tx_counts) == new_height + 1
 
         # First the headers
         headers = b''.join(self.headers)
@@ -345,7 +347,7 @@ class FSCache(LoggedClass):
         # Finally the hashes
         hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
         assert len(hashes) % 32 == 0
-        assert len(hashes) // 32 == tx_diff
+        assert len(hashes) // 32 == txs_done
         cursor = 0
         file_pos = prior_tx_count * 32
         while cursor < len(hashes):
@@ -362,9 +364,9 @@ class FSCache(LoggedClass):
 
         self.tx_hashes = []
         self.headers = []
-        self.height += block_count
+        self.height += blocks_done
 
-        return tx_diff
+        return txs_done
 
     def read_headers(self, height, count):
         read_count = min(count, self.height + 1 - height)
@@ -402,6 +404,11 @@ class FSCache(LoggedClass):
                 tx_hash = f.read(32)
 
         return tx_hash, height
+
+    def block_hashes(self, height, count):
+        headers = self.read_headers(height, count)
+        hlen = self.coin.HEADER_LEN
+        return [double_sha256(header) for header in chunks(headers, hlen)]
 
     def encode_header(self, height):
         if height < 0 or height > self.height + len(self.headers):

@@ -7,7 +7,6 @@ import json
 import traceback
 from functools import partial
 
-from lib.hash import hash_to_str
 from lib.util import LoggedClass
 from server.version import VERSION
 
