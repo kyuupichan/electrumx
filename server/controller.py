@@ -27,7 +27,7 @@ class Controller(LoggedClass):
         self.env = env
         self.db = DB(env)
         self.daemon = Daemon(env.daemon_url)
-        self.block_cache = BlockProcessor(self.db, self.daemon)
+        self.block_processor = BlockProcessor(self.db, self.daemon)
         self.servers = []
         self.sessions = set()
         self.addresses = {}
@@ -61,10 +61,7 @@ class Controller(LoggedClass):
                 self.logger.info('SSL server listening on {}:{:d}'
                                  .format(env.host, env.ssl_port))
 
-        coros = [
-            self.block_cache.prefetcher(),
-            self.block_cache.process_blocks(),
-        ]
+        coros = self.block_processor.coros()
 
         for coro in coros:
             asyncio.ensure_future(coro)
