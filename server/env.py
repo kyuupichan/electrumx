@@ -25,6 +25,7 @@ class Env(LoggedClass):
         self.tcp_port = self.integer('TCP_PORT', None)
         self.ssl_port = self.integer('SSL_PORT', None)
         self.rpc_port = self.integer('RPC_PORT', 8000)
+        self.reorg_limit = self.integer('REORG_LIMIT', 200)
         self.daemon_url = self.build_daemon_url()
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)

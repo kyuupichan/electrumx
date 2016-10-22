@@ -11,11 +11,31 @@ from server.block_processor import BlockProcessor
 from lib.hash import hash_to_str
 
 
+def count_entries(db):
+    utxos = 0
+    for key in db.iterator(prefix=b'u', include_value=False):
+        utxos += 1
+    print("UTXO count:", utxos)
+
+    hash168 = 0
+    for key in db.iterator(prefix=b'h', include_value=False):
+        hash168 += 1
+    print("Hash168 count:", hash168)
+
+    hist = 0
+    for key in db.iterator(prefix=b'H', include_value=False):
+        hist += 1
+    print("History addresses:", hist)
+
+
 def main():
     env = Env()
     coin = env.coin
     os.chdir(env.db_dir)
     bp = BlockProcessor(env, None)
+    if len(sys.argv) == 1:
+        count_entries(bp.db)
+        return
     argc = 1
     try:
         limit = int(sys.argv[argc])

@@ -7,7 +7,6 @@ import os
 import struct
 from bisect import bisect_right
 
-from lib.script import ScriptPubKey
 from lib.util import chunks, LoggedClass
 from lib.hash import double_sha256, hash_to_str
 
@@ -17,6 +16,8 @@ HIST_ENTRIES_PER_KEY = 1024
 HIST_VALUE_BYTES = HIST_ENTRIES_PER_KEY * 4
 ADDR_TX_HASH_LEN = 4
 UTXO_TX_HASH_LEN = 4
+NO_HASH_168 = bytes([255]) * 21
+NO_CACHE_ENTRY = NO_HASH_168 + bytes(12)
 
 
 class UTXOCache(LoggedClass):
@@ -76,84 +77,47 @@ class UTXOCache(LoggedClass):
         self.parent = parent
         self.coin = coin
         self.cache = {}
+        self.put = self.cache.__setitem__
         self.db = db
         self.db_cache = {}
         # Statistics
-        self.adds = 0
-        self.cache_hits = 0
+        self.cache_spends = 0
         self.db_deletes = 0
 
-    def add_many(self, tx_hash, tx_num, txouts):
-        '''Add a sequence of UTXOs to the cache, return the set of hash168s
-        seen.
-
-        Pass the hash of the TX it appears in, its TX number, and the
-        TX outputs.
-        '''
-        parse_script = ScriptPubKey.from_script
-        pack = struct.pack
-        tx_numb = pack('<I', tx_num)
-        hash168s = set()
-
-        self.adds += len(txouts)
-        for idx, txout in enumerate(txouts):
-            # Get the hash168.  Ignore scripts we can't grok.
-            pk = parse_script(txout.pk_script, self.coin)
-            hash168 = pk.hash168
-            if not hash168:
-                continue
-
-            hash168s.add(hash168)
-            key = tx_hash + pack('<H', idx)
-
-            # Well-known duplicate coinbases from heights 91722-91880
-            # that destoyed 100 BTC forever:
-            # e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468
-            # d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599
-            #if key in self.cache:
-            #    self.logger.info('duplicate tx hash {}'
-            #                     .format(hash_to_str(tx_hash)))
-
-            self.cache[key] = hash168 + tx_numb + pack('<Q', txout.value)
-
-        return hash168s
-
-    def spend(self, txin):
-        '''Spend a UTXO and return the address spent.
+    def spend(self, prev_hash, prev_idx):
+        '''Spend a UTXO and return the cache's value.
 
         If the UTXO is not in the cache it must be on disk.
         '''
         # Fast track is it's in the cache
         pack = struct.pack
-        key = txin.prev_hash + pack('<H', txin.prev_idx)
-        value = self.cache.pop(key, None)
+        idx_packed = pack('<H', prev_idx)
+        value = self.cache.pop(prev_hash + idx_packed, None)
         if value:
-            self.cache_hits += 1
-            return value[:21]
+            self.cache_spends += 1
+            return value
 
         # Oh well.  Find and remove it from the DB.
-        hash168 = self.hash168(txin.prev_hash, txin.prev_idx)
+        hash168 = self.hash168(prev_hash, idx_packed)
         if not hash168:
-            return None
+            return NO_CACHE_ENTRY
 
         self.db_deletes += 1
 
         # Read the UTXO through the cache from the disk.  We have to
         # go through the cache because compressed keys can collide.
-        key = (b'u' + hash168 + txin.prev_hash[:UTXO_TX_HASH_LEN]
-               + pack('<H', txin.prev_idx))
+        key = b'u' + hash168 + prev_hash[:UTXO_TX_HASH_LEN] + idx_packed
         data = self.cache_get(key)
         if data is None:
             # Uh-oh, this should not happen...
             self.logger.error('found no UTXO for {} / {:d} key {}'
-                             .format(hash_to_str(txin.prev_hash),
-                                     txin.prev_idx, bytes(key).hex()))
-            return hash168
+                             .format(hash_to_str(prev_hash), prev_idx,
+                                     bytes(key).hex()))
+            return NO_CACHE_ENTRY
 
         if len(data) == 12:
-            (tx_num, ) = struct.unpack('<I', data[:4])
             self.cache_delete(key)
-            return hash168
+            return hash168 + data
 
         # Resolve the compressed key collison.  These should be
         # extremely rare.
@@ -161,26 +125,25 @@ class UTXOCache(LoggedClass):
         for n in range(0, len(data), 12):
             (tx_num, ) = struct.unpack('<I', data[n:n+4])
             tx_hash, height = self.parent.get_tx_hash(tx_num)
-            if txin.prev_hash == tx_hash:
-                data = data[:n] + data[n + 12:]
+            if prev_hash == tx_hash:
+                result = hash168 + data[n: n+12]
+                data = data[:n] + data[n+12:]
                 self.cache_write(key, data)
-                return hash168
+                return result
 
         raise Exception('could not resolve UTXO key collision')
 
-    def hash168(self, tx_hash, idx):
+    def hash168(self, tx_hash, idx_packed):
         '''Return the hash168 paid to by the given TXO.
 
         Refers to the database.  Returns None if not found (which is
         indicates a non-standard script).
         '''
-        key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + struct.pack('<H', idx)
+        key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + idx_packed
         data = self.cache_get(key)
         if data is None:
             # Assuming the DB is not corrupt, this indicates a
             # successful spend of a non-standard script
-            # self.logger.info('ignoring spend of non-standard UTXO {} / {:d}'
-            #                  .format(hash_to_str(tx_hash), idx)))
             return None
 
         if len(data) == 25:
@@ -222,6 +185,7 @@ class UTXOCache(LoggedClass):
         # may be in the DB already.
         hcolls = ucolls = 0
         new_utxos = len(self.cache)
+
         for cache_key, cache_value in self.cache.items():
             # Frist write to the hash168 lookup table
             key = b'h' + cache_key[:ADDR_TX_HASH_LEN] + cache_key[-2:]
@@ -244,6 +208,7 @@ class UTXOCache(LoggedClass):
 
         # GC-ing this now can only help the levelDB write.
         self.cache = {}
+        self.put = self.cache.__setitem__
 
         # Now we can update to the batch.
         for key, value in self.db_cache.items():
@@ -254,13 +219,15 @@ class UTXOCache(LoggedClass):
 
         self.db_cache = {}
 
+        adds = new_utxos + self.cache_spends
+
         self.logger.info('UTXO cache adds: {:,d} spends: {:,d} '
-                         .format(self.adds, self.cache_hits))
+                         .format(adds, self.cache_spends))
         self.logger.info('UTXO DB adds: {:,d} spends: {:,d}. '
                          'Collisions: hash168: {:,d} UTXO: {:,d}'
                          .format(new_utxos, self.db_deletes,
                                  hcolls, ucolls))
-        self.adds = self.cache_hits = self.db_deletes = 0
+        self.cache_spends = self.db_deletes = 0
 
 
 class FSCache(LoggedClass):
@@ -311,9 +278,15 @@ class FSCache(LoggedClass):
         self.tx_hashes.append(tx_hashes)
         self.tx_counts.append(prior_tx_count + len(txs))
 
-    def backup_block(self, block):
-        '''Revert a block and return (header, tx_hashes, txs)'''
-        pass
+    def backup_block(self):
+        '''Revert a block.'''
+        assert not self.headers
+        assert not self.tx_hashes
+        assert self.height >= 0
+        # Just update in-memory.  It doesn't matter if disk files are
+        # too long, they will be overwritten when advancing.
+        self.height -= 1
+        self.tx_counts.pop()
 
     def flush(self, new_height, new_tx_count):
         '''Flush the things stored on the filesystem.
@@ -326,9 +299,10 @@ class FSCache(LoggedClass):
         txs_done = cur_tx_count - prior_tx_count
 
         assert self.height + blocks_done == new_height
-        assert cur_tx_count == new_tx_count
         assert len(self.tx_hashes) == blocks_done
         assert len(self.tx_counts) == new_height + 1
+        assert cur_tx_count == new_tx_count, \
+            'cur: {:,d} new: {:,d}'.format(cur_tx_count, new_tx_count)
 
         # First the headers
         headers = b''.join(self.headers)
@@ -363,8 +337,6 @@ class FSCache(LoggedClass):
         self.tx_hashes = []
         self.headers = []
         self.height += blocks_done
-
-        return txs_done
 
     def read_headers(self, height, count):
         read_count = min(count, self.height + 1 - height)
