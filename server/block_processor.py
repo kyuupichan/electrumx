@@ -6,7 +6,7 @@ import ast
 import asyncio
 import struct
 import time
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from functools import partial
 
 import plyvel
@@ -23,6 +23,9 @@ def formatted_time(t):
     t = int(t)
     return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
         t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
+
+
+UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
 
 class ChainError(Exception):

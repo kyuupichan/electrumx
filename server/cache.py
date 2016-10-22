@@ -6,7 +6,6 @@ import itertools
 import os
 import struct
 from bisect import bisect_right
-from collections import namedtuple
 
 from lib.script import ScriptPubKey
 from lib.util import chunks, LoggedClass
@@ -18,7 +17,6 @@ HIST_ENTRIES_PER_KEY = 1024
 HIST_VALUE_BYTES = HIST_ENTRIES_PER_KEY * 4
 ADDR_TX_HASH_LEN = 4
 UTXO_TX_HASH_LEN = 4
-UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
 
 class UTXOCache(LoggedClass):

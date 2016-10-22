@@ -7,15 +7,15 @@ import os
 import sys
 
 from server.env import Env
-from server.block_processor import DB
+from server.block_processor import BlockProcessor
 from lib.hash import hash_to_str
 
 
 def main():
     env = Env()
+    coin = env.coin
     os.chdir(env.db_dir)
-    db = DB(env)
-    coin = db.coin
+    bp = BlockProcessor(env, None)
     argc = 1
     try:
         limit = int(sys.argv[argc])
@@ -26,19 +26,19 @@ def main():
         print('Address: ', addr)
         hash168 = coin.address_to_hash168(addr)
         n = None
-        for n, (tx_hash, height) in enumerate(db.get_history(hash168, limit)):
+        for n, (tx_hash, height) in enumerate(bp.get_history(hash168, limit)):
             print('History #{:d}: hash: {} height: {:d}'
                   .format(n + 1, hash_to_str(tx_hash), height))
         if n is None:
             print('No history')
         n = None
-        for n, utxo in enumerate(db.get_utxos(hash168, limit)):
+        for n, utxo in enumerate(bp.get_utxos(hash168, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
                   .format(n + 1, hash_to_str(utxo.tx_hash),
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')
-        balance = db.get_balance(hash168)
+        balance = bp.get_balance(hash168)
         print('Balance: {} {}'.format(coin.decimal_value(balance),
                                       coin.SHORTNAME))
 
