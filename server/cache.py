@@ -120,21 +120,21 @@ class UTXOCache(LoggedClass):
 
         return hash168s
 
-    def spend(self, prevout):
+    def spend(self, txin):
         '''Spend a UTXO and return the address spent.
 
         If the UTXO is not in the cache it must be on disk.
         '''
         # Fast track is it's in the cache
         pack = struct.pack
-        key = prevout.hash + pack('<H', prevout.n)
+        key = txin.prev_hash + pack('<H', txin.prev_idx)
         value = self.cache.pop(key, None)
         if value:
             self.cache_hits += 1
             return value[:21]
 
         # Oh well.  Find and remove it from the DB.
-        hash168 = self.hash168(prevout.hash, prevout.n)
+        hash168 = self.hash168(txin.prev_hash, txin.prev_idx)
         if not hash168:
             return None
 
@@ -142,14 +142,14 @@ class UTXOCache(LoggedClass):
 
         # Read the UTXO through the cache from the disk.  We have to
         # go through the cache because compressed keys can collide.
-        key = (b'u' + hash168 + prevout.hash[:UTXO_TX_HASH_LEN]
-               + pack('<H', prevout.n))
+        key = (b'u' + hash168 + txin.prev_hash[:UTXO_TX_HASH_LEN]
+               + pack('<H', txin.prev_idx))
         data = self.cache_get(key)
         if data is None:
             # Uh-oh, this should not happen...
             self.logger.error('found no UTXO for {} / {:d} key {}'
-                             .format(hash_to_str(prevout.hash),
-                                     prevout.n, bytes(key).hex()))
+                             .format(hash_to_str(txin.prev_hash),
+                                     txin.prev_idx, bytes(key).hex()))
             return hash168
 
         if len(data) == 12:
@@ -163,7 +163,7 @@ class UTXOCache(LoggedClass):
         for n in range(0, len(data), 12):
             (tx_num, ) = struct.unpack('<I', data[n:n+4])
             tx_hash, height = self.parent.get_tx_hash(tx_num)
-            if prevout.hash == tx_hash:
+            if txin.prev_hash == tx_hash:
                 data = data[:n] + data[n + 12:]
                 self.cache_write(key, data)
                 return hash168

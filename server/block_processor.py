@@ -439,7 +439,7 @@ class BlockProcessor(LoggedClass):
             hash168s = cache.add_many(tx_hash, tx_num, tx.outputs)
             if not tx.is_coinbase:
                 for txin in tx.inputs:
-                    hash168s.add(cache.spend(txin.prevout))
+                    hash168s.add(cache.spend(txin))
 
             for hash168 in hash168s:
                 self.history[hash168].append(tx_num)

@@ -2,11 +2,10 @@
 # and warranty status of this software.
 
 from collections import namedtuple
-import binascii
 import struct
 
 from lib.util import cachedproperty
-from lib.hash import double_sha256
+from lib.hash import double_sha256, hash_to_str
 
 
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
@@ -15,17 +14,17 @@ class Tx(namedtuple("Tx", "version inputs outputs locktime")):
     def is_coinbase(self):
         return self.inputs[0].is_coinbase
 
-OutPoint = namedtuple("OutPoint", "hash n")
+    # FIXME: add hash as a cached property?
 
-# prevout is an OutPoint object
-class TxInput(namedtuple("TxInput", "prevout script sequence")):
+class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 
     ZERO = bytes(32)
     MINUS_1 = 4294967295
 
     @cachedproperty
     def is_coinbase(self):
-        return self.prevout == (TxInput.ZERO, TxInput.MINUS_1)
+        return (self.prev_hash == TxInput.ZERO
+                and self.prev_idx == TxInput.MINUS_1)
 
     @cachedproperty
     def script_sig_info(self):
@@ -34,11 +33,11 @@ class TxInput(namedtuple("TxInput", "prevout script sequence")):
             return None
         return Script.parse_script_sig(self.script)
 
-    def __repr__(self):
-        script = binascii.hexlify(self.script).decode("ascii")
-        prev_hash = binascii.hexlify(self.prevout.hash).decode("ascii")
-        return ("Input(prevout=({}, {:d}), script={}, sequence={:d})"
-                .format(prev_hash, self.prevout.n, script, self.sequence))
+    def __str__(self):
+        script = self.script.hex()
+        prev_hash = hash_to_str(self.prev_hash)
+        return ("Input({}, {:d}, script={}, sequence={:d})"
+                .format(prev_hash, self.prev_idx, script, self.sequence))
 
 
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
@@ -56,11 +55,12 @@ class Deserializer(object):
         self.cursor = 0
 
     def read_tx(self):
-        version = self.read_le_int32()
-        inputs = self.read_inputs()
-        outputs = self.read_outputs()
-        locktime = self.read_le_uint32()
-        return Tx(version, inputs, outputs, locktime)
+        return Tx(
+            self.read_le_int32(),  # version
+            self.read_inputs(),    # inputs
+            self.read_outputs(),   # outputs
+            self.read_le_uint32()  # locktime
+        )
 
     def read_block(self):
         tx_hashes = []
@@ -81,15 +81,12 @@ class Deserializer(object):
         return [self.read_input() for i in range(n)]
 
     def read_input(self):
-        prevout = self.read_outpoint()
-        script = self.read_varbytes()
-        sequence = self.read_le_uint32()
-        return TxInput(prevout, script, sequence)
-
-    def read_outpoint(self):
-        hash = self.read_nbytes(32)
-        n = self.read_le_uint32()
-        return OutPoint(hash, n)
+        return TxInput(
+            self.read_nbytes(32),  # prev_hash
+            self.read_le_uint32(), # prev_idx
+            self.read_varbytes(),  # script
+            self.read_le_uint32()  # sequence
+        )
 
     def read_outputs(self):
         n = self.read_varint()
