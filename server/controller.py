@@ -37,29 +37,11 @@ class Controller(LoggedClass):
         env = self.env
         loop = self.loop
 
-        if False:
-            protocol = partial(LocalRPC, self)
-            if env.rpc_port is not None:
-                host = 'localhost'
-                rpc_server = loop.create_server(protocol, host, env.rpc_port)
-                self.servers.append(loop.run_until_complete(rpc_server))
-                self.logger.info('RPC server listening on {}:{:d}'
-                                 .format(host, env.rpc_port))
-
-            protocol = partial(ElectrumX, self, self.daemon, env)
-            if env.tcp_port is not None:
-                tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
-                self.servers.append(loop.run_until_complete(tcp_server))
-                self.logger.info('TCP server listening on {}:{:d}'
-                                 .format(env.host, env.tcp_port))
-
-            if env.ssl_port is not None:
-                ssl_server = loop.create_server(protocol, env.host, env.ssl_port)
-                self.servers.append(loop.run_until_complete(ssl_server))
-                self.logger.info('SSL server listening on {}:{:d}'
-                                 .format(env.host, env.ssl_port))
-
         coros = self.block_processor.coros()
+
+        if False:
+            self.start_servers()
+            coros.append(self.reap_jobs())
 
         for coro in coros:
             asyncio.ensure_future(coro)
@@ -68,6 +50,28 @@ class Controller(LoggedClass):
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
                                     partial(self.on_signal, signame))
+
+    def start_servers(self):
+        protocol = partial(LocalRPC, self)
+        if env.rpc_port is not None:
+            host = 'localhost'
+            rpc_server = loop.create_server(protocol, host, env.rpc_port)
+            self.servers.append(loop.run_until_complete(rpc_server))
+            self.logger.info('RPC server listening on {}:{:d}'
+                             .format(host, env.rpc_port))
+
+        protocol = partial(ElectrumX, self, self.daemon, env)
+        if env.tcp_port is not None:
+            tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
+            self.servers.append(loop.run_until_complete(tcp_server))
+            self.logger.info('TCP server listening on {}:{:d}'
+                             .format(env.host, env.tcp_port))
+
+        if env.ssl_port is not None:
+            ssl_server = loop.create_server(protocol, env.host, env.ssl_port)
+            self.servers.append(loop.run_until_complete(ssl_server))
+            self.logger.info('SSL server listening on {}:{:d}'
+                             .format(env.host, env.ssl_port))
 
     def stop(self):
         '''Close the listening servers.'''
