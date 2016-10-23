@@ -31,18 +31,21 @@ bit bigger than the combine cache size, because of Python overhead and
 also because leveldb can consume quite a lot of memory during UTXO
 flushing.  So these are rough numbers only:
 
-HIST_MB - amount of history cache, in MB, to retain before flushing to
-          disk.  Default is 250; probably no benefit being much larger
-          as history is append-only and not searched.
+HIST_MB   - amount of history cache, in MB, to retain before flushing to
+            disk.  Default is 250; probably no benefit being much larger
+            as history is append-only and not searched.
 
-UTXO_MB - amount of UTXO and history cache, in MB, to retain before
-          flushing to disk.  Default is 1000.  This may be too large
-          for small boxes or too small for machines with lots of RAM.
-          Larger caches generally perform better as there is
-          significant searching of the UTXO cache during indexing.
-          However, I don't see much benefit in my tests pushing this
-          too high, and in fact performance begins to fall.  My
-          machine has 24GB RAM; the slow down is probably because of
-          leveldb caching and Python GC effects.  However this may be
-          very dependent on hardware and you may have different
-          results.
+UTXO_MB   - amount of UTXO and history cache, in MB, to retain before
+            flushing to disk.  Default is 1000.  This may be too large
+            for small boxes or too small for machines with lots of RAM.
+            Larger caches generally perform better as there is
+            significant searching of the UTXO cache during indexing.
+            However, I don't see much benefit in my tests pushing this
+            too high, and in fact performance begins to fall.  My
+            machine has 24GB RAM; the slow down is probably because of
+            leveldb caching and Python GC effects.  However this may be
+            very dependent on hardware and you may have different
+            results.
+
+DB_ENGINE - database engine for the transaction database, either rocksdb,
+            leveldb or lmdb

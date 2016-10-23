@@ -10,13 +10,12 @@ from bisect import bisect_left
 from collections import defaultdict, namedtuple
 from functools import partial
 
-import plyvel
-
 from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
 from server.daemon import DaemonError
 from lib.hash import hash_to_str
 from lib.script import ScriptPubKey
 from lib.util import chunks, LoggedClass
+from server.storage import LMDB, RocksDB, LevelDB, NoDatabaseException
 
 
 def formatted_time(t):
@@ -137,7 +136,7 @@ class BlockProcessor(LoggedClass):
         self.wall_time = 0
 
         # Open DB and metadata files.  Record some of its state.
-        self.db = self.open_db(self.coin)
+        self.db = self.open_db(self.coin, env.db_engine)
         self.tx_count = self.db_tx_count
         self.height = self.db_height
         self.tip = self.db_tip
@@ -200,7 +199,7 @@ class BlockProcessor(LoggedClass):
                     await self.handle_chain_reorg()
                     self.caught_up = False
                     break
-                await asyncio.sleep(0)   # Yield
+                await asyncio.sleep(0)  # Yield
 
             if self.height != self.daemon.cached_height():
                 continue
@@ -239,6 +238,7 @@ class BlockProcessor(LoggedClass):
         '''Return the list of hashes to back up beacuse of a reorg.
 
         The hashes are returned in order of increasing height.'''
+
         def match_pos(hashes1, hashes2):
             for n, (hash1, hash2) in enumerate(zip(hashes1, hashes2)):
                 if hash1 == hash2:
@@ -268,17 +268,22 @@ class BlockProcessor(LoggedClass):
 
         return self.fs_cache.block_hashes(start, count)
 
-    def open_db(self, coin):
+    def open_db(self, coin, db_engine):
         db_name = '{}-{}'.format(coin.NAME, coin.NET)
+        db_engine_class = {
+            "leveldb": LevelDB,
+            "rocksdb": RocksDB,
+            "lmdb": LMDB
+        }[db_engine.lower()]
         try:
-            db = plyvel.DB(db_name, create_if_missing=False,
-                           error_if_exists=False, compression=None)
-        except:
-            db = plyvel.DB(db_name, create_if_missing=True,
-                           error_if_exists=True, compression=None)
-            self.logger.info('created new database {}'.format(db_name))
+            db = db_engine_class(db_name, create_if_missing=False,
+                                 error_if_exists=False, compression=None)
+        except NoDatabaseException:
+            db = db_engine_class(db_name, create_if_missing=True,
+                                 error_if_exists=True, compression=None)
+            self.logger.info('created new {} database {}'.format(db_engine, db_name))
         else:
-            self.logger.info('successfully opened database {}'.format(db_name))
+            self.logger.info('successfully opened {} database {}'.format(db_engine, db_name))
             self.read_state(db)
 
         return db
@@ -306,7 +311,7 @@ class BlockProcessor(LoggedClass):
         '''
         if self.flush_count < self.utxo_flush_count:
             raise ChainError('DB corrupt: flush_count < utxo_flush_count')
-        with self.db.write_batch(transaction=True) as batch:
+        with self.db.write_batch() as batch:
             if self.flush_count > self.utxo_flush_count:
                 self.logger.info('DB shut down uncleanly.  Scanning for '
                                  'excess history flushes...')
@@ -400,7 +405,7 @@ class BlockProcessor(LoggedClass):
         if self.height > self.db_height:
             self.fs_cache.flush(self.height, self.tx_count)
 
-        with self.db.write_batch(transaction=True) as batch:
+        with self.db.write_batch() as batch:
             # History first - fast and frees memory.  Flush state last
             # as it reads the wall time.
             if self.height > self.db_height:
@@ -646,7 +651,7 @@ class BlockProcessor(LoggedClass):
             if not tx.is_coinbase:
                 for txin in reversed(tx.inputs):
                     n -= 33
-                    undo_item = undo_info[n:n+33]
+                    undo_item = undo_info[n:n + 33]
                     put_utxo(txin.prev_hash + pack('<H', txin.prev_idx),
                              undo_item)
                     hash168s.add(undo_item[:21])
@@ -693,13 +698,13 @@ class BlockProcessor(LoggedClass):
         prefix = b'u' + hash168
         utxos = []
         for k, v in self.db.iterator(prefix=prefix):
-            (tx_pos, ) = unpack('<H', k[-2:])
+            (tx_pos,) = unpack('<H', k[-2:])
 
             for n in range(0, len(v), 12):
                 if limit == 0:
                     return
-                (tx_num, ) = unpack('<I', v[n:n+4])
-                (value, ) = unpack('<Q', v[n+4:n+12])
+                (tx_num,) = unpack('<I', v[n:n + 4])
+                (value,) = unpack('<Q', v[n + 4:n + 12])
                 tx_hash, height = self.get_tx_hash(tx_num)
                 yield UTXO(tx_num, tx_pos, tx_hash, height, value)
                 limit -= 1
