@@ -461,6 +461,9 @@ class DB(LoggedClass):
         self.utxo_cache = UTXOCache(self, self.db, self.coin)
         self.fs_cache = FSCache(self.coin, self.height, self.tx_count)
 
+        # Redirected member func
+        self.get_tx_hash = self.fs_cache.get_tx_hash
+
         # Log state
         self.logger.info('{}/{} height: {:,d} tx count: {:,d} '
                          'flush count: {:,d} utxo flush count: {:,d} '
