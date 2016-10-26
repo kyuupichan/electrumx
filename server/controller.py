@@ -31,29 +31,29 @@ class Controller(LoggedClass):
     def start(self, loop):
         env = self.env
 
-        protocol = partial(LocalRPC, self)
-        if env.rpc_port is not None:
-            host = 'localhost'
-            rpc_server = loop.create_server(protocol, host, env.rpc_port)
-            self.servers.append(loop.run_until_complete(rpc_server))
-            self.logger.info('RPC server listening on {}:{:d}'
-                             .format(host, env.rpc_port))
+        if False:
+            protocol = partial(LocalRPC, self)
+            if env.rpc_port is not None:
+                host = 'localhost'
+                rpc_server = loop.create_server(protocol, host, env.rpc_port)
+                self.servers.append(loop.run_until_complete(rpc_server))
+                self.logger.info('RPC server listening on {}:{:d}'
+                                 .format(host, env.rpc_port))
 
-        protocol = partial(ElectrumX, self, env)
-        if env.tcp_port is not None:
-            tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
-            self.servers.append(loop.run_until_complete(tcp_server))
-            self.logger.info('TCP server listening on {}:{:d}'
-                             .format(env.host, env.tcp_port))
+            protocol = partial(ElectrumX, self, env)
+            if env.tcp_port is not None:
+                tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
+                self.servers.append(loop.run_until_complete(tcp_server))
+                self.logger.info('TCP server listening on {}:{:d}'
+                                 .format(env.host, env.tcp_port))
 
-        if env.ssl_port is not None:
-            ssl_server = loop.create_server(protocol, env.host, env.ssl_port)
-            self.servers.append(loop.run_until_complete(ssl_server))
-            self.logger.info('SSL server listening on {}:{:d}'
-                             .format(env.host, env.ssl_port))
+            if env.ssl_port is not None:
+                ssl_server = loop.create_server(protocol, env.host, env.ssl_port)
+                self.servers.append(loop.run_until_complete(ssl_server))
+                self.logger.info('SSL server listening on {}:{:d}'
+                                 .format(env.host, env.ssl_port))
 
         coros = [
-            self.reap_jobs(),
             self.block_cache.catch_up(),
             self.block_cache.process_cache()
         ]
