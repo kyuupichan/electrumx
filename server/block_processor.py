@@ -167,13 +167,16 @@ class BlockProcessor(LoggedClass):
                 self.flush(True)
 
     def open_db(self, coin):
+        block_size = 4 * 1024
         db_name = '{}-{}'.format(coin.NAME, coin.NET)
         try:
             db = plyvel.DB(db_name, create_if_missing=False,
-                           error_if_exists=False, compression=None)
+                           error_if_exists=False, compression=None,
+                           block_size = block_size)
         except:
             db = plyvel.DB(db_name, create_if_missing=True,
-                           error_if_exists=True, compression=None)
+                           error_if_exists=True, compression=None,
+                           block_size = block_size)
             self.logger.info('created new database {}'.format(db_name))
             self.flush_state(db)
         else:
