@@ -46,7 +46,7 @@ class Controller(LoggedClass):
                 self.logger.info('RPC server listening on {}:{:d}'
                                  .format(host, env.rpc_port))
 
-            protocol = partial(ElectrumX, self, self.db, self.daemon, env)
+            protocol = partial(ElectrumX, self, self.daemon, env)
             if env.tcp_port is not None:
                 tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
                 self.servers.append(loop.run_until_complete(tcp_server))

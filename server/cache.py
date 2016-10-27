@@ -276,7 +276,6 @@ class FSCache(LoggedClass):
 
         # On-disk values, updated by a flush
         self.height = height
-        self.tx_count = tx_count
 
         # Unflushed items
         self.headers = []
@@ -289,6 +288,10 @@ class FSCache(LoggedClass):
         self.tx_counts = array.array('I')
         self.txcount_file.seek(0)
         self.tx_counts.fromfile(self.txcount_file, self.height + 1)
+        if self.tx_counts:
+            assert tx_count == self.tx_counts[-1]
+        else:
+            assert tx_count == 0
 
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
@@ -299,6 +302,8 @@ class FSCache(LoggedClass):
                 return open(filename, 'wb+')
             raise
 
+        return self.tx_counts[self.height] if self.tx_counts else 0
+
     def process_block(self, block):
         '''Process a new block and return (header, tx_hashes, txs)'''
         assert len(self.tx_counts) == self.height + 1 + len(self.headers)
@@ -308,7 +313,8 @@ class FSCache(LoggedClass):
         # Cache the new header, tx hashes and cumulative tx count
         self.headers.append(header)
         self.tx_hashes.append(tx_hashes)
-        self.tx_counts.append(self.tx_count + len(txs))
+        prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+        self.tx_counts.append(prior_tx_count + len(txs))
 
         return triple
 
@@ -320,6 +326,9 @@ class FSCache(LoggedClass):
         assert self.height + block_count == new_height
         assert len(self.tx_hashes) == block_count
         assert len(self.tx_counts) == self.height + 1 + block_count
+        assert new_tx_count == self.tx_counts[-1] if self.tx_counts else 0
+        prior_tx_count = self.tx_counts[self.height] if self.height >= 0 else 0
+        tx_diff = new_tx_count - prior_tx_count
 
         # First the headers
         headers = b''.join(self.headers)
@@ -336,9 +345,9 @@ class FSCache(LoggedClass):
         # Finally the hashes
         hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
         assert len(hashes) % 32 == 0
-        assert self.tx_count + len(hashes) // 32 == new_tx_count
+        assert len(hashes) // 32 == tx_diff
         cursor = 0
-        file_pos = self.tx_count * 32
+        file_pos = prior_tx_count * 32
         while cursor < len(hashes):
             file_num, offset = divmod(file_pos, self.tx_hash_file_size)
             size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
@@ -351,11 +360,9 @@ class FSCache(LoggedClass):
 
         os.sync()
 
-        tx_diff = new_tx_count - self.tx_count
         self.tx_hashes = []
         self.headers = []
         self.height += block_count
-        self.tx_count = new_tx_count
 
         return tx_diff
 
