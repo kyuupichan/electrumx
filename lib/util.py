@@ -2,8 +2,16 @@
 # and warranty status of this software.
 
 import array
+import logging
 import sys
 from collections import Container, Mapping
+
+
+class LoggedClass(object):
+
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.INFO)
 
 
 # Method decorator.  To be used for calculations that will always

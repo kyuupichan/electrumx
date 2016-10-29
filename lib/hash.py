@@ -30,6 +30,16 @@ def hmac_sha512(key, msg):
 def hash160(x):
     return ripemd160(sha256(x))
 
+def hash_to_str(x):
+    '''Converts a big-endian binary hash to a little-endian hex string, as
+    shown in block explorers, etc.
+    '''
+    return bytes(reversed(x)).hex()
+
+def hex_str_to_hash(x):
+    '''Converts a little-endian hex string as shown to a big-endian binary
+    hash.'''
+    return bytes(reversed(bytes.fromhex(x)))
 
 class InvalidBase58String(Exception):
     pass

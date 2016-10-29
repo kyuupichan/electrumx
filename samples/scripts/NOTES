@@ -5,6 +5,11 @@ NETWORK       - see lib/coins.py, must be a coin NET
 DB_DIRECTORY  - path to the database directory (if relative, to run script)
 USERNAME      - the username the server will run as
 SERVER_MAIN   - path to the server_main.py script (if relative, to run script)
+DAEMON_URL    - the URL used to connect to the daemon.  Should be of the form
+                    http://username:password@hostname:port/
+                Alternatively you can specify DAEMON_USERNAME, DAEMON_PASSWORD,
+                DAEMON_HOST and DAEMON_PORT.  DAEMON_PORT is optional and
+                will default appropriately for COIN.
 
 In addition either RPC_URL must be given as the full RPC URL for
 connecting to the daemon, or you must specify RPC_HOST, RPC_USER,
@@ -13,6 +18,11 @@ the coin and network otherwise).
 
 The other environment variables are all optional and will adopt
 sensible defaults if not specified.
+
+REORG_LIMIT - maximum number of blocks to be able to handle in a chain
+              reorganisation.  ElectrumX retains some fairly compact
+              undo information for this many blocks in levelDB.
+              Default is 200.
 
 Your performance might change by tweaking these cache settings.  Cache
 size is only checked roughly every minute, so the caches can grow
@@ -25,14 +35,14 @@ HIST_MB - amount of history cache, in MB, to retain before flushing to
           disk.  Default is 250; probably no benefit being much larger
           as history is append-only and not searched.
 
-CACHE_MB- amount of UTXO and history cache, in MB, to retain before
+UTXO_MB - amount of UTXO and history cache, in MB, to retain before
           flushing to disk.  Default is 1000.  This may be too large
           for small boxes or too small for machines with lots of RAM.
           Larger caches generally perform better as there is
           significant searching of the UTXO cache during indexing.
           However, I don't see much benefit in my tests pushing this
-          beyond 2000, and in fact beyond there performance begins to
-          fall.  My machine has 24GB RAM; the slow down is probably
-          because of leveldb caching and Python GC effects.  However
-          this may be very dependent on hardware and you may have
-          different results.
+          too high, and in fact performance begins to fall.  My
+          machine has 24GB RAM; the slow down is probably because of
+          leveldb caching and Python GC effects.  However this may be
+          very dependent on hardware and you may have different
+          results.

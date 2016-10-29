@@ -47,33 +47,28 @@ faster?
 All of the following likely play a part:
 
 - aggressive caching and batching of DB writes
-- more compact representation of UTXOs, the mp address index, and
+- more compact representation of UTXOs, the address index, and
   history.  Electrum server stores full transaction hash and height
   for all UTXOs.  In its pruned history it does the same.  ElectrumX
   just stores the transaction number in the linear history of
-  transactions, and it looks like that for at least 5 years that will
-  fit in a 4-byte integer.  ElectrumX calculates the height from a
-  simple lookup in a linear array which is stored on disk.  ElectrumX
-  also stores transaction hashes in a linear array on disk.
+  transactions.  For at least another 5 years the transaction number
+  will fit in a 4-byte integer.  ElectrumX calculates the height from
+  a simple lookup in a linear array which is stored on disk.
+  ElectrumX also stores transaction hashes in a linear array on disk.
 - storing static append-only metadata which is indexed by position on
   disk rather than in levelDB.  It would be nice to do this for histories
   but I cannot think how they could be easily indexable on a filesystem.
 - avoiding unnecessary or redundant computations
 - more efficient memory usage
-- asyncio and asynchronous prefetch of blocks.  With luck ElectrumX
-  will have no need of threads or locking primitives
-- because it prunes electrum-server needs to store undo information,
-  ElectrumX should does not need to store undo information for
-  blockchain reorganisations (note blockchain reorgs are not yet
-  implemented in ElectrumX)
+- asyncio and asynchronous prefetch of blocks.  ElectrumX should not
+  have any need of threads.
 
 
 Roadmap
 =======
 
 - test a few more performance improvement ideas
-- handle blockchain reorgs
-- handle client connections
+- handle client connections (half-implemented but not functional)
 - potentially move some functionality to C or C++
 
 Once I get round to writing the server part, I will add DoS
@@ -102,12 +97,13 @@ As I've been researching where the time is going during block chain
 indexing and how various cache sizes and hardware choices affect it,
 I'd appreciate it if anyone trying to synchronize could tell me::
 
+  - the version of ElectrumX
   - their O/S and filesystem
   - their hardware (CPU name and speed, RAM, and disk kind)
   - whether their daemon was on the same host or not
   - whatever stats about sync height vs time they can provide (the
     logs give it all in wall time)
-  - the network they synced
+  - the network (e.g. bitcoin mainnet) they synced
 
 
 Neil Booth

@@ -6,14 +6,15 @@ successfully on MaxOSX and DragonFlyBSD.  It won't run out-of-the-box
 on Windows, but the changes required to make it do so should be
 small - patches welcome.
 
-+ Python3:  ElectrumX makes heavy use of asyncio so version >=3.5 is required
++ Python3:  ElectrumX uses asyncio.  Python version >=3.5 is required.
 + plyvel:   Python interface to LevelDB.  I am using plyvel-0.9.
 + aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
-            communication with the daemon.  I am using aiohttp-0.21.
+            communication with the daemon.  Version >= 1.0 required; I am
+            using 1.0.5.
 
 While not requirements for running ElectrumX, it is intended to be run
-with supervisor software such as Daniel Bernstein's daemontools, or
-Gerald Pape's runit package.  These make administration of secure
+with supervisor software such as Daniel Bernstein's daemontools,
+Gerald Pape's runit package or systemd.  These make administration of secure
 unix servers very easy, and I strongly recommend you install one of these
 and familiarise yourself with them.  The instructions below and sample
 run scripts assume daemontools; adapting to runit should be trivial
@@ -54,6 +55,10 @@ on an SSD::
 
     mkdir /path/to/db_directory
     chown electrumx /path/to/db_directory
+
+
+Using daemontools
+-----------------
 
 Next create a daemontools service directory; this only holds symlinks
 (see daemontools documentation).  The 'svscan' program will ensure the
@@ -107,6 +112,34 @@ You can see its logs with::
     tail -F /path/to/log/dir/current | tai64nlocal
 
 
+Using systemd
+-------------
+
+This repository contains a sample systemd unit file that you can use to
+setup ElectrumX with systemd. Simply copy it to :code:`/etc/systemd/system`::
+
+    cp samples/systemd-unit /etc/systemd/system/electrumx.service
+
+The sample unit file assumes that the repository is located at
+:code:`/home/electrumx/electrumx`. If that differs on your system, you need to
+change the unit file accordingly.
+
+You need to set a few configuration variables in :code:`/etc/electrumx.conf`,
+see `samples/NOTES` for the list of required variables.
+
+Now you can start ElectrumX using :code:`systemctl`::
+
+    systemctl start electrumx
+
+You can use :code:`journalctl` to check the log output::
+
+    journalctl -u electrumx -f
+
+Once configured, you may want to start ElectrumX at boot::
+
+    systemctl enable electrumx
+
+
 Sync Progress
 =============
 
@@ -127,13 +160,14 @@ Here is my experience with the current codebase, to given heights and
 rough wall-time::
 
                  Machine A     Machine B    DB + Metadata
-  180,000                       7m 10s       0.4 GiB
-  245,800                       1h 00m       2.7 GiB
-  290,000                       1h 56m       3.3 GiB
-  343,000                       3h 56m       6.0 GiB
-  386,000                       7h 28m       7.0 GiB
-  404,000                       9h 41m
-  434,369                      14h 38m      17.1 GiB
+  181,000                       7m 09s       0.4 GiB
+  255,000                       1h 02m       2.7 GiB
+  289,000                       1h 46m       3.3 GiB
+  317,000                       2h 33m
+  351,000                       3h 58m
+  377,000                       6h 06m       6.5 GiB
+  403,400                       8h 51m
+  436,196                      14h 03m      17.3 GiB
 
 Machine A: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU, 8GB
 RAM and a DragonFlyBSD HAMMER fileystem on an SSD.  It requests blocks
@@ -141,7 +175,7 @@ over the LAN from a bitcoind on machine B.
 
 Machine B: a late 2012 iMac running El-Capitan 10.11.6, 2.9GHz
 quad-core Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on
-the same machine.  HIST_MB of 400, CACHE_MB of 2,000.
+the same machine.  HIST_MB of 350, UTXO_MB of 1,600.
 
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
@@ -158,7 +192,7 @@ by bringing it down like so::
 
 If processing the blockchain the server will start the process of
 flushing to disk.  Once that is complete the server will exit.  Be
-patient as disk flushing can take a while.
+patient as disk flushing can take many minutes.
 
 ElectrumX flushes to leveldb using its transaction functionality.  The
 plyvel documentation claims this is atomic.  I have written ElectrumX
@@ -228,4 +262,5 @@ After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
 is harmless.
 
-The ETA is just a guide and can be quite volatile.
+The ETA is just a guide and can be quite volatile.  It is too optimistic
+initially.

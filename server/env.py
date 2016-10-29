@@ -1,28 +1,37 @@
 # See the file "LICENSE" for information about the copyright
 # and warranty status of this software.
 
-import logging
 from os import environ
 
 from lib.coins import Coin
+from lib.util import LoggedClass
 
 
-class Env(object):
+class Env(LoggedClass):
     '''Wraps environment configuration.'''
 
     class Error(Exception):
         pass
 
     def __init__(self):
-        self.logger = logging.getLogger('Env')
-        self.logger.setLevel(logging.INFO)
+        super().__init__()
         coin_name = self.default('COIN', 'Bitcoin')
         network = self.default('NETWORK', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.db_dir = self.required('DB_DIRECTORY')
         self.utxo_MB = self.integer('UTXO_MB', 1000)
         self.hist_MB = self.integer('HIST_MB', 250)
-        self.rpc_url = self.build_rpc_url()
+        self.host = self.default('HOST', 'localhost')
+        self.reorg_limit = self.integer('REORG_LIMIT', 200)
+        self.daemon_url = self.build_daemon_url()
+        # Server stuff
+        self.tcp_port = self.integer('TCP_PORT', None)
+        self.ssl_port = self.integer('SSL_PORT', None)
+        self.rpc_port = self.integer('RPC_PORT', 8000)
+        self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
+        self.banner_file = self.default('BANNER_FILE', None)
+        # The electrum client takes the empty string as unspecified
+        self.donation_address = self.default('DONATION_ADDRESS', '')
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
@@ -43,13 +52,13 @@ class Env(object):
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
 
-    def build_rpc_url(self):
-        rpc_url = environ.get('RPC_URL')
-        if not rpc_url:
-            rpc_username = self.required('RPC_USERNAME')
-            rpc_password = self.required('RPC_PASSWORD')
-            rpc_host = self.required('RPC_HOST')
-            rpc_port = self.default('RPC_PORT', self.coin.DEFAULT_RPC_PORT)
-            rpc_url = ('http://{}:{}@{}:{}/'
-                       .format(rpc_username, rpc_password, rpc_host, rpc_port))
-        return rpc_url
+    def build_daemon_url(self):
+        daemon_url = environ.get('DAEMON_URL')
+        if not daemon_url:
+            username = self.required('DAEMON_USERNAME')
+            password = self.required('DAEMON_PASSWORD')
+            host = self.required('DAEMON_HOST')
+            port = self.default('DAEMON_PORT', self.coin.DEFAULT_RPC_PORT)
+            daemon_url = ('http://{}:{}@{}:{}/'
+                          .format(username, password, host, port))
+        return daemon_url
