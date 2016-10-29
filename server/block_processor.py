@@ -124,7 +124,6 @@ class BlockProcessor(LoggedClass):
         self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
-        self.last_flush = time.time()
         self.coin = env.coin
         self.caught_up = False
         self.reorg_limit = env.reorg_limit
@@ -151,6 +150,9 @@ class BlockProcessor(LoggedClass):
         self.utxo_cache = UTXOCache(self, self.db, self.coin)
         self.fs_cache = FSCache(self.coin, self.height, self.tx_count)
         self.prefetcher = Prefetcher(daemon, self.height)
+
+        self.last_flush = time.time()
+        self.last_flush_tx_count = self.tx_count
 
         # Redirected member func
         self.get_tx_hash = self.fs_cache.get_tx_hash
@@ -348,6 +350,7 @@ class BlockProcessor(LoggedClass):
         now = time.time()
         self.wall_time += now - self.last_flush
         self.last_flush = now
+        self.last_flush_tx_count = self.tx_count
         state = {
             'genesis': self.coin.GENESIS_HASH,
             'height': self.db_height,
@@ -388,7 +391,7 @@ class BlockProcessor(LoggedClass):
 
         flush_start = time.time()
         last_flush = self.last_flush
-        tx_diff = self.tx_count - self.db_tx_count
+        tx_diff = self.tx_count - self.last_flush_tx_count
 
         # Write out the files to the FS before flushing to the DB.  If
         # the DB transaction fails, the files being too long doesn't
@@ -506,8 +509,8 @@ class BlockProcessor(LoggedClass):
                          'hist addrs: {:,d}  hist size {:,d}'
                          .format(len(self.utxo_cache.cache),
                                  len(self.utxo_cache.db_cache),
-                                 self.history_size,
-                                 len(self.history)))
+                                 len(self.history),
+                                 self.history_size))
         self.logger.info('  size: {:,d}MB  (UTXOs {:,d}MB hist {:,d}MB)'
                          .format(utxo_MB + hist_MB, utxo_MB, hist_MB))
         return utxo_MB, hist_MB
