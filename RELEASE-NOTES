@@ -1,0 +1,11 @@
+Version 0.02
+------------
+
+- fix bug where tx counts were incorrectly saved
+- large clean-up and refactoring of code, breakout into new files
+- several efficiency improvements
+- initial implementation of chain reorg handling
+- work on RPC and TCP server functionality.  Code committed but not
+  functional, so currently disabled
+- note that some of the enivronment variables have been renamed,
+  see samples/scripts/NOTES for the list
