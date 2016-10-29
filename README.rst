@@ -97,6 +97,7 @@ As I've been researching where the time is going during block chain
 indexing and how various cache sizes and hardware choices affect it,
 I'd appreciate it if anyone trying to synchronize could tell me::
 
+  - the version of ElectrumX
   - their O/S and filesystem
   - their hardware (CPU name and speed, RAM, and disk kind)
   - whether their daemon was on the same host or not
