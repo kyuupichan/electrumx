@@ -13,8 +13,8 @@ small - patches welcome.
             using 1.0.5.
 
 While not requirements for running ElectrumX, it is intended to be run
-with supervisor software such as Daniel Bernstein's daemontools, or
-Gerald Pape's runit package.  These make administration of secure
+with supervisor software such as Daniel Bernstein's daemontools, 
+Gerald Pape's runit package or systemd.  These make administration of secure
 unix servers very easy, and I strongly recommend you install one of these
 and familiarise yourself with them.  The instructions below and sample
 run scripts assume daemontools; adapting to runit should be trivial
@@ -55,6 +55,10 @@ on an SSD::
 
     mkdir /path/to/db_directory
     chown electrumx /path/to/db_directory
+
+
+Using daemontools
+-----------------
 
 Next create a daemontools service directory; this only holds symlinks
 (see daemontools documentation).  The 'svscan' program will ensure the
@@ -106,6 +110,35 @@ Creating the symlink will kick off the server process almost immediately.
 You can see its logs with::
 
     tail -F /path/to/log/dir/current | tai64nlocal
+
+
+Using systemd
+-------------
+
+This repository contains a sample systemd unit file that you can use to
+setup ElectrumX with systemd. Simply copy it to :code:`/etc/systemd/system`::
+
+    cp samples/systemd-unit /etc/systemd/system/electrumx.service
+
+The sample unit file assumes that the repository is located at 
+:code:`/home/electrumx/electrumx`. If that differs on your system, you need to
+change the unit file accordingly.
+
+You need to set a few configuration variables in :code:`/etc/electrumx.conf`,
+see `samples/NOTES` for the list of required variables.
+
+Now you can start ElectrumX using :code:`systemctl`::
+
+    systemctl start electrumx
+
+You can use :code:`journalctl` to check the log output::
+
+    journalctl -u electrumx -f
+
+Once configured, you may want to start ElectrumX at boot::
+
+    systemctl enable electrumx
+
 
 
 Sync Progress
