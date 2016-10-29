@@ -69,15 +69,15 @@ class Prefetcher(LoggedClass):
 
     async def start(self):
         '''Loop forever polling for more blocks.'''
-        self.logger.info('prefetching blocks...')
+        self.logger.info('looping forever prefetching blocks...')
         while True:
-            while self.queue_size < self.target_cache_size:
-                try:
-                    with await self.semaphore:
-                        await self._prefetch()
-                except DaemonError as e:
-                    self.logger.info('ignoring daemon errors: {}'.format(e))
-            await asyncio.sleep(2)
+            try:
+                with await self.semaphore:
+                    count = await self._prefetch()
+                if not count:
+                    await asyncio.sleep(5)
+            except DaemonError as e:
+                self.logger.info('ignoring daemon errors: {}'.format(e))
 
     def _prefill_count(self, room):
         ave_size = sum(self.recent_sizes) // len(self.recent_sizes)
@@ -89,10 +89,13 @@ class Prefetcher(LoggedClass):
         daemon_height = await self.daemon.height()
         max_count = min(daemon_height - self.fetched_height, 4000)
         count = min(max_count, self._prefill_count(self.target_cache_size))
+        if not count:
+            return 0
         first = self.fetched_height + 1
         hex_hashes = await self.daemon.block_hex_hashes(first, count)
         if not hex_hashes:
-            return
+            self.logger.error('requested {:,d} hashes, got none'.format(count))
+            return 0
 
         blocks = await self.daemon.raw_blocks(hex_hashes)
         sizes = [len(block) for block in blocks]
@@ -106,6 +109,7 @@ class Prefetcher(LoggedClass):
         excess = len(self.recent_sizes) - 50
         if excess > 0:
             self.recent_sizes = self.recent_sizes[excess:]
+        return count
 
 
 class BlockProcessor(LoggedClass):
@@ -135,6 +139,7 @@ class BlockProcessor(LoggedClass):
         self.flush_count = 0
         self.utxo_flush_count = 0
         self.wall_time = 0
+        self.first_sync = True
 
         # Open DB and metadata files.  Record some of its state.
         self.db = self.open_db(self.coin)
@@ -296,6 +301,7 @@ class BlockProcessor(LoggedClass):
         self.flush_count = state['flush_count']
         self.utxo_flush_count = state['utxo_flush_count']
         self.wall_time = state['wall_time']
+        self.first_sync = state.get('first_sync', True)
 
     def clean_db(self):
         '''Clean out stale DB items.
@@ -347,6 +353,8 @@ class BlockProcessor(LoggedClass):
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
+        if self.caught_up:
+            self.first_sync = False
         now = time.time()
         self.wall_time += now - self.last_flush
         self.last_flush = now
@@ -359,6 +367,7 @@ class BlockProcessor(LoggedClass):
             'flush_count': self.flush_count,
             'utxo_flush_count': self.utxo_flush_count,
             'wall_time': self.wall_time,
+            'first_sync': self.first_sync,
         }
         batch.put(b'state', repr(state).encode())
 
@@ -392,6 +401,7 @@ class BlockProcessor(LoggedClass):
         flush_start = time.time()
         last_flush = self.last_flush
         tx_diff = self.tx_count - self.last_flush_tx_count
+        show_stats = self.first_sync
 
         # Write out the files to the FS before flushing to the DB.  If
         # the DB transaction fails, the files being too long doesn't
@@ -422,7 +432,7 @@ class BlockProcessor(LoggedClass):
                                  flush_time))
 
         # Catch-up stats
-        if not self.caught_up and tx_diff > 0:
+        if show_stats:
             daemon_height = self.daemon.cached_height()
             txs_per_sec = int(self.tx_count / self.wall_time)
             this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
