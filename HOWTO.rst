@@ -6,10 +6,11 @@ successfully on MaxOSX and DragonFlyBSD.  It won't run out-of-the-box
 on Windows, but the changes required to make it do so should be
 small - patches welcome.
 
-+ Python3:  ElectrumX makes heavy use of asyncio so version >=3.5 is required
++ Python3:  ElectrumX uses asyncio.  Python version >=3.5 is required.
 + plyvel:   Python interface to LevelDB.  I am using plyvel-0.9.
 + aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
-            communication with the daemon.  I am using aiohttp-0.21.
+            communication with the daemon.  Version >= 1.0 required; I am
+            using 1.0.5.
 
 While not requirements for running ElectrumX, it is intended to be run
 with supervisor software such as Daniel Bernstein's daemontools, or
