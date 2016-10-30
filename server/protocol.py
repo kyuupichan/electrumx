@@ -24,6 +24,14 @@ class Error(Exception):
 
 
 class JSONRPC(asyncio.Protocol, LoggedClass):
+    '''Base class that manages a JSONRPC connection.
+
+    When a request comes in for an RPC method M, then a member
+    function handle_M is called with the request params array, except
+    that periods in M are replaced with underscores.  So a RPC call
+    for method 'blockchain.estimatefee' will be passed to
+    handle_blockchain_estimatefee.
+    '''
 
     def __init__(self, controller):
         super().__init__()
@@ -31,39 +39,41 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.parts = []
 
     def connection_made(self, transport):
+        '''Handle an incoming client connection.'''
         self.transport = transport
-        peername = transport.get_extra_info('peername')
-        self.logger.info('connection from {}'.format(peername))
+        self.peername = transport.get_extra_info('peername')
+        self.logger.info('connection from {}'.format(self.peername))
         self.controller.add_session(self)
 
     def connection_lost(self, exc):
-        self.logger.info('disconnected')
+        '''Handle client disconnection.'''
+        self.logger.info('disconnected: {}'.format(self.peername))
         self.controller.remove_session(self)
 
     def data_received(self, data):
+        '''Handle incoming data (synchronously).
+
+        Requests end in newline characters.  Pass complete requests to
+        decode_message for handling.
+        '''
         while True:
             npos = data.find(ord('\n'))
             if npos == -1:
+                self.parts.append(data)
                 break
             tail, data = data[:npos], data[npos + 1:]
-            parts = self.parts
-            self.parts = []
+            parts, self.parts = self.parts, []
             parts.append(tail)
             self.decode_message(b''.join(parts))
 
-        if data:
-            self.parts.append(data)
-
     def decode_message(self, message):
-        '''Message is a binary message.'''
+        '''Decode a binary message and queue it for asynchronous handling.'''
         try:
             message = json.loads(message.decode())
         except Exception as e:
-            self.logger.info('caught exception decoding message'.format(e))
-            return
-
-        job = self.request_handler(message)
-        self.controller.add_job(job)
+            self.logger.info('error decoding JSON message'.format(e))
+        else:
+            self.controller.add_job(self.request_handler(message))
 
     async def request_handler(self, request):
         '''Called asynchronously.'''

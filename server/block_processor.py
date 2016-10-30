@@ -126,17 +126,18 @@ class BlockProcessor(LoggedClass):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, daemon):
+    def __init__(self, env, daemon, on_catchup=None):
         super().__init__()
 
         self.daemon = daemon
+        self.on_catchup = on_catchup
 
         # Meta
         self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
         self.coin = env.coin
-        self.caught_up = False
+        self.have_caught_up = False
         self.reorg_limit = env.reorg_limit
 
         # Chain state (initialize to genesis in case of new DB)
@@ -192,6 +193,17 @@ class BlockProcessor(LoggedClass):
         else:
             return [self.start(), self.prefetcher.start()]
 
+    async def caught_up(self):
+        '''Call when we catch up to the daemon's height.'''
+        # Flush everything when in caught-up state as queries
+        # are performed on DB and not in-memory.
+        self.flush(True)
+        if not self.have_caught_up:
+            self.have_caught_up = True
+            self.logger.info('caught up to height {:,d}'.format(self.height))
+            if self.on_catchup:
+                await self.on_catchup()
+
     async def start(self):
         '''External entry point for block processing.
 
@@ -199,32 +211,26 @@ class BlockProcessor(LoggedClass):
         shutdown.
         '''
         try:
-            await self.advance_blocks()
+            # If we're caught up so the start servers immediately
+            if self.height == await self.daemon.height():
+                await self.caught_up()
+            await self.wait_for_blocks()
         finally:
             self.flush(True)
 
-    async def advance_blocks(self):
+    async def wait_for_blocks(self):
         '''Loop forever processing blocks in the forward direction.'''
         while True:
             blocks = await self.prefetcher.get_blocks()
             for block in blocks:
                 if not self.advance_block(block):
                     await self.handle_chain_reorg()
-                    self.caught_up = False
+                    self.have_caught_up = False
                     break
                 await asyncio.sleep(0)   # Yield
 
-            if self.height != self.daemon.cached_height():
-                continue
-
-            if not self.caught_up:
-                self.caught_up = True
-                self.logger.info('caught up to height {:,d}'
-                                 .format(self.height))
-
-            # Flush everything when in caught-up state as queries
-            # are performed on DB not in-memory
-            self.flush(True)
+            if self.height == self.daemon.cached_height():
+                await self.caught_up()
 
     async def force_chain_reorg(self, to_genesis):
         try:
@@ -360,7 +366,7 @@ class BlockProcessor(LoggedClass):
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
-        if self.caught_up:
+        if self.have_caught_up:
             self.first_sync = False
         now = time.time()
         self.wall_time += now - self.last_flush

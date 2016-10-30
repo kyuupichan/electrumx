@@ -34,6 +34,9 @@ class Env(LoggedClass):
         # Server stuff
         self.tcp_port = self.integer('TCP_PORT', None)
         self.ssl_port = self.integer('SSL_PORT', None)
+        if self.ssl_port:
+            self.ssl_certfile = self.required('SSL_CERTFILE')
+            self.ssl_keyfile = self.required('SSL_KEYFILE')
         self.rpc_port = self.integer('RPC_PORT', 8000)
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
