@@ -32,6 +32,7 @@ class Env(LoggedClass):
         self.banner_file = self.default('BANNER_FILE', None)
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
+        self.db_engine = self.default('DB_ENGINE', 'leveldb')
 
     def default(self, envvar, default):
         return environ.get(envvar, default)

@@ -29,6 +29,19 @@ metadata comes to just over 17GB.  Leveldb needs a bit more for brief
 periods, and the block chain is only getting longer, so I would
 recommend having at least 30-40GB free space.
 
+Database Engine
+===============
+
+You can choose between either RocksDB, LevelDB or LMDB to store transaction
+information on disk. Currently, the fastest seems to be RocksDB with LevelDB
+being about 10% slower. LMDB seems to be the slowest but maybe that's because
+of bad implementation or configuration.
+
+You will need to install either:
+
++ `plyvel <https://plyvel.readthedocs.io/en/latest/installation.html>`_ for LevelDB
++ `pyrocksdb <http://pyrocksdb.readthedocs.io/en/v0.4/installation.html>`_ for RocksDB
++ `lmdb <https://lmdb.readthedocs.io/en/release/#installation-unix>`_ for LMDB
 
 Running
 =======
