@@ -1,7 +1,5 @@
 The following environment variables are required:
 
-COIN          - see lib/coins.py, must be a coin NAME
-NETWORK       - see lib/coins.py, must be a coin NET
 DB_DIRECTORY  - path to the database directory (if relative, to run script)
 USERNAME      - the username the server will run as
 SERVER_MAIN   - path to the server_main.py script (if relative, to run script)
@@ -11,18 +9,15 @@ DAEMON_URL    - the URL used to connect to the daemon.  Should be of the form
                 DAEMON_HOST and DAEMON_PORT.  DAEMON_PORT is optional and
                 will default appropriately for COIN.
 
-In addition either RPC_URL must be given as the full RPC URL for
-connecting to the daemon, or you must specify RPC_HOST, RPC_USER,
-RPC_PASSWORD and optionally RPC_PORT (it defaults appropriately for
-the coin and network otherwise).
-
 The other environment variables are all optional and will adopt
 sensible defaults if not specified.
 
-REORG_LIMIT - maximum number of blocks to be able to handle in a chain
-              reorganisation.  ElectrumX retains some fairly compact
-              undo information for this many blocks in levelDB.
-              Default is 200.
+COIN          - see lib/coins.py, must be a coin NAME.  Defaults to Bitcoin.
+NETWORK       - see lib/coins.py, must be a coin NET.  Defaults to mainnet.
+REORG_LIMIT   - maximum number of blocks to be able to handle in a chain
+                reorganisation.  ElectrumX retains some fairly compact
+                undo information for this many blocks in levelDB.
+                Default is 200.
 
 Your performance might change by tweaking these cache settings.  Cache
 size is only checked roughly every minute, so the caches can grow
@@ -47,5 +42,7 @@ UTXO_MB   - amount of UTXO and history cache, in MB, to retain before
             very dependent on hardware and you may have different
             results.
 
-DB_ENGINE - database engine for the transaction database, either rocksdb,
-            leveldb or lmdb
+DB_ENGINE - database engine for the transaction database.  Default is
+            leveldb.  Supported alternatives are rocksdb and lmdb,
+            which will require installation of the appropriate python
+            packages.
