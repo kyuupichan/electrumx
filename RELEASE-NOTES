@@ -1,3 +1,12 @@
+Version 0.03
+------------
+
+- merged bauerj's abstracted DB engine contribution to make it easy to
+  play with different backends.  In addition to LevelDB this adds
+  support for RocksDB and LMDB.  We're interested in your comparitive
+  performance experiences.
+
+
 Version 0.02
 ------------
 
