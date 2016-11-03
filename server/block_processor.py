@@ -520,7 +520,7 @@ class BlockProcessor(LoggedClass):
             prefix = b'H' + hash168
             deletes = []
             puts = {}
-            for key, hist in self.db.iterator(reverse=True, prefix=prefix):
+            for key, hist in self.db.iterator(prefix=prefix, reverse=True):
                 a = array.array('I')
                 a.frombytes(hist)
                 # Remove all history entries >= self.tx_count

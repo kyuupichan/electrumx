@@ -1,4 +1,5 @@
 import os
+from functools import partial
 
 
 class Storage(object):
@@ -19,7 +20,7 @@ class Storage(object):
         """
         raise NotImplementedError()
 
-    def iterator(self, prefix=b""):
+    def iterator(self, prefix=b'', reverse=False):
         """
         Returns an iterator that yields (key, value) pairs from the database sorted by key.
         If `prefix` is set, only keys starting with `prefix` will be included.
@@ -37,18 +38,10 @@ class LevelDB(Storage):
         import plyvel
         self.db = plyvel.DB(name, create_if_missing=create_if_missing,
                             error_if_exists=error_if_exists, compression=compression)
-
-    def get(self, key):
-        return self.db.get(key)
-
-    def write_batch(self):
-        return self.db.write_batch(transaction=True)
-
-    def iterator(self, prefix=b""):
-        return self.db.iterator(prefix=prefix)
-
-    def put(self, key, value):
-        self.db.put(key, value)
+        self.get = self.db.get
+        self.put = self.db.put
+        self.iterator = self.db.iterator
+        self.write_batch = partial(self.db.write_batch, transaction=True)
 
 
 class RocksDB(Storage):
@@ -65,9 +58,8 @@ class RocksDB(Storage):
                                                    compression=compression,
                                                    target_file_size_base=33554432,
                                                    max_open_files=1024))
-
-    def get(self, key):
-        return self.db.get(key)
+        self.get = self.db.get
+        self.put = self.db.put
 
     class WriteBatch(object):
         def __init__(self, db):
@@ -85,8 +77,10 @@ class RocksDB(Storage):
         return RocksDB.WriteBatch(self.db)
 
     class Iterator(object):
-        def __init__(self, db, prefix):
+        def __init__(self, db, prefix, reverse):
             self.it = db.iteritems()
+            if reverse:
+                self.it = reversed(self.it)
             self.prefix = prefix
 
         def __iter__(self):
@@ -100,11 +94,8 @@ class RocksDB(Storage):
                 raise StopIteration
             return k, v
 
-    def iterator(self, prefix=b""):
-        return RocksDB.Iterator(self.db, prefix)
-
-    def put(self, key, value):
-        return self.db.put(key, value)
+    def iterator(self, prefix=b'', reverse=False):
+        return RocksDB.Iterator(self.db, prefix, reverse)
 
 
 class LMDB(Storage):
@@ -128,15 +119,16 @@ class LMDB(Storage):
     def write_batch(self):
         return self.env.begin(db=self.db, write=True)
 
-    def iterator(self, prefix=b""):
-        return LMDB.lmdb.Iterator(self.db, self.env, prefix)
+    def iterator(self, prefix=b'', reverse=False):
+        return LMDB.Iterator(self.db, self.env, prefix, reverse)
 
     class Iterator:
-        def __init__(self, db, env, prefix):
+        def __init__(self, db, env, prefix, reverse):
             self.transaction = env.begin(db=db)
             self.transaction.__enter__()
             self.db = db
             self.prefix = prefix
+            self.reverse = reverse   # FIXME
 
         def __iter__(self):
             self.iterator = LMDB.lmdb.Cursor(self.db, self.transaction)
