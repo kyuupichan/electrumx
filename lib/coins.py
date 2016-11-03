@@ -19,6 +19,7 @@ import sys
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer
+from lib.util import subclasses
 
 
 class CoinError(Exception):
@@ -34,21 +35,12 @@ class Coin(object):
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
 
-    @staticmethod
-    def coin_classes():
-        '''Return a list of coin classes in declaration order.'''
-        is_coin = lambda obj: (inspect.isclass(obj)
-                               and issubclass(obj, Coin)
-                               and obj != Coin)
-        pairs = inspect.getmembers(sys.modules[__name__], is_coin)
-        return [pair[1] for pair in pairs]
-
     @classmethod
     def lookup_coin_class(cls, name, net):
         '''Return a coin class given name and network.
 
         Raise an exception if unrecognised.'''
-        for coin in cls.coin_classes():
+        for coin in subclasses(Coin):
             if (coin.NAME.lower() == name.lower()
                     and coin.NET.lower() == net.lower()):
                 return coin

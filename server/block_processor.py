@@ -22,7 +22,7 @@ from server.daemon import DaemonError
 from lib.hash import hash_to_str
 from lib.script import ScriptPubKey
 from lib.util import chunks, LoggedClass
-from server.storage import LMDB, RocksDB, LevelDB, NoDatabaseException
+from server.storage import open_db
 
 
 def formatted_time(t):
@@ -161,17 +161,17 @@ class BlockProcessor(LoggedClass):
         self.coin = env.coin
         self.reorg_limit = env.reorg_limit
 
-        # Chain state (initialize to genesis in case of new DB)
-        self.db_height = -1
-        self.db_tx_count = 0
-        self.db_tip = b'\0' * 32
-        self.flush_count = 0
-        self.utxo_flush_count = 0
-        self.wall_time = 0
-        self.first_sync = True
-
         # Open DB and metadata files.  Record some of its state.
-        self.db = self.open_db(self.coin, env.db_engine)
+        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
+        self.db = open_db(db_name, env.db_engine)
+        if self.db.is_new:
+            self.logger.info('created new {} database {}'
+                             .format(env.db_engine, db_name))
+        else:
+            self.logger.info('successfully opened {} database {}'
+                             .format(env.db_engine, db_name))
+
+        self.init_state()
         self.tx_count = self.db_tx_count
         self.height = self.db_height
         self.tip = self.db_tip
@@ -313,40 +313,29 @@ class BlockProcessor(LoggedClass):
 
         return self.fs_cache.block_hashes(start, count)
 
-    def open_db(self, coin, db_engine):
-        db_name = '{}-{}'.format(coin.NAME, coin.NET)
-        db_engine_class = {
-            "leveldb": LevelDB,
-            "rocksdb": RocksDB,
-            "lmdb": LMDB
-        }[db_engine.lower()]
-        try:
-            db = db_engine_class(db_name, create_if_missing=False,
-                                 error_if_exists=False, compression=None)
-        except NoDatabaseException:
-            db = db_engine_class(db_name, create_if_missing=True,
-                                 error_if_exists=True, compression=None)
-            self.logger.info('created new {} database {}'.format(db_engine, db_name))
+    def init_state(self):
+        if self.db.is_new:
+            self.db_height = -1
+            self.db_tx_count = 0
+            self.db_tip = b'\0' * 32
+            self.flush_count = 0
+            self.utxo_flush_count = 0
+            self.wall_time = 0
+            self.first_sync = True
         else:
-            self.logger.info('successfully opened {} database {}'.format(db_engine, db_name))
-            self.read_state(db)
-
-        return db
-
-    def read_state(self, db):
-        state = db.get(b'state')
-        state = ast.literal_eval(state.decode())
-        if state['genesis'] != self.coin.GENESIS_HASH:
-            raise ChainError('DB genesis hash {} does not match coin {}'
-                             .format(state['genesis_hash'],
-                                     self.coin.GENESIS_HASH))
-        self.db_height = state['height']
-        self.db_tx_count = state['tx_count']
-        self.db_tip = state['tip']
-        self.flush_count = state['flush_count']
-        self.utxo_flush_count = state['utxo_flush_count']
-        self.wall_time = state['wall_time']
-        self.first_sync = state.get('first_sync', True)
+            state = self.db.get(b'state')
+            state = ast.literal_eval(state.decode())
+            if state['genesis'] != self.coin.GENESIS_HASH:
+                raise ChainError('DB genesis hash {} does not match coin {}'
+                                 .format(state['genesis_hash'],
+                                         self.coin.GENESIS_HASH))
+            self.db_height = state['height']
+            self.db_tx_count = state['tx_count']
+            self.db_tip = state['tip']
+            self.flush_count = state['flush_count']
+            self.utxo_flush_count = state['utxo_flush_count']
+            self.wall_time = state['wall_time']
+            self.first_sync = state.get('first_sync', True)
 
     def clean_db(self):
         '''Clean out stale DB items.

@@ -9,6 +9,7 @@
 
 
 import array
+import inspect
 import logging
 import sys
 from collections import Container, Mapping
@@ -77,6 +78,14 @@ def deep_getsizeof(obj):
 
     return size(obj)
 
+def subclasses(base_class, strict=True):
+    '''Return a list of subclasses of base_class in its module.'''
+    def select(obj):
+        return (inspect.isclass(obj) and issubclass(obj, base_class)
+                and (not strict or obj != base_class))
+
+    pairs = inspect.getmembers(sys.modules[base_class.__module__], select)
+    return [pair[1] for pair in pairs]
 
 def chunks(items, size):
     '''Break up items, an iterable, into chunks of length size.'''
