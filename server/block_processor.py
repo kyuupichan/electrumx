@@ -767,7 +767,8 @@ class BlockProcessor(LoggedClass):
         '''Returns the hash168 for a UTXO.'''
         hash168 = None
         if 0 <= index <= 65535:
-            hash168 = self.utxo_cache(tx_hash, struct.pack('<H', index))
+            idx_packed = struct.pack('<H', index)
+            hash168 = self.utxo_cache.hash168(tx_hash, idx_packed)
             if hash168 == NO_CACHE_ENTRY:
                 hash168 = None
         return hash168

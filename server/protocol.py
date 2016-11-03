@@ -143,8 +143,14 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     @classmethod
     def non_negative_integer_from_param(cls, param):
-        if isinstance(param, int) and param >= 0:
-            return param
+        try:
+            param = int(param)
+        except ValueError:
+            pass
+        else:
+            if param >= 0:
+                return param
+
         raise RPCError('param should be a non-negative integer: {}'
                        .format(param))
 
