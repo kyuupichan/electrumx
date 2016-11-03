@@ -78,6 +78,11 @@ class Coin(object):
         return result
 
     @classmethod
+    def hash168_to_address(cls, hash168):
+        '''Return an address given a 21-byte hash.'''
+        return Base58.encode_check(hash168)
+
+    @classmethod
     def P2PKH_address_from_hash160(cls, hash_bytes):
         '''Return a P2PKH address given a public key.'''
         assert len(hash_bytes) == 20

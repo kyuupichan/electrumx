@@ -16,6 +16,7 @@ import traceback
 from functools import partial
 
 from server.daemon import DaemonError
+from lib.hash import hex_str_to_hash
 from lib.util import LoggedClass
 from server.version import VERSION
 
@@ -201,6 +202,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             'blockchain.numblocks.subscribe',
             (height, ),
         )
+        hash168_to_address = cls.COIN.hash168_to_address
+
         for session in cls.SESSIONS:
             if height != session.notified_height:
                 session.notified_height = height
@@ -210,8 +213,9 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
                     session.json_send(height_payload)
 
             for hash168 in session.hash168s.intersection(touched):
+                address = hash168_to_address(hash168)
                 payload = json_notification('blockchain.address.subscribe',
-                                            (Base58.encode_check(hash168), ))
+                                            (address, ))
                 session.json_send(payload)
 
 
@@ -347,7 +351,16 @@ class ElectrumX(JSONRPC):
         raise RPCError('params should contain a transaction hash and height')
 
     async def utxo_get_address(self, params):
-        pass # TODO
+        if len(params) == 2:
+            tx_hash = self.tx_hash_from_param(params[0])
+            index = self.non_negative_integer_from_param(params[1])
+            tx_hash = hex_str_to_hash(tx_hash)
+            hash168 = self.BLOCK_PROCESSOR.get_utxo_hash168(tx_hash, index)
+            if hash168:
+                return self.COIN.hash168_to_address(hash168)
+            return None
+
+        raise RPCError('params should contain a transaction hash and index')
 
     # --- server commands
 

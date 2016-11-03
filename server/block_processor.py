@@ -762,3 +762,12 @@ class BlockProcessor(LoggedClass):
         '''Returns all the UTXOs for an address sorted by height and
         position in the block.'''
         return sorted(self.get_utxos(hash168, limit=None))
+
+    def get_utxo_hash168(self, tx_hash, index):
+        '''Returns the hash168 for a UTXO.'''
+        hash168 = None
+        if 0 <= index <= 65535:
+            hash168 = self.utxo_cache(tx_hash, struct.pack('<H', index))
+            if hash168 == NO_CACHE_ENTRY:
+                hash168 = None
+        return hash168

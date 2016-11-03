@@ -17,11 +17,10 @@ import ssl
 import traceback
 from functools import partial
 
-from server.daemon import Daemon, DaemonError
+from server.daemon import Daemon
 from server.block_processor import BlockProcessor
-from server.protocol import ElectrumX, LocalRPC, RPCError, JSONRPC
-from lib.hash import (sha256, double_sha256, hash_to_str,
-                      Base58, hex_str_to_hash)
+from server.protocol import ElectrumX, LocalRPC, JSONRPC
+from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.util import LoggedClass
 
 
