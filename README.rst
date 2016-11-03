@@ -68,26 +68,24 @@ Roadmap
 =======
 
 - test a few more performance improvement ideas
-- handle client connections (half-implemented but not functional)
+- handle the mempool
+- implement light caching of client responses
+- yield during expensive requests and/or penalize the connection
+- improve DB abstraction so LMDB is not penalized
+- continue to clean up the code and remove layering violations
+- store all UTXOs, not just those with addresses
+- implement IRC connectivity
 - potentially move some functionality to C or C++
 
-Once I get round to writing the server part, I will add DoS
-protections if necessary to defend against requests for large
-histories.  However with asyncio it would not surprise me if ElectrumX
-could smoothly serve the whole history of the biggest Satoshi dice
-address with minimal negative impact on other connections; we shall
-have to see.  If the requestor is running Electrum client I am
-confident that it would collapse under the load far more quickly that
-the server would; it is very inefficient at handling large wallets
-and histories.
+The above are in no particular order.
 
 
 Database Format
 ===============
 
-The database and metadata formats of ElectrumX are very likely to
-change in the future which will render old DBs unusable.  For now I do
-not intend to provide converters as the rate of flux is high.
+The database and metadata formats of ElectrumX is certain to change in
+the future which will render old DBs unusable.  For now I do not
+intend to provide converters as the rate of flux is high.
 
 
 Miscellany

@@ -1,8 +1,8 @@
 The following environment variables are required:
 
-DB_DIRECTORY  - path to the database directory (if relative, to run script)
-USERNAME      - the username the server will run as
-SERVER_MAIN   - path to the server_main.py script (if relative, to run script)
+DB_DIRECTORY  - path to the database directory (if relative, to `run` script)
+USERNAME      - the username the server will run as if using `run` script
+SERVER_MAIN   - path to the server_main.py script (if relative, to `run` script)
 DAEMON_URL    - the URL used to connect to the daemon.  Should be of the form
                     http://username:password@hostname:port/
                 Alternatively you can specify DAEMON_USERNAME, DAEMON_PASSWORD,
@@ -14,10 +14,22 @@ sensible defaults if not specified.
 
 COIN          - see lib/coins.py, must be a coin NAME.  Defaults to Bitcoin.
 NETWORK       - see lib/coins.py, must be a coin NET.  Defaults to mainnet.
+DB_ENGINE     - database engine for the transaction database.  Default is
+                leveldb.  Supported alternatives are rocksdb and lmdb.
+                You will need to install the appropriate python packages.
+                Not case sensitive.
 REORG_LIMIT   - maximum number of blocks to be able to handle in a chain
                 reorganisation.  ElectrumX retains some fairly compact
                 undo information for this many blocks in levelDB.
                 Default is 200.
+TCP_PORT      - if set will serve Electrum clients on that port
+SSL_PORT      - if set will serve Electrum clients over SSL on that port.
+                If set SSL_CERTFILE and SSL_KEYFILE must be filesystem paths
+RPC_PORT      - Listen on this port for local RPC connections, defaults to
+                8000.
+BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
+                is re-read for each new client.
+DONATION_ADDRESS  - server donation address.  Defaults to none.
 
 Your performance might change by tweaking these cache settings.  Cache
 size is only checked roughly every minute, so the caches can grow
@@ -41,8 +53,3 @@ UTXO_MB   - amount of UTXO and history cache, in MB, to retain before
             leveldb caching and Python GC effects.  However this may be
             very dependent on hardware and you may have different
             results.
-
-DB_ENGINE - database engine for the transaction database.  Default is
-            leveldb.  Supported alternatives are rocksdb and lmdb,
-            which will require installation of the appropriate python
-            packages.
