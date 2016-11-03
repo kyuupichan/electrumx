@@ -125,11 +125,15 @@ class BlockProcessor(LoggedClass):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, daemon, on_catchup=None):
+    def __init__(self, env, daemon, on_update=None):
+        '''on_update is awaitable, and called only when caught up with the
+        daemon and a new block arrives or the mempool is updated.
+        '''
+
         super().__init__()
 
         self.daemon = daemon
-        self.on_catchup = on_catchup
+        self.on_update = on_update
 
         # Meta
         self.utxo_MB = env.utxo_MB
@@ -200,8 +204,8 @@ class BlockProcessor(LoggedClass):
         if not self.have_caught_up:
             self.have_caught_up = True
             self.logger.info('caught up to height {:,d}'.format(self.height))
-            if self.on_catchup:
-                await self.on_catchup()
+            if self.on_update:
+                await self.on_update(self.height, set())
 
     async def start(self):
         '''External entry point for block processing.

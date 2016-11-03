@@ -390,22 +390,3 @@ class FSCache(LoggedClass):
         headers = self.read_headers(height, count)
         hlen = self.coin.HEADER_LEN
         return [double_sha256(header) for header in chunks(headers, hlen)]
-
-    def encode_header(self, height):
-        if height < 0 or height > self.height + len(self.headers):
-            raise Exception('no header information for height {:,d}'
-                            .format(height))
-        header = self.read_headers(self.height, 1)
-        unpack = struct.unpack
-        version, = unpack('<I', header[:4])
-        timestamp, bits, nonce = unpack('<III', header[68:80])
-
-        return {
-            'block_height': self.height,
-            'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': nonce,
-        }

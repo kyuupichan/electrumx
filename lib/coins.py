@@ -13,9 +13,10 @@ necessary for appropriate handling.
 
 from decimal import Decimal
 import inspect
+import struct
 import sys
 
-from lib.hash import Base58, hash160, double_sha256
+from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer
 
@@ -31,6 +32,7 @@ class Coin(object):
     HEADER_LEN = 80
     DEFAULT_RPC_PORT = 8332
     VALUE_PER_COIN = 100000000
+    CHUNK_SIZE=2016
 
     @staticmethod
     def coin_classes():
@@ -167,6 +169,21 @@ class Coin(object):
         For example 1 BTC is returned for 100 million satoshis.
         '''
         return Decimal(value) / cls.VALUE_PER_COIN
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce,
+        }
 
 
 class Bitcoin(Coin):

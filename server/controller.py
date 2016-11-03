@@ -19,7 +19,7 @@ from functools import partial
 
 from server.daemon import Daemon, DaemonError
 from server.block_processor import BlockProcessor
-from server.protocol import ElectrumX, LocalRPC
+from server.protocol import ElectrumX, LocalRPC, RPCError, JSONRPC
 from lib.hash import (sha256, double_sha256, hash_to_str,
                       Base58, hex_str_to_hash)
 from lib.util import LoggedClass
@@ -35,11 +35,12 @@ class Controller(LoggedClass):
         super().__init__()
         self.loop = loop
         self.env = env
+        self.coin = env.coin
         self.daemon = Daemon(env.daemon_url)
         self.block_processor = BlockProcessor(env, self.daemon,
-                                              on_catchup=self.start_servers)
+                                              on_update=self.on_update)
+        JSONRPC.init(self.block_processor, self.coin)
         self.servers = []
-        self.sessions = set()
         self.addresses = {}
         self.jobs = asyncio.Queue()
         self.peers = {}
@@ -57,15 +58,18 @@ class Controller(LoggedClass):
             self.loop.add_signal_handler(getattr(signal, signame),
                                          partial(self.on_signal, signame))
 
+    async def on_update(self, height, touched):
+        if not self.servers:
+            self.servers = await self.start_servers()
+        ElectrumX.notify(height, touched)
+
     async def start_servers(self):
         '''Start listening on RPC, TCP and SSL ports.
 
         Does not start a server if the port wasn't specified.  Does
         nothing if servers are already running.
         '''
-        if self.servers:
-            return
-
+        servers = []
         env = self.env
         loop = self.loop
 
@@ -73,14 +77,14 @@ class Controller(LoggedClass):
         if env.rpc_port is not None:
             host = 'localhost'
             rpc_server = loop.create_server(protocol, host, env.rpc_port)
-            self.servers.append(await rpc_server)
+            servers.append(await rpc_server)
             self.logger.info('RPC server listening on {}:{:d}'
                              .format(host, env.rpc_port))
 
         protocol = partial(ElectrumX, self, self.daemon, env)
         if env.tcp_port is not None:
             tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
-            self.servers.append(await tcp_server)
+            servers.append(await tcp_server)
             self.logger.info('TCP server listening on {}:{:d}'
                              .format(env.host, env.tcp_port))
 
@@ -91,9 +95,11 @@ class Controller(LoggedClass):
                                         keyfile=env.ssl_keyfile)
             ssl_server = loop.create_server(protocol, env.host, env.ssl_port,
                                             ssl=ssl_context)
-            self.servers.append(await ssl_server)
+            servers.append(await ssl_server)
             self.logger.info('SSL server listening on {}:{:d}'
                              .format(env.host, env.ssl_port))
+
+        return servers
 
     def stop(self):
         '''Close the listening servers.'''
@@ -106,14 +112,6 @@ class Controller(LoggedClass):
                             .format(signame))
         for task in asyncio.Task.all_tasks(self.loop):
             task.cancel()
-
-    def add_session(self, session):
-        '''Add a session representing one incoming connection.'''
-        self.sessions.add(session)
-
-    def remove_session(self, session):
-        '''Remove a session.'''
-        self.sessions.remove(session)
 
     def add_job(self, coro):
         '''Queue a job for asynchronous processing.'''
@@ -174,12 +172,29 @@ class Controller(LoggedClass):
     def height(self):
         return self.block_processor.height
 
-    def get_current_header(self):
-        return self.block_processor.get_current_header()
-
     def get_history(self, hash168):
         history = self.block_processor.get_history(hash168, limit=None)
         return [
             {'tx_hash': hash_to_str(tx_hash), 'height': height}
             for tx_hash, height in history
         ]
+
+    def get_chunk(self, index):
+        '''Return header chunk as hex.  Index is a non-negative integer.'''
+        chunk_size = self.coin.CHUNK_SIZE
+        next_height = self.height() + 1
+        start_height = min(index * chunk_size, next_height)
+        count = min(next_height - start_height, chunk_size)
+        return self.block_processor.read_headers(start_height, count).hex()
+
+    def get_balance(self, hash168):
+        confirmed = self.block_processor.get_balance(hash168)
+        unconfirmed = -1  # FIXME
+        return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
+
+    def list_unspent(self, hash168):
+        utxos = self.block_processor.get_utxos_sorted(hash168)
+        return tuple({'tx_hash': hash_to_str(utxo.tx_hash),
+                      'tx_pos': utxo.tx_pos, 'height': utxo.height,
+                      'value': utxo.value}
+                     for utxo in utxos)
