@@ -1,18 +1,29 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
+'''Module providing coin abstraction.
+
+Anything coin-specific should go in this file and be subclassed where
+necessary for appropriate handling.
+'''
 
 from decimal import Decimal
 import inspect
+import struct
 import sys
 
-from lib.hash import Base58, hash160, double_sha256
+from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer
+from lib.util import subclasses
 
 
 class CoinError(Exception):
-    pass
+    '''Exception raised for coin-related errors.'''
 
 
 class Coin(object):
@@ -22,19 +33,14 @@ class Coin(object):
     HEADER_LEN = 80
     DEFAULT_RPC_PORT = 8332
     VALUE_PER_COIN = 100000000
-
-    @staticmethod
-    def coins():
-        is_coin = lambda obj: (inspect.isclass(obj)
-                               and issubclass(obj, Coin)
-                               and obj != Coin)
-        pairs = inspect.getmembers(sys.modules[__name__], is_coin)
-        # Returned in the order they appear in this file
-        return [pair[1] for pair in pairs]
+    CHUNK_SIZE=2016
 
     @classmethod
     def lookup_coin_class(cls, name, net):
-        for coin in cls.coins():
+        '''Return a coin class given name and network.
+
+        Raise an exception if unrecognised.'''
+        for coin in subclasses(Coin):
             if (coin.NAME.lower() == name.lower()
                     and coin.NET.lower() == net.lower()):
                 return coin
@@ -43,13 +49,14 @@ class Coin(object):
 
     @staticmethod
     def lookup_xverbytes(verbytes):
+        '''Return a (is_xpub, coin_class) pair given xpub/xprv verbytes.'''
         # Order means BTC testnet will override NMC testnet
-        for coin in Coin.coins():
+        for coin in Coin.coin_classes():
             if verbytes == coin.XPUB_VERBYTES:
                 return True, coin
             if verbytes == coin.XPRV_VERBYTES:
                 return False, coin
-        raise CoinError("version bytes unrecognised")
+        raise CoinError('version bytes unrecognised')
 
     @classmethod
     def address_to_hash168(cls, addr):
@@ -61,6 +68,11 @@ class Coin(object):
         if len(result) != 21:
             raise CoinError('invalid address: {}'.format(addr))
         return result
+
+    @classmethod
+    def hash168_to_address(cls, hash168):
+        '''Return an address given a 21-byte hash.'''
+        return Base58.encode_check(hash168)
 
     @classmethod
     def P2PKH_address_from_hash160(cls, hash_bytes):
@@ -129,7 +141,7 @@ class Coin(object):
 
     @classmethod
     def prvkey_WIF(privkey_bytes, compressed):
-        "Return the private key encoded in Wallet Import Format."
+        '''Return the private key encoded in Wallet Import Format.'''
         payload = bytearray([cls.WIF_BYTE]) + privkey_bytes
         if compressed:
             payload.append(0x01)
@@ -137,19 +149,38 @@ class Coin(object):
 
     @classmethod
     def header_hashes(cls, header):
-        '''Given a header return the previous block hash and the current block
-        hash.'''
+        '''Given a header return the previous and current block hashes.'''
         return header[4:36], double_sha256(header)
 
     @classmethod
     def read_block(cls, block):
-        '''Read a block and return (header, tx_hashes, txs)'''
+        '''Return a tuple (header, tx_hashes, txs) given a raw block.'''
         header, rest = block[:cls.HEADER_LEN], block[cls.HEADER_LEN:]
         return (header, ) + Deserializer(rest).read_block()
 
     @classmethod
     def decimal_value(cls, value):
+        '''Return the number of standard coin units as a Decimal given a
+        quantity of smallest units.
+
+        For example 1 BTC is returned for 100 million satoshis.
+        '''
         return Decimal(value) / cls.VALUE_PER_COIN
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce,
+        }
 
 
 class Bitcoin(Coin):
@@ -167,6 +198,7 @@ class Bitcoin(Coin):
     TX_COUNT_HEIGHT = 420976
     TX_PER_BLOCK = 1600
 
+
 class BitcoinTestnet(Coin):
     NAME = "Bitcoin"
     SHORTNAME = "XTN"
@@ -176,6 +208,7 @@ class BitcoinTestnet(Coin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+
 
 # Source: pycoin and others
 class Litecoin(Coin):
@@ -188,6 +221,7 @@ class Litecoin(Coin):
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0xb0
 
+
 class LitecoinTestnet(Coin):
     NAME = "Litecoin"
     SHORTNAME = "XLT"
@@ -197,6 +231,7 @@ class LitecoinTestnet(Coin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+
 
 # Source: namecoin.org
 class Namecoin(Coin):
@@ -209,6 +244,7 @@ class Namecoin(Coin):
     P2SH_VERBYTE = 0x0d
     WIF_BYTE = 0xe4
 
+
 class NamecoinTestnet(Coin):
     NAME = "Namecoin"
     SHORTNAME = "XNM"
@@ -218,6 +254,7 @@ class NamecoinTestnet(Coin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+
 
 # For DOGE there is disagreement across sites like bip32.org and
 # pycoin.  Taken from bip32.org and bitmerchant on github
@@ -231,6 +268,7 @@ class Dogecoin(Coin):
     P2SH_VERBYTE = 0x16
     WIF_BYTE = 0x9e
 
+
 class DogecoinTestnet(Coin):
     NAME = "Dogecoin"
     SHORTNAME = "XDT"
@@ -240,6 +278,7 @@ class DogecoinTestnet(Coin):
     P2PKH_VERBYTE = 0x71
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xf1
+
 
 # Source: pycoin
 class Dash(Coin):
@@ -251,6 +290,7 @@ class Dash(Coin):
     P2PKH_VERBYTE = 0x4c
     P2SH_VERBYTE = 0x10
     WIF_BYTE = 0xcc
+
 
 class DashTestnet(Coin):
     NAME = "Dogecoin"

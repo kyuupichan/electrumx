@@ -1,5 +1,12 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''Block prefetcher and chain processor.'''
+
 
 import array
 import ast
@@ -15,7 +22,7 @@ from server.daemon import DaemonError
 from lib.hash import hash_to_str
 from lib.script import ScriptPubKey
 from lib.util import chunks, LoggedClass
-from server.storage import LMDB, RocksDB, LevelDB, NoDatabaseException
+from server.storage import open_db
 
 
 def formatted_time(t):
@@ -42,16 +49,12 @@ class Prefetcher(LoggedClass):
         self.semaphore = asyncio.Semaphore()
         self.queue = asyncio.Queue()
         self.queue_size = 0
+        self.fetched_height = height
+        self.mempool = []
         # Target cache size.  Has little effect on sync time.
         self.target_cache_size = 10 * 1024 * 1024
-        self.fetched_height = height
-        self.recent_sizes = [0]
-
-    async def get_blocks(self):
-        '''Returns a list of prefetched blocks.'''
-        blocks, total_size = await self.queue.get()
-        self.queue_size -= total_size
-        return blocks
+        # First fetch to be 10 blocks
+        self.ave_size = self.target_cache_size // 10
 
     async def clear(self, height):
         '''Clear prefetched blocks and restart from the given height.
@@ -66,49 +69,73 @@ class Prefetcher(LoggedClass):
             self.queue_size = 0
             self.fetched_height = height
 
+    async def get_blocks(self):
+        '''Returns a list of prefetched blocks and the mempool.'''
+        blocks, height, size = await self.queue.get()
+        self.queue_size -= size
+        if height == self.daemon.cached_height():
+            return blocks, self.mempool
+        else:
+            return blocks, None
+
     async def start(self):
         '''Loop forever polling for more blocks.'''
-        self.logger.info('looping forever prefetching blocks...')
+        self.logger.info('starting prefetch loop...')
         while True:
             try:
-                with await self.semaphore:
-                    count = await self._prefetch()
-                if not count:
+                if await self._caught_up():
                     await asyncio.sleep(5)
+                else:
+                    await asyncio.sleep(0)
             except DaemonError as e:
                 self.logger.info('ignoring daemon errors: {}'.format(e))
 
-    def _prefill_count(self, room):
-        ave_size = sum(self.recent_sizes) // len(self.recent_sizes)
-        count = room // ave_size if ave_size else 0
-        return max(count, 10)
+    async def _caught_up(self):
+        '''Poll for new blocks and mempool state.
+
+        Mempool is only queried if caught up with daemon.'''
+        with await self.semaphore:
+            blocks, size = await self._prefetch()
+            self.fetched_height += len(blocks)
+            caught_up = self.fetched_height == self.daemon.cached_height()
+            if caught_up:
+                self.mempool = await self.daemon.mempool_hashes()
+
+            # Wake up block processor if we have something
+            if blocks or caught_up:
+                self.queue.put_nowait((blocks, self.fetched_height, size))
+                self.queue_size += size
+
+            return caught_up
 
     async def _prefetch(self):
-        '''Prefetch blocks if there are any to prefetch.'''
+        '''Prefetch blocks unless the prefetch queue is full.'''
+        if self.queue_size >= self.target_cache_size:
+            return [], 0
+
         daemon_height = await self.daemon.height()
-        max_count = min(daemon_height - self.fetched_height, 4000)
-        count = min(max_count, self._prefill_count(self.target_cache_size))
+        cache_room = self.target_cache_size // self.ave_size
+
+        # Try and catch up all blocks but limit to room in cache.
+        # Constrain count to between 0 and 4000 regardless
+        count = min(daemon_height - self.fetched_height, cache_room)
+        count = min(4000, max(count, 0))
         if not count:
-            return 0
+            return [], 0
+
         first = self.fetched_height + 1
         hex_hashes = await self.daemon.block_hex_hashes(first, count)
-        if not hex_hashes:
-            self.logger.error('requested {:,d} hashes, got none'.format(count))
-            return 0
-
         blocks = await self.daemon.raw_blocks(hex_hashes)
-        sizes = [len(block) for block in blocks]
-        total_size = sum(sizes)
-        self.queue.put_nowait((blocks, total_size))
-        self.queue_size += total_size
-        self.fetched_height += len(blocks)
 
-        # Keep 50 most recent block sizes for fetch count estimation
-        self.recent_sizes.extend(sizes)
-        excess = len(self.recent_sizes) - 50
-        if excess > 0:
-            self.recent_sizes = self.recent_sizes[excess:]
-        return count
+        size = sum(len(block) for block in blocks)
+
+        # Update our recent average block size estimate
+        if count >= 10:
+            self.ave_size = size // count
+        else:
+            self.ave_size = (size + (10 - count) * self.ave_size) // 10
+
+        return blocks, size
 
 
 class BlockProcessor(LoggedClass):
@@ -118,30 +145,33 @@ class BlockProcessor(LoggedClass):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, daemon):
+    def __init__(self, env, daemon, on_update=None):
+        '''on_update is awaitable, and called only when caught up with the
+        daemon and a new block arrives or the mempool is updated.
+        '''
         super().__init__()
 
         self.daemon = daemon
+        self.on_update = on_update
 
         # Meta
         self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
         self.coin = env.coin
-        self.caught_up = False
         self.reorg_limit = env.reorg_limit
 
-        # Chain state (initialize to genesis in case of new DB)
-        self.db_height = -1
-        self.db_tx_count = 0
-        self.db_tip = b'\0' * 32
-        self.flush_count = 0
-        self.utxo_flush_count = 0
-        self.wall_time = 0
-        self.first_sync = True
-
         # Open DB and metadata files.  Record some of its state.
-        self.db = self.open_db(self.coin, env.db_engine)
+        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
+        self.db = open_db(db_name, env.db_engine)
+        if self.db.is_new:
+            self.logger.info('created new {} database {}'
+                             .format(env.db_engine, db_name))
+        else:
+            self.logger.info('successfully opened {} database {}'
+                             .format(env.db_engine, db_name))
+
+        self.init_state()
         self.tx_count = self.db_tx_count
         self.height = self.db_height
         self.tip = self.db_tip
@@ -150,7 +180,6 @@ class BlockProcessor(LoggedClass):
         # entry per block
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
-        self.backup_hash168s = set()
         self.utxo_cache = UTXOCache(self, self.db, self.coin)
         self.fs_cache = FSCache(self.coin, self.height, self.tx_count)
         self.prefetcher = Prefetcher(daemon, self.height)
@@ -158,8 +187,9 @@ class BlockProcessor(LoggedClass):
         self.last_flush = time.time()
         self.last_flush_tx_count = self.tx_count
 
-        # Redirected member func
+        # Redirected member funcs
         self.get_tx_hash = self.fs_cache.get_tx_hash
+        self.read_headers = self.fs_cache.read_headers
 
         # Log state
         self.logger.info('{}/{} height: {:,d} tx count: {:,d} '
@@ -187,36 +217,42 @@ class BlockProcessor(LoggedClass):
     async def start(self):
         '''External entry point for block processing.
 
-        A simple wrapper that safely flushes the DB on clean
-        shutdown.
+        Safely flushes the DB on clean shutdown.
         '''
         try:
-            await self.advance_blocks()
+            while True:
+                await self._wait_for_update()
+                await asyncio.sleep(0)   # Yield
         finally:
             self.flush(True)
 
-    async def advance_blocks(self):
-        '''Loop forever processing blocks in the forward direction.'''
-        while True:
-            blocks = await self.prefetcher.get_blocks()
-            for block in blocks:
-                if not self.advance_block(block):
-                    await self.handle_chain_reorg()
-                    self.caught_up = False
-                    break
-                await asyncio.sleep(0)  # Yield
+    async def _wait_for_update(self):
+        '''Wait for the prefetcher to deliver blocks or a mempool update.
 
-            if self.height != self.daemon.cached_height():
-                continue
+        Blocks are only processed in the forward direction.  The
+        prefetcher only provides a non-None mempool when caught up.
+        '''
+        all_touched = []
+        blocks, mempool = await self.prefetcher.get_blocks()
+        for block in blocks:
+            touched = self.advance_block(block)
+            if touched is None:
+                all_touched.append(await self.handle_chain_reorg())
+                mempool = None
+                break
+            all_touched.append(touched)
+            await asyncio.sleep(0)  # Yield
 
-            if not self.caught_up:
-                self.caught_up = True
-                self.logger.info('caught up to height {:,d}'
-                                 .format(self.height))
-
-            # Flush everything when in caught-up state as queries
-            # are performed on DB not in-memory
+        if mempool is not None:
+            # Caught up to daemon height.  Flush everything as queries
+            # are performed on the DB and not in-memory.
             self.flush(True)
+            if self.first_sync:
+                self.first_sync = False
+                self.logger.info('synced to height {:,d}'.format(self.height))
+            if self.on_update:
+                await self.on_update(self.height, set.union(*all_touched))
+
 
     async def force_chain_reorg(self, to_genesis):
         try:
@@ -229,15 +265,20 @@ class BlockProcessor(LoggedClass):
         self.logger.info('chain reorg detected')
         self.flush(True)
         self.logger.info('finding common height...')
+
+        touched = set()
         hashes = await self.reorg_hashes(to_genesis)
         # Reverse and convert to hex strings.
         hashes = [hash_to_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             blocks = await self.daemon.raw_blocks(hex_hashes)
-            self.backup_blocks(blocks)
+            touched.update(self.backup_blocks(blocks))
+
         self.logger.info('backed up to height {:,d}'.format(self.height))
         await self.prefetcher.clear(self.height)
         self.logger.info('prefetcher reset')
+
+        return touched
 
     async def reorg_hashes(self, to_genesis):
         '''Return the list of hashes to back up beacuse of a reorg.
@@ -253,7 +294,6 @@ class BlockProcessor(LoggedClass):
         start = self.height - 1
         count = 1
         while start > 0:
-            self.logger.info('start: {:,d} count: {:,d}'.format(start, count))
             hashes = self.fs_cache.block_hashes(start, count)
             hex_hashes = [hash_to_str(hash) for hash in hashes]
             d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
@@ -273,40 +313,29 @@ class BlockProcessor(LoggedClass):
 
         return self.fs_cache.block_hashes(start, count)
 
-    def open_db(self, coin, db_engine):
-        db_name = '{}-{}'.format(coin.NAME, coin.NET)
-        db_engine_class = {
-            "leveldb": LevelDB,
-            "rocksdb": RocksDB,
-            "lmdb": LMDB
-        }[db_engine.lower()]
-        try:
-            db = db_engine_class(db_name, create_if_missing=False,
-                                 error_if_exists=False, compression=None)
-        except NoDatabaseException:
-            db = db_engine_class(db_name, create_if_missing=True,
-                                 error_if_exists=True, compression=None)
-            self.logger.info('created new {} database {}'.format(db_engine, db_name))
+    def init_state(self):
+        if self.db.is_new:
+            self.db_height = -1
+            self.db_tx_count = 0
+            self.db_tip = b'\0' * 32
+            self.flush_count = 0
+            self.utxo_flush_count = 0
+            self.wall_time = 0
+            self.first_sync = True
         else:
-            self.logger.info('successfully opened {} database {}'.format(db_engine, db_name))
-            self.read_state(db)
-
-        return db
-
-    def read_state(self, db):
-        state = db.get(b'state')
-        state = ast.literal_eval(state.decode())
-        if state['genesis'] != self.coin.GENESIS_HASH:
-            raise ChainError('DB genesis hash {} does not match coin {}'
-                             .format(state['genesis_hash'],
-                                     self.coin.GENESIS_HASH))
-        self.db_height = state['height']
-        self.db_tx_count = state['tx_count']
-        self.db_tip = state['tip']
-        self.flush_count = state['flush_count']
-        self.utxo_flush_count = state['utxo_flush_count']
-        self.wall_time = state['wall_time']
-        self.first_sync = state.get('first_sync', True)
+            state = self.db.get(b'state')
+            state = ast.literal_eval(state.decode())
+            if state['genesis'] != self.coin.GENESIS_HASH:
+                raise ChainError('DB genesis hash {} does not match coin {}'
+                                 .format(state['genesis_hash'],
+                                         self.coin.GENESIS_HASH))
+            self.db_height = state['height']
+            self.db_tx_count = state['tx_count']
+            self.db_tip = state['tip']
+            self.flush_count = state['flush_count']
+            self.utxo_flush_count = state['utxo_flush_count']
+            self.wall_time = state['wall_time']
+            self.first_sync = state.get('first_sync', True)
 
     def clean_db(self):
         '''Clean out stale DB items.
@@ -358,8 +387,6 @@ class BlockProcessor(LoggedClass):
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
-        if self.caught_up:
-            self.first_sync = False
         now = time.time()
         self.wall_time += now - self.last_flush
         self.last_flush = now
@@ -392,14 +419,13 @@ class BlockProcessor(LoggedClass):
         assert not self.history
         assert not self.utxo_cache.cache
         assert not self.utxo_cache.db_cache
-        assert not self.backup_hash168s
 
-    def flush(self, flush_utxos=False):
+    def flush(self, flush_utxos=False, flush_history=None):
         '''Flush out cached state.
 
         History is always flushed.  UTXOs are flushed if flush_utxos.'''
         if self.height == self.db_height:
-            self.logger.info('nothing to flush')
+            assert flush_history is None
             self.assert_flushed()
             return
 
@@ -413,15 +439,14 @@ class BlockProcessor(LoggedClass):
         # matter.  But if writing the files fails we do not want to
         # have updated the DB.
         if self.height > self.db_height:
+            assert flush_history is None
+            flush_history = self.flush_history
             self.fs_cache.flush(self.height, self.tx_count)
 
         with self.db.write_batch() as batch:
             # History first - fast and frees memory.  Flush state last
             # as it reads the wall time.
-            if self.height > self.db_height:
-                self.flush_history(batch)
-            else:
-                self.backup_history(batch)
+            flush_history(batch)
             if flush_utxos:
                 self.flush_utxos(batch)
             self.flush_state(batch)
@@ -457,7 +482,6 @@ class BlockProcessor(LoggedClass):
 
     def flush_history(self, batch):
         self.logger.info('flushing history')
-        assert not self.backup_hash168s
 
         self.flush_count += 1
         flush_id = struct.pack('>H', self.flush_count)
@@ -472,20 +496,20 @@ class BlockProcessor(LoggedClass):
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
 
-    def backup_history(self, batch):
+    def backup_history(self, batch, hash168s):
         self.logger.info('backing up history to height {:,d}  tx_count {:,d}'
                          .format(self.height, self.tx_count))
 
         # Drop any NO_CACHE entry
-        self.backup_hash168s.discard(NO_CACHE_ENTRY)
+        hash168s.discard(NO_CACHE_ENTRY)
         assert not self.history
 
         nremoves = 0
-        for hash168 in sorted(self.backup_hash168s):
+        for hash168 in sorted(hash168s):
             prefix = b'H' + hash168
             deletes = []
             puts = {}
-            for key, hist in self.db.iterator(reverse=True, prefix=prefix):
+            for key, hist in self.db.iterator(prefix=prefix, reverse=True):
                 a = array.array('I')
                 a.frombytes(hist)
                 # Remove all history entries >= self.tx_count
@@ -502,8 +526,7 @@ class BlockProcessor(LoggedClass):
                 batch.put(key, value)
 
         self.logger.info('removed {:,d} history entries from {:,d} addresses'
-                         .format(nremoves, len(self.backup_hash168s)))
-        self.backup_hash168s = set()
+                         .format(nremoves, len(hash168s)))
 
     def cache_sizes(self):
         '''Returns the approximate size of the cache, in MB.'''
@@ -547,14 +570,15 @@ class BlockProcessor(LoggedClass):
         # the UTXO cache uses the fs_cache via get_tx_hash() to
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
-        self.fs_cache.advance_block(header, tx_hashes, txs)
         prev_hash, header_hash = self.coin.header_hashes(header)
         if prev_hash != self.tip:
-            return False
+            return None
 
+        touched = set()
+        self.fs_cache.advance_block(header, tx_hashes, txs)
         self.tip = header_hash
         self.height += 1
-        undo_info = self.advance_txs(tx_hashes, txs)
+        undo_info = self.advance_txs(tx_hashes, txs, touched)
         if self.daemon.cached_height() - self.height <= self.reorg_limit:
             self.write_undo_info(self.height, b''.join(undo_info))
 
@@ -566,9 +590,9 @@ class BlockProcessor(LoggedClass):
             if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
                 self.flush(utxo_MB >= self.utxo_MB)
 
-        return True
+        return touched
 
-    def advance_txs(self, tx_hashes, txs):
+    def advance_txs(self, tx_hashes, txs, touched):
         put_utxo = self.utxo_cache.put
         spend_utxo = self.utxo_cache.spend
         undo_info = []
@@ -605,6 +629,7 @@ class BlockProcessor(LoggedClass):
             for hash168 in hash168s:
                 history[hash168].append(tx_num)
             self.history_size += len(hash168s)
+            touched.update(hash168s)
             tx_num += 1
 
         self.tx_count = tx_num
@@ -620,6 +645,7 @@ class BlockProcessor(LoggedClass):
         self.logger.info('backing up {:,d} blocks'.format(len(blocks)))
         self.assert_flushed()
 
+        touched = set()
         for block in blocks:
             header, tx_hashes, txs = self.coin.read_block(block)
             prev_hash, header_hash = self.coin.header_hashes(header)
@@ -628,15 +654,18 @@ class BlockProcessor(LoggedClass):
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
 
-            self.backup_txs(tx_hashes, txs)
+            self.backup_txs(tx_hashes, txs, touched)
             self.fs_cache.backup_block()
             self.tip = prev_hash
             self.height -= 1
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
-        self.flush(True)
 
-    def backup_txs(self, tx_hashes, txs):
+        flush_history = partial(self.backup_history, hash168s=touched)
+        self.flush(True, flush_history=flush_history)
+        return touched
+
+    def backup_txs(self, tx_hashes, txs, touched):
         # Prevout values, in order down the block (coinbase first if present)
         # undo_info is in reverse block order
         undo_info = self.read_undo_info(self.height)
@@ -646,7 +675,6 @@ class BlockProcessor(LoggedClass):
         pack = struct.pack
         put_utxo = self.utxo_cache.put
         spend_utxo = self.utxo_cache.spend
-        hash168s = self.backup_hash168s
 
         rtxs = reversed(txs)
         rtx_hashes = reversed(tx_hashes)
@@ -655,7 +683,7 @@ class BlockProcessor(LoggedClass):
             # Spend the outputs
             for idx, txout in enumerate(tx.outputs):
                 cache_value = spend_utxo(tx_hash, idx)
-                hash168s.add(cache_value[:21])
+                touched.add(cache_value[:21])
 
             # Restore the inputs
             if not tx.is_coinbase:
@@ -664,7 +692,7 @@ class BlockProcessor(LoggedClass):
                     undo_item = undo_info[n:n + 33]
                     put_utxo(txin.prev_hash + pack('<H', txin.prev_idx),
                              undo_item)
-                    hash168s.add(undo_item[:21])
+                    touched.add(undo_item[:21])
 
         assert n == 0
         self.tx_count -= len(txs)
@@ -724,6 +752,12 @@ class BlockProcessor(LoggedClass):
         position in the block.'''
         return sorted(self.get_utxos(hash168, limit=None))
 
-    def get_current_header(self):
-        '''Returns the current header as a dictionary.'''
-        return self.fs_cache.encode_header(self.height)
+    def get_utxo_hash168(self, tx_hash, index):
+        '''Returns the hash168 for a UTXO.'''
+        hash168 = None
+        if 0 <= index <= 65535:
+            idx_packed = struct.pack('<H', index)
+            hash168 = self.utxo_cache.hash168(tx_hash, idx_packed)
+            if hash168 == NO_CACHE_ENTRY:
+                hash168 = None
+        return hash168

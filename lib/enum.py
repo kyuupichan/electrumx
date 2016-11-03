@@ -1,8 +1,17 @@
-# enum-like type
-# From the Python Cookbook from http://code.activestate.com/recipes/67107/
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
+# and warranty status of this software.
+
+'''An enum-like type with reverse lookup.
+
+Source: Python Cookbook, http://code.activestate.com/recipes/67107/
+'''
 
 
-class EnumException(Exception):
+class EnumError(Exception):
     pass
 
 
@@ -20,13 +29,13 @@ class Enumeration:
             if isinstance(x, tuple):
                 x, i = x
             if not isinstance(x, str):
-                raise EnumException("enum name {} not a string".format(x))
+                raise EnumError("enum name {} not a string".format(x))
             if not isinstance(i, int):
-                raise EnumException("enum value {} not an integer".format(i))
+                raise EnumError("enum value {} not an integer".format(i))
             if x in uniqueNames:
-                raise EnumException("enum name {} not unique".format(x))
+                raise EnumError("enum name {} not unique".format(x))
             if i in uniqueValues:
-                raise EnumException("enum value {} not unique".format(x))
+                raise EnumError("enum value {} not unique".format(x))
             uniqueNames.add(x)
             uniqueValues.add(i)
             lookup[x] = i

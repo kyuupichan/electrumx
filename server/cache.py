@@ -1,5 +1,16 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''UTXO and file cache.
+
+During initial sync these cache data and only flush occasionally.
+Once synced flushes are performed after processing each block.
+'''
+
 
 import array
 import itertools
@@ -98,7 +109,7 @@ class UTXOCache(LoggedClass):
             return value
 
         # Oh well.  Find and remove it from the DB.
-        hash168 = self.hash168(prev_hash, idx_packed)
+        hash168 = self.hash168(prev_hash, idx_packed, True)
         if not hash168:
             return NO_CACHE_ENTRY
 
@@ -133,7 +144,7 @@ class UTXOCache(LoggedClass):
 
         raise Exception('could not resolve UTXO key collision')
 
-    def hash168(self, tx_hash, idx_packed):
+    def hash168(self, tx_hash, idx_packed, delete=False):
         '''Return the hash168 paid to by the given TXO.
 
         Refers to the database.  Returns None if not found (which is
@@ -147,7 +158,8 @@ class UTXOCache(LoggedClass):
             return None
 
         if len(data) == 25:
-            self.cache_delete(key)
+            if delete:
+                self.cache_delete(key)
             return data[:21]
 
         assert len(data) % 25 == 0
@@ -157,7 +169,8 @@ class UTXOCache(LoggedClass):
             (tx_num, ) = struct.unpack('<I', data[n+21:n+25])
             my_hash, height = self.parent.get_tx_hash(tx_num)
             if my_hash == tx_hash:
-                self.cache_write(key, data[:n] + data[n+25:])
+                if delete:
+                    self.cache_write(key, data[:n] + data[n+25:])
                 return data[n:n+21]
 
         raise Exception('could not resolve hash168 collision')
@@ -379,22 +392,3 @@ class FSCache(LoggedClass):
         headers = self.read_headers(height, count)
         hlen = self.coin.HEADER_LEN
         return [double_sha256(header) for header in chunks(headers, hlen)]
-
-    def encode_header(self, height):
-        if height < 0 or height > self.height + len(self.headers):
-            raise Exception('no header information for height {:,d}'
-                            .format(height))
-        header = self.read_headers(self.height, 1)
-        unpack = struct.unpack
-        version, = unpack('<I', header[:4])
-        timestamp, bits, nonce = unpack('<III', header[68:80])
-
-        return {
-            'block_height': self.height,
-            'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': nonce,
-        }

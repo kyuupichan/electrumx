@@ -32,12 +32,12 @@ recommend having at least 30-40GB free space.
 Database Engine
 ===============
 
-You can choose between either RocksDB, LevelDB or LMDB to store transaction
-information on disk. Currently, the fastest seems to be RocksDB with LevelDB
-being about 10% slower. LMDB seems to be the slowest but maybe that's because
-of bad implementation or configuration.
+You can choose from RocksDB, LevelDB or LMDB to store transaction
+information on disk. Currently, the fastest seems to be RocksDB with
+LevelDB being about 10% slower. LMDB is slowest but that is because it
+is not yet efficiently abstracted.
 
-You will need to install either:
+You will need to install one of:
 
 + `plyvel <https://plyvel.readthedocs.io/en/latest/installation.html>`_ for LevelDB
 + `pyrocksdb <http://pyrocksdb.readthedocs.io/en/v0.4/installation.html>`_ for RocksDB
@@ -188,7 +188,7 @@ over the LAN from a bitcoind on machine B.
 
 Machine B: a late 2012 iMac running El-Capitan 10.11.6, 2.9GHz
 quad-core Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on
-the same machine.  HIST_MB of 350, UTXO_MB of 1,600.
+the same machine.  HIST_MB of 350, UTXO_MB of 1,600.  LevelDB.
 
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
@@ -275,5 +275,5 @@ After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
 is harmless.
 
-The ETA is just a guide and can be quite volatile.  It is too optimistic
-initially.
+The ETA is just a guide and can be quite volatile, particularly around
+flushes.  It is too optimistic initially.

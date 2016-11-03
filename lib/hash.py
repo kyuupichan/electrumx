@@ -1,5 +1,12 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''Cryptograph hash functions and related classes.'''
+
 
 import hashlib
 import hmac
@@ -8,11 +15,13 @@ from lib.util import bytes_to_int, int_to_bytes
 
 
 def sha256(x):
+    '''Simple wrapper of hashlib sha256.'''
     assert isinstance(x, (bytes, bytearray, memoryview))
     return hashlib.sha256(x).digest()
 
 
 def ripemd160(x):
+    '''Simple wrapper of hashlib ripemd160.'''
     assert isinstance(x, (bytes, bytearray, memoryview))
     h = hashlib.new('ripemd160')
     h.update(x)
@@ -20,36 +29,41 @@ def ripemd160(x):
 
 
 def double_sha256(x):
+    '''SHA-256 of SHA-256, as used extensively in bitcoin.'''
     return sha256(sha256(x))
 
 
 def hmac_sha512(key, msg):
+    '''Use SHA-512 to provide an HMAC.'''
     return hmac.new(key, msg, hashlib.sha512).digest()
 
 
 def hash160(x):
+    '''RIPEMD-160 of SHA-256.
+
+    Used to make bitcoin addresses from pubkeys.'''
     return ripemd160(sha256(x))
 
+
 def hash_to_str(x):
-    '''Converts a big-endian binary hash to a little-endian hex string, as
-    shown in block explorers, etc.
+    '''Convert a big-endian binary hash to displayed hex string.
+
+    Display form of a binary hash is reversed and converted to hex.
     '''
     return bytes(reversed(x)).hex()
 
+
 def hex_str_to_hash(x):
-    '''Converts a little-endian hex string as shown to a big-endian binary
-    hash.'''
+    '''Convert a displayed hex string to a binary hash.'''
     return bytes(reversed(bytes.fromhex(x)))
 
-class InvalidBase58String(Exception):
-    pass
 
-
-class InvalidBase58CheckSum(Exception):
-    pass
+class Base58Error(Exception):
+    '''Exception used for Base58 errors.'''
 
 
 class Base58(object):
+    '''Class providing base 58 functionality.'''
 
     chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
     assert len(chars) == 58
@@ -59,17 +73,17 @@ class Base58(object):
     def char_value(c):
         val = Base58.cmap.get(c)
         if val is None:
-            raise InvalidBase58String
+            raise Base58Error('invalid base 58 character "{}"'.format(c))
         return val
 
     @staticmethod
     def decode(txt):
         """Decodes txt into a big-endian bytearray."""
         if not isinstance(txt, str):
-            raise InvalidBase58String("a string is required")
+            raise Base58Error('a string is required')
 
         if not txt:
-            raise InvalidBase58String("string cannot be empty")
+            raise Base58Error('string cannot be empty')
 
         value = 0
         for c in txt:
@@ -112,14 +126,14 @@ class Base58(object):
         be_bytes = Base58.decode(txt)
         result, check = be_bytes[:-4], be_bytes[-4:]
         if check != double_sha256(result)[:4]:
-            raise InvalidBase58CheckSum
+            raise Base58Error('invalid base 58 checksum for {}'.format(txt))
         return result
 
     @staticmethod
     def encode_check(payload):
         """Encodes a payload bytearray (which includes the version byte(s))
         into a Base58Check string."""
-        assert isinstance(payload, (bytes, bytearray))
+        assert isinstance(payload, (bytes, bytearray, memoryview))
 
         be_bytes = payload + double_sha256(payload)[:4]
         return Base58.encode(be_bytes)

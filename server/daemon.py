@@ -1,7 +1,11 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
-'''Classes for handling asynchronous connections to a blockchain
+'''Class for handling asynchronous connections to a blockchain
 daemon.'''
 
 import asyncio
@@ -67,8 +71,7 @@ class Daemon(LoggedClass):
                     msg = 'daemon still warming up.'
                     secs = 30
                 else:
-                    msg = '{}'.format(errs)
-                    raise DaemonError(msg)
+                    raise DaemonError(errs)
 
             self.logger.error('{}.  Sleeping {:d}s and trying again...'
                               .format(msg, secs))
@@ -85,6 +88,28 @@ class Daemon(LoggedClass):
         blocks = await self.send_vector('getblock', param_lists)
         # Convert hex string to bytes
         return [bytes.fromhex(block) for block in blocks]
+
+    async def mempool_hashes(self):
+        '''Return the hashes of the txs in the daemon's mempool.'''
+        return await self.send_single('getrawmempool')
+
+    async def estimatefee(self, params):
+        '''Return the fee estimate for the given parameters.'''
+        return await self.send_single('estimatefee', params)
+
+    async def relayfee(self):
+        '''The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool.'''
+        net_info = await self.send_single('getnetworkinfo')
+        return net_info['relayfee']
+
+    async def getrawtransaction(self, hex_hash):
+        '''Return the serialized raw transaction with the given hash.'''
+        return await self.send_single('getrawtransaction', (hex_hash, 0))
+
+    async def sendrawtransaction(self, params):
+        '''Broadcast a transaction to the network.'''
+        return await self.send_single('sendrawtransaction', params)
 
     async def height(self):
         '''Query the daemon for its current height.'''

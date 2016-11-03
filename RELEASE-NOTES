@@ -1,3 +1,23 @@
+Version 0.04
+------------
+
+- made the DB interface a little faster for LevelDB and RocksDB; this was
+  a small regression in 0.03
+- fixed a bug that prevented block reorgs from working
+- implement and enable client connectivity.  This is not yet ready for
+  public use for several reasons.  Local RPC, and remote TCP and SSL
+  connections are all supported in the same way as Electrum-server.
+  ElectrumX does not begin listening for incoming connections until it
+  has caught up with the daemon's height.  Which ports it is listening
+  on will appear in the logs when it starts listening.  The complete
+  Electrum wire protocol is implemented, so it is possible to now use
+  as a server for your own Electrum client.  Note that mempools are
+  not yet handled so unconfirmed transactions will not be notified or
+  appear; they will appear once they get in a block.  Also no
+  responses are cached, so performance would likely degrade if used by
+  many clients.  I welcome feedback on your experience using this.
+
+
 Version 0.03
 ------------
 

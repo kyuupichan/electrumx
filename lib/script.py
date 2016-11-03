@@ -1,5 +1,12 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''Script-related classes and functions.'''
+
 
 from binascii import hexlify
 import struct
@@ -10,7 +17,7 @@ from lib.util import cachedproperty
 
 
 class ScriptError(Exception):
-    pass
+    '''Exception used for script errors.'''
 
 
 OpCodes = Enumeration("Opcodes", [
@@ -52,7 +59,9 @@ assert OpCodes.OP_CHECKMULTISIG == 0xae
 
 
 class ScriptSig(object):
-    '''A script from a tx input, typically provides one or more signatures.'''
+    '''A script from a tx input.
+
+    Typically provides one or more signatures.'''
 
     SIG_ADDRESS, SIG_MULTI, SIG_PUBKEY, SIG_UNKNOWN = range(4)
 
@@ -73,8 +82,9 @@ class ScriptSig(object):
 
     @classmethod
     def from_script(cls, script, coin):
-        '''Returns an instance of this class.  Uncrecognised scripts return
-        an object of kind SIG_UNKNOWN.'''
+        '''Return an instance of this class.
+
+        Return an object with kind SIG_UNKNOWN for unrecognised scripts.'''
         try:
             return cls.parse_script(script, coin)
         except ScriptError:
@@ -82,8 +92,9 @@ class ScriptSig(object):
 
     @classmethod
     def parse_script(cls, script, coin):
-        '''Returns an instance of this class.  Raises on unrecognised
-        scripts.'''
+        '''Return an instance of this class.
+
+        Raises on unrecognised scripts.'''
         ops, datas = Script.get_ops(script)
 
         # Address, PubKey and P2SH redeems only push data
