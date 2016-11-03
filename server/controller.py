@@ -20,7 +20,6 @@ from functools import partial
 from server.daemon import Daemon
 from server.block_processor import BlockProcessor
 from server.protocol import ElectrumX, LocalRPC, JSONRPC
-from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.util import LoggedClass
 
 
@@ -38,11 +37,10 @@ class Controller(LoggedClass):
         self.daemon = Daemon(env.daemon_url)
         self.block_processor = BlockProcessor(env, self.daemon,
                                               on_update=self.on_update)
-        JSONRPC.init(self.block_processor, self.coin)
+        JSONRPC.init(self.block_processor, self.daemon, self.coin,
+                     self.add_job)
         self.servers = []
-        self.addresses = {}
         self.jobs = asyncio.Queue()
-        self.peers = {}
 
     def start(self):
         '''Prime the event loop with asynchronous jobs.'''
@@ -72,7 +70,7 @@ class Controller(LoggedClass):
         env = self.env
         loop = self.loop
 
-        protocol = partial(LocalRPC, self)
+        protocol = LocalRPC
         if env.rpc_port is not None:
             host = 'localhost'
             rpc_server = loop.create_server(protocol, host, env.rpc_port)
@@ -80,7 +78,7 @@ class Controller(LoggedClass):
             self.logger.info('RPC server listening on {}:{:d}'
                              .format(host, env.rpc_port))
 
-        protocol = partial(ElectrumX, self, self.daemon, env)
+        protocol = partial(ElectrumX, env)
         if env.tcp_port is not None:
             tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
             servers.append(await tcp_server)
@@ -127,73 +125,3 @@ class Controller(LoggedClass):
             except Exception:
                 # Getting here should probably be considered a bug and fixed
                 traceback.print_exc()
-
-    def address_status(self, hash168):
-        '''Returns status as 32 bytes.'''
-        status = self.addresses.get(hash168)
-        if status is None:
-            history = self.block_processor.get_history(hash168)
-            status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
-                             for tx_hash, height in history)
-            if status:
-                status = sha256(status.encode())
-            self.addresses[hash168] = status
-
-        return status
-
-    async def get_merkle(self, tx_hash, height):
-        '''tx_hash is a hex string.'''
-        block_hash = await self.daemon.send_single('getblockhash', (height,))
-        block = await self.daemon.send_single('getblock', (block_hash, True))
-        tx_hashes = block['tx']
-        # This will throw if the tx_hash is bad
-        pos = tx_hashes.index(tx_hash)
-
-        idx = pos
-        hashes = [hex_str_to_hash(txh) for txh in tx_hashes]
-        merkle_branch = []
-        while len(hashes) > 1:
-            if len(hashes) & 1:
-                hashes.append(hashes[-1])
-            idx = idx - 1 if (idx & 1) else idx + 1
-            merkle_branch.append(hash_to_str(hashes[idx]))
-            idx //= 2
-            hashes = [double_sha256(hashes[n] + hashes[n + 1])
-                      for n in range(0, len(hashes), 2)]
-
-        return {"block_height": height, "merkle": merkle_branch, "pos": pos}
-
-    def get_peers(self):
-        '''Returns a dictionary of IRC nick to (ip, host, ports) tuples, one
-        per peer.'''
-        return self.peers
-
-    def height(self):
-        return self.block_processor.height
-
-    def get_history(self, hash168):
-        history = self.block_processor.get_history(hash168, limit=None)
-        return [
-            {'tx_hash': hash_to_str(tx_hash), 'height': height}
-            for tx_hash, height in history
-        ]
-
-    def get_chunk(self, index):
-        '''Return header chunk as hex.  Index is a non-negative integer.'''
-        chunk_size = self.coin.CHUNK_SIZE
-        next_height = self.height() + 1
-        start_height = min(index * chunk_size, next_height)
-        count = min(next_height - start_height, chunk_size)
-        return self.block_processor.read_headers(start_height, count).hex()
-
-    def get_balance(self, hash168):
-        confirmed = self.block_processor.get_balance(hash168)
-        unconfirmed = -1  # FIXME
-        return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
-
-    def list_unspent(self, hash168):
-        utxos = self.block_processor.get_utxos_sorted(hash168)
-        return tuple({'tx_hash': hash_to_str(utxo.tx_hash),
-                      'tx_pos': utxo.tx_pos, 'height': utxo.height,
-                      'value': utxo.value}
-                     for utxo in utxos)
