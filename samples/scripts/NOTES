@@ -24,19 +24,20 @@ REORG_LIMIT   - maximum number of blocks to be able to handle in a chain
                 Default is 200.
 TCP_PORT      - if set will serve Electrum clients on that port
 SSL_PORT      - if set will serve Electrum clients over SSL on that port.
-                If set SSL_CERTFILE and SSL_KEYFILE must be filesystem paths
+                If set, SSL_CERTFILE and SSL_KEYFILE must be filesystem paths.
 RPC_PORT      - Listen on this port for local RPC connections, defaults to
                 8000.
 BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
                 is re-read for each new client.
 DONATION_ADDRESS  - server donation address.  Defaults to none.
 
-Your performance might change by tweaking these cache settings.  Cache
-size is only checked roughly every minute, so the caches can grow
-beyond the specified size.  Also the Python process is often quite a
-bit bigger than the combine cache size, because of Python overhead and
-also because leveldb can consume quite a lot of memory during UTXO
-flushing.  So these are rough numbers only:
+Your performance might change by tweaking the following cache
+variables.  Cache size is only checked roughly every minute, so the
+caches can grow beyond the specified size.  Also the Python process is
+often quite a bit fatter than the combined cache size, because of
+Python overhead and also because leveldb consumes a lot of memory
+during UTXO flushing.  So I recommend you set the sum of these to
+nothing over half your available physical RAM:
 
 HIST_MB   - amount of history cache, in MB, to retain before flushing to
             disk.  Default is 250; probably no benefit being much larger

@@ -734,7 +734,6 @@ class BlockProcessor(LoggedClass):
         limit = self.resolve_limit(limit)
         unpack = struct.unpack
         prefix = b'u' + hash168
-        utxos = []
         for k, v in self.db.iterator(prefix=prefix):
             (tx_pos,) = unpack('<H', k[-2:])
 

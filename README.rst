@@ -83,9 +83,10 @@ The above are in no particular order.
 Database Format
 ===============
 
-The database and metadata formats of ElectrumX is certain to change in
-the future which will render old DBs unusable.  For now I do not
-intend to provide converters as the rate of flux is high.
+The database and metadata formats of ElectrumX are certain to change
+in the future.  Such a change will render old DBs unusable.  For now I
+do not intend to provide converters as this is still non-production
+software.  Moreover from-genesis sync time is quite bearable.
 
 
 Miscellany
