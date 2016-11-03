@@ -1,5 +1,16 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''UTXO and file cache.
+
+During initial sync these cache data and only flush occasionally.
+Once synced flushes are performed after processing each block.
+'''
+
 
 import array
 import itertools

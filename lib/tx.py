@@ -1,5 +1,12 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''Transaction-related classes and functions.'''
+
 
 from collections import namedtuple
 import struct
@@ -9,6 +16,7 @@ from lib.hash import double_sha256, hash_to_str
 
 
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a transaction.'''
 
     @cachedproperty
     def is_coinbase(self):
@@ -17,6 +25,7 @@ class Tx(namedtuple("Tx", "version inputs outputs locktime")):
     # FIXME: add hash as a cached property?
 
 class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
+    '''Class representing a transaction input.'''
 
     ZERO = bytes(32)
     MINUS_1 = 4294967295
@@ -41,6 +50,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 
 
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
+    '''Class representing a transaction output.'''
 
     @cachedproperty
     def pay_to(self):
@@ -48,9 +58,10 @@ class TxOutput(namedtuple("TxOutput", "value pk_script")):
 
 
 class Deserializer(object):
+    '''Deserializes blocks into transactions.'''
 
     def __init__(self, binary):
-        assert isinstance(binary, (bytes, memoryview))
+        assert isinstance(binary, bytes)
         self.binary = binary
         self.cursor = 0
 

@@ -1,5 +1,12 @@
-# See the file "LICENSE" for information about the copyright
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
+
+'''Miscellaneous utility classes and functions.'''
+
 
 import array
 import logging
@@ -72,6 +79,7 @@ def deep_getsizeof(obj):
 
 
 def chunks(items, size):
+    '''Break up items, an iterable, into chunks of length size.'''
     for i in range(0, len(items), size):
         yield items[i: i + size]
 
