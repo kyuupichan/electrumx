@@ -294,7 +294,6 @@ class BlockProcessor(LoggedClass):
         start = self.height - 1
         count = 1
         while start > 0:
-            self.logger.info('start: {:,d} count: {:,d}'.format(start, count))
             hashes = self.fs_cache.block_hashes(start, count)
             hex_hashes = [hash_to_str(hash) for hash in hashes]
             d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
@@ -582,12 +581,12 @@ class BlockProcessor(LoggedClass):
         # the UTXO cache uses the fs_cache via get_tx_hash() to
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
-        self.fs_cache.advance_block(header, tx_hashes, txs)
         prev_hash, header_hash = self.coin.header_hashes(header)
         if prev_hash != self.tip:
             return None
 
         touched = set()
+        self.fs_cache.advance_block(header, tx_hashes, txs)
         self.tip = header_hash
         self.height += 1
         undo_info = self.advance_txs(tx_hashes, txs, touched)
