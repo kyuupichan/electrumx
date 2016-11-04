@@ -232,7 +232,7 @@ class BlockProcessor(LoggedClass):
         Blocks are only processed in the forward direction.  The
         prefetcher only provides a non-None mempool when caught up.
         '''
-        all_touched = []
+        all_touched = [set()]
         blocks, mempool = await self.prefetcher.get_blocks()
         for block in blocks:
             touched = self.advance_block(block)
