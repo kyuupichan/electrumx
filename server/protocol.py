@@ -310,8 +310,8 @@ class ElectrumX(JSONRPC):
 
         conf = tuple({'tx_hash': hash_to_str(tx_hash), 'height': height}
                        for tx_hash, height in history)
-        unconf = tuple({'tx_hash': hex, 'height': -unconfirmed, 'fee': fee}
-                       for hex, tx_fee, unconfirmed in mempool)
+        unconf = tuple({'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
+                       for tx_hash, fee, unconfirmed in mempool)
         return conf + unconf
 
     @classmethod

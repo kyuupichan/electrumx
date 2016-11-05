@@ -222,7 +222,8 @@ class MemPool(LoggedClass):
                                     .format(hash_to_str(txin.prev_hash),
                                             txin.prev_idx))
                 raise MissingUTXOError
-            return (entry[:21], struct.unpack('<Q', entry[-8:])), False
+            value, = struct.unpack('<Q', entry[-8:])
+            return (entry[:21], value), False
 
         # Now add the inputs
         for hex_hash, tx in new_txs.items():
@@ -269,7 +270,7 @@ class MemPool(LoggedClass):
         '''
         value = 0
         for tx_hash in self.hash168s[hash168]:
-            txin_pairs, txout_pairs, unconfirmed = self.txs[hex_hash]
+            txin_pairs, txout_pairs, unconfirmed = self.txs[tx_hash]
             value -= sum(v for h168, v in txin_pairs if h168 == hash168)
             value += sum(v for h168, v in txout_pairs if h168 == hash168)
         return value
