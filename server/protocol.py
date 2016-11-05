@@ -404,8 +404,7 @@ class ElectrumX(JSONRPC):
             self.logger.info('sent tx: {}'.format(tx_hash))
             return tx_hash
         except DaemonError as e:
-            errors = e.args[0]
-            error = errors[0]
+            error = e.args[0]
             message = error['message']
             self.logger.info('sendrawtransaction: {}'.format(message))
             if 'non-mandatory-script-verify-flag' in message:
