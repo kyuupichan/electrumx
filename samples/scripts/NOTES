@@ -22,6 +22,7 @@ REORG_LIMIT   - maximum number of blocks to be able to handle in a chain
                 reorganisation.  ElectrumX retains some fairly compact
                 undo information for this many blocks in levelDB.
                 Default is 200.
+HOST          - Defaults to localhost (i.e., client and server must be on same machine) 
 TCP_PORT      - if set will serve Electrum clients on that port
 SSL_PORT      - if set will serve Electrum clients over SSL on that port.
                 If set, SSL_CERTFILE and SSL_KEYFILE must be filesystem paths.
