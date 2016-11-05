@@ -75,7 +75,7 @@ class Daemon(util.LoggedClass):
             try:
                 result = await self.post(data)
                 if prior_msg:
-                    self.logger.error('connection successfully restored')
+                    self.logger.info('connection successfully restored')
                 return result
             except asyncio.TimeoutError:
                 msg = 'timeout error'
