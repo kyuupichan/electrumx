@@ -68,7 +68,6 @@ Roadmap
 =======
 
 - test a few more performance improvement ideas
-- handle the mempool
 - implement light caching of client responses
 - yield during expensive requests and/or penalize the connection
 - improve DB abstraction so LMDB is not penalized
