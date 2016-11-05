@@ -53,8 +53,8 @@ Check out the code from Github::
     git clone https://github.com/kyuupichan/electrumx.git
     cd electrumx
 
-I have not yet created a setup.py, so for now I suggest you run
-the code from the source tree or a copy of it.
+You can install with setup.py, or run the code from the source tree or
+a copy of it.
 
 You should create a standard user account to run the server under;
 your own is probably adequate unless paranoid.  The paranoid might
@@ -275,5 +275,4 @@ After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
 is harmless.
 
-The ETA is just a guide and can be quite volatile, particularly around
-flushes.  It is too optimistic initially.
+The ETA is just a guide and can be quite volatile around flushes.

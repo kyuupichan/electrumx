@@ -81,7 +81,7 @@ class Prefetcher(LoggedClass):
 
     async def start(self):
         '''Loop forever polling for more blocks.'''
-        self.logger.info('starting prefetch loop...')
+        self.logger.info('starting daemon poll loop...')
         while True:
             try:
                 if await self._caught_up():
@@ -89,7 +89,7 @@ class Prefetcher(LoggedClass):
                 else:
                     await asyncio.sleep(0)
             except DaemonError as e:
-                self.logger.info('ignoring daemon errors: {}'.format(e))
+                self.logger.info('ignoring daemon error: {}'.format(e))
 
     async def _caught_up(self):
         '''Poll for new blocks and mempool state.
@@ -167,6 +167,7 @@ class MemPool(LoggedClass):
         self.txs = {}
         self.hash168s = defaultdict(set)  # None can be a key
         self.bp = bp
+        self.count = 0
 
     async def update(self, hex_hashes):
         '''Update state given the current mempool to the passed set of hashes.
@@ -177,7 +178,7 @@ class MemPool(LoggedClass):
         hex_hashes = set(hex_hashes)
         touched = set()
 
-        if not self.txs:
+        if self.count == 0:
             self.logger.info('initial fetch of {:,d} daemon mempool txs'
                              .format(len(hex_hashes)))
 
@@ -190,9 +191,6 @@ class MemPool(LoggedClass):
             for hash168 in hash168s:
                 self.hash168s[hash168].remove(hex_hash)
             touched.update(hash168s)
-        if gone:
-            self.logger.info('{:,d} entries removed from mempool'
-                             .format(len(gone)))
 
         # Get the raw transactions for the new hashes.  Ignore the
         # ones the daemon no longer has (it will return None).  Put
@@ -251,8 +249,10 @@ class MemPool(LoggedClass):
                 self.hash168s[hash168].add(hex_hash)
                 touched.add(hash168)
 
-        self.logger.info('{:,d} entries in mempool for {:,d} addresses'
-                         .format(len(self.txs), len(self.hash168s)))
+        if self.count % 20 == 0:
+            self.logger.info('{:,d} entries in mempool for {:,d} addresses'
+                             .format(len(self.txs), len(self.hash168s)))
+        self.count += 1
 
         # Might include a None
         return touched
@@ -261,7 +261,7 @@ class MemPool(LoggedClass):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
         entries for the hash168.
 
-        unconfirmed is True if any txin is confirmed.
+        unconfirmed is True if any txin is unconfirmed.
         '''
         for hex_hash in self.hash168s[hash168]:
             txin_pairs, txout_pairs, unconfirmed = self.txs[hex_hash]
@@ -322,6 +322,8 @@ class BlockProcessor(LoggedClass):
         self.height = self.db_height
         self.tip = self.db_tip
 
+        self.daemon.debug_set_height(self.height)
+
         # Caches to be flushed later.  Headers and tx_hashes have one
         # entry per block
         self.history = defaultdict(partial(array.array, 'I'))
@@ -354,11 +356,8 @@ class BlockProcessor(LoggedClass):
 
         self.clean_db()
 
-    def coros(self, force_backup=False):
-        if force_backup:
-            return [self.force_chain_reorg(True), self.prefetcher.start()]
-        else:
-            return [self.start(), self.prefetcher.start()]
+    def coros(self):
+        return [self.start(), self.prefetcher.start()]
 
     async def start(self):
         '''External entry point for block processing.
@@ -402,19 +401,13 @@ class BlockProcessor(LoggedClass):
             await self.on_update(self.height, self.touched)
         self.touched = set()
 
-    async def force_chain_reorg(self, to_genesis):
-        try:
-            await self.handle_chain_reorg(to_genesis)
-        finally:
-            self.flush(True)
-
-    async def handle_chain_reorg(self, to_genesis=False):
+    async def handle_chain_reorg(self):
         # First get all state on disk
         self.logger.info('chain reorg detected')
         self.flush(True)
         self.logger.info('finding common height...')
 
-        hashes = await self.reorg_hashes(to_genesis)
+        hashes = await self.reorg_hashes()
         # Reverse and convert to hex strings.
         hashes = [hash_to_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
@@ -425,7 +418,7 @@ class BlockProcessor(LoggedClass):
         await self.prefetcher.clear(self.height)
         self.logger.info('prefetcher reset')
 
-    async def reorg_hashes(self, to_genesis):
+    async def reorg_hashes(self):
         '''Return the list of hashes to back up beacuse of a reorg.
 
         The hashes are returned in order of increasing height.'''
@@ -443,7 +436,7 @@ class BlockProcessor(LoggedClass):
             hex_hashes = [hash_to_str(hash) for hash in hashes]
             d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
             n = match_pos(hex_hashes, d_hex_hashes)
-            if n >= 0 and not to_genesis:
+            if n >= 0:
                 start += n + 1
                 break
             count = min(count * 2, start)
@@ -609,8 +602,8 @@ class BlockProcessor(LoggedClass):
         # Catch-up stats
         if show_stats:
             daemon_height = self.daemon.cached_height()
-            txs_per_sec = int(self.tx_count / self.wall_time)
-            this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
+            tx_per_sec = int(self.tx_count / self.wall_time)
+            this_tx_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
             if self.height > self.coin.TX_COUNT_HEIGHT:
                 tx_est = (daemon_height - self.height) * self.coin.TX_PER_BLOCK
             else:
@@ -618,12 +611,16 @@ class BlockProcessor(LoggedClass):
                           * self.coin.TX_PER_BLOCK
                           + (self.coin.TX_COUNT - self.tx_count))
 
+            # Damp the enthusiasm
+            realism = 2.0 - 0.9 * self.height / self.coin.TX_COUNT_HEIGHT
+            tx_est *= max(realism, 1.0)
+
             self.logger.info('tx/sec since genesis: {:,d}, '
                              'since last flush: {:,d}'
-                             .format(txs_per_sec, this_txs_per_sec))
+                             .format(tx_per_sec, this_tx_per_sec))
             self.logger.info('sync time: {}  ETA: {}'
                              .format(formatted_time(self.wall_time),
-                                     formatted_time(tx_est / this_txs_per_sec)))
+                                     formatted_time(tx_est / this_tx_per_sec)))
 
     def flush_history(self, batch):
         self.logger.info('flushing history')
@@ -854,7 +851,7 @@ class BlockProcessor(LoggedClass):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
         entries for the hash168.
 
-        unconfirmed is True if any txin is confirmed.
+        unconfirmed is True if any txin is unconfirmed.
         '''
         return self.mempool.transactions(hash168)
 

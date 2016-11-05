@@ -1,3 +1,13 @@
+Version 0.1
+------------
+
+- added setup.py, experimental.  Because of this server_main.py renamed
+  electrumx_server.py, and SERVER_MAIN environment variable was renamed
+  to ELECTRUMX.  The sample run script was updated to match.
+- improvements to logging of daemon connection issues
+- removal of old reorg test code
+- hopefully more accurate sync ETA
+
 Version 0.07
 ------------
 

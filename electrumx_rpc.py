@@ -43,14 +43,16 @@ def main():
     parser = argparse.ArgumentParser('Send electrumx an RPC command' )
     parser.add_argument('-p', '--port', metavar='port_num', type=int,
                         help='RPC port number')
-    parser.add_argument('command', nargs='*', default=[],
+    parser.add_argument('command', nargs=1, default=[],
                         help='command to send')
+    parser.add_argument('param', nargs='*', default=[],
+                        help='params to send')
     args = parser.parse_args()
 
     if args.port is None:
         args.port = int(environ.get('ELECTRUMX_RPC_PORT', 8000))
 
-    payload = {'method': args.command[0], 'params': args.command[1:]}
+    payload = {'method': args.command[0], 'params': args.param}
 
     loop = asyncio.get_event_loop()
     proto_factory = partial(RPCClient, loop)
@@ -60,7 +62,7 @@ def main():
         protocol.send(payload)
         loop.run_forever()
     except OSError:
-        print('error connecting - is ElectrumX running?')
+        print('error connecting - is ElectrumX catching up or not running?')
     finally:
         loop.close()
 
