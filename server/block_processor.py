@@ -358,11 +358,8 @@ class BlockProcessor(LoggedClass):
 
         self.clean_db()
 
-    def coros(self, force_backup=False):
-        if force_backup:
-            return [self.force_chain_reorg(True), self.prefetcher.start()]
-        else:
-            return [self.start(), self.prefetcher.start()]
+    def coros(self):
+        return [self.start(), self.prefetcher.start()]
 
     async def start(self):
         '''External entry point for block processing.
@@ -406,19 +403,13 @@ class BlockProcessor(LoggedClass):
             await self.on_update(self.height, self.touched)
         self.touched = set()
 
-    async def force_chain_reorg(self, to_genesis):
-        try:
-            await self.handle_chain_reorg(to_genesis)
-        finally:
-            self.flush(True)
-
-    async def handle_chain_reorg(self, to_genesis=False):
+    async def handle_chain_reorg(self):
         # First get all state on disk
         self.logger.info('chain reorg detected')
         self.flush(True)
         self.logger.info('finding common height...')
 
-        hashes = await self.reorg_hashes(to_genesis)
+        hashes = await self.reorg_hashes()
         # Reverse and convert to hex strings.
         hashes = [hash_to_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
@@ -429,7 +420,7 @@ class BlockProcessor(LoggedClass):
         await self.prefetcher.clear(self.height)
         self.logger.info('prefetcher reset')
 
-    async def reorg_hashes(self, to_genesis):
+    async def reorg_hashes(self):
         '''Return the list of hashes to back up beacuse of a reorg.
 
         The hashes are returned in order of increasing height.'''
@@ -447,7 +438,7 @@ class BlockProcessor(LoggedClass):
             hex_hashes = [hash_to_str(hash) for hash in hashes]
             d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
             n = match_pos(hex_hashes, d_hex_hashes)
-            if n >= 0 and not to_genesis:
+            if n >= 0:
                 start += n + 1
                 break
             count = min(count * 2, start)
