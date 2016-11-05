@@ -49,6 +49,8 @@ class Daemon(util.LoggedClass):
                 if not self.is_warming_up(result):
                     return result
                 msg = 'daemon is still warming up'
+            except asyncio.TimeoutError:
+                msg = 'timeout error'
             except aiohttp.DisconnectedError as e:
                 msg = '{}: {}'.format(e.__class__.__name__, e)
 
