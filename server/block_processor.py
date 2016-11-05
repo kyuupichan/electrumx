@@ -81,7 +81,7 @@ class Prefetcher(LoggedClass):
 
     async def start(self):
         '''Loop forever polling for more blocks.'''
-        self.logger.info('starting prefetch loop...')
+        self.logger.info('starting daemon poll loop...')
         while True:
             try:
                 if await self._caught_up():
@@ -261,7 +261,7 @@ class MemPool(LoggedClass):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
         entries for the hash168.
 
-        unconfirmed is True if any txin is confirmed.
+        unconfirmed is True if any txin is unconfirmed.
         '''
         for hex_hash in self.hash168s[hash168]:
             txin_pairs, txout_pairs, unconfirmed = self.txs[hex_hash]
@@ -854,7 +854,7 @@ class BlockProcessor(LoggedClass):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
         entries for the hash168.
 
-        unconfirmed is True if any txin is confirmed.
+        unconfirmed is True if any txin is unconfirmed.
         '''
         return self.mempool.transactions(hash168)
 
