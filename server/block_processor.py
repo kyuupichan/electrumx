@@ -609,8 +609,8 @@ class BlockProcessor(LoggedClass):
         # Catch-up stats
         if show_stats:
             daemon_height = self.daemon.cached_height()
-            txs_per_sec = int(self.tx_count / self.wall_time)
-            this_txs_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
+            tx_per_sec = int(self.tx_count / self.wall_time)
+            this_tx_per_sec = 1 + int(tx_diff / (self.last_flush - last_flush))
             if self.height > self.coin.TX_COUNT_HEIGHT:
                 tx_est = (daemon_height - self.height) * self.coin.TX_PER_BLOCK
             else:
@@ -618,12 +618,16 @@ class BlockProcessor(LoggedClass):
                           * self.coin.TX_PER_BLOCK
                           + (self.coin.TX_COUNT - self.tx_count))
 
+            # Damp the enthusiasm
+            realism = 2.0 - 0.9 * self.height / self.coin.TX_COUNT_HEIGHT
+            tx_est *= max(realism, 1.0)
+
             self.logger.info('tx/sec since genesis: {:,d}, '
                              'since last flush: {:,d}'
-                             .format(txs_per_sec, this_txs_per_sec))
+                             .format(tx_per_sec, this_tx_per_sec))
             self.logger.info('sync time: {}  ETA: {}'
                              .format(formatted_time(self.wall_time),
-                                     formatted_time(tx_est / this_txs_per_sec)))
+                                     formatted_time(tx_est / this_tx_per_sec)))
 
     def flush_history(self, batch):
         self.logger.info('flushing history')
