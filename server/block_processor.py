@@ -138,8 +138,14 @@ class Prefetcher(LoggedClass):
 
         return blocks, size
 
+
 class MissingUTXOError(Exception):
-    pass
+    '''Raised if a mempool tx input UTXO couldn't be found.'''
+
+
+class ChainReorg(Exception):
+    '''Raised on a blockchain reorganisation.'''
+
 
 class MemPool(LoggedClass):
     '''Representation of the daemon's mempool.
@@ -374,14 +380,14 @@ class BlockProcessor(LoggedClass):
         '''
         blocks, mempool_hashes = await self.prefetcher.get_blocks()
         caught_up = mempool_hashes is not None
-        for block in blocks:
-            if self.advance_block(block, caught_up):
-                await self.handle_chain_reorg()
-                return
-            await asyncio.sleep(0)  # Yield
-
-        if caught_up:
-            await self.caught_up(mempool_hashes)
+        try:
+            for block in blocks:
+                self.advance_block(block, caught_up)
+                await asyncio.sleep(0)  # Yield
+            if caught_up:
+                await self.caught_up(mempool_hashes)
+        except ChainReorg:
+            await self.handle_chain_reorg()
 
     async def caught_up(self, mempool_hashes):
         '''Called after each deamon poll if caught up.'''
@@ -711,7 +717,7 @@ class BlockProcessor(LoggedClass):
         header, tx_hashes, txs = self.coin.read_block(block)
         prev_hash, header_hash = self.coin.header_hashes(header)
         if prev_hash != self.tip:
-            return None
+            raise ChainReorg
 
         touched = set()
         self.fs_cache.advance_block(header, tx_hashes, txs)
