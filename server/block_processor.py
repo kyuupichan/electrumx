@@ -167,6 +167,7 @@ class MemPool(LoggedClass):
         self.txs = {}
         self.hash168s = defaultdict(set)  # None can be a key
         self.bp = bp
+        self.initial = True
 
     async def update(self, hex_hashes):
         '''Update state given the current mempool to the passed set of hashes.
@@ -177,7 +178,8 @@ class MemPool(LoggedClass):
         hex_hashes = set(hex_hashes)
         touched = set()
 
-        if not self.txs:
+        if self.initial:
+            self.initial = False
             self.logger.info('initial fetch of {:,d} daemon mempool txs'
                              .format(len(hex_hashes)))
 
@@ -321,6 +323,8 @@ class BlockProcessor(LoggedClass):
         self.tx_count = self.db_tx_count
         self.height = self.db_height
         self.tip = self.db_tip
+
+        self.daemon.debug_set_height(self.height)
 
         # Caches to be flushed later.  Headers and tx_hashes have one
         # entry per block

@@ -34,7 +34,7 @@ class Controller(LoggedClass):
         self.loop = loop
         self.env = env
         self.coin = env.coin
-        self.daemon = Daemon(env.daemon_url)
+        self.daemon = Daemon(env.daemon_url, env.debug)
         self.block_processor = BlockProcessor(env, self.daemon,
                                               on_update=self.on_update)
         JSONRPC.init(self.block_processor, self.daemon, self.coin,
