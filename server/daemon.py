@@ -13,7 +13,7 @@ import json
 
 import aiohttp
 
-from lib.util import LoggedClass
+import lib.util as util
 
 
 class DaemonError(Exception):
@@ -21,7 +21,7 @@ class DaemonError(Exception):
     cannot be remedied by retrying.'''
 
 
-class Daemon(LoggedClass):
+class Daemon(util.LoggedClass):
     '''Handles connections to a daemon at the given URL.'''
 
     def __init__(self, url):
@@ -106,6 +106,19 @@ class Daemon(LoggedClass):
     async def getrawtransaction(self, hex_hash):
         '''Return the serialized raw transaction with the given hash.'''
         return await self.send_single('getrawtransaction', (hex_hash, 0))
+
+    async def getrawtransactions(self, hex_hashes):
+        '''Return the serialized raw transactions with the given hashes.
+
+        Breaks large requests up.  Yields after each sub request.'''
+        param_lists = tuple((hex_hash, 0) for hex_hash in hex_hashes)
+        raw_txs = []
+        for chunk in util.chunks(param_lists, 10000):
+            txs = await self.send_vector('getrawtransaction', chunk)
+            # Convert hex strings to bytes
+            raw_txs.append(tuple(bytes.fromhex(tx) for tx in txs))
+            await asyncio.sleep(0)
+        return sum(raw_txs, ())
 
     async def sendrawtransaction(self, params):
         '''Broadcast a transaction to the network.'''

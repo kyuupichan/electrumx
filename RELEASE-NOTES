@@ -1,3 +1,14 @@
+Version 0.06
+------------
+
+- mempool support.  ElectrumX maintains a representation of the daemon's
+  mempool and serves unconfirmed transactions and balances to clients.
+
+Version 0.05
+------------
+
+- fixed a bug in 0.04 that stopped ElectrumX serving once synced
+
 Version 0.04
 ------------
 
