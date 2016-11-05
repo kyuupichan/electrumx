@@ -2,7 +2,8 @@ The following environment variables are required:
 
 DB_DIRECTORY  - path to the database directory (if relative, to `run` script)
 USERNAME      - the username the server will run as if using `run` script
-SERVER_MAIN   - path to the server_main.py script (if relative, to `run` script)
+ELECTRUMX     - path to the electrumx_server.py script (if relative,
+                to `run` script)
 DAEMON_URL    - the URL used to connect to the daemon.  Should be of the form
                     http://username:password@hostname:port/
                 Alternatively you can specify DAEMON_USERNAME, DAEMON_PASSWORD,

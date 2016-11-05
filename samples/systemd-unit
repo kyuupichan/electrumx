@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 EnvironmentFile=/etc/electrumx.conf
-ExecStart=/home/electrumx/electrumx/server_main.py
+ExecStart=/usr/local/bin/electrumx_server.py
 User=electrumx
 
 [Install]
