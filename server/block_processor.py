@@ -190,6 +190,8 @@ class MemPool(LoggedClass):
             hash168s.update(hash168 for hash168, value in txout_pairs)
             for hash168 in hash168s:
                 self.hash168s[hash168].remove(hex_hash)
+                if not self.hash168s[hash168]:
+                    del self.hash168s[hash168]
             touched.update(hash168s)
 
         # Get the raw transactions for the new hashes.  Ignore the
