@@ -255,9 +255,15 @@ class ElectrumX(JSONRPC):
     @classmethod
     def address_status(cls, hash168):
         '''Returns status as 32 bytes.'''
+        # Note history is ordered and mempool unordered in electrum-server
+        # For mempool, height is -1 if unconfirmed txins, otherwise 0
         history = cls.BLOCK_PROCESSOR.get_history(hash168)
+        mempool = cls.BLOCK_PROCESSOR.mempool_transactions(hash168)
+
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
                          for tx_hash, height in history)
+        status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
+                          for hex_hash, tx_fee, unconfirmed in mempool)
         if status:
             return sha256(status.encode()).hex()
         return None
@@ -297,11 +303,16 @@ class ElectrumX(JSONRPC):
 
     @classmethod
     def get_history(cls, hash168):
+        # Note history is ordered and mempool unordered in electrum-server
+        # For mempool, height is -1 if unconfirmed txins, otherwise 0
         history = cls.BLOCK_PROCESSOR.get_history(hash168, limit=None)
-        return [
-            {'tx_hash': hash_to_str(tx_hash), 'height': height}
-            for tx_hash, height in history
-        ]
+        mempool = cls.BLOCK_PROCESSOR.mempool_transactions(hash168)
+
+        conf = tuple({'tx_hash': hash_to_str(tx_hash), 'height': height}
+                       for tx_hash, height in history)
+        unconf = tuple({'tx_hash': hex, 'height': -unconfirmed, 'fee': fee}
+                       for hex, tx_fee, unconfirmed in mempool)
+        return conf + unconf
 
     @classmethod
     def get_chunk(cls, index):
@@ -315,7 +326,7 @@ class ElectrumX(JSONRPC):
     @classmethod
     def get_balance(cls, hash168):
         confirmed = cls.BLOCK_PROCESSOR.get_balance(hash168)
-        unconfirmed = -1  # FIXME
+        unconfirmed = cls.BLOCK_PROCESSOR.mempool_value(hash168)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
     @classmethod

@@ -95,39 +95,41 @@ class UTXOCache(LoggedClass):
         self.cache_spends = 0
         self.db_deletes = 0
 
-    def spend(self, prev_hash, prev_idx):
-        '''Spend a UTXO and return the cache's value.
+    def lookup(self, prev_hash, prev_idx):
+        '''Given a prevout, return a pair (hash168, value).
 
-        If the UTXO is not in the cache it must be on disk.
-        '''
-        # Fast track is it's in the cache
-        pack = struct.pack
-        idx_packed = pack('<H', prev_idx)
-        value = self.cache.pop(prev_hash + idx_packed, None)
+        If the UTXO is not found, returns (None, None).'''
+        # Fast track is it being in the cache
+        idx_packed = struct.pack('<H', prev_idx)
+        value = self.cache.get(prev_hash + idx_packed, None)
         if value:
-            self.cache_spends += 1
             return value
+        return self.db_lookup(prev_hash, idx_packed, False)
 
-        # Oh well.  Find and remove it from the DB.
-        hash168 = self.hash168(prev_hash, idx_packed, True)
+    def db_lookup(self, tx_hash, idx_packed, delete=True):
+        '''Return a UTXO from the DB.  Remove it if delete is True.
+
+        Return NO_CACHE_ENTRY if it is not in the DB.'''
+        hash168 = self.hash168(tx_hash, idx_packed, delete)
         if not hash168:
             return NO_CACHE_ENTRY
 
-        self.db_deletes += 1
-
         # Read the UTXO through the cache from the disk.  We have to
         # go through the cache because compressed keys can collide.
-        key = b'u' + hash168 + prev_hash[:UTXO_TX_HASH_LEN] + idx_packed
+        key = b'u' + hash168 + tx_hash[:UTXO_TX_HASH_LEN] + idx_packed
         data = self.cache_get(key)
         if data is None:
             # Uh-oh, this should not happen...
             self.logger.error('found no UTXO for {} / {:d} key {}'
-                             .format(hash_to_str(prev_hash), prev_idx,
+                             .format(hash_to_str(tx_hash),
+                                     struct.unpack('<H', idx_packed),
                                      bytes(key).hex()))
             return NO_CACHE_ENTRY
 
         if len(data) == 12:
-            self.cache_delete(key)
+            if delete:
+                self.db_deletes += 1
+                self.cache_delete(key)
             return hash168 + data
 
         # Resolve the compressed key collison.  These should be
@@ -135,26 +137,42 @@ class UTXOCache(LoggedClass):
         assert len(data) % 12 == 0
         for n in range(0, len(data), 12):
             (tx_num, ) = struct.unpack('<I', data[n:n+4])
-            tx_hash, height = self.parent.get_tx_hash(tx_num)
-            if prev_hash == tx_hash:
-                result = hash168 + data[n: n+12]
-                data = data[:n] + data[n+12:]
-                self.cache_write(key, data)
+            this_tx_hash, height = self.parent.get_tx_hash(tx_num)
+            if tx_hash == this_tx_hash:
+                result = hash168 + data[n:n+12]
+                if delete:
+                    self.db_deletes += 1
+                    self.cache_write(key, data[:n] + data[n+12:])
                 return result
 
         raise Exception('could not resolve UTXO key collision')
 
-    def hash168(self, tx_hash, idx_packed, delete=False):
+    def spend(self, prev_hash, prev_idx):
+        '''Spend a UTXO and return the cache's value.
+
+        If the UTXO is not in the cache it must be on disk.
+        '''
+        # Fast track is it being in the cache
+        idx_packed = struct.pack('<H', prev_idx)
+        value = self.cache.pop(prev_hash + idx_packed, None)
+        if value:
+            self.cache_spends += 1
+            return value
+
+        return self.db_lookup(prev_hash, idx_packed)
+
+    def hash168(self, tx_hash, idx_packed, delete=True):
         '''Return the hash168 paid to by the given TXO.
 
-        Refers to the database.  Returns None if not found (which is
-        indicates a non-standard script).
+        Look it up in the DB and removes it if delete is True.  Return
+        None if not found.
         '''
         key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + idx_packed
         data = self.cache_get(key)
         if data is None:
-            # Assuming the DB is not corrupt, this indicates a
-            # successful spend of a non-standard script
+            # Assuming the DB is not corrupt, if delete is True this
+            # indicates a successful spend of a non-standard script
+            # as we don't currently record those
             return None
 
         if len(data) == 25:
