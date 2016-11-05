@@ -53,8 +53,8 @@ Check out the code from Github::
     git clone https://github.com/kyuupichan/electrumx.git
     cd electrumx
 
-I have not yet created a setup.py, so for now I suggest you run
-the code from the source tree or a copy of it.
+You can install with setup.py, or run the code from the source tree or
+a copy of it.
 
 You should create a standard user account to run the server under;
 your own is probably adequate unless paranoid.  The paranoid might
