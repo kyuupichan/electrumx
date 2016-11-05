@@ -17,8 +17,11 @@ import lib.util as util
 
 
 class DaemonError(Exception):
-    '''Raised when the daemon returns an error in its results that
-    cannot be remedied by retrying.'''
+    '''Raised when the daemon returns an error in its results.'''
+
+
+class DaemonWarmingUpError(DaemonError):
+    '''Raised when the daemon returns an error in its results.'''
 
 
 class Daemon(util.LoggedClass):
@@ -39,42 +42,59 @@ class Daemon(util.LoggedClass):
                              .format(height))
             self._height = height
 
-    @classmethod
-    def is_warming_up(cls, err):
-        if not isinstance(err, list):
-            err = [err]
-        return any(elt.get('code') == cls.WARMING_UP for elt in err)
+    async def post(self, data):
+        '''Send data to the daemon and handle the response.'''
+        async with aiohttp.post(self.url, data=data) as resp:
+            result = await resp.json()
+
+        if isinstance(result, list):
+            errs = tuple(item['error'] for item in result)
+            if not any(errs):
+                return tuple(item['result'] for item in result)
+            if any(err.get('code') == self.WARMING_UP for err in errs if err):
+                raise DaemonWarmingUpError
+            raise DaemonError(errs)
+        else:
+            err = result['error']
+            if not err:
+                return result['result']
+            if err.get('code') == self.WARMING_UP:
+                raise DaemonWarmingUpError
+            raise DaemonError(err)
 
     async def send(self, payload):
-        '''Send a payload to be converted to JSON.'''
+        '''Send a payload to be converted to JSON.
+
+        Handles temporary connection issues.  Daemon reponse errors
+        are raise through DaemonError.
+        '''
         data = json.dumps(payload)
         secs = 1
         while True:
             try:
-                async with aiohttp.post(self.url, data=data) as resp:
-                    result = await resp.json()
-                if not self.is_warming_up(result):
-                    return result
-                msg = 'daemon is still warming up'
+                return await self.post(data)
             except asyncio.TimeoutError:
                 msg = 'timeout error'
-            except aiohttp.DisconnectedError as e:
-                msg = '{}: {}'.format(e.__class__.__name__, e)
+            except aiohttp.ClientHttpProcessingError:
+                msg = 'HTTP error'
+            except aiohttp.ServerDisconnectedError:
+                msg = 'daemon disconnected'
+            except aiohttp.ClientConnectionError:
+                msg = 'connection problem - is your daemon running?'
+            except DaemonWarmingUpError:
+                msg = 'daemon is still warming up'
 
-            secs = min(180, secs * 2)
             self.logger.error('{}.  Sleeping {:d}s and trying again...'
                               .format(msg, secs))
             await asyncio.sleep(secs)
+            secs = min(180, secs * 2)
 
     async def send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
         payload = {'method': method}
         if params:
             payload['params'] = params
-        item = await self.send(payload)
-        if item['error']:
-            raise DaemonError(item['error'])
-        return item['result']
+        return await self.send(payload)
 
     async def send_many(self, mp_iterable):
         '''Send several requests at once.
@@ -82,11 +102,7 @@ class Daemon(util.LoggedClass):
         The results are returned as a tuple.'''
         payload = tuple({'method': m, 'params': p} for m, p in mp_iterable)
         if payload:
-            items = await self.send(payload)
-            errs = tuple(item['error'] for item in items)
-            if any(errs):
-                raise DaemonError(errs)
-            return tuple(item['result'] for item in items)
+            return await self.send(payload)
         return ()
 
     async def send_vector(self, method, params_iterable):
@@ -132,14 +148,10 @@ class Daemon(util.LoggedClass):
         '''Return the serialized raw transactions with the given hashes.
 
         Breaks large requests up.  Yields after each sub request.'''
-        param_lists = tuple((hex_hash, 0) for hex_hash in hex_hashes)
-        raw_txs = []
-        for chunk in util.chunks(param_lists, 10000):
-            txs = await self.send_vector('getrawtransaction', chunk)
-            # Convert hex strings to bytes
-            raw_txs.append(tuple(bytes.fromhex(tx) for tx in txs))
-            await asyncio.sleep(0)
-        return sum(raw_txs, ())
+        params_iterable = ((hex_hash, 0) for hex_hash in hex_hashes)
+        txs = await self.send_vector('getrawtransaction', params_iterable)
+        # Convert hex strings to bytes
+        return tuple(bytes.fromhex(tx) for tx in txs)
 
     async def sendrawtransaction(self, params):
         '''Broadcast a transaction to the network.'''
