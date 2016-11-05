@@ -26,11 +26,18 @@ class Daemon(util.LoggedClass):
 
     WARMING_UP = -28
 
-    def __init__(self, url):
+    def __init__(self, url, debug):
         super().__init__()
         self.url = url
         self._height = None
         self.logger.info('connecting to daemon at URL {}'.format(url))
+        self.debug_caught_up = 'caught_up' in debug
+
+    def debug_set_height(self, height):
+        if self.debug_caught_up:
+            self.logger.info('pretending to have caught up to height {}'
+                             .format(height))
+            self._height = height
 
     @classmethod
     def is_warming_up(cls, err):
@@ -103,6 +110,8 @@ class Daemon(util.LoggedClass):
 
     async def mempool_hashes(self):
         '''Return the hashes of the txs in the daemon's mempool.'''
+        if self.debug_caught_up:
+            return []
         return await self.send_single('getrawmempool')
 
     async def estimatefee(self, params):
@@ -138,7 +147,8 @@ class Daemon(util.LoggedClass):
 
     async def height(self):
         '''Query the daemon for its current height.'''
-        self._height = await self.send_single('getblockcount')
+        if not self.debug_caught_up:
+            self._height = await self.send_single('getblockcount')
         return self._height
 
     def cached_height(self):

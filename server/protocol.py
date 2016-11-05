@@ -77,7 +77,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         try:
             message = json.loads(message.decode())
         except Exception as e:
-            self.logger.info('error decoding JSON message'.format(e))
+            self.logger.info('error decoding JSON message: {}'.format(e))
         else:
             self.ADD_JOB(self.request_handler(message))
 
