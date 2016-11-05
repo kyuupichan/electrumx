@@ -275,5 +275,4 @@ After flush-to-disk you may see an aiohttp error; this is the daemon
 timing out the connection while the disk flush was in progress.  This
 is harmless.
 
-The ETA is just a guide and can be quite volatile, particularly around
-flushes.  It is too optimistic initially.
+The ETA is just a guide and can be quite volatile around flushes.
