@@ -70,9 +70,13 @@ class Daemon(util.LoggedClass):
         '''
         data = json.dumps(payload)
         secs = 1
+        prior_msg = None
         while True:
             try:
-                return await self.post(data)
+                result = await self.post(data)
+                if prior_msg:
+                    self.logger.error('connection successfully restored')
+                return result
             except asyncio.TimeoutError:
                 msg = 'timeout error'
             except aiohttp.ClientHttpProcessingError:
@@ -84,10 +88,14 @@ class Daemon(util.LoggedClass):
             except DaemonWarmingUpError:
                 msg = 'daemon is still warming up'
 
-            self.logger.error('{}.  Sleeping {:d}s and trying again...'
-                              .format(msg, secs))
+            if msg != prior_msg or count == 10:
+                self.logger.error('{}.  Retrying between sleeps...'
+                                  .format(msg))
+                prior_msg = msg
+                count = 0
             await asyncio.sleep(secs)
-            secs = min(180, secs * 2)
+            count += 1
+            secs = min(16, secs * 2)
 
     async def send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
