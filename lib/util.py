@@ -31,15 +31,10 @@ class cachedproperty(object):
         self.f = f
 
     def __get__(self, obj, type):
-        if obj is None:
-            return self
+        obj = obj or type
         value = self.f(obj)
-        obj.__dict__[self.f.__name__] = value
+        setattr(obj, self.f.__name__, value)
         return value
-
-    def __set__(self, obj, value):
-        raise AttributeError('cannot set {} on {}'
-                             .format(self.f.__name__, obj))
 
 
 def deep_getsizeof(obj):

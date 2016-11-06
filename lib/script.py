@@ -8,8 +8,8 @@
 '''Script-related classes and functions.'''
 
 
-from binascii import hexlify
 import struct
+from collections import namedtuple
 
 from lib.enum import Enumeration
 from lib.hash import hash160
@@ -133,60 +133,38 @@ class ScriptSig(object):
 
 
 class ScriptPubKey(object):
-    '''A script from a tx output that gives conditions necessary for
-    spending.'''
+    '''A class for handling a tx output script that gives conditions
+    necessary for spending.
+    '''
 
-    TO_ADDRESS, TO_P2SH, TO_PUBKEY, TO_UNKNOWN = range(4)
     TO_ADDRESS_OPS = [OpCodes.OP_DUP, OpCodes.OP_HASH160, -1,
                       OpCodes.OP_EQUALVERIFY, OpCodes.OP_CHECKSIG]
     TO_P2SH_OPS = [OpCodes.OP_HASH160, -1, OpCodes.OP_EQUAL]
     TO_PUBKEY_OPS = [-1, OpCodes.OP_CHECKSIG]
 
-    def __init__(self, script, coin, kind, hash168, pubkey=None):
-        self.script = script
-        self.coin = coin
-        self.kind = kind
-        self.hash168 = hash168
-        if pubkey:
-            self.pubkey = pubkey
-
-    @cachedproperty
-    def address(self):
-        if self.kind == ScriptPubKey.TO_P2SH:
-            return self.coin.P2SH_address_from_hash160(self.hash168[1:])
-        if self.hash160:
-            return self.coin.P2PKH_address_from_hash160(self.hash168[1:])
-        return ''
+    PayToHandlers = namedtuple('PayToHandlers',
+                               'address script_hash pubkey unknown')
 
     @classmethod
-    def from_script(cls, script, coin):
-        '''Returns an instance of this class.  Uncrecognised scripts return
-        an object of kind TO_UNKNOWN.'''
-        try:
-            return cls.parse_script(script, coin)
-        except ScriptError:
-            return cls(script, coin, cls.TO_UNKNOWN, None)
+    def pay_to(cls, script, handlers):
+        '''Parse a script, invoke the appropriate handler and
+        return the result.
 
-    @classmethod
-    def parse_script(cls, script, coin):
-        '''Returns an instance of this class.  Raises on unrecognised
-        scripts.'''
+        One of the following handlers is invoked:
+           handlers.address(hash160)
+           handlers.script_hash(hash160)
+           handlers.pubkey(pubkey)
+           handlers.unknown(None)
+        '''
         ops, datas = Script.get_ops(script)
 
         if Script.match_ops(ops, cls.TO_ADDRESS_OPS):
-            return cls(script, coin, cls.TO_ADDRESS,
-                       bytes([coin.P2PKH_VERBYTE]) + datas[2])
-
+            return handlers.address(datas[2])
         if Script.match_ops(ops, cls.TO_P2SH_OPS):
-            return cls(script, coin, cls.TO_P2SH,
-                       bytes([coin.P2SH_VERBYTE]) + datas[1])
-
+            return handlers.script_hash(datas[1])
         if Script.match_ops(ops, cls.TO_PUBKEY_OPS):
-            pubkey = datas[0]
-            return cls(script, coin, cls.TO_PUBKEY,
-                       bytes([coin.P2PKH_VERBYTE]) + hash160(pubkey), pubkey)
-
-        raise ScriptError('unknown script pubkey pattern')
+            return handlers.pubkey(datas[0])
+        return handlers.unknown(None)
 
     @classmethod
     def P2SH_script(cls, hash160):
@@ -317,4 +295,4 @@ class Script(object):
                 print(name)
             else:
                 print('{} {} ({:d} bytes)'
-                      .format(name, hexlify(data).decode('ascii'), len(data)))
+                      .format(name, data.hex(), len(data)))

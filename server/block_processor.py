@@ -20,7 +20,6 @@ from functools import partial
 from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
 from server.daemon import DaemonError
 from lib.hash import hash_to_str
-from lib.script import ScriptPubKey
 from lib.tx import Deserializer
 from lib.util import chunks, LoggedClass
 from server.storage import open_db
@@ -205,12 +204,11 @@ class MemPool(LoggedClass):
 
         # The mempool is unordered, so process all outputs first so
         # that looking for inputs has full info.
-        parse_script = ScriptPubKey.from_script
-        coin = self.bp.coin
+        script_hash168 = self.bp.coin.hash168_from_script
         utxo_lookup = self.bp.utxo_cache.lookup
 
         def txout_pair(txout):
-            return (parse_script(txout.pk_script, coin).hash168, txout.value)
+            return (script_hash168(txout.pk_script), txout.value)
 
         for hex_hash, tx in new_txs.items():
             txout_pairs = tuple(txout_pair(txout) for txout in tx.outputs)
@@ -745,8 +743,7 @@ class BlockProcessor(LoggedClass):
         # Use local vars for speed in the loops
         history = self.history
         tx_num = self.tx_count
-        coin = self.coin
-        parse_script = ScriptPubKey.from_script
+        script_hash168 = self.coin.hash168_from_script
         pack = struct.pack
 
         for tx, tx_hash in zip(txs, tx_hashes):
@@ -763,7 +760,7 @@ class BlockProcessor(LoggedClass):
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
                 # Get the hash168.  Ignore scripts we can't grok.
-                hash168 = parse_script(txout.pk_script, coin).hash168
+                hash168 = script_hash168(txout.pk_script)
                 if hash168:
                     hash168s.add(hash168)
                     put_utxo(tx_hash + pack('<H', idx),

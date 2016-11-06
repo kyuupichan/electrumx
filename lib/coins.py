@@ -17,9 +17,9 @@ import struct
 import sys
 
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
-from lib.script import ScriptPubKey
+from lib.script import ScriptPubKey, Script
 from lib.tx import Deserializer
-from lib.util import subclasses
+from lib.util import cachedproperty, subclasses
 
 
 class CoinError(Exception):
@@ -46,6 +46,19 @@ class Coin(object):
                 return coin
         raise CoinError('unknown coin {} and network {} combination'
                         .format(name, net))
+
+    @cachedproperty
+    def hash168_handlers(cls):
+        return ScriptPubKey.PayToHandlers(
+            address = cls.P2PKH_hash168_from_hash160,
+            script_hash = cls.P2SH_hash168_from_hash160,
+            pubkey = cls.P2PKH_hash168_from_pubkey,
+            unknown = lambda x : None,
+        )
+
+    @classmethod
+    def hash168_from_script(cls, script):
+        return ScriptPubKey.pay_to(script, cls.hash168_handlers)
 
     @staticmethod
     def lookup_xverbytes(verbytes):
@@ -75,11 +88,18 @@ class Coin(object):
         return Base58.encode_check(hash168)
 
     @classmethod
-    def P2PKH_address_from_hash160(cls, hash_bytes):
+    def P2PKH_hash168_from_hash160(cls, hash160):
+        assert len(hash160) == 20
+        return bytes([cls.P2PKH_VERBYTE]) + hash160
+
+    @classmethod
+    def P2PKH_hash168_from_pubkey(cls, pubkey):
+        return cls.P2PKH_hash168_from_hash160(hash160(pubkey))
+
+    @classmethod
+    def P2PKH_address_from_hash160(cls, hash160):
         '''Return a P2PKH address given a public key.'''
-        assert len(hash_bytes) == 20
-        payload = bytes([cls.P2PKH_VERBYTE]) + hash_bytes
-        return Base58.encode_check(payload)
+        return Base58.encode_check(cls.P2PKH_hash168_from_hash160(hash160))
 
     @classmethod
     def P2PKH_address_from_pubkey(cls, pubkey):
@@ -87,11 +107,14 @@ class Coin(object):
         return cls.P2PKH_address_from_hash160(hash160(pubkey))
 
     @classmethod
-    def P2SH_address_from_hash160(cls, pubkey_bytes):
-        '''Return a coin address given a public key.'''
-        assert len(hash_bytes) == 20
-        payload = bytes([cls.P2SH_VERBYTE]) + hash_bytes
-        return Base58.encode_check(payload)
+    def P2SH_hash168_from_hash160(cls, hash160):
+        assert len(hash160) == 20
+        return bytes([cls.P2SH_VERBYTE]) + hash160
+
+    @classmethod
+    def P2SH_address_from_hash160(cls, hash160):
+        '''Return a coin address given a hash160.'''
+        return Base58.encode_check(cls.P2SH_hash168_from_hash160(hash160))
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
