@@ -167,7 +167,7 @@ class MemPool(LoggedClass):
         self.txs = {}
         self.hash168s = defaultdict(set)  # None can be a key
         self.bp = bp
-        self.count = 0
+        self.count = -1
 
     async def update(self, hex_hashes):
         '''Update state given the current mempool to the passed set of hashes.
@@ -178,7 +178,7 @@ class MemPool(LoggedClass):
         hex_hashes = set(hex_hashes)
         touched = set()
 
-        if self.count == 0:
+        if self.count < 0:
             self.logger.info('initial fetch of {:,d} daemon mempool txs'
                              .format(len(hex_hashes)))
 
@@ -251,10 +251,11 @@ class MemPool(LoggedClass):
                 self.hash168s[hash168].add(hex_hash)
                 touched.add(hash168)
 
-        if self.count % 20 == 0:
+        self.count += 1
+        if self.count % 25 == 0 or gone:
+            self.count = 0
             self.logger.info('{:,d} txs touching {:,d} addresses'
                              .format(len(self.txs), len(self.hash168s)))
-        self.count += 1
 
         # Might include a None
         return touched
