@@ -142,8 +142,7 @@ class ScriptPubKey(object):
     TO_P2SH_OPS = [OpCodes.OP_HASH160, -1, OpCodes.OP_EQUAL]
     TO_PUBKEY_OPS = [-1, OpCodes.OP_CHECKSIG]
 
-    PayToHandlers = namedtuple('PayToHandlers',
-                               'address script_hash pubkey unknown')
+    PayToHandlers = namedtuple('PayToHandlers', 'address script_hash pubkey')
 
     @classmethod
     def pay_to(cls, script, handlers):
@@ -154,9 +153,12 @@ class ScriptPubKey(object):
            handlers.address(hash160)
            handlers.script_hash(hash160)
            handlers.pubkey(pubkey)
-           handlers.unknown(None)
+        or None is returned if the script is invalid or unregonised.
         '''
-        ops, datas = Script.get_ops(script)
+        try:
+            ops, datas = Script.get_ops(script)
+        except ScriptError:
+            return None
 
         if Script.match_ops(ops, cls.TO_ADDRESS_OPS):
             return handlers.address(datas[2])
@@ -164,7 +166,8 @@ class ScriptPubKey(object):
             return handlers.script_hash(datas[1])
         if Script.match_ops(ops, cls.TO_PUBKEY_OPS):
             return handlers.pubkey(datas[0])
-        return handlers.unknown(None)
+
+        return None
 
     @classmethod
     def P2SH_script(cls, hash160):
