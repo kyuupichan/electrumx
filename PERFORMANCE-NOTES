@@ -1,0 +1,23 @@
+Just some notes on performance with Python 3.5.  I am taking this into
+account in the code.
+
+- 60% faster to create lists with [] list comprehensions than tuples
+  or lists with tuple(), list().  Of those list is 10% faster than
+  tuple.
+
+- an implicit default argument is ~5% faster than passing the default
+  explicitly
+
+- using a local variable x rather than self.x in loops and list
+  comprehensions is over 50% faster
+
+- struct.pack, struct.unpack are over 60% faster than int.to_bytes and
+  int.from_bytes.  They are faster little endian (presumably because
+  it matches the host) than big endian regardless of length.
+
+- single-item list and tuple unpacking.  Suppose b = (1, )
+
+   a, = b  is a about 0.4% faster than  (a,) = b
+           and about 45% faster than a = b[0]
+
+- multiple assignment is faster using tuples only for 3 or more items

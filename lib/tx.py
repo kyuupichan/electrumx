@@ -9,7 +9,7 @@
 
 
 from collections import namedtuple
-import struct
+from struct import unpack_from
 
 from lib.util import cachedproperty
 from lib.hash import double_sha256, hash_to_str
@@ -58,7 +58,13 @@ class TxOutput(namedtuple("TxOutput", "value pk_script")):
 
 
 class Deserializer(object):
-    '''Deserializes blocks into transactions.'''
+    '''Deserializes blocks into transactions.
+
+    External entry points are read_tx() and read_block().
+
+    This code is performance sensitive as it is executed 100s of
+    millions of times during sync.
+    '''
 
     def __init__(self, binary):
         assert isinstance(binary, bytes)
@@ -67,82 +73,91 @@ class Deserializer(object):
 
     def read_tx(self):
         return Tx(
-            self.read_le_int32(),  # version
-            self.read_inputs(),    # inputs
-            self.read_outputs(),   # outputs
-            self.read_le_uint32()  # locktime
+            self._read_le_int32(),  # version
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
         )
 
     def read_block(self):
         tx_hashes = []
         txs = []
-        tx_count = self.read_varint()
-        for n in range(tx_count):
+        binary = self.binary
+        hash = double_sha256
+        read_tx = self.read_tx
+        append_hash = tx_hashes.append
+        for n in range(self._read_varint()):
             start = self.cursor
-            tx = self.read_tx()
+            txs.append(read_tx())
             # Note this hash needs to be reversed for human display
             # For efficiency we store it in the natural serialized order
-            tx_hash = double_sha256(self.binary[start:self.cursor])
-            tx_hashes.append(tx_hash)
-            txs.append(tx)
+            append_hash(hash(binary[start:self.cursor]))
+        assert self.cursor == len(binary)
         return tx_hashes, txs
 
-    def read_inputs(self):
-        n = self.read_varint()
-        return [self.read_input() for i in range(n)]
+    def _read_inputs(self):
+        read_input = self._read_input
+        return [read_input() for i in range(self._read_varint())]
 
-    def read_input(self):
+    def _read_input(self):
         return TxInput(
-            self.read_nbytes(32),  # prev_hash
-            self.read_le_uint32(), # prev_idx
-            self.read_varbytes(),  # script
-            self.read_le_uint32()  # sequence
+            self._read_nbytes(32),  # prev_hash
+            self._read_le_uint32(), # prev_idx
+            self._read_varbytes(),  # script
+            self._read_le_uint32()  # sequence
         )
 
-    def read_outputs(self):
-        n = self.read_varint()
-        return [self.read_output() for i in range(n)]
+    def _read_outputs(self):
+        read_output = self._read_output
+        return [read_output() for i in range(self._read_varint())]
 
-    def read_output(self):
-        value = self.read_le_int64()
-        pk_script = self.read_varbytes()
-        return TxOutput(value, pk_script)
+    def _read_output(self):
+        return TxOutput(
+            self._read_le_int64(),  # value
+            self._read_varbytes(),  # pk_script
+        )
 
-    def read_nbytes(self, n):
-        result = self.binary[self.cursor:self.cursor + n]
-        self.cursor += n
+    def _read_nbytes(self, n):
+        cursor = self.cursor
+        self.cursor = end = cursor + n
+        assert len(self.binary) >= end
+        return self.binary[cursor:end]
+
+    def _read_varbytes(self):
+        return self._read_nbytes(self._read_varint())
+
+    def _read_varint(self):
+        n = self.binary[self.cursor]
+        self.cursor += 1
+        if n < 253:
+            return n
+        if n == 253:
+            return self._read_le_uint16()
+        if n == 254:
+            return self._read_le_uint32()
+        return self._read_le_uint64()
+
+    def _read_le_int32(self):
+        result, = unpack_from('<i', self.binary, self.cursor)
+        self.cursor += 4
         return result
 
-    def read_varbytes(self):
-        return self.read_nbytes(self.read_varint())
+    def _read_le_int64(self):
+        result, = unpack_from('<q', self.binary, self.cursor)
+        self.cursor += 8
+        return result
 
-    def read_varint(self):
-        b = self.binary[self.cursor]
-        self.cursor += 1
-        if b < 253:
-            return b
-        if b == 253:
-            return self.read_le_uint16()
-        if b == 254:
-            return self.read_le_uint32()
-        return self.read_le_uint64()
+    def _read_le_uint16(self):
+        result, = unpack_from('<H', self.binary, self.cursor)
+        self.cursor += 2
+        return result
 
-    def read_le_int32(self):
-        return self.read_format('<i')
+    def _read_le_uint32(self):
+        result, = unpack_from('<I', self.binary, self.cursor)
+        self.cursor += 4
+        return result
 
-    def read_le_int64(self):
-        return self.read_format('<q')
-
-    def read_le_uint16(self):
-        return self.read_format('<H')
-
-    def read_le_uint32(self):
-        return self.read_format('<I')
-
-    def read_le_uint64(self):
-        return self.read_format('<Q')
-
-    def read_format(self, fmt):
-        (result,) = struct.unpack_from(fmt, self.binary, self.cursor)
-        self.cursor += struct.calcsize(fmt)
+    def _read_le_uint64(self):
+        result, = unpack_from('<Q', self.binary, self.cursor)
+        self.cursor += 8
         return result
