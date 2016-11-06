@@ -11,7 +11,6 @@
 import asyncio
 import codecs
 import json
-import struct
 import traceback
 from functools import partial
 
@@ -33,6 +32,8 @@ def json_notification(method, params):
 class JSONRPC(asyncio.Protocol, LoggedClass):
     '''Base class that manages a JSONRPC connection.'''
     SESSIONS = set()
+    # Queue for aynchronous job processing.
+    JOBS = None
 
     def __init__(self):
         super().__init__()
@@ -40,6 +41,26 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.send_count = 0
         self.send_size = 0
         self.error_count = 0
+        self.init_jobs()
+
+    @classmethod
+    def init_jobs(cls):
+        if not cls.JOBS:
+            cls.JOBS = asyncio.Queue()
+            asyncio.ensure_future(cls.run_jobs())
+
+    @classmethod
+    async def run_jobs(cls):
+        '''Asynchronously run through the job queue.'''
+        while True:
+            job = await cls.JOBS.get()
+            try:
+                await job
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Getting here should probably be considered a bug and fixed
+                traceback.print_exc()
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
@@ -79,7 +100,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         except Exception as e:
             self.logger.info('error decoding JSON message: {}'.format(e))
         else:
-            self.ADD_JOB(self.request_handler(message))
+            self.JOBS.put_nowait(self.request_handler(message))
 
     async def request_handler(self, request):
         '''Called asynchronously.'''
@@ -168,11 +189,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             raise RPCError('params should be empty: {}'.format(params))
 
     @classmethod
-    def init(cls, block_processor, daemon, coin, add_job):
+    def init(cls, block_processor, daemon, coin):
         cls.BLOCK_PROCESSOR = block_processor
         cls.DAEMON = daemon
         cls.COIN = coin
-        cls.ADD_JOB = add_job
 
     @classmethod
     def height(cls):

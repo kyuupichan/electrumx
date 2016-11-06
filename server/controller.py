@@ -14,7 +14,6 @@ client-serving data such as histories.
 import asyncio
 import signal
 import ssl
-import traceback
 from functools import partial
 
 from server.daemon import Daemon
@@ -37,15 +36,12 @@ class Controller(LoggedClass):
         self.daemon = Daemon(env.daemon_url, env.debug)
         self.block_processor = BlockProcessor(env, self.daemon,
                                               on_update=self.on_update)
-        JSONRPC.init(self.block_processor, self.daemon, self.coin,
-                     self.add_job)
+        JSONRPC.init(self.block_processor, self.daemon, self.coin)
         self.servers = []
-        self.jobs = asyncio.Queue()
 
     def start(self):
         '''Prime the event loop with asynchronous jobs.'''
         coros = self.block_processor.coros()
-        coros.append(self.run_jobs())
 
         for coro in coros:
             asyncio.ensure_future(coro)
@@ -109,19 +105,3 @@ class Controller(LoggedClass):
                             .format(signame))
         for task in asyncio.Task.all_tasks(self.loop):
             task.cancel()
-
-    def add_job(self, coro):
-        '''Queue a job for asynchronous processing.'''
-        self.jobs.put_nowait(coro)
-
-    async def run_jobs(self):
-        '''Asynchronously run through the job queue.'''
-        while True:
-            job = await self.jobs.get()
-            try:
-                await job
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                # Getting here should probably be considered a bug and fixed
-                traceback.print_exc()
