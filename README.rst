@@ -7,6 +7,11 @@ ElectrumX - Reimplementation of Electrum-server
   Language: Python (>=3.5)
 
 
+Getting Started
+===============
+
+See :code:`docs/HOWTO.rst`.
+
 Motivation
 ==========
 
