@@ -89,8 +89,10 @@ class Coin(object):
 
     @classmethod
     def P2PKH_hash168_from_hash160(cls, hash160):
-        assert len(hash160) == 20
-        return bytes([cls.P2PKH_VERBYTE]) + hash160
+        '''Return a hash168 if hash160 is 160 bits otherwise None.'''
+        if len(hash160) == 20:
+            return bytes([cls.P2PKH_VERBYTE]) + hash160
+        return None
 
     @classmethod
     def P2PKH_hash168_from_pubkey(cls, pubkey):
@@ -99,6 +101,7 @@ class Coin(object):
     @classmethod
     def P2PKH_address_from_hash160(cls, hash160):
         '''Return a P2PKH address given a public key.'''
+        assert len(hash160) == 20
         return Base58.encode_check(cls.P2PKH_hash168_from_hash160(hash160))
 
     @classmethod
@@ -108,12 +111,15 @@ class Coin(object):
 
     @classmethod
     def P2SH_hash168_from_hash160(cls, hash160):
-        assert len(hash160) == 20
-        return bytes([cls.P2SH_VERBYTE]) + hash160
+        '''Return a hash168 if hash160 is 160 bits otherwise None.'''
+        if len(hash160) == 20:
+            return bytes([cls.P2SH_VERBYTE]) + hash160
+        return None
 
     @classmethod
     def P2SH_address_from_hash160(cls, hash160):
         '''Return a coin address given a hash160.'''
+        assert len(hash160) == 20
         return Base58.encode_check(cls.P2SH_hash168_from_hash160(hash160))
 
     @classmethod
@@ -126,8 +132,7 @@ class Coin(object):
         for, e.g., wallet recovery.
         '''
         script = cls.pay_to_multisig_script(m, pubkeys)
-        payload = bytes([cls.P2SH_VERBYTE]) + hash160(pubkey_bytes)
-        return Base58.encode_check(payload)
+        return cls.P2SH_address_from_hash160(hash160(script))
 
     @classmethod
     def pay_to_multisig_script(cls, m, pubkeys):
