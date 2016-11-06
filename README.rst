@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/kyuupichan/electrumx.svg?branch=master
+    :target: https://travis-ci.org/kyuupichan/electrumx
+
 ElectrumX - Reimplementation of Electrum-server
 ===============================================
 ::
