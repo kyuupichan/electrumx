@@ -53,7 +53,6 @@ class Coin(object):
             address = cls.P2PKH_hash168_from_hash160,
             script_hash = cls.P2SH_hash168_from_hash160,
             pubkey = cls.P2PKH_hash168_from_pubkey,
-            unknown = lambda x : None,
         )
 
     @classmethod
