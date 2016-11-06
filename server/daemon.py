@@ -48,9 +48,9 @@ class Daemon(util.LoggedClass):
             result = await resp.json()
 
         if isinstance(result, list):
-            errs = tuple(item['error'] for item in result)
+            errs = [item['error'] for item in result]
             if not any(errs):
-                return tuple(item['result'] for item in result)
+                return [item['result'] for item in result]
             if any(err.get('code') == self.WARMING_UP for err in errs if err):
                 raise DaemonWarmingUpError
             raise DaemonError(errs)
@@ -105,18 +105,14 @@ class Daemon(util.LoggedClass):
         return await self.send(payload)
 
     async def send_many(self, mp_iterable):
-        '''Send several requests at once.
-
-        The results are returned as a tuple.'''
-        payload = tuple({'method': m, 'params': p} for m, p in mp_iterable)
+        '''Send several requests at once.'''
+        payload = [{'method': m, 'params': p} for m, p in mp_iterable]
         if payload:
             return await self.send(payload)
-        return ()
+        return []
 
     async def send_vector(self, method, params_iterable):
-        '''Send several requests of the same method.
-
-        The results are returned as a tuple.'''
+        '''Send several requests of the same method.'''
         return await self.send_many((method, params)
                                     for params in params_iterable)
 
@@ -130,7 +126,7 @@ class Daemon(util.LoggedClass):
         params_iterable = ((h, False) for h in hex_hashes)
         blocks = await self.send_vector('getblock', params_iterable)
         # Convert hex string to bytes
-        return tuple(bytes.fromhex(block) for block in blocks)
+        return [bytes.fromhex(block) for block in blocks]
 
     async def mempool_hashes(self):
         '''Return the hashes of the txs in the daemon's mempool.'''
@@ -159,7 +155,7 @@ class Daemon(util.LoggedClass):
         params_iterable = ((hex_hash, 0) for hex_hash in hex_hashes)
         txs = await self.send_vector('getrawtransaction', params_iterable)
         # Convert hex strings to bytes
-        return tuple(bytes.fromhex(tx) for tx in txs)
+        return [bytes.fromhex(tx) for tx in txs]
 
     async def sendrawtransaction(self, params):
         '''Broadcast a transaction to the network.'''
