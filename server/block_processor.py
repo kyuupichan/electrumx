@@ -325,8 +325,6 @@ class BlockProcessor(LoggedClass):
         self.height = self.db_height
         self.tip = self.db_tip
 
-        self.daemon.debug_set_height(self.height)
-
         # Caches to be flushed later.  Headers and tx_hashes have one
         # entry per block
         self.history = defaultdict(partial(array.array, 'I'))
@@ -360,6 +358,7 @@ class BlockProcessor(LoggedClass):
         self.clean_db()
 
     def coros(self):
+        self.daemon.debug_set_height(self.height)
         return [self.start(), self.prefetcher.start()]
 
     async def start(self):
