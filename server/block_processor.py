@@ -252,7 +252,7 @@ class MemPool(LoggedClass):
                 touched.add(hash168)
 
         if self.count % 20 == 0:
-            self.logger.info('{:,d} entries in mempool for {:,d} addresses'
+            self.logger.info('{:,d} txs touching {:,d} addresses'
                              .format(len(self.txs), len(self.hash168s)))
         self.count += 1
 
