@@ -5,6 +5,9 @@ account in the code.
   or lists with tuple(), list().  Of those list is 10% faster than
   tuple.
 
+- however when not initializing from a generator, a fixed-length tuple
+  is at least 80% faster than a list.
+
 - an implicit default argument is ~5% faster than passing the default
   explicitly
 

@@ -211,8 +211,8 @@ class MemPool(LoggedClass):
             return (script_hash168(txout.pk_script), txout.value)
 
         for hex_hash, tx in new_txs.items():
-            txout_pairs = tuple(txout_pair(txout) for txout in tx.outputs)
-            self.txs[hex_hash] = [None, txout_pairs, None]
+            txout_pairs = [txout_pair(txout) for txout in tx.outputs]
+            self.txs[hex_hash] = (None, txout_pairs, None)
 
         def txin_info(txin):
             hex_hash = hash_to_str(txin.prev_hash)
@@ -239,7 +239,7 @@ class MemPool(LoggedClass):
                 # If we were missing a UTXO for some reason drop this tx
                 del self.txs[hex_hash]
                 continue
-            self.txs[hex_hash] = [txin_pairs, txout_pairs, any(unconfs)]
+            self.txs[hex_hash] = (txin_pairs, txout_pairs, any(unconfs))
 
             # Update touched and self.hash168s for the new tx
             for hash168, value in txin_pairs:
