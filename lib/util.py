@@ -104,3 +104,20 @@ def int_to_bytes(value):
         value, mod = divmod(value, 256)
         mods.append(mod)
     return bytes(reversed(mods))
+
+
+def increment_byte_string(bs):
+    bs = bytearray(bs)
+    incremented = False
+    for i in reversed(range(len(bs))):
+        if bs[i] < 0xff:
+            # This is easy
+            bs[i] += 1
+            incremented = True
+            break
+        # Otherwise we need to look at the previous character
+        bs[i] = 0
+    if not incremented:
+        # This can only happen if all characters are 0xff
+        bs = bytes([1]) + bs
+    return bytes(bs)
