@@ -12,7 +12,6 @@ client-serving data such as histories.
 '''
 
 import asyncio
-import signal
 import ssl
 from functools import partial
 
@@ -45,11 +44,6 @@ class Controller(LoggedClass):
 
         for coro in coros:
             asyncio.ensure_future(coro)
-
-        # Signal handlers
-        for signame in ('SIGINT', 'SIGTERM'):
-            self.loop.add_signal_handler(getattr(signal, signame),
-                                         partial(self.on_signal, signame))
 
     async def on_update(self, height, touched):
         if not self.servers:
@@ -98,10 +92,3 @@ class Controller(LoggedClass):
         '''Close the listening servers.'''
         for server in self.servers:
             server.close()
-
-    def on_signal(self, signame):
-        '''Call on receipt of a signal to cleanly shutdown.'''
-        self.logger.warning('received {} signal, preparing to shut down'
-                            .format(signame))
-        for task in asyncio.Task.all_tasks(self.loop):
-            task.cancel()

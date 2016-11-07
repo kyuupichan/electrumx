@@ -9,14 +9,27 @@
 
 '''Script to kick off the server.'''
 
-
 import asyncio
 import logging
 import os
+import signal
 import traceback
+from functools import partial
 
 from server.env import Env
 from server.controller import Controller
+
+
+def cancel_tasks(loop):
+    # Cancel and collect the remaining tasks
+    tasks = asyncio.Task.all_tasks()
+    for task in tasks:
+        task.cancel()
+
+    try:
+        loop.run_until_complete(asyncio.gather(*tasks))
+    except asyncio.CancelledError:
+        pass
 
 
 def main_loop():
@@ -33,16 +46,26 @@ def main_loop():
     #loop.set_debug(True)
 
     controller = Controller(loop, env)
-    controller.start()
 
-    tasks = asyncio.Task.all_tasks(loop)
+    # Signal handlers
+    def on_signal(signame):
+        '''Call on receipt of a signal to cleanly shutdown.'''
+        logging.warning('received {} signal, preparing to shut down'
+                        .format(signame))
+        loop.stop()
+
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(getattr(signal, signame),
+                                partial(on_signal, signame))
+
+    controller.start()
     try:
-        loop.run_until_complete(asyncio.gather(*tasks))
-    except asyncio.CancelledError:
-        logging.warning('task cancelled; asyncio event loop closing')
+        loop.run_forever()
     finally:
         controller.stop()
-        loop.close()
+        cancel_tasks(loop)
+
+    loop.close()
 
 
 def main():
