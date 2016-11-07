@@ -369,22 +369,23 @@ class FSCache(LoggedClass):
         self.headers = []
         self.height += blocks_done
 
-    def read_headers(self, height, count):
-        read_count = min(count, self.height + 1 - height)
-
-        assert height >= 0 and read_count >= 0
-        assert count <= read_count + len(self.headers)
-
+    def read_headers(self, start, count):
         result = b''
-        if read_count > 0:
-            header_len = self.coin.HEADER_LEN
-            self.headers_file.seek(height * header_len)
-            result = self.headers_file.read(read_count * header_len)
 
-        count -= read_count
-        if count:
-            start = (height + read_count) - (self.height + 1)
-            result += b''.join(self.headers[start: start + count])
+        # Read some from disk
+        disk_count = min(count, self.height + 1 - start)
+        if disk_count > 0:
+            header_len = self.coin.HEADER_LEN
+            assert start >= 0
+            self.headers_file.seek(start * header_len)
+            result = self.headers_file.read(disk_count * header_len)
+            count -= disk_count
+            start += disk_count
+
+        # The rest from memory
+        start -= self.height + 1
+        assert count >= 0 and start + count <= len(self.headers)
+        result += b''.join(self.headers[start: start + count])
 
         return result
 
