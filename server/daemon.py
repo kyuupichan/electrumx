@@ -35,6 +35,9 @@ class Daemon(util.LoggedClass):
         self._height = None
         self.logger.info('connecting to daemon at URL {}'.format(url))
         self.debug_caught_up = 'caught_up' in debug
+        # Limit concurrent RPC calls to this number.
+        # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
+        self.workqueue_semaphore = asyncio.Semaphore(value=10)
 
     def debug_set_height(self, height):
         if self.debug_caught_up:
@@ -44,8 +47,9 @@ class Daemon(util.LoggedClass):
 
     async def post(self, data):
         '''Send data to the daemon and handle the response.'''
-        async with aiohttp.post(self.url, data=data) as resp:
-            result = await resp.json()
+        async with self.workqueue_semaphore:
+            async with aiohttp.post(self.url, data=data) as resp:
+                result = await resp.json()
 
         if isinstance(result, list):
             errs = [item['error'] for item in result]
