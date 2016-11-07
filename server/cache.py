@@ -83,9 +83,9 @@ class UTXOCache(LoggedClass):
 
     '''
 
-    def __init__(self, parent, db, coin):
+    def __init__(self, get_tx_hash, db, coin):
         super().__init__()
-        self.parent = parent
+        self.get_tx_hash = get_tx_hash
         self.coin = coin
         self.cache = {}
         self.put = self.cache.__setitem__
@@ -137,7 +137,7 @@ class UTXOCache(LoggedClass):
         assert len(data) % 12 == 0
         for n in range(0, len(data), 12):
             (tx_num, ) = struct.unpack('<I', data[n:n+4])
-            this_tx_hash, height = self.parent.get_tx_hash(tx_num)
+            this_tx_hash, height = self.get_tx_hash(tx_num)
             if tx_hash == this_tx_hash:
                 result = hash168 + data[n:n+12]
                 if delete:
@@ -185,7 +185,7 @@ class UTXOCache(LoggedClass):
         # Resolve the compressed key collision using the TX number
         for n in range(0, len(data), 25):
             (tx_num, ) = struct.unpack('<I', data[n+21:n+25])
-            my_hash, height = self.parent.get_tx_hash(tx_num)
+            my_hash, height = self.get_tx_hash(tx_num)
             if my_hash == tx_hash:
                 if delete:
                     self.cache_write(key, data[:n] + data[n+25:])
