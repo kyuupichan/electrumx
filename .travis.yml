@@ -1,0 +1,19 @@
+sudo: required
+dist: trusty
+language: python
+before_install:
+  - sudo add-apt-repository -y ppa:giskou/librocksdb
+  - sudo apt-get -qq update
+  - sudo apt-get install -yq libleveldb-dev librocksdb libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev
+python:
+  - "3.5"
+  - "3.6-dev"
+  - "nightly"
+# command to install dependencies
+install:
+  - pip install aiohttp
+  - pip install lmdb
+  - pip install plyvel
+  - pip install pyrocksdb
+# command to run tests
+script: pytest
