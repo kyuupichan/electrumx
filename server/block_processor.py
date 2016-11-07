@@ -19,7 +19,7 @@ from collections import defaultdict, namedtuple
 from functools import partial
 
 from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
-from server.daemon import DaemonError
+from server.daemon import Daemon, DaemonError
 from server.protocol import ElectrumX, LocalRPC, JSONRPC
 from lib.hash import hash_to_str
 from lib.tx import Deserializer
@@ -78,7 +78,11 @@ class Prefetcher(LoggedClass):
         else:
             return blocks, None
 
-    async def start(self):
+    def start(self):
+        '''Start the prefetcher.'''
+        asyncio.ensure_future(self.main_loop())
+
+    async def main_loop(self):
         '''Loop forever polling for more blocks.'''
         self.logger.info('starting daemon poll loop...')
         while True:
@@ -290,14 +294,13 @@ class BlockProcessor(server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, daemon):
+    def __init__(self, env):
         '''on_update is awaitable, and called only when caught up with the
         daemon and a new block arrives or the mempool is updated.'''
-        super().__init__(env.coin, env.db_engine)
-        daemon.debug_set_height(self.height)
+        super().__init__(env)
 
-        self.env = env
-        self.daemon = daemon
+        self.daemon = Daemon(env.daemon_url, env.debug)
+        self.daemon.debug_set_height(self.height)
         self.mempool = MemPool(self)
         self.touched = set()
 
@@ -310,7 +313,7 @@ class BlockProcessor(server.db.DB):
         # Headers and tx_hashes have one entry per block
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
-        self.prefetcher = Prefetcher(daemon, self.height)
+        self.prefetcher = Prefetcher(self.daemon, self.height)
 
         self.last_flush = time.time()
         self.last_flush_tx_count = self.tx_count
@@ -332,11 +335,13 @@ class BlockProcessor(server.db.DB):
 
         self.clean_db()
 
-    def coros(self):
-        return [self.start(), self.prefetcher.start()]
+    def start(self):
+        '''Start the block processor.'''
+        asyncio.ensure_future(self.main_loop())
+        self.prefetcher.start()
 
-    async def start(self):
-        '''External entry point for block processing.
+    async def main_loop(self):
+        '''Main loop for block processing.
 
         Safely flushes the DB on clean shutdown.
         '''
@@ -808,10 +813,10 @@ class BlockProcessor(server.db.DB):
 class BlockServer(BlockProcessor):
     '''Like BlockProcessor but also starts servers when caught up.'''
 
-    def __init__(self, env, daemon):
+    def __init__(self, env):
         '''on_update is awaitable, and called only when caught up with the
         daemon and a new block arrives or the mempool is updated.'''
-        super().__init__(env, daemon)
+        super().__init__(env)
         self.servers = []
 
     async def caught_up(self, mempool_hashes):

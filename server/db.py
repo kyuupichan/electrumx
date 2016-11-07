@@ -9,6 +9,7 @@
 
 import array
 import ast
+import os
 import struct
 from collections import namedtuple
 
@@ -26,19 +27,24 @@ class DB(LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    def __init__(self, coin, db_engine):
+    def __init__(self, env):
         super().__init__()
-        self.coin = coin
+        self.env = env
+        self.coin = env.coin
+
+        self.logger.info('switching current directory to {}'
+                         .format(env.db_dir))
+        os.chdir(env.db_dir)
 
         # Open DB and metadata files.  Record some of its state.
-        db_name = '{}-{}'.format(coin.NAME, coin.NET)
-        self.db = open_db(db_name, db_engine)
+        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
+        self.db = open_db(db_name, env.db_engine)
         if self.db.is_new:
             self.logger.info('created new {} database {}'
-                             .format(db_engine, db_name))
+                             .format(env.db_engine, db_name))
         else:
             self.logger.info('successfully opened {} database {}'
-                             .format(db_engine, db_name))
+                             .format(env.db_engine, db_name))
 
         self.init_state_from_db()
         self.tx_count = self.db_tx_count
