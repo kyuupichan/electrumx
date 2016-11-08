@@ -17,7 +17,7 @@ import traceback
 from functools import partial
 
 from server.env import Env
-from server.block_processor import BlockServer
+from server.protocol import BlockServer
 
 
 def close_loop(loop):

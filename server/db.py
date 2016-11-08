@@ -7,6 +7,7 @@
 
 '''Interface to the blockchain database.'''
 
+
 import array
 import ast
 import os
