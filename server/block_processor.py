@@ -241,7 +241,7 @@ class MemPool(LoggedClass):
         # Now add the inputs
         for n, (hex_hash, tx) in enumerate(new_txs.items()):
             # Yield to process e.g. signals
-            if n % 100 == 0:
+            if n % 50 == 0:
                 await asyncio.sleep(0)
 
             if initial and time.time() > next_log:
