@@ -211,7 +211,10 @@ class MemPool(LoggedClass):
         def txout_pair(txout):
             return (script_hash168(txout.pk_script), txout.value)
 
-        for hex_hash, tx in new_txs.items():
+        for n, (hex_hash, tx) in enumerate(new_txs.items()):
+            # Yield to process e.g. signals
+            if n % 500 == 0:
+                await asyncio.sleep(0)
             txout_pairs = [txout_pair(txout) for txout in tx.outputs]
             self.txs[hex_hash] = (None, txout_pairs, None)
 
@@ -237,10 +240,15 @@ class MemPool(LoggedClass):
 
         # Now add the inputs
         for n, (hex_hash, tx) in enumerate(new_txs.items()):
+            # Yield to process e.g. signals
+            if n % 100 == 0:
+                await asyncio.sleep(0)
+
             if initial and time.time() > next_log:
                 next_log = time.time() + 10
                 self.logger.info('{:,d} done ({:d}%)'
                                  .format(n, int(n / len(new_txs) * 100)))
+
             txout_pairs = self.txs[hex_hash][1]
             try:
                 infos = (txin_info(txin) for txin in tx.inputs)
