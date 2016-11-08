@@ -180,8 +180,9 @@ class MemPool(LoggedClass):
         hex_hashes = set(hex_hashes)
         touched = set()
 
-        if self.count < 0:
-            self.logger.info('initial fetch of {:,d} daemon mempool txs'
+        initial = self.count < 0
+        if initial:
+            self.logger.info('beginning import of {:,d} mempool txs'
                              .format(len(hex_hashes)))
 
         # Remove gone items
@@ -201,6 +202,8 @@ class MemPool(LoggedClass):
         # them into a dictionary of hex hash to deserialized tx.
         hex_hashes.difference_update(self.txs)
         raw_txs = await self.bp.daemon.getrawtransactions(hex_hashes)
+        if initial:
+            self.logger.info('all fetched, now analysing...')
         new_txs = {hex_hash: Deserializer(raw_tx).read_tx()
                    for hex_hash, raw_tx in zip(hex_hashes, raw_txs) if raw_tx}
         del raw_txs, hex_hashes
@@ -232,8 +235,17 @@ class MemPool(LoggedClass):
             value, = struct.unpack('<Q', entry[-8:])
             return (entry[:21], value), False
 
+        if initial:
+            next_log = time.time()
+            self.logger.info('processed outputs, now examining inputs. '
+                             'This can take some time...')
+
         # Now add the inputs
-        for hex_hash, tx in new_txs.items():
+        for n, (hex_hash, tx) in enumerate(new_txs.items()):
+            if initial and time.time() > next_log:
+                next_log = time.time() + 10
+                self.logger.info('{:,d} done ({:d}%)'
+                                 .format(n, int(n / len(new_txs) * 100)))
             txout_pairs = self.txs[hex_hash][1]
             try:
                 infos = (txin_info(txin) for txin in tx.inputs)
