@@ -86,11 +86,11 @@ class Daemon(util.LoggedClass):
             except aiohttp.ClientHttpProcessingError:
                 msg = 'HTTP error'
             except aiohttp.ServerDisconnectedError:
-                msg = 'daemon disconnected'
+                msg = 'disconnected'
             except aiohttp.ClientConnectionError:
                 msg = 'connection problem - is your daemon running?'
             except DaemonWarmingUpError:
-                msg = 'daemon is still warming up'
+                msg = 'still starting up checking blocks...'
 
             if msg != prior_msg or count == 10:
                 self.logger.error('{}.  Retrying between sleeps...'
