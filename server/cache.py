@@ -12,14 +12,10 @@ Once synced flushes are performed after processing each block.
 '''
 
 
-import array
-import itertools
-import os
 import struct
-from bisect import bisect_right
 
-from lib.util import chunks, LoggedClass
-from lib.hash import double_sha256, hash_to_str
+from lib.util import LoggedClass
+from lib.hash import hash_to_str
 
 
 # History can hold approx. 65536 * HIST_ENTRIES_PER_KEY entries
@@ -83,9 +79,9 @@ class UTXOCache(LoggedClass):
 
     '''
 
-    def __init__(self, parent, db, coin):
+    def __init__(self, get_tx_hash, db, coin):
         super().__init__()
-        self.parent = parent
+        self.get_tx_hash = get_tx_hash
         self.coin = coin
         self.cache = {}
         self.put = self.cache.__setitem__
@@ -137,7 +133,7 @@ class UTXOCache(LoggedClass):
         assert len(data) % 12 == 0
         for n in range(0, len(data), 12):
             (tx_num, ) = struct.unpack('<I', data[n:n+4])
-            this_tx_hash, height = self.parent.get_tx_hash(tx_num)
+            this_tx_hash, height = self.get_tx_hash(tx_num)
             if tx_hash == this_tx_hash:
                 result = hash168 + data[n:n+12]
                 if delete:
@@ -185,7 +181,7 @@ class UTXOCache(LoggedClass):
         # Resolve the compressed key collision using the TX number
         for n in range(0, len(data), 25):
             (tx_num, ) = struct.unpack('<I', data[n+21:n+25])
-            my_hash, height = self.parent.get_tx_hash(tx_num)
+            my_hash, height = self.get_tx_hash(tx_num)
             if my_hash == tx_hash:
                 if delete:
                     self.cache_write(key, data[:n] + data[n+25:])
@@ -259,155 +255,3 @@ class UTXOCache(LoggedClass):
                          .format(new_utxos, self.db_deletes,
                                  hcolls, ucolls))
         self.cache_spends = self.db_deletes = 0
-
-
-class FSCache(LoggedClass):
-
-    def __init__(self, coin, height, tx_count):
-        super().__init__()
-
-        self.coin = coin
-        self.tx_hash_file_size = 16 * 1024 * 1024
-        assert self.tx_hash_file_size % 32 == 0
-
-        # On-disk values, updated by a flush
-        self.height = height
-
-        # Unflushed items
-        self.headers = []
-        self.tx_hashes = []
-
-        is_new = height == -1
-        self.headers_file = self.open_file('headers', is_new)
-        self.txcount_file = self.open_file('txcount', is_new)
-
-        # tx_counts[N] has the cumulative number of txs at the end of
-        # height N.  So tx_counts[0] is 1 - the genesis coinbase
-        self.tx_counts = array.array('I')
-        self.txcount_file.seek(0)
-        self.tx_counts.fromfile(self.txcount_file, self.height + 1)
-        if self.tx_counts:
-            assert tx_count == self.tx_counts[-1]
-        else:
-            assert tx_count == 0
-
-    def open_file(self, filename, create=False):
-        '''Open the file name.  Return its handle.'''
-        try:
-            return open(filename, 'rb+')
-        except FileNotFoundError:
-            if create:
-                return open(filename, 'wb+')
-            raise
-
-    def advance_block(self, header, tx_hashes, txs):
-        '''Update the FS cache for a new block.'''
-        prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
-
-        # Cache the new header, tx hashes and cumulative tx count
-        self.headers.append(header)
-        self.tx_hashes.append(tx_hashes)
-        self.tx_counts.append(prior_tx_count + len(txs))
-
-    def backup_block(self):
-        '''Revert a block.'''
-        assert not self.headers
-        assert not self.tx_hashes
-        assert self.height >= 0
-        # Just update in-memory.  It doesn't matter if disk files are
-        # too long, they will be overwritten when advancing.
-        self.height -= 1
-        self.tx_counts.pop()
-
-    def flush(self, new_height, new_tx_count):
-        '''Flush the things stored on the filesystem.
-        The arguments are passed for sanity check assertions only.'''
-        self.logger.info('flushing to file system')
-
-        blocks_done = len(self.headers)
-        prior_tx_count = self.tx_counts[self.height] if self.height >= 0 else 0
-        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
-        txs_done = cur_tx_count - prior_tx_count
-
-        assert self.height + blocks_done == new_height
-        assert len(self.tx_hashes) == blocks_done
-        assert len(self.tx_counts) == new_height + 1
-        assert cur_tx_count == new_tx_count, \
-            'cur: {:,d} new: {:,d}'.format(cur_tx_count, new_tx_count)
-
-        # First the headers
-        headers = b''.join(self.headers)
-        header_len = self.coin.HEADER_LEN
-        self.headers_file.seek((self.height + 1) * header_len)
-        self.headers_file.write(headers)
-        self.headers_file.flush()
-
-        # Then the tx counts
-        self.txcount_file.seek((self.height + 1) * self.tx_counts.itemsize)
-        self.txcount_file.write(self.tx_counts[self.height + 1:])
-        self.txcount_file.flush()
-
-        # Finally the hashes
-        hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
-        assert len(hashes) % 32 == 0
-        assert len(hashes) // 32 == txs_done
-        cursor = 0
-        file_pos = prior_tx_count * 32
-        while cursor < len(hashes):
-            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
-            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
-            filename = 'hashes{:04d}'.format(file_num)
-            with self.open_file(filename, create=True) as f:
-                f.seek(offset)
-                f.write(hashes[cursor:cursor + size])
-            cursor += size
-            file_pos += size
-
-        os.sync()
-
-        self.tx_hashes = []
-        self.headers = []
-        self.height += blocks_done
-
-    def read_headers(self, start, count):
-        result = b''
-
-        # Read some from disk
-        disk_count = min(count, self.height + 1 - start)
-        if disk_count > 0:
-            header_len = self.coin.HEADER_LEN
-            assert start >= 0
-            self.headers_file.seek(start * header_len)
-            result = self.headers_file.read(disk_count * header_len)
-            count -= disk_count
-            start += disk_count
-
-        # The rest from memory
-        start -= self.height + 1
-        assert count >= 0 and start + count <= len(self.headers)
-        result += b''.join(self.headers[start: start + count])
-
-        return result
-
-    def get_tx_hash(self, tx_num):
-        '''Returns the tx_hash and height of a tx number.'''
-        height = bisect_right(self.tx_counts, tx_num)
-
-        # Is this on disk or unflushed?
-        if height > self.height:
-            tx_hashes = self.tx_hashes[height - (self.height + 1)]
-            tx_hash = tx_hashes[tx_num - self.tx_counts[height - 1]]
-        else:
-            file_pos = tx_num * 32
-            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
-            filename = 'hashes{:04d}'.format(file_num)
-            with self.open_file(filename) as f:
-                f.seek(offset)
-                tx_hash = f.read(32)
-
-        return tx_hash, height
-
-    def block_hashes(self, height, count):
-        headers = self.read_headers(height, count)
-        hlen = self.coin.HEADER_LEN
-        return [double_sha256(header) for header in chunks(headers, hlen)]

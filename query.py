@@ -13,11 +13,10 @@ Not currently documented; might become easier to use in future.
 '''
 
 
-import os
 import sys
 
 from server.env import Env
-from server.block_processor import BlockProcessor
+from server.DB import DB
 from lib.hash import hash_to_str
 
 
@@ -40,9 +39,8 @@ def count_entries(db):
 
 def main():
     env = Env()
+    bp = DB(env)
     coin = env.coin
-    os.chdir(env.db_dir)
-    bp = BlockProcessor(env, None)
     if len(sys.argv) == 1:
         count_entries(bp.db)
         return

@@ -1,3 +1,14 @@
+Version 0.2.2
+-------------
+
+- mostly refactoring: controller.py is gone; cache.py is half-gone.
+  Split BlockProcessor into 3: DB, BlockProcessor and BlockServer.  DB
+  handles stored DB and FS state; BlockProcessor handles pushing the
+  chain forward and caching of updates, and BlockServer will
+  additionally serve clients on catchup.  More to come.
+- mempool: better logging; also yields during initial seeding
+- issues fixed: #10
+
 Version 0.2.1
 -------------
 

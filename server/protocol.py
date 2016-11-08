@@ -11,10 +11,12 @@
 import asyncio
 import codecs
 import json
+import ssl
 import traceback
 from collections import namedtuple
 from functools import partial
 
+from server.block_processor import BlockProcessor
 from server.daemon import DaemonError
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.util import LoggedClass
@@ -28,6 +30,63 @@ class RPCError(Exception):
 def json_notification(method, params):
     '''Create a json notification.'''
     return {'id': None, 'method': method, 'params': params}
+
+
+class BlockServer(BlockProcessor):
+    '''Like BlockProcessor but also starts servers when caught up.'''
+
+    def __init__(self, env):
+        '''on_update is awaitable, and called only when caught up with the
+        daemon and a new block arrives or the mempool is updated.'''
+        super().__init__(env)
+        self.servers = []
+
+    async def caught_up(self, mempool_hashes):
+        await super().caught_up(mempool_hashes)
+        if not self.servers:
+            await self.start_servers()
+        ElectrumX.notify(self.height, self.touched)
+
+    async def start_servers(self):
+        '''Start listening on RPC, TCP and SSL ports.
+
+        Does not start a server if the port wasn't specified.
+        '''
+        env = self.env
+        loop = asyncio.get_event_loop()
+
+        JSONRPC.init(self, self.daemon, self.coin)
+
+        protocol = LocalRPC
+        if env.rpc_port is not None:
+            host = 'localhost'
+            rpc_server = loop.create_server(protocol, host, env.rpc_port)
+            self.servers.append(await rpc_server)
+            self.logger.info('RPC server listening on {}:{:d}'
+                             .format(host, env.rpc_port))
+
+        protocol = partial(ElectrumX, env)
+        if env.tcp_port is not None:
+            tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
+            self.servers.append(await tcp_server)
+            self.logger.info('TCP server listening on {}:{:d}'
+                             .format(env.host, env.tcp_port))
+
+        if env.ssl_port is not None:
+            # FIXME: update if we want to require Python >= 3.5.3
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            ssl_context.load_cert_chain(env.ssl_certfile,
+                                        keyfile=env.ssl_keyfile)
+            ssl_server = loop.create_server(protocol, env.host, env.ssl_port,
+                                            ssl=ssl_context)
+            self.servers.append(await ssl_server)
+            self.logger.info('SSL server listening on {}:{:d}'
+                             .format(env.host, env.ssl_port))
+
+    def stop(self):
+        '''Close the listening servers.'''
+        for server in self.servers:
+            server.close()
 
 
 AsyncTask = namedtuple('AsyncTask', 'session job')

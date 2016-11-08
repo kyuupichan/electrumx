@@ -9,19 +9,21 @@
 
 
 import array
-import ast
 import asyncio
+import itertools
+import os
 import struct
 import time
 from bisect import bisect_left
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from functools import partial
 
-from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
-from server.daemon import DaemonError
+from server.cache import UTXOCache, NO_CACHE_ENTRY
+from server.daemon import Daemon, DaemonError
 from lib.hash import hash_to_str
 from lib.tx import Deserializer
 from lib.util import chunks, LoggedClass
+import server.db
 from server.storage import open_db
 
 
@@ -31,9 +33,6 @@ def formatted_time(t):
     t = int(t)
     return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
         t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
-
-
-UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
 
 class ChainError(Exception):
@@ -78,7 +77,7 @@ class Prefetcher(LoggedClass):
         else:
             return blocks, None
 
-    async def start(self):
+    async def main_loop(self):
         '''Loop forever polling for more blocks.'''
         self.logger.info('starting daemon poll loop...')
         while True:
@@ -176,9 +175,11 @@ class MemPool(LoggedClass):
         '''
         hex_hashes = set(hex_hashes)
         touched = set()
+        missing_utxos = 0
 
-        if self.count < 0:
-            self.logger.info('initial fetch of {:,d} daemon mempool txs'
+        initial = self.count < 0
+        if initial:
+            self.logger.info('beginning import of {:,d} mempool txs'
                              .format(len(hex_hashes)))
 
         # Remove gone items
@@ -198,6 +199,8 @@ class MemPool(LoggedClass):
         # them into a dictionary of hex hash to deserialized tx.
         hex_hashes.difference_update(self.txs)
         raw_txs = await self.bp.daemon.getrawtransactions(hex_hashes)
+        if initial:
+            self.logger.info('all fetched, now analysing...')
         new_txs = {hex_hash: Deserializer(raw_tx).read_tx()
                    for hex_hash, raw_tx in zip(hex_hashes, raw_txs) if raw_tx}
         del raw_txs, hex_hashes
@@ -210,7 +213,10 @@ class MemPool(LoggedClass):
         def txout_pair(txout):
             return (script_hash168(txout.pk_script), txout.value)
 
-        for hex_hash, tx in new_txs.items():
+        for n, (hex_hash, tx) in enumerate(new_txs.items()):
+            # Yield to process e.g. signals
+            if n % 500 == 0:
+                await asyncio.sleep(0)
             txout_pairs = [txout_pair(txout) for txout in tx.outputs]
             self.txs[hex_hash] = (None, txout_pairs, None)
 
@@ -221,22 +227,38 @@ class MemPool(LoggedClass):
                 return mempool_entry[1][txin.prev_idx], True
             entry = utxo_lookup(txin.prev_hash, txin.prev_idx)
             if entry == NO_CACHE_ENTRY:
-                # Not possible unless daemon is lying or we're corrupted?
-                self.logger.warning('no UTXO found for {} / {}'
-                                    .format(hash_to_str(txin.prev_hash),
-                                            txin.prev_idx))
+                # This happens when the daemon is a block ahead of us
+                # and has mempool txs spending new txs in that block
                 raise MissingUTXOError
             value, = struct.unpack('<Q', entry[-8:])
             return (entry[:21], value), False
 
+        if initial:
+            next_log = time.time()
+            self.logger.info('processed outputs, now examining inputs. '
+                             'This can take some time...')
+
         # Now add the inputs
-        for hex_hash, tx in new_txs.items():
+        for n, (hex_hash, tx) in enumerate(new_txs.items()):
+            # Yield to process e.g. signals
+            if n % 50 == 0:
+                await asyncio.sleep(0)
+
+            if initial and time.time() > next_log:
+                next_log = time.time() + 10
+                self.logger.info('{:,d} done ({:d}%)'
+                                 .format(n, int(n / len(new_txs) * 100)))
+
             txout_pairs = self.txs[hex_hash][1]
             try:
                 infos = (txin_info(txin) for txin in tx.inputs)
                 txin_pairs, unconfs = zip(*infos)
             except MissingUTXOError:
-                # If we were missing a UTXO for some reason drop this tx
+                # Drop this TX.  If other mempool txs depend on it
+                # it's harmless - next time the mempool is refreshed
+                # they'll either be cleaned up or the UTXOs will no
+                # longer be missing.
+                missing_utxos += 1
                 del self.txs[hex_hash]
                 continue
             self.txs[hex_hash] = (txin_pairs, txout_pairs, any(unconfs))
@@ -248,6 +270,11 @@ class MemPool(LoggedClass):
             for hash168, value in txout_pairs:
                 self.hash168s[hash168].add(hex_hash)
                 touched.add(hash168)
+
+        if missing_utxos:
+            self.logger.info('{:,d} txs had missing UTXOs; probably the '
+                             'daemon is a block or two ahead of us'
+                             .format(missing_utxos))
 
         self.count += 1
         if self.count % 25 == 0 or gone:
@@ -283,21 +310,25 @@ class MemPool(LoggedClass):
         return value
 
 
-class BlockProcessor(LoggedClass):
+class BlockProcessor(server.db.DB):
     '''Process blocks and update the DB state to match.
 
     Employ a prefetcher to prefetch blocks in batches for processing.
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, daemon, on_update=None):
+    def __init__(self, env):
         '''on_update is awaitable, and called only when caught up with the
-        daemon and a new block arrives or the mempool is updated.
-        '''
-        super().__init__()
+        daemon and a new block arrives or the mempool is updated.'''
+        super().__init__(env)
 
-        self.daemon = daemon
-        self.on_update = on_update
+        # These are our state as we move ahead of DB state
+        self.height = self.db_height
+        self.tip = self.db_tip
+        self.tx_count = self.db_tx_count
+
+        self.daemon = Daemon(env.daemon_url, env.debug)
+        self.daemon.debug_set_height(self.height)
         self.mempool = MemPool(self)
         self.touched = set()
 
@@ -305,38 +336,20 @@ class BlockProcessor(LoggedClass):
         self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
-        self.coin = env.coin
         self.reorg_limit = env.reorg_limit
 
-        # Open DB and metadata files.  Record some of its state.
-        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
-        self.db = open_db(db_name, env.db_engine)
-        if self.db.is_new:
-            self.logger.info('created new {} database {}'
-                             .format(env.db_engine, db_name))
-        else:
-            self.logger.info('successfully opened {} database {}'
-                             .format(env.db_engine, db_name))
-
-        self.init_state()
-        self.tx_count = self.db_tx_count
-        self.height = self.db_height
-        self.tip = self.db_tip
-
-        # Caches to be flushed later.  Headers and tx_hashes have one
-        # entry per block
+        # Headers and tx_hashes have one entry per block
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
-        self.utxo_cache = UTXOCache(self, self.db, self.coin)
-        self.fs_cache = FSCache(self.coin, self.height, self.tx_count)
-        self.prefetcher = Prefetcher(daemon, self.height)
+        self.prefetcher = Prefetcher(self.daemon, self.height)
 
         self.last_flush = time.time()
         self.last_flush_tx_count = self.tx_count
 
-        # Redirected member funcs
-        self.get_tx_hash = self.fs_cache.get_tx_hash
-        self.read_headers = self.fs_cache.read_headers
+        # Caches of unflushed items
+        self.utxo_cache = UTXOCache(self.get_tx_hash, self.db, self.coin)
+        self.headers = []
+        self.tx_hashes = []
 
         # Log state
         self.logger.info('{}/{} height: {:,d} tx count: {:,d} '
@@ -355,12 +368,13 @@ class BlockProcessor(LoggedClass):
 
         self.clean_db()
 
-    def coros(self):
-        self.daemon.debug_set_height(self.height)
-        return [self.start(), self.prefetcher.start()]
+    def start(self):
+        '''Returns a future that starts the block processor when awaited.'''
+        return asyncio.gather(self.main_loop(),
+                              self.prefetcher.main_loop())
 
-    async def start(self):
-        '''External entry point for block processing.
+    async def main_loop(self):
+        '''Main loop for block processing.
 
         Safely flushes the DB on clean shutdown.
         '''
@@ -385,6 +399,7 @@ class BlockProcessor(LoggedClass):
                 await asyncio.sleep(0)  # Yield
             if caught_up:
                 await self.caught_up(mempool_hashes)
+            self.touched = set()
         except ChainReorg:
             await self.handle_chain_reorg()
 
@@ -396,10 +411,7 @@ class BlockProcessor(LoggedClass):
         if self.first_sync:
             self.first_sync = False
             self.logger.info('synced to height {:,d}'.format(self.height))
-        if self.on_update:
-            self.touched.update(await self.mempool.update(mempool_hashes))
-            await self.on_update(self.height, self.touched)
-        self.touched = set()
+        self.touched.update(await self.mempool.update(mempool_hashes))
 
     async def handle_chain_reorg(self):
         # First get all state on disk
@@ -432,7 +444,7 @@ class BlockProcessor(LoggedClass):
         start = self.height - 1
         count = 1
         while start > 0:
-            hashes = self.fs_cache.block_hashes(start, count)
+            hashes = self.fs_block_hashes(start, count)
             hex_hashes = [hash_to_str(hash) for hash in hashes]
             d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
             n = match_pos(hex_hashes, d_hex_hashes)
@@ -449,31 +461,7 @@ class BlockProcessor(LoggedClass):
                          'height {:,d} to height {:,d}'
                          .format(count, start, start + count - 1))
 
-        return self.fs_cache.block_hashes(start, count)
-
-    def init_state(self):
-        if self.db.is_new:
-            self.db_height = -1
-            self.db_tx_count = 0
-            self.db_tip = b'\0' * 32
-            self.flush_count = 0
-            self.utxo_flush_count = 0
-            self.wall_time = 0
-            self.first_sync = True
-        else:
-            state = self.db.get(b'state')
-            state = ast.literal_eval(state.decode())
-            if state['genesis'] != self.coin.GENESIS_HASH:
-                raise ChainError('DB genesis hash {} does not match coin {}'
-                                 .format(state['genesis_hash'],
-                                         self.coin.GENESIS_HASH))
-            self.db_height = state['height']
-            self.db_tx_count = state['tx_count']
-            self.db_tip = state['tip']
-            self.flush_count = state['flush_count']
-            self.utxo_flush_count = state['utxo_flush_count']
-            self.wall_time = state['wall_time']
-            self.first_sync = state.get('first_sync', True)
+        return self.fs_block_hashes(start, count)
 
     def clean_db(self):
         '''Clean out stale DB items.
@@ -547,9 +535,6 @@ class BlockProcessor(LoggedClass):
                                  self.height - self.db_height))
         self.utxo_cache.flush(batch)
         self.utxo_flush_count = self.flush_count
-        self.db_tx_count = self.tx_count
-        self.db_height = self.height
-        self.db_tip = self.tip
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
@@ -567,37 +552,40 @@ class BlockProcessor(LoggedClass):
             self.assert_flushed()
             return
 
+        self.flush_count += 1
         flush_start = time.time()
         last_flush = self.last_flush
         tx_diff = self.tx_count - self.last_flush_tx_count
         show_stats = self.first_sync
 
-        # Write out the files to the FS before flushing to the DB.  If
-        # the DB transaction fails, the files being too long doesn't
-        # matter.  But if writing the files fails we do not want to
-        # have updated the DB.
         if self.height > self.db_height:
             assert flush_history is None
             flush_history = self.flush_history
-            self.fs_cache.flush(self.height, self.tx_count)
 
         with self.db.write_batch() as batch:
             # History first - fast and frees memory.  Flush state last
             # as it reads the wall time.
             flush_history(batch)
             if flush_utxos:
+                self.fs_flush()
                 self.flush_utxos(batch)
             self.flush_state(batch)
             self.logger.info('committing transaction...')
+
+        # Update our in-memory state after successful flush
+        self.db_tx_count = self.tx_count
+        self.db_height = self.height
+        self.db_tip = self.tip
+        self.tx_hashes = []
+        self.headers = []
 
         # Update and put the wall time again - otherwise we drop the
         # time it took to commit the batch
         self.flush_state(self.db)
 
-        flush_time = int(self.last_flush - flush_start)
         self.logger.info('flush #{:,d} to height {:,d} txs: {:,d} took {:,d}s'
                          .format(self.flush_count, self.height, self.tx_count,
-                                 flush_time))
+                                 int(self.last_flush - flush_start)))
 
         # Catch-up stats
         if show_stats:
@@ -623,20 +611,67 @@ class BlockProcessor(LoggedClass):
                                      formatted_time(tx_est / this_tx_per_sec)))
 
     def flush_history(self, batch):
-        self.logger.info('flushing history')
-
-        self.flush_count += 1
+        flush_start = time.time()
         flush_id = struct.pack('>H', self.flush_count)
 
         for hash168, hist in self.history.items():
             key = b'H' + hash168 + flush_id
             batch.put(key, hist.tobytes())
 
-        self.logger.info('{:,d} history entries in {:,d} addrs'
-                         .format(self.history_size, len(self.history)))
-
+        self.logger.info('flushed {:,d} history entries for {:,d} addrs '
+                         'in {:,d}s'
+                         .format(self.history_size, len(self.history),
+                                 int(time.time() - flush_start)))
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
+
+    def fs_flush(self):
+        '''Flush the things stored on the filesystem.'''
+        flush_start = time.time()
+        blocks_done = len(self.headers)
+        prior_tx_count = (self.tx_counts[self.db_height]
+                          if self.db_height >= 0 else 0)
+        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+        txs_done = cur_tx_count - prior_tx_count
+
+        assert self.db_height + blocks_done == self.height
+        assert len(self.tx_hashes) == blocks_done
+        assert len(self.tx_counts) == self.height + 1
+        assert cur_tx_count == self.tx_count, \
+            'cur: {:,d} new: {:,d}'.format(cur_tx_count, self.tx_count)
+
+        # First the headers
+        headers = b''.join(self.headers)
+        header_len = self.coin.HEADER_LEN
+        self.headers_file.seek((self.db_height + 1) * header_len)
+        self.headers_file.write(headers)
+        self.headers_file.flush()
+
+        # Then the tx counts
+        self.txcount_file.seek((self.db_height + 1) * self.tx_counts.itemsize)
+        self.txcount_file.write(self.tx_counts[self.db_height + 1:])
+        self.txcount_file.flush()
+
+        # Finally the hashes
+        hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
+        assert len(hashes) % 32 == 0
+        assert len(hashes) // 32 == txs_done
+        cursor = 0
+        file_pos = prior_tx_count * 32
+        while cursor < len(hashes):
+            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
+            filename = 'hashes{:04d}'.format(file_num)
+            with self.open_file(filename, create=True) as f:
+                f.seek(offset)
+                f.write(hashes[cursor:cursor + size])
+            cursor += size
+            file_pos += size
+
+        os.sync()
+
+        self.logger.info('FS flush took {:.1f} seconds'
+                         .format(time.time() - flush_start))
 
     def backup_history(self, batch, hash168s):
         self.logger.info('backing up history to height {:,d}  tx_count {:,d}'
@@ -707,9 +742,18 @@ class BlockProcessor(LoggedClass):
         '''Read undo information from a file for the current height.'''
         return self.db.get(self.undo_key(height))
 
+    def fs_advance_block(self, header, tx_hashes, txs):
+        '''Update unflushed FS state for a new block.'''
+        prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+
+        # Cache the new header, tx hashes and cumulative tx count
+        self.headers.append(header)
+        self.tx_hashes.append(tx_hashes)
+        self.tx_counts.append(prior_tx_count + len(txs))
+
     def advance_block(self, block, update_touched):
-        # We must update the fs_cache before calling advance_txs() as
-        # the UTXO cache uses the fs_cache via get_tx_hash() to
+        # We must update the FS cache before calling advance_txs() as
+        # the UTXO cache uses the FS cache via get_tx_hash() to
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
         prev_hash, header_hash = self.coin.header_hashes(header)
@@ -717,7 +761,7 @@ class BlockProcessor(LoggedClass):
             raise ChainReorg
 
         touched = set()
-        self.fs_cache.advance_block(header, tx_hashes, txs)
+        self.fs_advance_block(header, tx_hashes, txs)
         self.tip = header_hash
         self.height += 1
         undo_info = self.advance_txs(tx_hashes, txs, touched)
@@ -797,9 +841,12 @@ class BlockProcessor(LoggedClass):
                                          hash_to_str(self.tip), self.height))
 
             self.backup_txs(tx_hashes, txs, touched)
-            self.fs_cache.backup_block()
             self.tip = prev_hash
+            assert self.height >= 0
             self.height -= 1
+
+        assert not self.headers
+        assert not self.tx_hashes
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
@@ -839,12 +886,33 @@ class BlockProcessor(LoggedClass):
         assert n == 0
         self.tx_count -= len(txs)
 
-    @staticmethod
-    def resolve_limit(limit):
-        if limit is None:
-            return -1
-        assert isinstance(limit, int) and limit >= 0
-        return limit
+    def read_headers(self, start, count):
+        # Read some from disk
+        disk_count = min(count, self.db_height + 1 - start)
+        result = self.fs_read_headers(start, disk_count)
+        count -= disk_count
+        start += disk_count
+
+        # The rest from memory
+        if count:
+            start -= self.db_height + 1
+            if not (count >= 0 and start + count <= len(self.headers)):
+                raise ChainError('{:,d} headers starting at {:,d} not on disk'
+                                 .format(count, start))
+            result += b''.join(self.headers[start: start + count])
+
+        return result
+
+    def get_tx_hash(self, tx_num):
+        '''Returns the tx_hash and height of a tx number.'''
+        tx_hash, tx_height = self.fs_tx_hash(tx_num)
+
+        # Is this unflushed?
+        if tx_hash is None:
+            tx_hashes = self.tx_hashes[tx_height - (self.db_height + 1)]
+            tx_hash = tx_hashes[tx_num - self.tx_counts[tx_height - 1]]
+
+        return tx_hash, tx_height
 
     def mempool_transactions(self, hash168):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -860,60 +928,3 @@ class BlockProcessor(LoggedClass):
         Can be positive or negative.
         '''
         return self.mempool.value(hash168)
-
-    def get_history(self, hash168, limit=1000):
-        '''Generator that returns an unpruned, sorted list of (tx_hash,
-        height) tuples of confirmed transactions that touched the address,
-        earliest in the blockchain first.  Includes both spending and
-        receiving transactions.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
-        '''
-        limit = self.resolve_limit(limit)
-        prefix = b'H' + hash168
-        for key, hist in self.db.iterator(prefix=prefix):
-            a = array.array('I')
-            a.frombytes(hist)
-            for tx_num in a:
-                if limit == 0:
-                    return
-                yield self.get_tx_hash(tx_num)
-                limit -= 1
-
-    def get_balance(self, hash168):
-        '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hash168, limit=None))
-
-    def get_utxos(self, hash168, limit=1000):
-        '''Generator that yields all UTXOs for an address sorted in no
-        particular order.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
-        '''
-        limit = self.resolve_limit(limit)
-        unpack = struct.unpack
-        prefix = b'u' + hash168
-        for k, v in self.db.iterator(prefix=prefix):
-            (tx_pos,) = unpack('<H', k[-2:])
-
-            for n in range(0, len(v), 12):
-                if limit == 0:
-                    return
-                (tx_num,) = unpack('<I', v[n:n + 4])
-                (value,) = unpack('<Q', v[n + 4:n + 12])
-                tx_hash, height = self.get_tx_hash(tx_num)
-                yield UTXO(tx_num, tx_pos, tx_hash, height, value)
-                limit -= 1
-
-    def get_utxos_sorted(self, hash168):
-        '''Returns all the UTXOs for an address sorted by height and
-        position in the block.'''
-        return sorted(self.get_utxos(hash168, limit=None))
-
-    def get_utxo_hash168(self, tx_hash, index):
-        '''Returns the hash168 for a UTXO.'''
-        hash168 = None
-        if 0 <= index <= 65535:
-            idx_packed = struct.pack('<H', index)
-            hash168 = self.utxo_cache.hash168(tx_hash, idx_packed, False)
-            if hash168 == NO_CACHE_ENTRY:
-                hash168 = None
-        return hash168

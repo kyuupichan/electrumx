@@ -9,39 +9,45 @@
 
 '''Script to kick off the server.'''
 
-
 import asyncio
 import logging
 import os
+import signal
 import traceback
+from functools import partial
 
 from server.env import Env
-from server.controller import Controller
+from server.protocol import BlockServer
 
 
 def main_loop():
-    '''Get tasks; loop until complete.'''
+    '''Start the server.'''
     if os.geteuid() == 0:
         raise Exception('DO NOT RUN AS ROOT! Create an unpriveleged user '
                         'account and use that')
 
-    env = Env()
-    logging.info('switching current directory to {}'.format(env.db_dir))
-    os.chdir(env.db_dir)
-
     loop = asyncio.get_event_loop()
     #loop.set_debug(True)
 
-    controller = Controller(loop, env)
-    controller.start()
+    def on_signal(signame):
+        '''Call on receipt of a signal to cleanly shutdown.'''
+        logging.warning('received {} signal, shutting down'.format(signame))
+        for task in asyncio.Task.all_tasks():
+            task.cancel()
 
-    tasks = asyncio.Task.all_tasks(loop)
+    # Install signal handlers
+    for signame in ('SIGINT', 'SIGTERM'):
+        loop.add_signal_handler(getattr(signal, signame),
+                                partial(on_signal, signame))
+
+    server = BlockServer(Env())
+    future = server.start()
     try:
-        loop.run_until_complete(asyncio.gather(*tasks))
+        loop.run_until_complete(future)
     except asyncio.CancelledError:
-        logging.warning('task cancelled; asyncio event loop closing')
+        pass
     finally:
-        controller.stop()
+        server.stop()
         loop.close()
 
 

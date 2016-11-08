@@ -15,13 +15,13 @@ The components of the server are roughly like this::
              - ElectrumX -<<<<<- LocalRPC -
              -------------     ------------
               <      >
-    ----------        -------------------    ----------
-    - Daemon -<<<<<<<<- Block processor ->>>>- Caches -
-    ----------        -------------------    ----------
+    ----------        -------------------    --------------
+    - Daemon -<<<<<<<<- Block processor ->>>>- UTXO Cache -
+    ----------        -------------------    --------------
         <              <               >           <
-         --------------                 -----------
-         - Prefetcher -                 - Storage -
-         --------------                 -----------
+         --------------                 ----------------
+         - Prefetcher -                 - FS + Storage -
+         --------------                 ----------------
 
 
 Env
@@ -90,10 +90,3 @@ IRC
 
 Not currently imlpemented; will handle IRC communication for the
 ElectrumX servers.
-
-Controller
-----------
-
-A historical artefact that currently coordinates some of the above
-components.  Not pictured as it is doesn't seem to have a logical
-place and so is probably going away.
