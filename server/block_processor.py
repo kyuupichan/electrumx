@@ -16,7 +16,7 @@ from bisect import bisect_left
 from collections import defaultdict
 from functools import partial
 
-from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
+from server.cache import UTXOCache, NO_CACHE_ENTRY
 from server.daemon import Daemon, DaemonError
 from lib.hash import hash_to_str
 from lib.tx import Deserializer
@@ -314,6 +314,9 @@ class BlockProcessor(server.db.DB):
 
         self.last_flush = time.time()
         self.last_flush_tx_count = self.tx_count
+
+        # UTXO cache
+        self.utxo_cache = UTXOCache(self.get_tx_hash, self.db, self.coin)
 
         # Log state
         self.logger.info('{}/{} height: {:,d} tx count: {:,d} '

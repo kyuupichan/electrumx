@@ -14,12 +14,11 @@ import os
 import struct
 from collections import namedtuple
 
-from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
+from server.cache import FSCache, NO_CACHE_ENTRY
 from lib.util import LoggedClass
 from server.storage import open_db
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
-
 
 class DB(LoggedClass):
     '''Simple wrapper of the backend database for querying.
@@ -27,6 +26,9 @@ class DB(LoggedClass):
     Performs no DB update, though the DB will be cleaned on opening if
     it was shutdown uncleanly.
     '''
+
+    class DBError(Exception):
+        pass
 
     def __init__(self, env):
         super().__init__()
@@ -57,9 +59,6 @@ class DB(LoggedClass):
         self.get_tx_hash = self.fs_cache.get_tx_hash
         self.read_headers = self.fs_cache.read_headers
 
-        # UTXO cache
-        self.utxo_cache = UTXOCache(self.get_tx_hash, self.db, self.coin)
-
     def init_state_from_db(self):
         if self.db.is_new:
             self.db_height = -1
@@ -73,9 +72,9 @@ class DB(LoggedClass):
             state = self.db.get(b'state')
             state = ast.literal_eval(state.decode())
             if state['genesis'] != self.coin.GENESIS_HASH:
-                raise ChainError('DB genesis hash {} does not match coin {}'
-                                 .format(state['genesis_hash'],
-                                         self.coin.GENESIS_HASH))
+                raise self.DBError('DB genesis hash {} does not match coin {}'
+                                   .format(state['genesis_hash'],
+                                           self.coin.GENESIS_HASH))
             self.db_height = state['height']
             self.db_tx_count = state['tx_count']
             self.db_tip = state['tip']
@@ -143,7 +142,30 @@ class DB(LoggedClass):
         hash168 = None
         if 0 <= index <= 65535:
             idx_packed = struct.pack('<H', index)
-            hash168 = self.utxo_cache.hash168(tx_hash, idx_packed, False)
+            hash168 = self.hash168(tx_hash, idx_packed, False)
             if hash168 == NO_CACHE_ENTRY:
                 hash168 = None
         return hash168
+
+    def hash168(self, tx_hash, idx_packed):
+        '''Return the hash168 paid to by the given TXO.
+
+        Return None if not found.'''
+        key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + idx_packed
+        data = self.db.get(key)
+        if data is None:
+            return None
+
+        if len(data) == 25:
+            return data[:21]
+
+        assert len(data) % 25 == 0
+
+        # Resolve the compressed key collision using the TX number
+        for n in range(0, len(data), 25):
+            tx_num, = struct.unpack('<I', data[n+21:n+25])
+            my_hash, height = self.get_tx_hash(tx_num)
+            if my_hash == tx_hash:
+                return data[n:n+21]
+
+        raise self.DBError('could not resolve hash168 collision')
