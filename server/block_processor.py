@@ -10,13 +10,15 @@
 
 import array
 import asyncio
+import itertools
+import os
 import struct
 import time
 from bisect import bisect_left
 from collections import defaultdict
 from functools import partial
 
-from server.cache import FSCache, UTXOCache, NO_CACHE_ENTRY
+from server.cache import UTXOCache, NO_CACHE_ENTRY
 from server.daemon import Daemon, DaemonError
 from lib.hash import hash_to_str
 from lib.tx import Deserializer
@@ -315,6 +317,9 @@ class BlockProcessor(server.db.DB):
         self.last_flush = time.time()
         self.last_flush_tx_count = self.tx_count
 
+        # UTXO cache
+        self.utxo_cache = UTXOCache(self.get_tx_hash, self.db, self.coin)
+
         # Log state
         self.logger.info('{}/{} height: {:,d} tx count: {:,d} '
                          'flush count: {:,d} utxo flush count: {:,d} '
@@ -408,7 +413,7 @@ class BlockProcessor(server.db.DB):
         start = self.height - 1
         count = 1
         while start > 0:
-            hashes = self.fs_cache.block_hashes(start, count)
+            hashes = self.block_hashes(start, count)
             hex_hashes = [hash_to_str(hash) for hash in hashes]
             d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
             n = match_pos(hex_hashes, d_hex_hashes)
@@ -425,7 +430,7 @@ class BlockProcessor(server.db.DB):
                          'height {:,d} to height {:,d}'
                          .format(count, start, start + count - 1))
 
-        return self.fs_cache.block_hashes(start, count)
+        return self.block_hashes(start, count)
 
     def clean_db(self):
         '''Clean out stale DB items.
@@ -531,7 +536,9 @@ class BlockProcessor(server.db.DB):
         if self.height > self.db_height:
             assert flush_history is None
             flush_history = self.flush_history
-            self.fs_cache.flush(self.height, self.tx_count)
+            self.fs_flush()
+            self.logger.info('FS flush took {:.1f} seconds'
+                             .format(time.time() - flush_start))
 
         with self.db.write_batch() as batch:
             # History first - fast and frees memory.  Flush state last
@@ -589,6 +596,55 @@ class BlockProcessor(server.db.DB):
 
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
+
+    def fs_flush(self):
+        '''Flush the things stored on the filesystem.
+        The arguments are passed for sanity check assertions only.'''
+        blocks_done = len(self.headers)
+        prior_tx_count = (self.tx_counts[self.fs_height]
+                          if self.fs_height >= 0 else 0)
+        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+        txs_done = cur_tx_count - prior_tx_count
+
+        assert self.fs_height + blocks_done == self.height
+        assert len(self.tx_hashes) == blocks_done
+        assert len(self.tx_counts) == self.height + 1
+        assert cur_tx_count == self.tx_count, \
+            'cur: {:,d} new: {:,d}'.format(cur_tx_count, self.tx_count)
+
+        # First the headers
+        headers = b''.join(self.headers)
+        header_len = self.coin.HEADER_LEN
+        self.headers_file.seek((self.fs_height + 1) * header_len)
+        self.headers_file.write(headers)
+        self.headers_file.flush()
+
+        # Then the tx counts
+        self.txcount_file.seek((self.fs_height + 1) * self.tx_counts.itemsize)
+        self.txcount_file.write(self.tx_counts[self.fs_height + 1:])
+        self.txcount_file.flush()
+
+        # Finally the hashes
+        hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
+        assert len(hashes) % 32 == 0
+        assert len(hashes) // 32 == txs_done
+        cursor = 0
+        file_pos = prior_tx_count * 32
+        while cursor < len(hashes):
+            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
+            filename = 'hashes{:04d}'.format(file_num)
+            with self.open_file(filename, create=True) as f:
+                f.seek(offset)
+                f.write(hashes[cursor:cursor + size])
+            cursor += size
+            file_pos += size
+
+        os.sync()
+
+        self.tx_hashes = []
+        self.headers = []
+        self.fs_height += blocks_done
 
     def backup_history(self, batch, hash168s):
         self.logger.info('backing up history to height {:,d}  tx_count {:,d}'
@@ -659,9 +715,18 @@ class BlockProcessor(server.db.DB):
         '''Read undo information from a file for the current height.'''
         return self.db.get(self.undo_key(height))
 
+    def fs_advance_block(self, header, tx_hashes, txs):
+        '''Update unflushed FS state for a new block.'''
+        prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+
+        # Cache the new header, tx hashes and cumulative tx count
+        self.headers.append(header)
+        self.tx_hashes.append(tx_hashes)
+        self.tx_counts.append(prior_tx_count + len(txs))
+
     def advance_block(self, block, update_touched):
-        # We must update the fs_cache before calling advance_txs() as
-        # the UTXO cache uses the fs_cache via get_tx_hash() to
+        # We must update the FS cache before calling advance_txs() as
+        # the UTXO cache uses the FS cache via get_tx_hash() to
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
         prev_hash, header_hash = self.coin.header_hashes(header)
@@ -669,7 +734,7 @@ class BlockProcessor(server.db.DB):
             raise ChainReorg
 
         touched = set()
-        self.fs_cache.advance_block(header, tx_hashes, txs)
+        self.fs_advance_block(header, tx_hashes, txs)
         self.tip = header_hash
         self.height += 1
         undo_info = self.advance_txs(tx_hashes, txs, touched)
@@ -730,6 +795,16 @@ class BlockProcessor(server.db.DB):
 
         return undo_info
 
+    def fs_backup_block(self):
+        '''Revert a block.'''
+        assert not self.headers
+        assert not self.tx_hashes
+        assert self.fs_height >= 0
+        # Just update in-memory.  It doesn't matter if disk files are
+        # too long, they will be overwritten when advancing.
+        self.fs_height -= 1
+        self.tx_counts.pop()
+
     def backup_blocks(self, blocks):
         '''Backup the blocks and flush.
 
@@ -749,7 +824,7 @@ class BlockProcessor(server.db.DB):
                                          hash_to_str(self.tip), self.height))
 
             self.backup_txs(tx_hashes, txs, touched)
-            self.fs_cache.backup_block()
+            self.fs_backup_block()
             self.tip = prev_hash
             self.height -= 1
 
