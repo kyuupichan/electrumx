@@ -82,6 +82,7 @@ def subclasses(base_class, strict=True):
     pairs = inspect.getmembers(sys.modules[base_class.__module__], select)
     return [pair[1] for pair in pairs]
 
+
 def chunks(items, size):
     '''Break up items, an iterable, into chunks of length size.'''
     for i in range(0, len(items), size):
@@ -90,20 +91,12 @@ def chunks(items, size):
 
 def bytes_to_int(be_bytes):
     '''Interprets a big-endian sequence of bytes as an integer'''
-    assert isinstance(be_bytes, (bytes, bytearray))
-    value = 0
-    for byte in be_bytes:
-        value = value * 256 + byte
-    return value
+    return int.from_bytes(be_bytes, 'big')
 
 
 def int_to_bytes(value):
     '''Converts an integer to a big-endian sequence of bytes'''
-    mods = []
-    while value:
-        value, mod = divmod(value, 256)
-        mods.append(mod)
-    return bytes(reversed(mods))
+    return value.to_bytes((value.bit_length() + 7) // 8, 'big')
 
 
 def increment_byte_string(bs):

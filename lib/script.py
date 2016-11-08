@@ -12,8 +12,6 @@ import struct
 from collections import namedtuple
 
 from lib.enum import Enumeration
-from lib.hash import hash160
-from lib.util import cachedproperty
 
 
 class ScriptError(Exception):
@@ -56,80 +54,6 @@ assert OpCodes.OP_EQUAL == 0x87
 assert OpCodes.OP_EQUALVERIFY == 0x88
 assert OpCodes.OP_CHECKSIG == 0xac
 assert OpCodes.OP_CHECKMULTISIG == 0xae
-
-
-class ScriptSig(object):
-    '''A script from a tx input.
-
-    Typically provides one or more signatures.'''
-
-    SIG_ADDRESS, SIG_MULTI, SIG_PUBKEY, SIG_UNKNOWN = range(4)
-
-    def __init__(self, script, coin, kind, sigs, pubkeys):
-        self.script = script
-        self.coin = coin
-        self.kind = kind
-        self.sigs = sigs
-        self.pubkeys = pubkeys
-
-    @cachedproperty
-    def address(self):
-        if self.kind == SIG_ADDRESS:
-            return self.coin.address_from_pubkey(self.pubkeys[0])
-        if self.kind == SIG_MULTI:
-            return self.coin.multsig_address(self.pubkeys)
-        return 'Unknown'
-
-    @classmethod
-    def from_script(cls, script, coin):
-        '''Return an instance of this class.
-
-        Return an object with kind SIG_UNKNOWN for unrecognised scripts.'''
-        try:
-            return cls.parse_script(script, coin)
-        except ScriptError:
-            return cls(script, coin, SIG_UNKNOWN, [], [])
-
-    @classmethod
-    def parse_script(cls, script, coin):
-        '''Return an instance of this class.
-
-        Raises on unrecognised scripts.'''
-        ops, datas = Script.get_ops(script)
-
-        # Address, PubKey and P2SH redeems only push data
-        if not ops or not Script.match_ops(ops, [-1] * len(ops)):
-            raise ScriptError('unknown scriptsig pattern')
-
-        # Assume double data pushes are address redeems, single data
-        # pushes are pubkey redeems
-        if len(ops) == 2:     # Signature, pubkey
-            return cls(script, coin, SIG_ADDRESS, [datas[0]], [datas[1]])
-
-        if len(ops) == 1:     # Pubkey
-            return cls(script, coin, SIG_PUBKEY, [datas[0]], [])
-
-        # Presumably it is P2SH (though conceivably the above could be
-        # too; cannot be sure without the send-to script).  We only
-        # handle CHECKMULTISIG P2SH, which because of a bitcoin core
-        # bug always start with an unused OP_0.
-        if ops[0] != OpCodes.OP_0:
-            raise ScriptError('unknown scriptsig pattern; expected OP_0')
-
-        # OP_0, Sig1, ..., SigM, pk_script
-        m = len(ops) - 2
-        pk_script = datas[-1]
-        pk_ops, pk_datas = Script.get_ops(script)
-
-        # OP_2 pubkey1 pubkey2 pubkey3 OP_3 OP_CHECKMULTISIG
-        n = len(pk_ops) - 3
-        pattern = ([OpCodes.OP_1 + m - 1] + [-1] * n
-                   + [OpCodes.OP_1 + n - 1, OpCodes.OP_CHECKMULTISIG])
-
-        if m <= n and Script.match_ops(pk_ops, pattern):
-            return cls(script, coin, SIG_MULTI, datas[1:-1], pk_datas[1:-2])
-
-        raise ScriptError('unknown multisig P2SH pattern')
 
 
 class ScriptPubKey(object):
