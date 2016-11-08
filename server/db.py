@@ -49,35 +49,22 @@ class DB(LoggedClass):
         else:
             self.logger.info('successfully opened {} database {}'
                              .format(env.db_engine, db_name))
-
         self.init_state_from_db()
-        self.tx_count = self.db_tx_count
-        self.height = self.db_height
-        self.tip = self.db_tip
 
-        # -- FS related members --
-        self.tx_hash_file_size = 16 * 1024 * 1024
-
-        # On-disk height updated by a flush
-        self.fs_height = self.height
-
-        # Unflushed items
-        self.headers = []
-        self.tx_hashes = []
-
-        create = self.height == -1
+        create = self.db_height == -1
         self.headers_file = self.open_file('headers', create)
         self.txcount_file = self.open_file('txcount', create)
+        self.tx_hash_file_size = 16 * 1024 * 1024
 
         # tx_counts[N] has the cumulative number of txs at the end of
         # height N.  So tx_counts[0] is 1 - the genesis coinbase
         self.tx_counts = array.array('I')
         self.txcount_file.seek(0)
-        self.tx_counts.fromfile(self.txcount_file, self.height + 1)
+        self.tx_counts.fromfile(self.txcount_file, self.db_height + 1)
         if self.tx_counts:
-            assert self.tx_count == self.tx_counts[-1]
+            assert self.db_tx_count == self.tx_counts[-1]
         else:
-            assert self.tx_count == 0
+            assert self.db_tx_count == 0
 
     def init_state_from_db(self):
         if self.db.is_new:
@@ -112,46 +99,37 @@ class DB(LoggedClass):
                 return open(filename, 'wb+')
             raise
 
-    def read_headers(self, start, count):
-        result = b''
-
+    def fs_read_headers(self, start, count):
         # Read some from disk
-        disk_count = min(count, self.fs_height + 1 - start)
-        if disk_count > 0:
+        disk_count = min(count, self.db_height + 1 - start)
+        if start < 0 or count < 0 or disk_count != count:
+            raise self.DBError('{:,d} headers starting at {:,d} not on disk'
+                               .format(count, start))
+        if disk_count:
             header_len = self.coin.HEADER_LEN
-            assert start >= 0
             self.headers_file.seek(start * header_len)
-            result = self.headers_file.read(disk_count * header_len)
-            count -= disk_count
-            start += disk_count
+            return self.headers_file.read(disk_count * header_len)
+        return b''
 
-        # The rest from memory
-        start -= self.fs_height + 1
-        assert count >= 0 and start + count <= len(self.headers)
-        result += b''.join(self.headers[start: start + count])
+    def fs_tx_hash(self, tx_num):
+        '''Return a par (tx_hash, tx_height) for the given tx number.
 
-        return result
+        If the tx_height is not on disk, returns (None, tx_height).'''
+        tx_height = bisect_right(self.tx_counts, tx_num)
 
-    def get_tx_hash(self, tx_num):
-        '''Returns the tx_hash and height of a tx number.'''
-        height = bisect_right(self.tx_counts, tx_num)
+        if tx_height > self.db_height:
+            return None, tx_height
+            raise self.DBError('tx_num {:,d} is not on disk')
 
-        # Is this on disk or unflushed?
-        if height > self.fs_height:
-            tx_hashes = self.tx_hashes[height - (self.fs_height + 1)]
-            tx_hash = tx_hashes[tx_num - self.tx_counts[height - 1]]
-        else:
-            file_pos = tx_num * 32
-            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
-            filename = 'hashes{:04d}'.format(file_num)
-            with self.open_file(filename) as f:
-                f.seek(offset)
-                tx_hash = f.read(32)
+        file_pos = tx_num * 32
+        file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+        filename = 'hashes{:04d}'.format(file_num)
+        with self.open_file(filename) as f:
+            f.seek(offset)
+            return f.read(32), tx_height
 
-        return tx_hash, height
-
-    def block_hashes(self, height, count):
-        headers = self.read_headers(height, count)
+    def fs_block_hashes(self, height, count):
+        headers = self.fs_read_headers(height, count)
         # FIXME: move to coins.py
         hlen = self.coin.HEADER_LEN
         return [double_sha256(header) for header in chunks(headers, hlen)]
@@ -178,7 +156,7 @@ class DB(LoggedClass):
             for tx_num in a:
                 if limit == 0:
                     return
-                yield self.get_tx_hash(tx_num)
+                yield self.fs_tx_hash(tx_num)
                 limit -= 1
 
     def get_balance(self, hash168):
@@ -201,7 +179,7 @@ class DB(LoggedClass):
                     return
                 (tx_num,) = unpack('<I', v[n:n + 4])
                 (value,) = unpack('<Q', v[n + 4:n + 12])
-                tx_hash, height = self.get_tx_hash(tx_num)
+                tx_hash, height = self.fs_tx_hash(tx_num)
                 yield UTXO(tx_num, tx_pos, tx_hash, height, value)
                 limit -= 1
 
@@ -235,7 +213,7 @@ class DB(LoggedClass):
         # Resolve the compressed key collision using the TX number
         for n in range(0, len(data), 25):
             tx_num, = struct.unpack('<I', data[n+21:n+25])
-            my_hash, height = self.get_tx_hash(tx_num)
+            my_hash, height = self.fs_tx_hash(tx_num)
             if my_hash == tx_hash:
                 return data[n:n+21]
 
