@@ -20,20 +20,6 @@ from server.env import Env
 from server.protocol import BlockServer
 
 
-def close_loop(loop):
-    '''Close the loop down cleanly.  Cancel and collect remaining tasks.'''
-    tasks = asyncio.Task.all_tasks()
-    for task in tasks:
-        task.cancel()
-
-    try:
-        loop.run_until_complete(asyncio.gather(*tasks))
-    except asyncio.CancelledError:
-        pass
-
-    loop.close()
-
-
 def main_loop():
     '''Start the server.'''
     if os.geteuid() == 0:
@@ -45,9 +31,9 @@ def main_loop():
 
     def on_signal(signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
-        logging.warning('received {} signal, preparing to shut down'
-                        .format(signame))
-        loop.stop()
+        logging.warning('received {} signal, shutting down'.format(signame))
+        for task in asyncio.Task.all_tasks():
+            task.cancel()
 
     # Install signal handlers
     for signame in ('SIGINT', 'SIGTERM'):
@@ -55,12 +41,14 @@ def main_loop():
                                 partial(on_signal, signame))
 
     server = BlockServer(Env())
-    server.start()
+    future = server.start()
     try:
-        loop.run_forever()
+        loop.run_until_complete(future)
+    except asyncio.CancelledError:
+        pass
     finally:
         server.stop()
-    close_loop(loop)
+        loop.close()
 
 
 def main():

@@ -77,10 +77,6 @@ class Prefetcher(LoggedClass):
         else:
             return blocks, None
 
-    def start(self):
-        '''Start the prefetcher.'''
-        asyncio.ensure_future(self.main_loop())
-
     async def main_loop(self):
         '''Loop forever polling for more blocks.'''
         self.logger.info('starting daemon poll loop...')
@@ -179,7 +175,6 @@ class MemPool(LoggedClass):
         '''
         hex_hashes = set(hex_hashes)
         touched = set()
-
         initial = self.count < 0
         if initial:
             self.logger.info('beginning import of {:,d} mempool txs'
@@ -357,9 +352,9 @@ class BlockProcessor(server.db.DB):
         self.clean_db()
 
     def start(self):
-        '''Start the block processor.'''
-        asyncio.ensure_future(self.main_loop())
-        self.prefetcher.start()
+        '''Returns a future that starts the block processor when awaited.'''
+        return asyncio.gather(self.main_loop(),
+                              self.prefetcher.main_loop())
 
     async def main_loop(self):
         '''Main loop for block processing.
