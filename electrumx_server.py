@@ -17,11 +17,11 @@ import traceback
 from functools import partial
 
 from server.env import Env
-from server.controller import Controller
+from server.block_processor import BlockServer
 
 
-def cancel_tasks(loop):
-    # Cancel and collect the remaining tasks
+def close_loop(loop):
+    '''Close the loop down cleanly.  Cancel and collect remaining tasks.'''
     tasks = asyncio.Task.all_tasks()
     for task in tasks:
         task.cancel()
@@ -31,41 +31,36 @@ def cancel_tasks(loop):
     except asyncio.CancelledError:
         pass
 
+    loop.close()
+
 
 def main_loop():
-    '''Get tasks; loop until complete.'''
+    '''Start the server.'''
     if os.geteuid() == 0:
         raise Exception('DO NOT RUN AS ROOT! Create an unpriveleged user '
                         'account and use that')
 
-    env = Env()
-    logging.info('switching current directory to {}'.format(env.db_dir))
-    os.chdir(env.db_dir)
-
     loop = asyncio.get_event_loop()
     #loop.set_debug(True)
 
-    controller = Controller(loop, env)
-
-    # Signal handlers
     def on_signal(signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
         logging.warning('received {} signal, preparing to shut down'
                         .format(signame))
         loop.stop()
 
+    # Install signal handlers
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame),
                                 partial(on_signal, signame))
 
-    controller.start()
+    server = BlockServer(Env())
+    server.start()
     try:
         loop.run_forever()
     finally:
-        controller.stop()
-        cancel_tasks(loop)
-
-    loop.close()
+        server.stop()
+    close_loop(loop)
 
 
 def main():

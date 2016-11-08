@@ -90,10 +90,3 @@ IRC
 
 Not currently imlpemented; will handle IRC communication for the
 ElectrumX servers.
-
-Controller
-----------
-
-A historical artefact that currently coordinates some of the above
-components.  Not pictured as it is doesn't seem to have a logical
-place and so is probably going away.
