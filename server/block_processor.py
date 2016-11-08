@@ -175,6 +175,8 @@ class MemPool(LoggedClass):
         '''
         hex_hashes = set(hex_hashes)
         touched = set()
+        missing_utxos = 0
+
         initial = self.count < 0
         if initial:
             self.logger.info('beginning import of {:,d} mempool txs'
@@ -225,10 +227,8 @@ class MemPool(LoggedClass):
                 return mempool_entry[1][txin.prev_idx], True
             entry = utxo_lookup(txin.prev_hash, txin.prev_idx)
             if entry == NO_CACHE_ENTRY:
-                # Not possible unless daemon is lying or we're corrupted?
-                self.logger.warning('no UTXO found for {} / {}'
-                                    .format(hash_to_str(txin.prev_hash),
-                                            txin.prev_idx))
+                # This happens when the daemon is a block ahead of us
+                # and has mempool txs spending new txs in that block
                 raise MissingUTXOError
             value, = struct.unpack('<Q', entry[-8:])
             return (entry[:21], value), False
@@ -254,7 +254,11 @@ class MemPool(LoggedClass):
                 infos = (txin_info(txin) for txin in tx.inputs)
                 txin_pairs, unconfs = zip(*infos)
             except MissingUTXOError:
-                # If we were missing a UTXO for some reason drop this tx
+                # Drop this TX.  If other mempool txs depend on it
+                # it's harmless - next time the mempool is refreshed
+                # they'll either be cleaned up or the UTXOs will no
+                # longer be missing.
+                missing_utxos += 1
                 del self.txs[hex_hash]
                 continue
             self.txs[hex_hash] = (txin_pairs, txout_pairs, any(unconfs))
@@ -266,6 +270,11 @@ class MemPool(LoggedClass):
             for hash168, value in txout_pairs:
                 self.hash168s[hash168].add(hex_hash)
                 touched.add(hash168)
+
+        if missing_utxos:
+            self.logger.info('{:,d} txs had missing UTXOs; probably the '
+                             'daemon is a block or two ahead of us'
+                             .format(missing_utxos))
 
         self.count += 1
         if self.count % 25 == 0 or gone:
