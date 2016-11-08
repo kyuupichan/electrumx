@@ -12,10 +12,11 @@ import array
 import ast
 import os
 import struct
+from bisect import bisect_right
 from collections import namedtuple
 
-from server.cache import FSCache, NO_CACHE_ENTRY
-from lib.util import LoggedClass
+from lib.util import chunks, LoggedClass
+from lib.hash import double_sha256
 from server.storage import open_db
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
@@ -54,10 +55,29 @@ class DB(LoggedClass):
         self.height = self.db_height
         self.tip = self.db_tip
 
-        # Cache wrapping the filesystem and redirected functions
-        self.fs_cache = FSCache(self.coin, self.height, self.tx_count)
-        self.get_tx_hash = self.fs_cache.get_tx_hash
-        self.read_headers = self.fs_cache.read_headers
+        # -- FS related members --
+        self.tx_hash_file_size = 16 * 1024 * 1024
+
+        # On-disk height updated by a flush
+        self.fs_height = self.height
+
+        # Unflushed items
+        self.headers = []
+        self.tx_hashes = []
+
+        create = self.height == -1
+        self.headers_file = self.open_file('headers', create)
+        self.txcount_file = self.open_file('txcount', create)
+
+        # tx_counts[N] has the cumulative number of txs at the end of
+        # height N.  So tx_counts[0] is 1 - the genesis coinbase
+        self.tx_counts = array.array('I')
+        self.txcount_file.seek(0)
+        self.tx_counts.fromfile(self.txcount_file, self.height + 1)
+        if self.tx_counts:
+            assert self.tx_count == self.tx_counts[-1]
+        else:
+            assert self.tx_count == 0
 
     def init_state_from_db(self):
         if self.db.is_new:
@@ -82,6 +102,59 @@ class DB(LoggedClass):
             self.utxo_flush_count = state['utxo_flush_count']
             self.wall_time = state['wall_time']
             self.first_sync = state.get('first_sync', True)
+
+    def open_file(self, filename, create=False):
+        '''Open the file name.  Return its handle.'''
+        try:
+            return open(filename, 'rb+')
+        except FileNotFoundError:
+            if create:
+                return open(filename, 'wb+')
+            raise
+
+    def read_headers(self, start, count):
+        result = b''
+
+        # Read some from disk
+        disk_count = min(count, self.fs_height + 1 - start)
+        if disk_count > 0:
+            header_len = self.coin.HEADER_LEN
+            assert start >= 0
+            self.headers_file.seek(start * header_len)
+            result = self.headers_file.read(disk_count * header_len)
+            count -= disk_count
+            start += disk_count
+
+        # The rest from memory
+        start -= self.fs_height + 1
+        assert count >= 0 and start + count <= len(self.headers)
+        result += b''.join(self.headers[start: start + count])
+
+        return result
+
+    def get_tx_hash(self, tx_num):
+        '''Returns the tx_hash and height of a tx number.'''
+        height = bisect_right(self.tx_counts, tx_num)
+
+        # Is this on disk or unflushed?
+        if height > self.fs_height:
+            tx_hashes = self.tx_hashes[height - (self.fs_height + 1)]
+            tx_hash = tx_hashes[tx_num - self.tx_counts[height - 1]]
+        else:
+            file_pos = tx_num * 32
+            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+            filename = 'hashes{:04d}'.format(file_num)
+            with self.open_file(filename) as f:
+                f.seek(offset)
+                tx_hash = f.read(32)
+
+        return tx_hash, height
+
+    def block_hashes(self, height, count):
+        headers = self.read_headers(height, count)
+        # FIXME: move to coins.py
+        hlen = self.coin.HEADER_LEN
+        return [double_sha256(header) for header in chunks(headers, hlen)]
 
     @staticmethod
     def _resolve_limit(limit):
@@ -142,9 +215,7 @@ class DB(LoggedClass):
         hash168 = None
         if 0 <= index <= 65535:
             idx_packed = struct.pack('<H', index)
-            hash168 = self.hash168(tx_hash, idx_packed, False)
-            if hash168 == NO_CACHE_ENTRY:
-                hash168 = None
+            hash168 = self.hash168(tx_hash, idx_packed)
         return hash168
 
     def hash168(self, tx_hash, idx_packed):
