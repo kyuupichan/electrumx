@@ -331,8 +331,8 @@ class ElectrumX(JSONRPC):
 
     @classmethod
     def watched_address_count(cls):
-        sessions = self.SESSION_MGR.sessions
-        return sum(len(session.hash168s) for session in session
+        sessions = cls.SESSION_MGR.sessions
+        return sum(len(session.hash168s) for session in sessions
                    if isinstance(session, cls))
 
     @classmethod
