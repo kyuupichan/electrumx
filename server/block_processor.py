@@ -382,8 +382,9 @@ class BlockProcessor(server.db.DB):
             while True:
                 await self._wait_for_update()
                 await asyncio.sleep(0)   # Yield
-        finally:
+        except asyncio.CancelledError:
             self.flush(True)
+            raise
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks or a mempool update.
@@ -535,6 +536,9 @@ class BlockProcessor(server.db.DB):
                                  self.height - self.db_height))
         self.utxo_cache.flush(batch)
         self.utxo_flush_count = self.flush_count
+        self.db_tx_count = self.tx_count
+        self.db_height = self.height
+        self.db_tip = self.tip
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
@@ -571,13 +575,6 @@ class BlockProcessor(server.db.DB):
                 self.flush_utxos(batch)
             self.flush_state(batch)
             self.logger.info('committing transaction...')
-
-        # Update our in-memory state after successful flush
-        self.db_tx_count = self.tx_count
-        self.db_height = self.height
-        self.db_tip = self.tip
-        self.tx_hashes = []
-        self.headers = []
 
         # Update and put the wall time again - otherwise we drop the
         # time it took to commit the batch
@@ -670,6 +667,8 @@ class BlockProcessor(server.db.DB):
 
         os.sync()
 
+        self.tx_hashes = []
+        self.headers = []
         self.logger.info('FS flush took {:.1f} seconds'
                          .format(time.time() - flush_start))
 

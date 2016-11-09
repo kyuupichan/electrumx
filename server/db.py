@@ -119,7 +119,6 @@ class DB(LoggedClass):
 
         if tx_height > self.db_height:
             return None, tx_height
-            raise self.DBError('tx_num {:,d} is not on disk')
 
         file_pos = tx_num * 32
         file_num, offset = divmod(file_pos, self.tx_hash_file_size)

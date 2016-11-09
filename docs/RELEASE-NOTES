@@ -1,3 +1,10 @@
+Version 0.2.2.1
+---------------
+
+- fixes issues #12, #13
+- only attempt to flush on asyncio.CancelledError to avoid spurious
+  secondary errors
+
 Version 0.2.2
 -------------
 
