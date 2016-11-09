@@ -382,8 +382,9 @@ class BlockProcessor(server.db.DB):
             while True:
                 await self._wait_for_update()
                 await asyncio.sleep(0)   # Yield
-        finally:
+        except asyncio.CancelledError:
             self.flush(True)
+            raise
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks or a mempool update.
