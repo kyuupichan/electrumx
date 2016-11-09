@@ -536,6 +536,9 @@ class BlockProcessor(server.db.DB):
                                  self.height - self.db_height))
         self.utxo_cache.flush(batch)
         self.utxo_flush_count = self.flush_count
+        self.db_tx_count = self.tx_count
+        self.db_height = self.height
+        self.db_tip = self.tip
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
@@ -572,13 +575,6 @@ class BlockProcessor(server.db.DB):
                 self.flush_utxos(batch)
             self.flush_state(batch)
             self.logger.info('committing transaction...')
-
-        # Update our in-memory state after successful flush
-        self.db_tx_count = self.tx_count
-        self.db_height = self.height
-        self.db_tip = self.tip
-        self.tx_hashes = []
-        self.headers = []
 
         # Update and put the wall time again - otherwise we drop the
         # time it took to commit the batch
@@ -671,6 +667,8 @@ class BlockProcessor(server.db.DB):
 
         os.sync()
 
+        self.tx_hashes = []
+        self.headers = []
         self.logger.info('FS flush took {:.1f} seconds'
                          .format(time.time() - flush_start))
 
