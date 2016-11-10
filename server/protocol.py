@@ -47,41 +47,42 @@ class BlockServer(BlockProcessor):
             await self.start_servers()
         ElectrumX.notify(self.height, self.touched)
 
+    async def start_server(self, name, protocol, host, port, *, ssl=None):
+        loop = asyncio.get_event_loop()
+        server = loop.create_server(protocol, host, port, ssl=ssl)
+        try:
+            self.servers.append(await server)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            self.logger.error('{} server failed to listen on {}:{:d} :{}'
+                              .format(name, host, port, e))
+        else:
+            self.logger.info('{} server listening on {}:{:d}'
+                             .format(name, host, port))
+
     async def start_servers(self):
         '''Start listening on RPC, TCP and SSL ports.
 
         Does not start a server if the port wasn't specified.
         '''
         env = self.env
-        loop = asyncio.get_event_loop()
-
         JSONRPC.init(self, self.daemon, self.coin)
 
         protocol = LocalRPC
         if env.rpc_port is not None:
-            host = 'localhost'
-            rpc_server = loop.create_server(protocol, host, env.rpc_port)
-            self.servers.append(await rpc_server)
-            self.logger.info('RPC server listening on {}:{:d}'
-                             .format(host, env.rpc_port))
+            await self.start_server('RPC', protocol, 'localhost', env.rpc_port)
 
         protocol = partial(ElectrumX, env)
         if env.tcp_port is not None:
-            tcp_server = loop.create_server(protocol, env.host, env.tcp_port)
-            self.servers.append(await tcp_server)
-            self.logger.info('TCP server listening on {}:{:d}'
-                             .format(env.host, env.tcp_port))
+            await self.start_server('TCP', protocol, env.host, env.tcp_port)
 
         if env.ssl_port is not None:
             # FIXME: update if we want to require Python >= 3.5.3
-            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-            ssl_context.load_cert_chain(env.ssl_certfile,
-                                        keyfile=env.ssl_keyfile)
-            ssl_server = loop.create_server(protocol, env.host, env.ssl_port,
-                                            ssl=ssl_context)
-            self.servers.append(await ssl_server)
-            self.logger.info('SSL server listening on {}:{:d}'
-                             .format(env.host, env.ssl_port))
+            sslc = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
+            await self.start_server('SSL', protocol, env.host, env.ssl_port,
+                                    ssl=sslc)
 
     def stop(self):
         '''Close the listening servers.'''

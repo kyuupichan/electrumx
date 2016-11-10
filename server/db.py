@@ -192,10 +192,10 @@ class DB(LoggedClass):
         hash168 = None
         if 0 <= index <= 65535:
             idx_packed = struct.pack('<H', index)
-            hash168 = self.hash168(tx_hash, idx_packed)
+            hash168 = self.db_hash168(tx_hash, idx_packed)
         return hash168
 
-    def hash168(self, tx_hash, idx_packed):
+    def db_hash168(self, tx_hash, idx_packed):
         '''Return the hash168 paid to by the given TXO.
 
         Return None if not found.'''
