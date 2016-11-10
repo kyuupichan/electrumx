@@ -15,13 +15,13 @@ The components of the server are roughly like this::
              - ElectrumX -<<<<<- LocalRPC -
              -------------     ------------
               <      >
-    ----------        -------------------    --------------
-    - Daemon -<<<<<<<<- Block processor ->>>>- UTXO Cache -
-    ----------        -------------------    --------------
-        <              <               >           <
-         --------------                 ----------------
-         - Prefetcher -                 - FS + Storage -
-         --------------                 ----------------
+    ----------        -------------------
+    - Daemon -<<<<<<<<- Block processor -
+    ----------        -------------------
+        <              <               >
+         --------------                 -----------
+         - Prefetcher -                 - FS + DB -
+         --------------                 -----------
 
 
 Env
@@ -60,22 +60,15 @@ Block Processor
 
 Responsible for managing block chain state (UTXO set, history,
 transaction and undo information) and processing towards the chain
-tip.  Uses the caches for in-memory state caching.  Flushes state to
-the storage layer.  Reponsible for handling block chain
-reorganisations.  Once caught up maintains a representation of daemon
-mempool state.
+tip.  Uses the caches for in-memory state updates since the last
+flush.  Flushes state to the storage layer.  Reponsible for handling
+block chain reorganisations.  Once caught up maintains a
+representation of daemon mempool state.
 
-Caches
-------
+Database
+--------
 
-The file system cache and the UTXO cache are implementation details of
-the block processor, nothing else should interface with them.
-
-Storage
--------
-
-Backend database abstraction.  Along with the host filesystem, used by
-the block processor (and therefore its caches) to store chain state.
+The database.  Along with the host filesystem stores flushed chain state.
 
 Prefetcher
 ----------

@@ -1,3 +1,10 @@
+Version 0.2.3
+-------------
+
+- fixes issues #6, #11, #15
+- the UTXO cache is now merged with BlockProcessor, where it properly belongs.
+  cache.py no longer exists
+
 Version 0.2.2.1
 ---------------
 
