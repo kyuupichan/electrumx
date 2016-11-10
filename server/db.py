@@ -210,12 +210,12 @@ class DB(LoggedClass):
             assert len(db_value) % 25 == 0
 
             # Find which entry, if any, the TX_HASH matches.
-            for n in range(0, len(data), 25):
-                tx_num_packed = data[n + 21: n + 25]
+            for n in range(0, len(db_value), 25):
+                tx_num_packed = db_value[n + 21: n + 25]
                 tx_num, = unpack('<I', tx_num_packed)
                 hash, height = self.fs_tx_hash(tx_num)
                 if hash == tx_hash:
-                    return data[n:n+21], tx_num_packed
+                    return db_value[n:n+21], tx_num_packed
 
         return None, None
 
@@ -230,7 +230,7 @@ class DB(LoggedClass):
         if not hash168:
             # This can happen when the daemon is a block ahead of us
             # and has mempool txs spending new txs in that block
-            raise MissingUTXOError
+            raise self.MissingUTXOError
 
         key = b'u' + hash168 + tx_num_packed + idx_packed
         db_value = self.db.get(key)

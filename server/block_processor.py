@@ -249,7 +249,7 @@ class MemPool(LoggedClass):
             try:
                 infos = (txin_info(txin) for txin in tx.inputs)
                 txin_pairs, unconfs = zip(*infos)
-            except MissingUTXOError:
+            except self.bp.MissingUTXOError:
                 # Drop this TX.  If other mempool txs depend on it
                 # it's harmless - next time the mempool is refreshed
                 # they'll either be cleaned up or the UTXOs will no
@@ -949,6 +949,19 @@ class BlockProcessor(server.db.DB):
             # Probably a strange UTXO
             return NO_CACHE_ENTRY
 
+        # FIXME: this matches what we did previously but until we store
+        # all UTXOs isn't safe
+        if len(db_value) == 25:
+            udb_key = b'u' + db_value + idx_packed
+            utxo_value_packed = self.db.get(udb_key)
+            if utxo_value_packed:
+                # Remove the UTXO from both tables
+                self.db_deletes += 1
+                self.db_cache[db_key] = None
+                self.db_cache[udb_key] = None
+                return db_value + utxo_value_packed
+            # Fall through to below
+
         assert len(db_value) % 25 == 0
 
         # Find which entry, if any, the TX_HASH matches.
@@ -956,15 +969,14 @@ class BlockProcessor(server.db.DB):
             tx_num, = unpack('<I', db_value[n+21:n+25])
             hash, height = self.get_tx_hash(tx_num)
             if hash == tx_hash:
-                self.db_deletes += 1
                 match = db_value[n:n+25]
-                # Remove the UTXO from both tables
-                self.db_cache[db_key] = db_value[:n] + db_value[n + 25:]
-
-                db_key = b'u' + match + idx_packed
-                utxo_value_packed = self.db.get(db_key)
+                udb_key = b'u' + match + idx_packed
+                utxo_value_packed = self.db.get(udb_key)
                 if utxo_value_packed:
-                    self.db_cache[db_key] = None
+                    # Remove the UTXO from both tables
+                    self.db_deletes += 1
+                    self.db_cache[db_key] = db_value[:n] + db_value[n + 25:]
+                    self.db_cache[udb_key] = None
                     return match + utxo_value_packed
 
                 # Uh-oh, this should not happen...
