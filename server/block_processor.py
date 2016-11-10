@@ -12,7 +12,7 @@ import array
 import asyncio
 import itertools
 import os
-import struct
+from struct import pack, unpack
 import time
 from bisect import bisect_left
 from collections import defaultdict
@@ -28,10 +28,9 @@ from server.storage import open_db
 # Limits single address history to ~ 65536 * HIST_ENTRIES_PER_KEY entries
 HIST_ENTRIES_PER_KEY = 1024
 HIST_VALUE_BYTES = HIST_ENTRIES_PER_KEY * 4
-ADDR_TX_HASH_LEN = 4
-UTXO_TX_HASH_LEN = 4
 NO_HASH_168 = bytes([255]) * 21
 NO_CACHE_ENTRY = NO_HASH_168 + bytes(12)
+
 
 def formatted_time(t):
     '''Return a number of seconds as a string in days, hours, mins and
@@ -143,10 +142,6 @@ class Prefetcher(LoggedClass):
         return blocks, size
 
 
-class MissingUTXOError(Exception):
-    '''Raised if a mempool tx input UTXO couldn't be found.'''
-
-
 class ChainReorg(Exception):
     '''Raised on a blockchain reorganisation.'''
 
@@ -214,7 +209,7 @@ class MemPool(LoggedClass):
         # The mempool is unordered, so process all outputs first so
         # that looking for inputs has full info.
         script_hash168 = self.bp.coin.hash168_from_script
-        utxo_lookup = self.bp.utxo_lookup
+        db_utxo_lookup = self.bp.db_utxo_lookup
 
         def txout_pair(txout):
             return (script_hash168(txout.pk_script), txout.value)
@@ -231,13 +226,8 @@ class MemPool(LoggedClass):
             mempool_entry = self.txs.get(hex_hash)
             if mempool_entry:
                 return mempool_entry[1][txin.prev_idx], True
-            entry = utxo_lookup(txin.prev_hash, txin.prev_idx)
-            if entry == NO_CACHE_ENTRY:
-                # This happens when the daemon is a block ahead of us
-                # and has mempool txs spending new txs in that block
-                raise MissingUTXOError
-            value, = struct.unpack('<Q', entry[-8:])
-            return (entry[:21], value), False
+            pair = db_utxo_lookup(txin.prev_hash, txin.prev_idx)
+            return pair, False
 
         if initial:
             next_log = time.time()
@@ -495,7 +485,6 @@ class BlockProcessor(server.db.DB):
 
     def remove_excess_history(self, batch):
         prefix = b'H'
-        unpack = struct.unpack
         keys = []
         for key, hist in self.db.iterator(prefix=prefix):
             flush_id, = unpack('>H', key[-2:])
@@ -509,7 +498,6 @@ class BlockProcessor(server.db.DB):
 
     def remove_stale_undo_items(self, batch):
         prefix = b'U'
-        unpack = struct.unpack
         cutoff = self.db_height - self.reorg_limit
         keys = []
         for key, hist in self.db.iterator(prefix=prefix):
@@ -610,7 +598,7 @@ class BlockProcessor(server.db.DB):
 
     def flush_history(self, batch):
         flush_start = time.time()
-        flush_id = struct.pack('>H', self.flush_count)
+        flush_id = pack('>H', self.flush_count)
 
         for hash168, hist in self.history.items():
             key = b'H' + hash168 + flush_id
@@ -732,7 +720,7 @@ class BlockProcessor(server.db.DB):
 
     def undo_key(self, height):
         '''DB key for undo information at the given height.'''
-        return b'U' + struct.pack('>I', height)
+        return b'U' + pack('>I', height)
 
     def write_undo_info(self, height, undo_info):
         '''Write out undo information for the current height.'''
@@ -788,11 +776,11 @@ class BlockProcessor(server.db.DB):
         history = self.history
         tx_num = self.tx_count
         script_hash168 = self.coin.hash168_from_script
-        pack = struct.pack
+        s_pack = pack
 
         for tx, tx_hash in zip(txs, tx_hashes):
             hash168s = set()
-            tx_numb = pack('<I', tx_num)
+            tx_numb = s_pack('<I', tx_num)
 
             # Spend the inputs
             if not tx.is_coinbase:
@@ -807,8 +795,8 @@ class BlockProcessor(server.db.DB):
                 hash168 = script_hash168(txout.pk_script)
                 if hash168:
                     hash168s.add(hash168)
-                    put_utxo(tx_hash + pack('<H', idx),
-                             hash168 + tx_numb + pack('<Q', txout.value))
+                    put_utxo(tx_hash + s_pack('<H', idx),
+                             hash168 + tx_numb + s_pack('<Q', txout.value))
 
             # Drop any NO_CACHE entry
             hash168s.discard(NO_CACHE_ENTRY)
@@ -861,7 +849,7 @@ class BlockProcessor(server.db.DB):
         n = len(undo_info)
 
         # Use local vars for speed in the loops
-        pack = struct.pack
+        s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
 
@@ -879,7 +867,7 @@ class BlockProcessor(server.db.DB):
                 for txin in reversed(tx.inputs):
                     n -= 33
                     undo_item = undo_info[n:n + 33]
-                    put_utxo(txin.prev_hash + pack('<H', txin.prev_idx),
+                    put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
                              undo_item)
                     touched.add(undo_item[:21])
 
@@ -889,12 +877,12 @@ class BlockProcessor(server.db.DB):
     '''An in-memory UTXO cache, representing all changes to UTXO state
     since the last DB flush.
 
-    We want to store millions, perhaps 10s of millions of these in
-    memory for optimal performance during initial sync, because then
-    it is possible to spend UTXOs without ever going to the database
-    (other than as an entry in the address history, and there is only
-    one such entry per TX not per UTXO).  So store them in a Python
-    dictionary with binary keys and values.
+    We want to store millions of these in memory for optimal
+    performance during initial sync, because then it is possible to
+    spend UTXOs without ever going to the database (other than as an
+    entry in the address history, and there is only one such entry per
+    TX not per UTXO).  So store them in a Python dictionary with
+    binary keys and values.
 
       Key:    TX_HASH + TX_IDX           (32 + 2 = 34 bytes)
       Value:  HASH168 + TX_NUM + VALUE   (21 + 4 + 8 = 33 bytes)
@@ -907,144 +895,87 @@ class BlockProcessor(server.db.DB):
     Semantics:
 
       add:   Add it to the cache dictionary.
-      spend: Remove it if in the cache dictionary.
-             Otherwise it's been flushed to the DB.  Each UTXO
-             is responsible for two entries in the DB stored using
-             compressed keys.  Mark both for deletion in the next
-             flush of the in-memory UTXO cache.
 
-    A UTXO is stored in the DB in 2 "tables":
+      spend: Remove it if in the cache dictionary.  Otherwise it's
+             been flushed to the DB.  Each UTXO is responsible for two
+             entries in the DB.  Mark them for deletion in the next
+             cache flush.
 
-      1.  The output value and tx number.  Must be keyed with a
-          hash168 prefix so the unspent outputs and balance of an
-          arbitrary address can be looked up with a simple key
-          traversal.
-          Key: b'u' + hash168 + compressed_tx_hash + tx_idx
-          Value: a (tx_num, value) pair
+    The UTXO database format has to be able to do two things efficiently:
 
-      2.  Given a prevout, we need to be able to look up the UTXO key
-          to remove it.  As is keyed by hash168 and that is not part
-          of the prevout, we need a hash168 lookup.
-          Key: b'h' + compressed tx_hash + tx_idx
-          Value: (hash168, tx_num) pair
+      1.  Given an address be able to list its UTXOs and their values
+          so its balance can be efficiently computed.
 
-    The compressed TX hash is just the first few bytes of the hash of
-    the TX the UTXO is in (and needn't be the same number of bytes in
-    each table).  As this is not unique there will be collisions;
-    tx_num is stored to resolve them.  The collision rate is around
-    0.02% for the hash168 table, and almost zero for the UTXO table
-    (there are around 100 collisions in the whole bitcoin blockchain).
+      2.  When processing transactions, for each prevout spent - a (tx_hash,
+          idx) pair - we have to be able to remove it from the DB.  To send
+          notifications to clients we also need to know any address it paid
+          to.
+
+    To this end we maintain two "tables", one for each point above:
+
+      1.  Key: b'u' + address_hash168 + tx_num + tx_idx
+          Value: the UTXO value as a 64-bit unsigned integer
+
+      2.  Key: b'h' + compressed_tx_hash + tx_idx
+          Value: [address_hash168 + tx_num]
+
+    The compressed tx hash is just the first few bytes of the hash of
+    the tx in which the UTXO was created.  As this is not unique there
+    will are potential collisions when saving and looking up UTXOs;
+    hence why the second table has a list as its value.  The collision
+    can be resolved with the tx_num.  The collision rate is almost
+    zero (I believe there are around 100 collisions in the whole
+    bitcoin blockchain).
     '''
 
-    def utxo_lookup(self, prev_hash, prev_idx):
-        '''Given a prevout, return a pair (hash168, value).
+    def spend_utxo(self, tx_hash, tx_idx):
+        '''Spend a UTXO and return the 33-byte value.
 
-        If the UTXO is not found, returns (None, None).'''
-        # Fast track is it being in the cache
-        idx_packed = struct.pack('<H', prev_idx)
-        value = self.utxo_cache.get(prev_hash + idx_packed, None)
-        if value:
-            return value
-        return self.db_lookup(prev_hash, idx_packed, False)
-
-    def db_lookup(self, tx_hash, idx_packed, delete=True):
-        '''Return a UTXO from the DB.  Remove it if delete is True.
-
-        Return NO_CACHE_ENTRY if it is not in the DB.'''
-        hash168 = self.hash168(tx_hash, idx_packed, delete)
-        if not hash168:
-            return NO_CACHE_ENTRY
-
-        # Read the UTXO through the cache from the disk.  We have to
-        # go through the cache because compressed keys can collide.
-        key = b'u' + hash168 + tx_hash[:UTXO_TX_HASH_LEN] + idx_packed
-        data = self.db_cache_get(key)
-        if data is None:
-            # Uh-oh, this should not happen...
-            self.logger.error('found no UTXO for {} / {:d} key {}'
-                             .format(hash_to_str(tx_hash),
-                                     struct.unpack('<H', idx_packed),
-                                     bytes(key).hex()))
-            return NO_CACHE_ENTRY
-
-        if len(data) == 12:
-            if delete:
-                self.db_deletes += 1
-                self.db_cache_delete(key)
-            return hash168 + data
-
-        # Resolve the compressed key collison.  These should be
-        # extremely rare.
-        assert len(data) % 12 == 0
-        for n in range(0, len(data), 12):
-            (tx_num, ) = struct.unpack('<I', data[n:n+4])
-            this_tx_hash, height = self.get_tx_hash(tx_num)
-            if tx_hash == this_tx_hash:
-                result = hash168 + data[n:n+12]
-                if delete:
-                    self.db_deletes += 1
-                    self.db_cache_write(key, data[:n] + data[n+12:])
-                return result
-
-        raise Exception('could not resolve UTXO key collision')
-
-    def spend_utxo(self, prev_hash, prev_idx):
-        '''Spend a UTXO and return the cache's value.
-
-        If the UTXO is not in the cache it must be on disk.
+        If the UTXO is not in the cache it may be on disk.
         '''
         # Fast track is it being in the cache
-        idx_packed = struct.pack('<H', prev_idx)
-        value = self.utxo_cache.pop(prev_hash + idx_packed, None)
-        if value:
+        idx_packed = pack('<H', tx_idx)
+        cache_value = self.utxo_cache.pop(tx_hash + idx_packed, None)
+        if cache_value:
             self.utxo_cache_spends += 1
-            return value
+            return cache_value
 
-        return self.db_lookup(prev_hash, idx_packed)
+        # Spend it from the DB.  Read the UTXO through the cache
+        # because compressed keys can collide.
+        # The 4 is the COMPRESSED_TX_HASH_LEN
+        db_key = b'h' + tx_hash[:4] + idx_packed
+        db_value = self.db_cache_get(db_key)
+        if db_value is None:
+            # Probably a strange UTXO
+            return NO_CACHE_ENTRY
 
-    def hash168(self, tx_hash, idx_packed, delete=True):
-        '''Return the hash168 paid to by the given TXO.
+        assert len(db_value) % 25 == 0
 
-        Look it up in the DB and removes it if delete is True.  Return
-        None if not found.
-        '''
-        key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + idx_packed
-        data = self.db_cache_get(key)
-        if data is None:
-            # Assuming the DB is not corrupt, if delete is True this
-            # indicates a successful spend of a non-standard script
-            # as we don't currently record those
-            return None
+        # Find which entry, if any, the TX_HASH matches.
+        for n in range(0, len(db_value), 25):
+            tx_num, = unpack('<I', db_value[n+21:n+25])
+            hash, height = self.get_tx_hash(tx_num)
+            if hash == tx_hash:
+                self.db_deletes += 1
+                match = db_value[n:n+25]
+                # Remove the UTXO from both tables
+                self.db_cache[db_key] = db_value[:n] + db_value[n + 25:]
 
-        if len(data) == 25:
-            if delete:
-                self.db_cache_delete(key)
-            return data[:21]
+                db_key = b'u' + match + idx_packed
+                utxo_value_packed = self.db.get(db_key)
+                if utxo_value_packed:
+                    self.db_cache[db_key] = None
+                    return match + utxo_value_packed
 
-        assert len(data) % 25 == 0
+                # Uh-oh, this should not happen...
+                raise self.DBError('UTXO {} / {:,d} not found, key {}'
+                                   .format(hash_to_str(tx_hash), tx_idx,
+                                           bytes(key).hex()))
 
-        # Resolve the compressed key collision using the TX number
-        for n in range(0, len(data), 25):
-            (tx_num, ) = struct.unpack('<I', data[n+21:n+25])
-            my_hash, height = self.get_tx_hash(tx_num)
-            if my_hash == tx_hash:
-                if delete:
-                    self.db_cache_write(key, data[:n] + data[n+25:])
-                return data[n:n+21]
-
-        raise Exception('could not resolve hash168 collision')
-
-    def db_cache_write(self, key, value):
-        '''Cache write of a (key, value) pair to the DB.'''
-        assert(bool(value))
-        self.db_cache[key] = value
-
-    def db_cache_delete(self, key):
-        '''Cache deletion of a key from the DB.'''
-        self.db_cache[key] = None
+        return NO_CACHE_ENTRY
 
     def db_cache_get(self, key):
-        '''Fetch a value from the DB through our write cache.'''
+        '''Fetch a 'h' value from the DB through our write cache.'''
         value = self.db_cache.get(key)
         if value:
             return value
@@ -1058,28 +989,23 @@ class BlockProcessor(server.db.DB):
         self.logger.info('flushing UTXOs: {:,d} txs and {:,d} blocks'
                          .format(self.tx_count - self.db_tx_count,
                                  self.height - self.db_height))
-        hcolls = ucolls = 0
+        collisions = 0
         new_utxos = len(self.utxo_cache)
 
         for cache_key, cache_value in self.utxo_cache.items():
             # Frist write to the hash168 lookup table
-            key = b'h' + cache_key[:ADDR_TX_HASH_LEN] + cache_key[-2:]
-            value = cache_value[:25]
-            prior_value = self.db_cache_get(key)
+            # The 4 is the COMPRESSED_TX_HASH_LEN
+            db_key = b'h' + cache_key[:4] + cache_key[-2:]
+            prior_value = self.db_cache_get(db_key)
             if prior_value:   # Should rarely happen
-                hcolls += 1
-                value += prior_value
-            self.db_cache_write(key, value)
+                collisions += 1
+                self.db_cache[db_key] = prior_value + cache_value[:25]
+            else:
+                self.db_cache[db_key] = cache_value[:25]
 
             # Next write the UTXO table
-            key = (b'u' + cache_value[:21] + cache_key[:UTXO_TX_HASH_LEN]
-                   + cache_key[-2:])
-            value = cache_value[-12:]
-            prior_value = self.db_cache_get(key)
-            if prior_value:   # Should almost never happen
-                ucolls += 1
-                value += prior_value
-            self.db_cache_write(key, value)
+            db_key = b'u' + cache_value[:25] + cache_key[-2:]
+            self.db_cache[db_key] = cache_value[-8:]
 
         # GC-ing this now can only help the levelDB write.
         self.utxo_cache = {}
@@ -1088,17 +1014,15 @@ class BlockProcessor(server.db.DB):
         for key, value in self.db_cache.items():
             if value:
                 batch.put(key, value)
-            else:
+            else:  # b'' or None
                 batch.delete(key)
 
         adds = new_utxos + self.utxo_cache_spends
 
         self.logger.info('UTXO cache adds: {:,d} spends: {:,d} '
                          .format(adds, self.utxo_cache_spends))
-        self.logger.info('UTXO DB adds: {:,d} spends: {:,d}. '
-                         'Collisions: hash168: {:,d} UTXO: {:,d}'
-                         .format(new_utxos, self.db_deletes,
-                                 hcolls, ucolls))
+        self.logger.info('DB adds: {:,d} spends: {:,d}, collisions: {:,d}'
+                         .format(new_utxos, self.db_deletes, collisions))
 
         self.db_cache = {}
         self.utxo_cache_spends = self.db_deletes = 0

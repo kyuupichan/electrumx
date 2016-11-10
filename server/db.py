@@ -11,13 +11,14 @@
 import array
 import ast
 import os
-import struct
+from struct import pack, unpack
 from bisect import bisect_right
 from collections import namedtuple
 
 from lib.util import chunks, LoggedClass
-from lib.hash import double_sha256
+from lib.hash import double_sha256, hash_to_str
 from server.storage import open_db
+
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
@@ -28,8 +29,11 @@ class DB(LoggedClass):
     it was shutdown uncleanly.
     '''
 
+    class MissingUTXOError(Exception):
+        '''Raised if a mempool tx input UTXO couldn't be found.'''
+
     class DBError(Exception):
-        pass
+        '''Raised on general DB errors generally indicating corruption.'''
 
     def __init__(self, env):
         super().__init__()
@@ -168,19 +172,16 @@ class DB(LoggedClass):
         Set limit to None to get them all.
         '''
         limit = self._resolve_limit(limit)
-        unpack = struct.unpack
+        s_unpack = unpack
         prefix = b'u' + hash168
-        for k, v in self.db.iterator(prefix=prefix):
-            (tx_pos,) = unpack('<H', k[-2:])
-
-            for n in range(0, len(v), 12):
-                if limit == 0:
-                    return
-                (tx_num,) = unpack('<I', v[n:n + 4])
-                (value,) = unpack('<Q', v[n + 4:n + 12])
-                tx_hash, height = self.fs_tx_hash(tx_num)
-                yield UTXO(tx_num, tx_pos, tx_hash, height, value)
-                limit -= 1
+        for db_key, db_value in self.db.iterator(prefix=prefix):
+            if limit == 0:
+                return
+            limit -= 1
+            tx_num, tx_pos = s_unpack('<IH', db_key[-6:])
+            value, = unpack('<Q', db_value)
+            tx_hash, height = self.fs_tx_hash(tx_num)
+            yield UTXO(tx_num, tx_pos, tx_hash, height, value)
 
     def get_utxos_sorted(self, hash168):
         '''Returns all the UTXOs for an address sorted by height and
@@ -188,32 +189,53 @@ class DB(LoggedClass):
         return sorted(self.get_utxos(hash168, limit=None))
 
     def get_utxo_hash168(self, tx_hash, index):
-        '''Returns the hash168 for a UTXO.'''
+        '''Returns the hash168 for a UTXO.
+
+        Used only for electrum client command-line requests.
+        '''
         hash168 = None
         if 0 <= index <= 65535:
-            idx_packed = struct.pack('<H', index)
-            hash168 = self.db_hash168(tx_hash, idx_packed)
+            idx_packed = pack('<H', index)
+            hash168, tx_num_packed = self.db_hash168(tx_hash, idx_packed)
         return hash168
 
     def db_hash168(self, tx_hash, idx_packed):
-        '''Return the hash168 paid to by the given TXO.
+        '''Return (hash168, tx_num_packed) for the given TXO.
 
-        Return None if not found.'''
-        key = b'h' + tx_hash[:ADDR_TX_HASH_LEN] + idx_packed
-        data = self.db.get(key)
-        if data is None:
-            return None
+        Both are None if not found.'''
+        # The 4 is the COMPRESSED_TX_HASH_LEN
+        key = b'h' + tx_hash[:4] + idx_packed
+        db_value = self.db.get(key)
+        if db_value:
+            assert len(db_value) % 25 == 0
 
-        if len(data) == 25:
-            return data[:21]
+            # Find which entry, if any, the TX_HASH matches.
+            for n in range(0, len(data), 25):
+                tx_num_packed = data[n + 21: n + 25]
+                tx_num, = unpack('<I', tx_num_packed)
+                hash, height = self.fs_tx_hash(tx_num)
+                if hash == tx_hash:
+                    return data[n:n+21], tx_num_packed
 
-        assert len(data) % 25 == 0
+        return None, None
 
-        # Resolve the compressed key collision using the TX number
-        for n in range(0, len(data), 25):
-            tx_num, = struct.unpack('<I', data[n+21:n+25])
-            my_hash, height = self.fs_tx_hash(tx_num)
-            if my_hash == tx_hash:
-                return data[n:n+21]
+    def db_utxo_lookup(self, tx_hash, tx_idx):
+        '''Given a prevout return a (hash168, value) pair.
 
-        raise self.DBError('could not resolve hash168 collision')
+        Raises MissingUTXOError if the UTXO is not found.  Used by the
+        mempool code.
+        '''
+        idx_packed = pack('<H', tx_idx)
+        hash168, tx_num_packed = self.db_hash168(tx_hash, idx_packed)
+        if not hash168:
+            # This can happen when the daemon is a block ahead of us
+            # and has mempool txs spending new txs in that block
+            raise MissingUTXOError
+
+        key = b'u' + hash168 + tx_num_packed + idx_packed
+        db_value = self.db.get(key)
+        if not db_value:
+            raise self.DBError('UTXO {} / {:,d} in one table only'
+                               .format(hash_to_str(tx_hash), tx_idx))
+        value, = unpack('<Q', db_value)
+        return hash168, value
