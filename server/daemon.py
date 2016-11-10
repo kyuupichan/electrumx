@@ -91,6 +91,10 @@ class Daemon(util.LoggedClass):
                 msg = 'connection problem - is your daemon running?'
             except DaemonWarmingUpError:
                 msg = 'still starting up checking blocks...'
+            except (asyncio.CancelledError, DaemonError):
+                raise
+            except Exception as e:
+                msg = ('request gave unexpected error: {}'.format(e))
 
             if msg != prior_msg or count == 10:
                 self.logger.error('{}.  Retrying between sleeps...'
