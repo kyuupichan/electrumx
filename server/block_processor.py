@@ -181,7 +181,7 @@ class MemPool(LoggedClass):
         '''
         hex_hashes = set(hex_hashes)
         touched = set()
-        missing_utxos = 0
+        missing_utxos = []
 
         initial = self.count < 0
         if initial:
@@ -235,6 +235,7 @@ class MemPool(LoggedClass):
             if entry == NO_CACHE_ENTRY:
                 # This happens when the daemon is a block ahead of us
                 # and has mempool txs spending new txs in that block
+                missing_utxos.append(txin)
                 raise MissingUTXOError
             value, = struct.unpack('<Q', entry[-8:])
             return (entry[:21], value), False
@@ -264,7 +265,6 @@ class MemPool(LoggedClass):
                 # it's harmless - next time the mempool is refreshed
                 # they'll either be cleaned up or the UTXOs will no
                 # longer be missing.
-                missing_utxos += 1
                 del self.txs[hex_hash]
                 continue
             self.txs[hex_hash] = (txin_pairs, txout_pairs, any(unconfs))
@@ -279,8 +279,12 @@ class MemPool(LoggedClass):
 
         if missing_utxos:
             self.logger.info('{:,d} txs had missing UTXOs; probably the '
-                             'daemon is a block or two ahead of us'
-                             .format(missing_utxos))
+                             'daemon is a block or two ahead of us.'
+                             .format(len(missing_utxos)))
+            first = ', '.join('{} / {:,d}'.format(hash_to_str(txin.prev_hash),
+                                                  txin.prev_idx)
+                              for txin in sorted(missing_utxos)[:3])
+            self.logger.info('first ones are {}'.format(first))
 
         self.count += 1
         if self.count % 25 == 0 or gone:
