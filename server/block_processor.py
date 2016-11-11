@@ -302,8 +302,8 @@ class MemPool(LoggedClass):
         Can be positive or negative.
         '''
         value = 0
-        for tx_hash in self.hash168s[hash168]:
-            txin_pairs, txout_pairs, unconfirmed = self.txs[tx_hash]
+        for hex_hash in self.hash168s[hash168]:
+            txin_pairs, txout_pairs, unconfirmed = self.txs[hex_hash]
             value -= sum(v for h168, v in txin_pairs if h168 == hash168)
             value += sum(v for h168, v in txout_pairs if h168 == hash168)
         return value
@@ -317,8 +317,6 @@ class BlockProcessor(server.db.DB):
     '''
 
     def __init__(self, env):
-        '''on_update is awaitable, and called only when caught up with the
-        daemon and a new block arrives or the mempool is updated.'''
         super().__init__(env)
 
         # These are our state as we move ahead of DB state
