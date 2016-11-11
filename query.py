@@ -16,7 +16,7 @@ Not currently documented; might become easier to use in future.
 import sys
 
 from server.env import Env
-from server.DB import DB
+from server.db import DB
 from lib.hash import hash_to_str
 
 
