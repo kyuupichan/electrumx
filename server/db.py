@@ -29,6 +29,8 @@ class DB(LoggedClass):
     it was shutdown uncleanly.
     '''
 
+    VERSIONS = [0]
+
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
 
@@ -53,7 +55,7 @@ class DB(LoggedClass):
         else:
             self.logger.info('successfully opened {} database {}'
                              .format(env.db_engine, db_name))
-        self.init_state_from_db()
+        self.read_state()
 
         create = self.db_height == -1
         self.headers_file = self.open_file('headers', create)
@@ -70,7 +72,7 @@ class DB(LoggedClass):
         else:
             assert self.db_tx_count == 0
 
-    def init_state_from_db(self):
+    def read_state(self):
         if self.db.is_new:
             self.db_height = -1
             self.db_tx_count = 0
@@ -81,7 +83,15 @@ class DB(LoggedClass):
             self.first_sync = True
         else:
             state = self.db.get(b'state')
-            state = ast.literal_eval(state.decode())
+            if state:
+                state = ast.literal_eval(state.decode())
+            if not isinstance(state, dict):
+                raise self.DBError('failed reading state from DB')
+            db_version = state.get('db_version', 0)
+            if db_version not in self.VERSIONS:
+                raise self.DBError('your DB version is {} but this software '
+                                   'only handles versions {}'
+                                   .format(db_version, self.VERSIONS))
             if state['genesis'] != self.coin.GENESIS_HASH:
                 raise self.DBError('DB genesis hash {} does not match coin {}'
                                    .format(state['genesis_hash'],
@@ -92,7 +102,22 @@ class DB(LoggedClass):
             self.flush_count = state['flush_count']
             self.utxo_flush_count = state['utxo_flush_count']
             self.wall_time = state['wall_time']
-            self.first_sync = state.get('first_sync', True)
+            self.first_sync = state['first_sync']
+
+    def write_state(self, batch):
+        '''Write chain state to the batch.'''
+        state = {
+            'genesis': self.coin.GENESIS_HASH,
+            'height': self.db_height,
+            'tx_count': self.db_tx_count,
+            'tip': self.db_tip,
+            'flush_count': self.flush_count,
+            'utxo_flush_count': self.utxo_flush_count,
+            'wall_time': self.wall_time,
+            'first_sync': self.first_sync,
+            'db_version': max(self.VERSIONS),
+        }
+        batch.put(b'state', repr(state).encode())
 
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
