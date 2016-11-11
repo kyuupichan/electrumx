@@ -36,8 +36,6 @@ class BlockServer(BlockProcessor):
     '''Like BlockProcessor but also starts servers when caught up.'''
 
     def __init__(self, env):
-        '''on_update is awaitable, and called only when caught up with the
-        daemon and a new block arrives or the mempool is updated.'''
         super().__init__(env)
         self.servers = []
 

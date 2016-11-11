@@ -1,3 +1,16 @@
+Version 0.3
+-----------
+
+- Database format has changed; old DBs are incompatible.  They will
+  not work and will probably die miserably as I'm not yet versioning
+  them for helpful warnings (coming soon).
+- The change in on-disk format makes UTXO flushes noticeably more
+  efficient.  My gut feeling is it probably benefits HDDs more than
+  SSDs, but I have no numbers to back that up other than that my HDD
+  synced about 90 minutes (10%) faster.  Until the treacle hits at
+  blocks 300k+ there will probably be little noticeable difference in
+  sync time.
+
 Version 0.2.3
 -------------
 
