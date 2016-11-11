@@ -72,38 +72,43 @@ class Daemon(util.LoggedClass):
         Handles temporary connection issues.  Daemon reponse errors
         are raise through DaemonError.
         '''
-        data = json.dumps(payload)
         secs = 1
         prior_msg = None
+        skip_count = 10
+
+        async def sleep(msg, *, skip_once=False):
+            skip_count -= 1
+            if skip_once and msg != prior_msg:
+                skip_count = 1
+            elif msg != prior_msg or skip_count == 0:
+                self.logger.error('{}.  Retrying between sleeps...'
+                                  .format(msg))
+                skip_count = 10
+            prior_msg = msg
+            await asyncio.sleep(secs)
+            secs = min(16, secs * 2)
+
+        data = json.dumps(payload)
         while True:
             try:
                 result = await self._post(data)
                 if prior_msg:
                     self.logger.info('connection successfully restored')
                 return result
-            except asyncio.TimeoutError:
-                msg = 'timeout error'
-            except aiohttp.ClientHttpProcessingError:
-                msg = 'HTTP error'
-            except aiohttp.ServerDisconnectedError:
-                msg = 'disconnected'
-            except aiohttp.ClientConnectionError:
-                msg = 'connection problem - is your daemon running?'
-            except DaemonWarmingUpError:
-                msg = 'still starting up checking blocks...'
             except (asyncio.CancelledError, DaemonError):
                 raise
+            except asyncio.TimeoutError:
+                sleep('timeout error', skip_once=True)
+            except aiohttp.ClientHttpProcessingError:
+                sleep('HTTP error', skip_once=True)
+            except aiohttp.ServerDisconnectedError:
+                sleep('disconnected', skip_once=True)
+            except aiohttp.ClientConnectionError:
+                sleep('connection problem - is your daemon running?')
+            except DaemonWarmingUpError:
+                sleep('still starting up checking blocks...')
             except Exception as e:
-                msg = ('request gave unexpected error: {}'.format(e))
-
-            if msg != prior_msg or count == 10:
-                self.logger.error('{}.  Retrying between sleeps...'
-                                  .format(msg))
-                prior_msg = msg
-                count = 0
-            await asyncio.sleep(secs)
-            count += 1
-            secs = min(16, secs * 2)
+                sleep('request gave unexpected error: {}'.format(e))
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
