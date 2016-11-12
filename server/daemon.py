@@ -19,15 +19,13 @@ import lib.util as util
 class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
-
-class DaemonWarmingUpError(DaemonError):
-    '''Raised when the daemon returns an error in its results.'''
-
-
 class Daemon(util.LoggedClass):
     '''Handles connections to a daemon at the given URL.'''
 
     WARMING_UP = -28
+
+    class DaemonWarmingUpError(Exception):
+        '''Raised when the daemon returns an error in its results.'''
 
     def __init__(self, url, debug):
         super().__init__()
@@ -74,8 +72,6 @@ class Daemon(util.LoggedClass):
                         if prior_msg:
                             self.logger.info('connection restored')
                         return result
-            except (asyncio.CancelledError, DaemonError):
-                raise
             except asyncio.TimeoutError:
                 log_error('timeout error', skip_once=True)
             except aiohttp.ClientHttpProcessingError:
@@ -84,8 +80,10 @@ class Daemon(util.LoggedClass):
                 log_error('disconnected', skip_once=True)
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
-            except DaemonWarmingUpError:
+            except self.DaemonWarmingUpError:
                 log_error('still starting up checking blocks...')
+            except (asyncio.CancelledError, DaemonError):
+                raise
             except Exception as e:
                 log_error('request gave unexpected error: {}'.format(e))
             await asyncio.sleep(secs)
@@ -98,7 +96,7 @@ class Daemon(util.LoggedClass):
             if not err:
                 return result['result']
             if err.get('code') == self.WARMING_UP:
-                raise DaemonWarmingUpError
+                raise self.DaemonWarmingUpError
             raise DaemonError(err)
 
         payload = {'method': method}
@@ -117,7 +115,7 @@ class Daemon(util.LoggedClass):
             if not errs or replace_errs:
                 return [item['result'] for item in result]
             if any(err.get('code') == self.WARMING_UP for err in errs):
-                raise DaemonWarmingUpError
+                raise self.DaemonWarmingUpError
             raise DaemonError(errs)
 
         payload = [{'method': method, 'params': p} for p in params_iterable]
