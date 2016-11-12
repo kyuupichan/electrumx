@@ -382,8 +382,8 @@ class ElectrumX(JSONRPC):
     @classmethod
     async def tx_merkle(cls, tx_hash, height):
         '''tx_hash is a hex string.'''
-        block_hash = await cls.DAEMON.send_single('getblockhash', (height,))
-        block = await cls.DAEMON.send_single('getblock', (block_hash, True))
+        hex_hashes = await cls.DAEMON.block_hex_hashes(height, 1)
+        block = await cls.DAEMON.deserialised_block(hex_hashes[0])
         tx_hashes = block['tx']
         # This will throw if the tx_hash is bad
         pos = tx_hashes.index(tx_hash)

@@ -128,6 +128,10 @@ class Daemon(util.LoggedClass):
         params_iterable = ((h, ) for h in range(first, first + count))
         return await self._send_vector('getblockhash', params_iterable)
 
+    async def deserialised_block(self, hex_hash):
+        '''Return the deserialised block with the given hex hash.'''
+        return await self._send_single('getblock', (hex_hash, True))
+
     async def raw_blocks(self, hex_hashes):
         '''Return the raw binary blocks with the given hex hashes.'''
         params_iterable = ((h, False) for h in hex_hashes)
