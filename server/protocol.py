@@ -43,7 +43,7 @@ class BlockServer(BlockProcessor):
         self.irc = IRC(env)
 
     async def caught_up(self, mempool_hashes):
-        await super().caught_up(mempool_hashes)
+        await super().caught_up([]) #mempool_hashes)
         if not self.servers:
             await self.start_servers()
             if self.env.irc:
@@ -632,8 +632,9 @@ class LocalRPC(JSONRPC):
 
     async def sessions(self, params):
         now = time.time()
-        return [(session.kind, session.peername, len(session.hash168s),
-                 session.client, now - session.start)
+        return [(session.kind,
+                 'this RPC client' if session == self else session.peername,
+                 len(session.hash168s), session.client, now - session.start)
                 for session in self.SESSION_MGR.sessions]
 
     async def numsessions(self, params):

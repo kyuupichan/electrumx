@@ -48,8 +48,8 @@ class RPCClient(asyncio.Protocol):
                 fmt = '{:<4} {:>23} {:>7} {:>15} {:>7}'
                 print(fmt.format('Type', 'Peer', 'Subs', 'Client', 'Time'))
                 for kind, peer, subs, client, time in result:
-                    print(fmt.format(kind, peer, '{:,d}'.format(subs)
-                                     client, '{:,d}'.format(int(time)))
+                    print(fmt.format(kind, peer, '{:,d}'.format(subs),
+                                     client, '{:,d}'.format(int(time))))
             else:
                 pprint.pprint(result, indent=4)
 
