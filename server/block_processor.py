@@ -201,7 +201,8 @@ class MemPool(LoggedClass):
         hex_hashes.difference_update(self.txs)
         raw_txs = await self.bp.daemon.getrawtransactions(hex_hashes)
         if initial:
-            self.logger.info('all fetched, now analysing...')
+            self.logger.info('analysing {:,d} mempool txs...'
+                             .format(len(raw_txs)))
         new_txs = {hex_hash: Deserializer(raw_tx).read_tx()
                    for hex_hash, raw_tx in zip(hex_hashes, raw_txs) if raw_tx}
         del raw_txs, hex_hashes

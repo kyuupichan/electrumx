@@ -12,14 +12,16 @@ import asyncio
 import codecs
 import json
 import ssl
+import time
 import traceback
 from collections import namedtuple
 from functools import partial
 
-from server.block_processor import BlockProcessor
-from server.daemon import DaemonError
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.util import LoggedClass
+from server.block_processor import BlockProcessor
+from server.daemon import DaemonError
+from server.irc import IRC
 from server.version import VERSION
 
 
@@ -38,15 +40,19 @@ class BlockServer(BlockProcessor):
     def __init__(self, env):
         super().__init__(env)
         self.servers = []
+        self.irc = IRC(env)
 
     async def caught_up(self, mempool_hashes):
         await super().caught_up(mempool_hashes)
         if not self.servers:
             await self.start_servers()
+            if self.env.irc:
+                asyncio.ensure_future(self.irc.start())
         ElectrumX.notify(self.height, self.touched)
 
-    async def start_server(self, name, protocol, host, port, *, ssl=None):
+    async def start_server(self, class_name, kind, host, port, *, ssl=None):
         loop = asyncio.get_event_loop()
+        protocol = partial(class_name, self.env, kind)
         server = loop.create_server(protocol, host, port, ssl=ssl)
         try:
             self.servers.append(await server)
@@ -54,10 +60,10 @@ class BlockServer(BlockProcessor):
             raise
         except Exception as e:
             self.logger.error('{} server failed to listen on {}:{:d} :{}'
-                              .format(name, host, port, e))
+                              .format(kind, host, port, e))
         else:
             self.logger.info('{} server listening on {}:{:d}'
-                             .format(name, host, port))
+                             .format(kind, host, port))
 
     async def start_servers(self):
         '''Start listening on RPC, TCP and SSL ports.
@@ -66,26 +72,26 @@ class BlockServer(BlockProcessor):
         '''
         env = self.env
         JSONRPC.init(self, self.daemon, self.coin)
-
-        protocol = LocalRPC
         if env.rpc_port is not None:
-            await self.start_server('RPC', protocol, 'localhost', env.rpc_port)
+            await self.start_server(LocalRPC, 'RPC', 'localhost', env.rpc_port)
 
-        protocol = partial(ElectrumX, env)
         if env.tcp_port is not None:
-            await self.start_server('TCP', protocol, env.host, env.tcp_port)
+            await self.start_server(ElectrumX, 'TCP', env.host, env.tcp_port)
 
         if env.ssl_port is not None:
             # FIXME: update if we want to require Python >= 3.5.3
             sslc = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
-            await self.start_server('SSL', protocol, env.host, env.ssl_port,
-                                    ssl=sslc)
+            await self.start_server(ElectrumX, 'SSL', env.host,
+                                    env.ssl_port, ssl=sslc)
 
     def stop(self):
         '''Close the listening servers.'''
         for server in self.servers:
             server.close()
+
+    def irc_peers(self):
+        return self.irc.peers
 
 
 AsyncTask = namedtuple('AsyncTask', 'session job')
@@ -107,7 +113,7 @@ class SessionManager(LoggedClass):
         self.sessions.remove(session)
         if self.current_task and session == self.current_task.session:
             self.logger.info('cancelling running task')
-            self.current_task.cancel()
+            self.current_task.job.cancel()
 
     def add_task(self, session, job):
         assert session in self.sessions
@@ -142,11 +148,16 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.send_count = 0
         self.send_size = 0
         self.error_count = 0
+        self.hash168s = set()
+        self.start = time.time()
+        self.client = 'unknown'
+        self.peername = 'unknown'
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         self.transport = transport
-        self.peername = transport.get_extra_info('peername')
+        peer = transport.get_extra_info('peername')
+        self.peername = '{}:{}'.format(peer[0], peer[1])
         self.logger.info('connection from {}'.format(self.peername))
         self.SESSION_MGR.add_session(self)
 
@@ -285,6 +296,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         cls.SESSION_MGR = SessionManager()
 
     @classmethod
+    def irc_peers(cls):
+        return cls.BLOCK_PROCESSOR.irc_peers()
+
+    @classmethod
     def height(cls):
         '''Return the current height.'''
         return cls.BLOCK_PROCESSOR.height
@@ -306,10 +321,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 class ElectrumX(JSONRPC):
     '''A TCP server that handles incoming Electrum connections.'''
 
-    def __init__(self, env):
+    def __init__(self, env, kind):
         super().__init__()
         self.env = env
-        self.hash168s = set()
+        self.kind = kind
         self.subscribe_headers = False
         self.subscribe_height = False
         self.notified_height = None
@@ -331,8 +346,7 @@ class ElectrumX(JSONRPC):
     @classmethod
     def watched_address_count(cls):
         sessions = cls.SESSION_MGR.sessions
-        return sum(len(session.hash168s) for session in sessions
-                   if isinstance(session, cls))
+        return sum(len(session.hash168s) for session in sessions)
 
     @classmethod
     def notify(cls, height, touched):
@@ -349,6 +363,9 @@ class ElectrumX(JSONRPC):
         hash168_to_address = cls.COIN.hash168_to_address
 
         for session in cls.SESSION_MGR.sessions:
+            if not isinstance(session, ElectrumX):
+                continue
+
             if height != session.notified_height:
                 session.notified_height = height
                 if session.subscribe_headers:
@@ -401,12 +418,6 @@ class ElectrumX(JSONRPC):
                       for n in range(0, len(hashes), 2)]
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
-
-    @classmethod
-    def irc_peers(cls):
-        '''Returns a dictionary of IRC nick to (ip, host, ports) tuples, one
-        per peer.'''
-        return {}
 
     @classmethod
     def height(cls):
@@ -590,39 +601,52 @@ class ElectrumX(JSONRPC):
         subscription.
         '''
         self.require_empty_params(params)
-        peers = ElectrumX.irc_peers()
-        return tuple(peers.values())
+        return list(self.irc_peers().values())
 
     async def version(self, params):
         '''Return the server version as a string.'''
+        if len(params) == 2:
+            self.client = str(params[0])
+            self.protocol_version = params[1]
         return VERSION
 
 
 class LocalRPC(JSONRPC):
     '''A local TCP RPC server for querying status.'''
 
-    def __init__(self):
+    def __init__(self, env, kind):
         super().__init__()
         cmds = 'getinfo sessions numsessions peers numpeers'.split()
         self.handlers = {cmd: getattr(self.__class__, cmd) for cmd in cmds}
+        self.env = env
+        self.kind = kind
 
     async def getinfo(self, params):
         return {
             'blocks': self.height(),
-            'peers': len(ElectrumX.irc_peers()),
+            'peers': len(self.irc_peers()),
             'sessions': len(self.SESSION_MGR.sessions),
             'watched': ElectrumX.watched_address_count(),
             'cached': 0,
         }
 
     async def sessions(self, params):
-        return []
+        now = time.time()
+        fmt = '{:<4} {:>21} {:>7} {:>12} {:>7}'
+        result = []
+        result.append(fmt.format('Type', 'Peer', 'Subs', 'Client', 'Time'))
+        for session in self.SESSION_MGR.sessions:
+            result.append(fmt.format(session.kind, session.peername,
+                                     '{:,d}'.format(len(session.hash168s)),
+                                     session.client,
+                                     '{:,d}'.format(int(now - session.start))))
+        return result
 
     async def numsessions(self, params):
         return len(self.SESSION_MGR.sessions)
 
     async def peers(self, params):
-        return tuple(ElectrumX.irc_peers().keys())
+        return self.irc_peers()
 
     async def numpeers(self, params):
-        return len(ElectrumX.irc_peers())
+        return len(self.irc_peers())
