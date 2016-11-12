@@ -20,6 +20,7 @@ from lib.hash import double_sha256
 from lib.util import LoggedClass
 from server.version import VERSION
 
+
 def port_text(letter, port, default):
     if not port:
         return ''
