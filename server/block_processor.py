@@ -201,7 +201,8 @@ class MemPool(LoggedClass):
         hex_hashes.difference_update(self.txs)
         raw_txs = await self.bp.daemon.getrawtransactions(hex_hashes)
         if initial:
-            self.logger.info('all fetched, now analysing...')
+            self.logger.info('analysing {:,d} mempool txs...'
+                             .format(len(raw_txs)))
         new_txs = {hex_hash: Deserializer(raw_tx).read_tx()
                    for hex_hash, raw_tx in zip(hex_hashes, raw_txs) if raw_tx}
         del raw_txs, hex_hashes
@@ -691,12 +692,12 @@ class BlockProcessor(server.db.DB):
         db_cache_size = len(self.db_cache) * 105
         hist_cache_size = len(self.history) * 180 + self.history_size * 4
         tx_hash_size = (self.tx_count - self.db_tx_count) * 74
-        utxo_MB = (db_deletes_size + utxo_cache_size + tx_hash_size) // one_MB
+        utxo_MB = (db_cache_size + utxo_cache_size + tx_hash_size) // one_MB
         hist_MB = hist_cache_size // one_MB
 
         self.logger.info('UTXOs: {:,d}  deletes: {:,d}  '
                          'UTXOs {:,d}MB  hist {:,d}MB'
-                         .format(len(self.utxo_cache), len(self.db_deletes),
+                         .format(len(self.utxo_cache), self.db_deletes,
                                  utxo_MB, hist_MB))
         self.logger.info('our height: {:,d}  daemon height: {:,d}'
                          .format(self.height, self.daemon.cached_height()))
@@ -989,7 +990,7 @@ class BlockProcessor(server.db.DB):
                          'DB spends: {:,d}'
                          .format(len(self.utxo_cache) + self.utxo_cache_spends,
                                  self.utxo_cache_spends,
-                                 len(self.db_deletes) // 2))
+                                 self.db_deletes))
 
         fs_flush_start = time.time()
         self.fs_flush()

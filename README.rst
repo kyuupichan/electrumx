@@ -68,8 +68,9 @@ All of the following likely play a part:
   but I cannot think how they could be easily indexable on a filesystem.
 - avoiding unnecessary or redundant computations
 - more efficient memory usage
-- asyncio and asynchronous prefetch of blocks.  ElectrumX should not
-  have any need of threads.
+- asyncio and asynchronous prefetch of blocks.
+
+ElectrumX should not have any need of threads.
 
 
 Roadmap
@@ -81,7 +82,6 @@ Roadmap
 - improve DB abstraction so LMDB is not penalized
 - continue to clean up the code and remove layering violations
 - store all UTXOs, not just those with addresses
-- implement IRC connectivity
 - potentially move some functionality to C or C++
 
 The above are in no particular order.
