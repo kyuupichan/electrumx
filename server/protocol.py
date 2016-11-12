@@ -43,7 +43,7 @@ class BlockServer(BlockProcessor):
         self.irc = IRC(env)
 
     async def caught_up(self, mempool_hashes):
-        await super().caught_up([]) #mempool_hashes)
+        await super().caught_up(mempool_hashes)
         if not self.servers:
             await self.start_servers()
             if self.env.irc:
