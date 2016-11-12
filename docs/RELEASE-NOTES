@@ -1,3 +1,9 @@
+version 0.4.1
+-------------
+
+- tweak IRC version reporting so we appear in the Electrum client's
+  network dialog box
+
 version 0.4
 -----------
 

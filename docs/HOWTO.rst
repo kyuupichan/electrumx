@@ -11,6 +11,10 @@ small - patches welcome.
 + aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
             communication with the daemon.  Version >= 1.0 required; I am
             using 1.0.5.
++ irc:      Python IRC package.  Only required if you enable IRC; ElectrumX
+            will happily serve clients that try to connect directly.
+            I use 15.0.4 but older versions likely are fine.
+
 
 While not requirements for running ElectrumX, it is intended to be run
 with supervisor software such as Daniel Bernstein's daemontools,
