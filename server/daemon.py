@@ -31,7 +31,7 @@ class Daemon(util.LoggedClass):
         super().__init__()
         self.url = url
         self._height = None
-        self.logger.info('connecting to daemon at URL {}'.format(url))
+        self.logger.info('connecting at URL {}'.format(url))
         self.debug_caught_up = 'caught_up' in debug
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16

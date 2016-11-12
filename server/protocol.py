@@ -632,15 +632,9 @@ class LocalRPC(JSONRPC):
 
     async def sessions(self, params):
         now = time.time()
-        fmt = '{:<4} {:>21} {:>7} {:>12} {:>7}'
-        result = []
-        result.append(fmt.format('Type', 'Peer', 'Subs', 'Client', 'Time'))
-        for session in self.SESSION_MGR.sessions:
-            result.append(fmt.format(session.kind, session.peername,
-                                     '{:,d}'.format(len(session.hash168s)),
-                                     session.client,
-                                     '{:,d}'.format(int(now - session.start))))
-        return result
+        return [(session.kind, session.peername, len(session.hash168s),
+                 session.client, now - session.start)
+                for session in self.SESSION_MGR.sessions]
 
     async def numsessions(self, params):
         return len(self.SESSION_MGR.sessions)
