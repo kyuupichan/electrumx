@@ -7,6 +7,8 @@ setuptools.setup(
     version=VERSION.split()[-1],
     scripts=['electrumx_server.py', 'electrumx_rpc.py'],
     python_requires='>=3.5',
+    # "irc" package is only required if IRC connectivity is enabled
+    # via environment variables, in which case I've tested with 15.0.4
     install_requires=['plyvel', 'aiohttp >= 1'],
     packages=setuptools.find_packages(),
     description='ElectrumX Server',

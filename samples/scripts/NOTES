@@ -34,13 +34,23 @@ BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
                 is re-read for each new client.
 DONATION_ADDRESS  - server donation address.  Defaults to none.
 
-Your performance might change by tweaking the following cache
-variables.  Cache size is only checked roughly every minute, so the
-caches can grow beyond the specified size.  Also the Python process is
-often quite a bit fatter than the combined cache size, because of
-Python overhead and also because leveldb consumes a lot of memory
-during UTXO flushing.  So I recommend you set the sum of these to
-nothing over half your available physical RAM:
+If you want IRC connectivity to advertise your node:
+
+IRC             - set to anything non-empty
+IRC_NICK        - the nick to use when connecting to IRC.  The default is a
+                  hash of REPORT_HOST.  Either way 'E_' will be prepended.
+REPORT_HOST     - the host to advertise.  Defaults to HOST.
+REPORT_SSL_PORT - the SSL port to advertise.  Defaults to SSL_PORT.
+REPORT_TCP_PORT - the TCP port to advertise.  Defaults to TCP_PORT.
+
+If synchronizing from the Genesis block your performance might change
+by tweaking the following cache variables.  Cache size is only checked
+roughly every minute, so the caches can grow beyond the specified
+size.  Also the Python process is often quite a bit fatter than the
+combined cache size, because of Python overhead and also because
+leveldb consumes a lot of memory during UTXO flushing.  So I recommend
+you set the sum of these to nothing over half your available physical
+RAM:
 
 HIST_MB   - amount of history cache, in MB, to retain before flushing to
             disk.  Default is 250; probably no benefit being much larger

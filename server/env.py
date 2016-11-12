@@ -45,6 +45,12 @@ class Env(LoggedClass):
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.debug = self.default('DEBUG', '')
         self.debug = [item.lower() for item in self.debug.split()]
+        # IRC
+        self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
+        self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
+        self.report_host = self.default('REPORT_HOST', self.host)
+        self.irc_nick = self.default('IRC_NICK', None)
+        self.irc = self.default('IRC', False)
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
