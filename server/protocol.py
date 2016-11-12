@@ -47,7 +47,10 @@ class BlockServer(BlockProcessor):
         if not self.servers:
             await self.start_servers()
             if self.env.irc:
+                self.logger.info('starting IRC coroutine')
                 asyncio.ensure_future(self.irc.start())
+            else:
+                self.logger.info('IRC disabled')
         ElectrumX.notify(self.height, self.touched)
 
     async def start_server(self, class_name, kind, host, port, *, ssl=None):

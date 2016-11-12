@@ -18,7 +18,6 @@ from collections import namedtuple
 
 from lib.hash import double_sha256
 from lib.util import LoggedClass
-from server.version import VERSION
 
 
 def port_text(letter, port, default):
@@ -41,7 +40,9 @@ class IRC(LoggedClass):
         super().__init__()
         tcp_text = port_text('t', env.report_tcp_port, 50001)
         ssl_text = port_text('s', env.report_ssl_port, 50002)
-        version = 'X{}'.format(VERSION.split()[1])
+        # If this isn't something the client expects you won't appear
+        # in the client's network dialog box
+        version = '1.0'
         self.real_name = '{} v{} {} {}'.format(env.report_host, version,
                                                tcp_text, ssl_text)
         self.nick = 'E_{}'.format(env.irc_nick if env.irc_nick else
