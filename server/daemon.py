@@ -49,18 +49,18 @@ class Daemon(util.LoggedClass):
         Handles temporary connection issues.  Daemon reponse errors
         are raise through DaemonError.
         '''
-        prior_msg = None
-        skip_count = None
+        self.prior_msg = None
+        self.skip_count = None
 
         def log_error(msg, skip_once=False):
-            if skip_once and skip_count is None:
-                skip_count = 1
-            if msg != prior_msg or skip_count == 0:
-                skip_count = 10
-                prior_msg = msg
+            if skip_once and self.skip_count is None:
+                self.skip_count = 1
+            if msg != self.prior_msg or self.skip_count == 0:
+                self.skip_count = 10
+                self.prior_msg = msg
                 self.logger.error('{}.  Retrying between sleeps...'
                                   .format(msg))
-            skip_count -= 1
+            self.skip_count -= 1
 
         data = json.dumps(payload)
         secs = 1
@@ -69,7 +69,7 @@ class Daemon(util.LoggedClass):
                 async with self.workqueue_semaphore:
                     async with aiohttp.post(self.url, data=data) as resp:
                         result = processor(await resp.json())
-                        if prior_msg:
+                        if self.prior_msg:
                             self.logger.info('connection restored')
                         return result
             except asyncio.TimeoutError:
