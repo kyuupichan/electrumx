@@ -1,3 +1,9 @@
+Version 0.3.1
+-------------
+
+- fixes issue #9
+- save DB version in DB; warn on DB open if incompatible format
+
 Version 0.3
 -----------
 

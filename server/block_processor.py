@@ -241,7 +241,7 @@ class MemPool(LoggedClass):
                 await asyncio.sleep(0)
 
             if initial and time.time() > next_log:
-                next_log = time.time() + 10
+                next_log = time.time() + 20
                 self.logger.info('{:,d} done ({:d}%)'
                                  .format(n, int(n / len(new_txs) * 100)))
 
@@ -518,17 +518,7 @@ class BlockProcessor(server.db.DB):
         self.wall_time += now - self.last_flush
         self.last_flush = now
         self.last_flush_tx_count = self.tx_count
-        state = {
-            'genesis': self.coin.GENESIS_HASH,
-            'height': self.db_height,
-            'tx_count': self.db_tx_count,
-            'tip': self.db_tip,
-            'flush_count': self.flush_count,
-            'utxo_flush_count': self.utxo_flush_count,
-            'wall_time': self.wall_time,
-            'first_sync': self.first_sync,
-        }
-        batch.put(b'state', repr(state).encode())
+        self.write_state(batch)
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
