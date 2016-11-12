@@ -58,7 +58,7 @@ class Daemon(util.LoggedClass):
             if msg != self.prior_msg or self.skip_count == 0:
                 self.skip_count = 10
                 self.prior_msg = msg
-                self.logger.error('{}.  Retrying between sleeps...'
+                self.logger.error('{}  Retrying between sleeps...'
                                   .format(msg))
             self.skip_count -= 1
 
@@ -73,19 +73,19 @@ class Daemon(util.LoggedClass):
                             self.logger.info('connection restored')
                         return result
             except asyncio.TimeoutError:
-                log_error('timeout error', skip_once=True)
+                log_error('timeout error.', skip_once=True)
             except aiohttp.ClientHttpProcessingError:
-                log_error('HTTP error', skip_once=True)
+                log_error('HTTP error.', skip_once=True)
             except aiohttp.ServerDisconnectedError:
-                log_error('disconnected', skip_once=True)
+                log_error('disconnected.', skip_once=True)
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
             except self.DaemonWarmingUpError:
-                log_error('still starting up checking blocks...')
+                log_error('still starting up checking blocks.')
             except (asyncio.CancelledError, DaemonError):
                 raise
             except Exception as e:
-                log_error('request gave unexpected error: {}'.format(e))
+                log_error('request gave unexpected error: {}.'.format(e))
             await asyncio.sleep(secs)
             secs = min(16, secs * 2)
 
