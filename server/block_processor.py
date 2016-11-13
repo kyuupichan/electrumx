@@ -84,7 +84,7 @@ class Prefetcher(LoggedClass):
 
     async def main_loop(self):
         '''Loop forever polling for more blocks.'''
-        self.logger.info('starting daemon poll loop...')
+        self.logger.info('starting daemon poll loop')
         while True:
             try:
                 if await self._caught_up():
@@ -201,7 +201,7 @@ class MemPool(LoggedClass):
         hex_hashes.difference_update(self.txs)
         raw_txs = await self.bp.daemon.getrawtransactions(hex_hashes)
         if initial:
-            self.logger.info('analysing {:,d} mempool txs...'
+            self.logger.info('analysing {:,d} mempool txs'
                              .format(len(raw_txs)))
         new_txs = {hex_hash: Deserializer(raw_tx).read_tx()
                    for hex_hash, raw_tx in zip(hex_hashes, raw_txs) if raw_tx}
