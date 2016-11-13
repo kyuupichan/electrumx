@@ -156,7 +156,7 @@ class ServerManager(LoggedClass):
         return self.irc.peers
 
     def session_count(self):
-        return len(self.sessions)
+        return len([s for s in self.sessions if s.send_count > 0])
 
     def info(self):
         '''Returned in the RPC 'getinfo' call.'''
