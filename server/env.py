@@ -40,6 +40,7 @@ class Env(LoggedClass):
         self.rpc_port = self.integer('RPC_PORT', 8000)
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
+        self.anon_logs = self.default('ANON_LOGS', False)
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')

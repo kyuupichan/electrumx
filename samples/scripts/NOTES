@@ -33,6 +33,7 @@ RPC_PORT      - Listen on this port for local RPC connections, defaults to
 BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
                 is re-read for each new client.
 DONATION_ADDRESS  - server donation address.  Defaults to none.
+ANON_LOGS - set to remove IP addresses from logs. Default: disabled
 
 If you want IRC connectivity to advertise your node:
 
