@@ -156,7 +156,10 @@ class ServerManager(LoggedClass):
         return self.irc.peers
 
     def session_count(self):
-        return len(self.sessions)
+        '''Returns a dictionary.'''
+        active = len(s for s in self.sessions if s.send_count)
+        total = len(self.sessions)
+        return {'active': active, 'inert': total - active, 'total': total}
 
     def address_count(self):
         return sum(len(session.hash168s) for session in self.sessions
