@@ -29,7 +29,7 @@ class DB(LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    VERSIONS = [0]
+    VERSIONS = [2]
 
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
