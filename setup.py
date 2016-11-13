@@ -9,6 +9,7 @@ setuptools.setup(
     python_requires='>=3.5',
     # "irc" package is only required if IRC connectivity is enabled
     # via environment variables, in which case I've tested with 15.0.4
+    # "x11_hash" package (1.4) is required to sync DASH network.
     install_requires=['plyvel', 'aiohttp >= 1'],
     packages=setuptools.find_packages(),
     description='ElectrumX Server',
