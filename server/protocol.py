@@ -156,22 +156,26 @@ class ServerManager(LoggedClass):
         return self.irc.peers
 
     def session_count(self):
-        return len(self.sessions)
+        '''Returns a dictionary.'''
+        active = len(s for s in self.sessions if s.send_count)
+        total = len(self.sessions)
+        return {'active': active, 'inert': total - active, 'total': total}
 
-    def info(self):
-        '''Returned in the RPC 'getinfo' call.'''
-        address_count = sum(len(session.hash168s)
-                            for session in self.sessions
-                            if isinstance(session, ElectrumX))
+    def address_count(self):
+        return sum(len(session.hash168s) for session in self.sessions
+                   if isinstance(session, ElectrumX))
+
+    async def rpc_getinfo(self, params):
+        '''The RPC 'getinfo' call.'''
         return {
             'blocks': self.bp.height,
-            'peers': len(self.irc_peers()),
+            'peers': len(self.irc.peers),
             'sessions': self.session_count(),
-            'watched': address_count,
+            'watched': self.address_count(),
             'cached': 0,
         }
 
-    def sessions_info(self):
+    async def rpc_sessions(self, params):
         '''Returned to the RPC 'sessions' call.'''
         now = time.time()
         return [(session.kind,
@@ -183,6 +187,15 @@ class ServerManager(LoggedClass):
                  session.error_count,
                  now - session.start)
                 for session in self.sessions]
+
+    async def rpc_numsessions(self, params):
+        return self.session_count()
+
+    async def rpc_peers(self, params):
+        return self.irc.peers
+
+    async def rpc_numpeers(self, params):
+        return len(self.irc.peers)
 
 
 class Session(JSONRPC):
@@ -572,19 +585,5 @@ class LocalRPC(Session):
     def __init__(self, *args):
         super().__init__(*args)
         cmds = 'getinfo sessions numsessions peers numpeers'.split()
-        self.handlers = {cmd: getattr(self, cmd) for cmd in cmds}
-
-    async def getinfo(self, params):
-        return self.manager.info()
-
-    async def sessions(self, params):
-        return self.manager.sessions_info()
-
-    async def numsessions(self, params):
-        return self.manager.session_count()
-
-    async def peers(self, params):
-        return self.manager.irc_peers()
-
-    async def numpeers(self, params):
-        return len(self.manager.irc_peers())
+        self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
+                         for cmd in cmds}
