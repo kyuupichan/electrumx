@@ -79,12 +79,11 @@ ElectrumX should not have any need of threads.
 Roadmap
 =======
 
+- store all UTXOs, not just those with addresses
 - test a few more performance improvement ideas
 - implement light caching of client responses
 - yield during expensive requests and/or penalize the connection
 - improve DB abstraction so LMDB is not penalized
-- continue to clean up the code and remove layering violations
-- store all UTXOs, not just those with addresses
 - potentially move some functionality to C or C++
 
 The above are in no particular order.

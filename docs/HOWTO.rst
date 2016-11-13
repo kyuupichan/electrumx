@@ -15,7 +15,7 @@ small - patches welcome.
             will happily serve clients that try to connect directly.
             I use 15.0.4 but older versions likely are fine.
 + x11_hash: Python X11 Hash package. Only required if you use ElectrumX
-            with Dash Network (Both Mainnet and Testnet). Version == 1.4 ;
+            with Dash Mainnet or Testnet.  Version 1.4 tested.
 
 While not requirements for running ElectrumX, it is intended to be run
 with supervisor software such as Daniel Bernstein's daemontools,

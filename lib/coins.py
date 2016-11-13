@@ -343,5 +343,3 @@ class DashTestnet(Dash):
     TX_COUNT_HEIGHT = 101619
     TX_COUNT = 132681
     TX_PER_BLOCK = 1
-
-#
