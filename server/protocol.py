@@ -202,7 +202,7 @@ class Session(JSONRPC):
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
-        self.logger.info('connection from {}'.format(self.peername()))
+        self.logger.info('connection from {}'.format(self.peername(True)))
         self.manager.add_session(self)
 
     def connection_lost(self, exc):
@@ -211,7 +211,7 @@ class Session(JSONRPC):
         if self.error_count or self.send_size >= 250000:
             self.logger.info('{} disconnected.  '
                              'Sent {:,d} bytes in {:,d} messages {:,d} errors'
-                             .format(self.peername(), self.send_size,
+                             .format(self.peername(True), self.send_size,
                                      self.send_count, self.error_count))
         self.manager.remove_session(self)
 
@@ -223,8 +223,12 @@ class Session(JSONRPC):
         '''Queue the request for asynchronous handling.'''
         self.manager.add_task(self, self.handle_json_request(request))
 
-    def peername(self):
-        info = self.peer_info
+    def peername(self, for_log=False):
+        # Anonymi{z, s}e all IP addresses that will be stored in a log
+        if for_log and self.env.anon_logs and self.peer_info:
+            info = ["XX.XX.XX.XX", "XX"]
+        else:
+            info = self.peer_info
         return 'unknown' if not info else '{}:{}'.format(info[0], info[1])
 
     def tx_hash_from_param(self, param):
