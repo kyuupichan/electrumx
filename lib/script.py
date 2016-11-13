@@ -107,7 +107,7 @@ class ScriptPubKey(object):
             return handlers.script_hash(ops[1][-1])
         if match(ops, cls.TO_PUBKEY_OPS):
             return handlers.pubkey(ops[0][-1])
-        if OpCodes.OP_RETURN in ops:
+        if ops and ops[0] == OpCodes.OP_RETURN:
             return handlers.unspendable()
         return handlers.strange(script)
 
