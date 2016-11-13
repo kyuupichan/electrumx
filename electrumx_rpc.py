@@ -13,7 +13,6 @@
 import argparse
 import asyncio
 import json
-import pprint
 from functools import partial
 from os import environ
 
@@ -67,7 +66,7 @@ class RPCClient(asyncio.Protocol):
                                      '{:,d}'.format(error_count),
                                      time_fmt(time)))
             else:
-                pprint.pprint(result, indent=4)
+                print(json.dumps(result, indent=4, sort_keys=True))
 
 def main():
     '''Send the RPC command to the server and print the result.'''
