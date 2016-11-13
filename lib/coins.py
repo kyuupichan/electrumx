@@ -307,24 +307,41 @@ class DogecoinTestnet(Coin):
     WIF_BYTE = 0xf1
 
 
-# Source: pycoin
+# Source: https://github.com/dashpay/dash
 class Dash(Coin):
     NAME = "Dash"
     SHORTNAME = "DASH"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("02fe52cc")
     XPRV_VERBYTES = bytes.fromhex("02fe52f8")
+    GENESIS_HASH = (b'00000ffd590b1485b3caadc19b22e637'
+                    b'9c733355108f107a430458cdf3407ab6')
     P2PKH_VERBYTE = 0x4c
     P2SH_VERBYTE = 0x10
     WIF_BYTE = 0xcc
+    TX_COUNT_HEIGHT = 569399
+    TX_COUNT = 2157510
+    TX_PER_BLOCK = 4
 
+    @classmethod
+    def header_hashes(cls, header):
+        '''Given a header return the previous and current block hashes.'''
+        import x11_hash
+        return header[4:36], x11_hash.getPoWHash(header)
 
-class DashTestnet(Coin):
-    NAME = "Dogecoin"
+class DashTestnet(Dash):
+    NAME = "Dash"
     SHORTNAME = "tDASH"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("3a805837")
     XPRV_VERBYTES = bytes.fromhex("3a8061a0")
-    P2PKH_VERBYTE = 0x8b
+    GENESIS_HASH = (b'00000bafbc94add76cb75e2ec9289483'
+                    b'7288a481e5c005f6563d91623bf8bc2c')
+    P2PKH_VERBYTE = 0x8c
     P2SH_VERBYTE = 0x13
     WIF_BYTE = 0xef
+    TX_COUNT_HEIGHT = 101619
+    TX_COUNT = 132681
+    TX_PER_BLOCK = 1
+
+#
