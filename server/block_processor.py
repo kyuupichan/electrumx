@@ -28,8 +28,6 @@ from server.storage import open_db
 # Limits single address history to ~ 65536 * HIST_ENTRIES_PER_KEY entries
 HIST_ENTRIES_PER_KEY = 1024
 HIST_VALUE_BYTES = HIST_ENTRIES_PER_KEY * 4
-NO_HASH_168 = bytes([255]) * 21
-NO_CACHE_ENTRY = NO_HASH_168 + bytes(12)
 
 
 def formatted_time(t):
@@ -209,7 +207,7 @@ class MemPool(LoggedClass):
 
         # The mempool is unordered, so process all outputs first so
         # that looking for inputs has full info.
-        script_hash168 = self.bp.coin.hash168_from_script
+        script_hash168 = self.bp.coin.hash168_from_script()
         db_utxo_lookup = self.bp.db_utxo_lookup
 
         def txout_pair(txout):
@@ -658,8 +656,6 @@ class BlockProcessor(server.db.DB):
         self.logger.info('backing up history to height {:,d}  tx_count {:,d}'
                          .format(self.height, self.tx_count))
 
-        # Drop any NO_CACHE entry
-        hash168s.discard(NO_CACHE_ENTRY)
         assert not self.history
 
         nremoves = 0
@@ -765,7 +761,7 @@ class BlockProcessor(server.db.DB):
         # Use local vars for speed in the loops
         history = self.history
         tx_num = self.tx_count
-        script_hash168 = self.coin.hash168_from_script
+        script_hash168 = self.coin.hash168_from_script()
         s_pack = pack
 
         for tx, tx_hash in zip(txs, tx_hashes):
@@ -781,15 +777,13 @@ class BlockProcessor(server.db.DB):
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
-                # Get the hash168.  Ignore scripts we can't grok.
+                # Get the hash168.  Ignore unspendable outputs
                 hash168 = script_hash168(txout.pk_script)
                 if hash168:
                     hash168s.add(hash168)
                     put_utxo(tx_hash + s_pack('<H', idx),
                              hash168 + tx_numb + s_pack('<Q', txout.value))
 
-            # Drop any NO_CACHE entry
-            hash168s.discard(NO_CACHE_ENTRY)
             for hash168 in hash168s:
                 history[hash168].append(tx_num)
             self.history_size += len(hash168s)
@@ -913,15 +907,15 @@ class BlockProcessor(server.db.DB):
     the tx in which the UTXO was created.  As this is not unique there
     will are potential collisions when saving and looking up UTXOs;
     hence why the second table has a list as its value.  The collision
-    can be resolved with the tx_num.  The collision rate is almost
-    zero (I believe there are around 100 collisions in the whole
-    bitcoin blockchain).
+    can be resolved with the tx_num.  The collision rate is low (<0.1%).
     '''
 
     def spend_utxo(self, tx_hash, tx_idx):
         '''Spend a UTXO and return the 33-byte value.
 
-        If the UTXO is not in the cache it may be on disk.
+        If the UTXO is not in the cache it must be on disk.  We store
+        all UTXOs so not finding one indicates a logic error or DB
+        corruption.
         '''
         # Fast track is it being in the cache
         idx_packed = pack('<H', tx_idx)
@@ -935,46 +929,42 @@ class BlockProcessor(server.db.DB):
         # The 4 is the COMPRESSED_TX_HASH_LEN
         db_key = b'h' + tx_hash[:4] + idx_packed
         db_value = self.db_cache_get(db_key)
-        if db_value is None:
-            # Probably a strange UTXO
-            return NO_CACHE_ENTRY
-
-        # FIXME: this matches what we did previously but until we store
-        # all UTXOs isn't safe
-        if len(db_value) == 25:
-            udb_key = b'u' + db_value + idx_packed
-            utxo_value_packed = self.db.get(udb_key)
-            if utxo_value_packed:
-                # Remove the UTXO from both tables
-                self.db_deletes += 1
-                self.db_cache[db_key] = None
-                self.db_cache[udb_key] = None
-                return db_value + utxo_value_packed
-            # Fall through to below
-
-        assert len(db_value) % 25 == 0
-
-        # Find which entry, if any, the TX_HASH matches.
-        for n in range(0, len(db_value), 25):
-            tx_num, = unpack('<I', db_value[n+21:n+25])
-            hash, height = self.get_tx_hash(tx_num)
-            if hash == tx_hash:
-                match = db_value[n:n+25]
-                udb_key = b'u' + match + idx_packed
+        if db_value:
+            # FIXME: this matches what we did previously but until we store
+            # all UTXOs isn't safe
+            if len(db_value) == 25:
+                udb_key = b'u' + db_value + idx_packed
                 utxo_value_packed = self.db.get(udb_key)
                 if utxo_value_packed:
                     # Remove the UTXO from both tables
                     self.db_deletes += 1
-                    self.db_cache[db_key] = db_value[:n] + db_value[n + 25:]
+                    self.db_cache[db_key] = None
                     self.db_cache[udb_key] = None
-                    return match + utxo_value_packed
+                    return db_value + utxo_value_packed
+                # Fall through to below loop for error
 
-                # Uh-oh, this should not happen...
-                raise self.DBError('UTXO {} / {:,d} not found, key {}'
-                                   .format(hash_to_str(tx_hash), tx_idx,
-                                           bytes(key).hex()))
+            assert len(db_value) % 25 == 0
 
-        return NO_CACHE_ENTRY
+            # Find which entry, if any, the TX_HASH matches.
+            for n in range(0, len(db_value), 25):
+                tx_num, = unpack('<I', db_value[n + 21:n + 25])
+                hash, height = self.get_tx_hash(tx_num)
+                if hash == tx_hash:
+                    match = db_value[n:n+25]
+                    udb_key = b'u' + match + idx_packed
+                    utxo_value_packed = self.db.get(udb_key)
+                    if utxo_value_packed:
+                        # Remove the UTXO from both tables
+                        self.db_deletes += 1
+                        self.db_cache[db_key] = db_value[:n] + db_value[n+25:]
+                        self.db_cache[udb_key] = None
+                        return match + utxo_value_packed
+
+                    raise self.DBError('UTXO {} / {:,d} not found in "u" table'
+                                       .format(hash_to_str(tx_hash), tx_idx))
+
+        raise ChainError('UTXO {} / {:,d} not found in "h" table'
+                         .format(hash_to_str(tx_hash), tx_idx))
 
     def db_cache_get(self, key):
         '''Fetch a 'h' value from the DB through our write cache.'''

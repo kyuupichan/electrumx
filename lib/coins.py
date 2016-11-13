@@ -12,6 +12,7 @@ necessary for appropriate handling.
 '''
 
 from decimal import Decimal
+from functools import partial
 import inspect
 import struct
 import sys
@@ -34,6 +35,7 @@ class Coin(object):
     DEFAULT_RPC_PORT = 8332
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
+    STRANGE_VERBYTE = 0xff
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -53,11 +55,14 @@ class Coin(object):
             address = cls.P2PKH_hash168_from_hash160,
             script_hash = cls.P2SH_hash168_from_hash160,
             pubkey = cls.P2PKH_hash168_from_pubkey,
+            unspendable = cls.hash168_from_unspendable,
+            strange = cls.hash168_from_strange,
         )
 
     @classmethod
-    def hash168_from_script(cls, script):
-        return ScriptPubKey.pay_to(script, cls.hash168_handlers)
+    def hash168_from_script(cls):
+        '''Returns a function that is passed a script to return a hash168.'''
+        return partial(ScriptPubKey.pay_to, cls.hash168_handlers)
 
     @staticmethod
     def lookup_xverbytes(verbytes):
@@ -85,6 +90,16 @@ class Coin(object):
     def hash168_to_address(cls, hash168):
         '''Return an address given a 21-byte hash.'''
         return Base58.encode_check(hash168)
+
+    @classmethod
+    def hash168_from_unspendable(cls):
+        '''Return a hash168 for an unspendable script.'''
+        return None
+
+    @classmethod
+    def hash168_from_strange(cls, script):
+        '''Return a hash168 for a strange script.'''
+        return bytes([cls.STRANGE_VERBYTE]) + hash160(script)
 
     @classmethod
     def P2PKH_hash168_from_hash160(cls, hash160):
