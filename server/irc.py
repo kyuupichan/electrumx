@@ -134,6 +134,5 @@ class IRC(LoggedClass):
                 ip_addr = line[1]
             peer = self.Peer(ip_addr, line[1], line[2:])
             self.peers[nick] = peer
-            self.logger.info('new {}'.format(peer))
         except IndexError:
             pass

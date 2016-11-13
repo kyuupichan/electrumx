@@ -224,7 +224,7 @@ class Session(JSONRPC):
         self.manager.add_task(self, self.handle_json_request(request))
 
     def peername(self):
-        info = self.peer_info()
+        info = self.peer_info
         return 'unknown' if not info else '{}:{}'.format(info[0], info[1])
 
     def tx_hash_from_param(self, param):
