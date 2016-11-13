@@ -1,3 +1,12 @@
+version 0.5
+-----------
+
+- DB change: all UTXOs, including those that are not canonically paying to
+  an address, are stored in the DB.  So an attempt to spend a UTXO not in
+  the DB means corruption.  DB version bumped to 2; older versions will not
+  work
+- fixed issue #17: the genesis coinbase is not in the UTXO set
+
 version 0.4.3
 -------------
 
