@@ -79,16 +79,12 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.send_count = 0
         self.send_size = 0
         self.error_count = 0
+        self.peer_info = None
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         self.transport = transport
-
-    def peer_info(self):
-        '''Return peer info.'''
-        if self.transport:
-            return self.transport.get_extra_info('peername')
-        return None
+        self.peer_info = transport.get_extra_info('peername')
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
