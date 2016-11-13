@@ -177,9 +177,6 @@ class Coin(object):
     @classmethod
     def header_hashes(cls, header):
         '''Given a header return the previous and current block hashes.'''
-        if cls.NAME.lower() == 'dash':
-            import x11_hash
-            return header[4:36], x11_hash.getPoWHash(header)
         return header[4:36], double_sha256(header)
 
     @classmethod
@@ -326,8 +323,13 @@ class Dash(Coin):
     TX_COUNT = 2157510
     TX_PER_BLOCK = 4
 
+    @classmethod
+    def header_hashes(cls, header):
+        '''Given a header return the previous and current block hashes.'''
+        import x11_hash
+        return header[4:36], x11_hash.getPoWHash(header)
 
-class DashTestnet(Coin):
+class DashTestnet(Dash):
     NAME = "Dash"
     SHORTNAME = "tDASH"
     NET = "testnet"
