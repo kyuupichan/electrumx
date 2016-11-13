@@ -79,7 +79,7 @@ ElectrumX should not have any need of threads.
 Roadmap
 =======
 
-- store all UTXOs, not just those with addresses
+- come up with UTXO root logic and implement it
 - test a few more performance improvement ideas
 - implement light caching of client responses
 - yield during expensive requests and/or penalize the connection
