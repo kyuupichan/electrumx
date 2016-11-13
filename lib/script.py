@@ -56,6 +56,19 @@ assert OpCodes.OP_CHECKSIG == 0xac
 assert OpCodes.OP_CHECKMULTISIG == 0xae
 
 
+def _match_ops(ops, pattern):
+    if len(ops) != len(pattern):
+        return False
+    for op, pop in zip(ops, pattern):
+        if pop != op:
+            # -1 means 'data push', whose op is an (op, data) tuple
+            if pop == -1 and isinstance(op, tuple):
+                continue
+            return False
+
+    return True
+
+
 class ScriptPubKey(object):
     '''A class for handling a tx output script that gives conditions
     necessary for spending.
@@ -66,10 +79,11 @@ class ScriptPubKey(object):
     TO_P2SH_OPS = [OpCodes.OP_HASH160, -1, OpCodes.OP_EQUAL]
     TO_PUBKEY_OPS = [-1, OpCodes.OP_CHECKSIG]
 
-    PayToHandlers = namedtuple('PayToHandlers', 'address script_hash pubkey')
+    PayToHandlers = namedtuple('PayToHandlers', 'address script_hash pubkey '
+                               'unspendable strange')
 
     @classmethod
-    def pay_to(cls, script, handlers):
+    def pay_to(cls, handlers, script):
         '''Parse a script, invoke the appropriate handler and
         return the result.
 
@@ -77,21 +91,25 @@ class ScriptPubKey(object):
            handlers.address(hash160)
            handlers.script_hash(hash160)
            handlers.pubkey(pubkey)
-        or None is returned if the script is invalid or unregonised.
+           handlers.unspendable()
+           handlers.strange(script)
         '''
         try:
-            ops, datas = Script.get_ops(script)
+            ops = Script.get_ops(script)
         except ScriptError:
-            return None
+            return handlers.unspendable()
 
-        if Script.match_ops(ops, cls.TO_ADDRESS_OPS):
-            return handlers.address(datas[2])
-        if Script.match_ops(ops, cls.TO_P2SH_OPS):
-            return handlers.script_hash(datas[1])
-        if Script.match_ops(ops, cls.TO_PUBKEY_OPS):
-            return handlers.pubkey(datas[0])
+        match = _match_ops
 
-        return None
+        if match(ops, cls.TO_ADDRESS_OPS):
+            return handlers.address(ops[2][-1])
+        if match(ops, cls.TO_P2SH_OPS):
+            return handlers.script_hash(ops[1][-1])
+        if match(ops, cls.TO_PUBKEY_OPS):
+            return handlers.pubkey(ops[0][-1])
+        if ops and ops[0] == OpCodes.OP_RETURN:
+            return handlers.unspendable()
+        return handlers.strange(script)
 
     @classmethod
     def P2SH_script(cls, hash160):
@@ -141,54 +159,40 @@ class Script(object):
 
     @classmethod
     def get_ops(cls, script):
-        opcodes, datas = [], []
+        ops = []
 
         # The unpacks or script[n] below throw on truncated scripts
         try:
             n = 0
             while n < len(script):
-                opcode, data = script[n], None
+                op = script[n]
                 n += 1
 
-                if opcode <= OpCodes.OP_PUSHDATA4:
+                if op <= OpCodes.OP_PUSHDATA4:
                     # Raw bytes follow
-                    if opcode < OpCodes.OP_PUSHDATA1:
-                        dlen = opcode
-                    elif opcode == OpCodes.OP_PUSHDATA1:
+                    if op < OpCodes.OP_PUSHDATA1:
+                        dlen = op
+                    elif op == OpCodes.OP_PUSHDATA1:
                         dlen = script[n]
                         n += 1
-                    elif opcode == OpCodes.OP_PUSHDATA2:
-                        (dlen,) = struct.unpack('<H', script[n: n + 2])
+                    elif op == OpCodes.OP_PUSHDATA2:
+                        dlen, = struct.unpack('<H', script[n: n + 2])
                         n += 2
                     else:
-                        (dlen,) = struct.unpack('<I', script[n: n + 4])
+                        dlen, = struct.unpack('<I', script[n: n + 4])
                         n += 4
-                    data = script[n:n + dlen]
-                    if len(data) != dlen:
-                        raise ScriptError('truncated script')
+                    if n + dlen > len(script):
+                        raise IndexError
+                    op = (op, script[n:n + dlen])
                     n += dlen
 
-                opcodes.append(opcode)
-                datas.append(data)
+                ops.append(op)
         except:
             # Truncated script; e.g. tx_hash
             # ebc9fa1196a59e192352d76c0f6e73167046b9d37b8302b6bb6968dfd279b767
             raise ScriptError('truncated script')
 
-        return opcodes, datas
-
-    @classmethod
-    def match_ops(cls, ops, pattern):
-        if len(ops) != len(pattern):
-            return False
-        for op, pop in zip(ops, pattern):
-            if pop != op:
-                # -1 Indicates data push expected
-                if pop == -1 and OpCodes.OP_0 <= op <= OpCodes.OP_PUSHDATA4:
-                    continue
-                return False
-
-        return True
+        return ops
 
     @classmethod
     def push_data(cls, data):
