@@ -396,6 +396,11 @@ class BlockProcessor(server.db.DB):
         prefetcher only provides a non-None mempool when caught up.
         '''
         blocks, mempool_hashes = await self.prefetcher.get_blocks()
+
+        '''Strip the unspendable genesis coinbase.'''
+        if self.height == -1:
+            blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
+
         caught_up = mempool_hashes is not None
         try:
             for block in blocks:
