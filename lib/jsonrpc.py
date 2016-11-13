@@ -147,7 +147,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     def send_json(self, payload):
         '''Send a JSON payload.'''
         if self.transport.is_closing():
-            self.logger.info('send_json: connection closing, not sending')
+            # Confirmed this happens, sometimes a lot
             return False
 
         try:
