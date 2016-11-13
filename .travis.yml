@@ -15,5 +15,8 @@ install:
   - pip install lmdb
   - pip install plyvel
   - pip install pyrocksdb
+  - pip install pytest-cov
+  - pip install python-coveralls
 # command to run tests
-script: pytest
+script: pytest --cov=server --cov=lib
+after_success: coveralls

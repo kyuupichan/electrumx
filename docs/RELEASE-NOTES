@@ -1,3 +1,12 @@
+version 0.4.2
+-------------
+
+- split out JSON RPC protcol handling.  Now more robust and we should
+  fully support JSON RPC 2.0 clients, including batch requests
+  (Electrum client does not yet support these)
+- refactored and cleaned up server handling
+- improved DASH support (thelazier)
+
 version 0.4.1
 -------------
 

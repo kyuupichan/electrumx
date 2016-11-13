@@ -14,7 +14,8 @@ small - patches welcome.
 + irc:      Python IRC package.  Only required if you enable IRC; ElectrumX
             will happily serve clients that try to connect directly.
             I use 15.0.4 but older versions likely are fine.
-
++ x11_hash: Python X11 Hash package. Only required if you use ElectrumX
+            with Dash Mainnet or Testnet.  Version 1.4 tested.
 
 While not requirements for running ElectrumX, it is intended to be run
 with supervisor software such as Daniel Bernstein's daemontools,
