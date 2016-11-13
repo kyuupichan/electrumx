@@ -32,7 +32,7 @@ class RPCClient(asyncio.Protocol):
 
     def send(self, method, params):
         self.method = method
-        payload = {'method': method, 'params': params}
+        payload = {'method': method, 'params': params, 'id': 'RPC'}
         data = json.dumps(payload) + '\n'
         self.transport.write(data.encode())
 

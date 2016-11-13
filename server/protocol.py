@@ -18,20 +18,12 @@ from collections import namedtuple
 from functools import partial
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
+from lib.jsonrpc import JSONRPC, json_notification_payload
 from lib.util import LoggedClass
 from server.block_processor import BlockProcessor
 from server.daemon import DaemonError
 from server.irc import IRC
 from server.version import VERSION
-
-
-class RPCError(Exception):
-    '''RPC handlers raise this error.'''
-
-
-def json_notification(method, params):
-    '''Create a json notification.'''
-    return {'id': None, 'method': method, 'params': params}
 
 
 class BlockServer(BlockProcessor):
@@ -74,7 +66,7 @@ class BlockServer(BlockProcessor):
         Does not start a server if the port wasn't specified.
         '''
         env = self.env
-        JSONRPC.init(self, self.daemon, self.coin)
+        Session.init(self, self.daemon, self.coin)
         if env.rpc_port is not None:
             await self.start_server(LocalRPC, 'RPC', 'localhost', env.rpc_port)
 
@@ -142,100 +134,43 @@ class SessionManager(LoggedClass):
                 self.current_task = None
 
 
-class JSONRPC(asyncio.Protocol, LoggedClass):
-    '''Base class that manages a JSONRPC connection.'''
+class Session(JSONRPC):
+    '''Base class of ElectrumX JSON session protocols.'''
 
-    def __init__(self):
+    def __init__(self, env, kind):
         super().__init__()
-        self.parts = []
-        self.send_count = 0
-        self.send_size = 0
-        self.error_count = 0
         self.hash168s = set()
-        self.start = time.time()
         self.client = 'unknown'
-        self.peername = 'unknown'
+        self.env = env
+        self.kind = kind
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
-        self.transport = transport
-        peer = transport.get_extra_info('peername')
-        self.peername = '{}:{}'.format(peer[0], peer[1])
-        self.logger.info('connection from {}'.format(self.peername))
+        super().connection_made(transport)
+        self.logger.info('connection from {}'.format(self.peername()))
         self.SESSION_MGR.add_session(self)
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
-        self.logger.info('{} disconnected.  '
-                         'Sent {:,d} bytes in {:,d} messages {:,d} errors'
-                         .format(self.peername, self.send_size,
-                                 self.send_count, self.error_count))
+        super().connection_lost(exc)
+        if self.error_count or self.send_size >= 250000:
+            self.logger.info('{} disconnected.  '
+                             'Sent {:,d} bytes in {:,d} messages {:,d} errors'
+                             .format(self.peername(), self.send_size,
+                                     self.send_count, self.error_count))
         self.SESSION_MGR.remove_session(self)
 
-    def data_received(self, data):
-        '''Handle incoming data (synchronously).
+    def method_handler(self, method):
+        '''Return the handler that will handle the RPC method.'''
+        return self.handlers.get(method)
 
-        Requests end in newline characters.  Pass complete requests to
-        decode_message for handling.
-        '''
-        while True:
-            npos = data.find(ord('\n'))
-            if npos == -1:
-                self.parts.append(data)
-                break
-            tail, data = data[:npos], data[npos + 1:]
-            parts, self.parts = self.parts, []
-            parts.append(tail)
-            self.decode_message(b''.join(parts))
+    def on_json_request(self, request):
+        '''Queue the request for asynchronous handling.'''
+        self.SESSION_MGR.add_task(self, self.handle_json_request(request))
 
-    def decode_message(self, message):
-        '''Decode a binary message and queue it for asynchronous handling.'''
-        try:
-            message = json.loads(message.decode())
-        except Exception as e:
-            self.logger.info('error decoding JSON message: {}'.format(e))
-        else:
-            self.SESSION_MGR.add_task(self, self.request_handler(message))
-
-    async def request_handler(self, request):
-        '''Called asynchronously.'''
-        error = result = None
-        try:
-            handler = self.rpc_handler(request.get('method'),
-                                       request.get('params', []))
-            result = await handler()
-        except RPCError as e:
-            self.error_count += 1
-            error = {'code': 1, 'message': e.args[0]}
-        payload = {'id': request.get('id'), 'error': error, 'result': result}
-        if not self.json_send(payload):
-            # Let asyncio call connection_lost() so we stop this
-            # session's tasks
-            await asyncio.sleep(0)
-
-    def json_send(self, payload):
-        if self.transport.is_closing():
-            self.logger.info('connection closing, not writing')
-            return False
-
-        data = (json.dumps(payload) + '\n').encode()
-        self.transport.write(data)
-        self.send_count += 1
-        self.send_size += len(data)
-        return True
-
-    def rpc_handler(self, method, params):
-        handler = None
-        if isinstance(method, str):
-            handler = self.handlers.get(method)
-        if not handler:
-            self.logger.info('unknown method: {}'.format(method))
-            raise RPCError('unknown method: {}'.format(method))
-
-        if not isinstance(params, list):
-            raise RPCError('params should be an array')
-
-        return partial(handler, self, params)
+    def peername(self):
+        info = self.peer_info()
+        return 'unknown' if not info else '{}:{}'.format(info[0], info[1])
 
     @classmethod
     def tx_hash_from_param(cls, param):
@@ -321,13 +256,11 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         return cls.electrum_header(cls.height())
 
 
-class ElectrumX(JSONRPC):
+class ElectrumX(Session):
     '''A TCP server that handles incoming Electrum connections.'''
 
     def __init__(self, env, kind):
-        super().__init__()
-        self.env = env
-        self.kind = kind
+        super().__init__(env, kind)
         self.subscribe_headers = False
         self.subscribe_height = False
         self.notified_height = None
@@ -342,7 +275,7 @@ class ElectrumX(JSONRPC):
              'banner donation_address peers.subscribe version'),
         ]
         self.handlers = {'.'.join([prefix, suffix]):
-                         getattr(self.__class__, suffix.replace('.', '_'))
+                         getattr(self, suffix.replace('.', '_'))
                          for prefix, suffixes in rpcs
                          for suffix in suffixes.split()}
 
@@ -355,11 +288,11 @@ class ElectrumX(JSONRPC):
     def notify(cls, height, touched):
         '''Notify electrum clients about height changes and touched
         addresses.'''
-        headers_payload = json_notification(
+        headers_payload = json_notification_payload(
             'blockchain.headers.subscribe',
             (cls.electrum_header(height), ),
         )
-        height_payload = json_notification(
+        height_payload = json_notification_payload(
             'blockchain.numblocks.subscribe',
             (height, ),
         )
@@ -372,16 +305,16 @@ class ElectrumX(JSONRPC):
             if height != session.notified_height:
                 session.notified_height = height
                 if session.subscribe_headers:
-                    session.json_send(headers_payload)
+                    session.send_json(headers_payload)
                 if session.subscribe_height:
-                    session.json_send(height_payload)
+                    session.send_json(height_payload)
 
             for hash168 in session.hash168s.intersection(touched):
                 address = hash168_to_address(hash168)
                 status = cls.address_status(hash168)
-                payload = json_notification('blockchain.address.subscribe',
-                                            (address, status))
-                session.json_send(payload)
+                payload = json_notification_payload(
+                    'blockchain.address.subscribe', (address, status))
+                session.send_json(payload)
 
     @classmethod
     def address_status(cls, hash168):
@@ -614,15 +547,13 @@ class ElectrumX(JSONRPC):
         return VERSION
 
 
-class LocalRPC(JSONRPC):
+class LocalRPC(Session):
     '''A local TCP RPC server for querying status.'''
 
     def __init__(self, env, kind):
-        super().__init__()
+        super().__init__(env, kind)
         cmds = 'getinfo sessions numsessions peers numpeers'.split()
-        self.handlers = {cmd: getattr(self.__class__, cmd) for cmd in cmds}
-        self.env = env
-        self.kind = kind
+        self.handlers = {cmd: getattr(self, cmd) for cmd in cmds}
 
     async def getinfo(self, params):
         return {
@@ -636,8 +567,10 @@ class LocalRPC(JSONRPC):
     async def sessions(self, params):
         now = time.time()
         return [(session.kind,
-                 'this RPC client' if session == self else session.peername,
-                 len(session.hash168s), session.client, now - session.start)
+                 '' if session == self else session.peername(),
+                 len(session.hash168s),
+                 'this RPC client' if session == self else session.client,
+                 now - session.start)
                 for session in self.SESSION_MGR.sessions]
 
     async def numsessions(self, params):
