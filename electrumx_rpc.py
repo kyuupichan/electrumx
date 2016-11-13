@@ -44,12 +44,28 @@ class RPCClient(asyncio.Protocol):
         if error:
             print("ERROR: {}".format(error))
         else:
+            def data_fmt(count, size):
+                return '{:,d}/{:,d}KB'.format(count, size // 1024)
+            def time_fmt(t):
+                t = int(t)
+                return ('{:3d}:{:02d}:{:02d}'
+                        .format(t // 3600, (t % 3600) // 60, t % 60))
+
             if self.method == 'sessions':
-                fmt = '{:<4} {:>23} {:>7} {:>15} {:>7}'
-                print(fmt.format('Type', 'Peer', 'Subs', 'Client', 'Time'))
-                for kind, peer, subs, client, time in result:
-                    print(fmt.format(kind, peer, '{:,d}'.format(subs),
-                                     client, '{:,d}'.format(int(time))))
+                fmt = ('{:<4} {:>23} {:>15} {:>5} '
+                       '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
+                print(fmt.format('Type', 'Peer', 'Client', 'Subs',
+                                 'Snt #', 'Snt MB', 'Rcv #', 'Rcv MB',
+                                 'Errs', 'Time'))
+                for (kind, peer, subs, client, recv_count, recv_size,
+                     send_count, send_size, error_count, time) in result:
+                    print(fmt.format(kind, peer, client, '{:,d}'.format(subs),
+                                     '{:,d}'.format(recv_count),
+                                     '{:,.1f}'.format(recv_size / 1048576),
+                                     '{:,d}'.format(send_count),
+                                     '{:,.1f}'.format(send_size / 1048576),
+                                     '{:,d}'.format(error_count),
+                                     time_fmt(time)))
             else:
                 pprint.pprint(result, indent=4)
 

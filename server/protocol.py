@@ -33,9 +33,13 @@ class BlockServer(BlockProcessor):
     def __init__(self, env):
         super().__init__(env)
         self.server_mgr = ServerManager(self, env)
+        self.bs_caught_up = False
 
     async def caught_up(self, mempool_hashes):
         await super().caught_up(mempool_hashes)
+        if not self.bs_caught_up:
+            await self.server_mgr.start_servers()
+            self.bs_caught_up = True
         self.server_mgr.notify(self.height, self.touched)
 
     def stop(self):
@@ -64,6 +68,7 @@ class ServerManager(LoggedClass):
         protocol = partial(protocol_class, self, self.bp, self.env, kind)
         server = loop.create_server(protocol, *args, **kw_args)
 
+        host, port = args[:2]
         try:
             self.servers.append(await server)
         except asyncio.CancelledError:
@@ -103,17 +108,11 @@ class ServerManager(LoggedClass):
         else:
             self.logger.info('IRC disabled')
 
-    async def notify(self, height, touched):
-        '''Notify electrum clients about height changes and touched addresses.
-
-        Start listening if not yet listening.
-        '''
-        if not self.servers:
-            await self.start_servers()
-
+    def notify(self, height, touched):
+        '''Notify sessions about height changes and touched addresses.'''
         sessions = [session for session in self.sessions
                     if isinstance(session, ElectrumX)]
-        self.ElectrumX.notify(sessions, height, touched)
+        ElectrumX.notify(sessions, height, touched)
 
     def stop(self):
         '''Close the listening servers.'''
@@ -157,7 +156,7 @@ class ServerManager(LoggedClass):
         return self.irc.peers
 
     def session_count(self):
-        return len(self.manager.sessions)
+        return len(self.sessions)
 
     def info(self):
         '''Returned in the RPC 'getinfo' call.'''
@@ -179,6 +178,9 @@ class ServerManager(LoggedClass):
                  session.peername(),
                  len(session.hash168s),
                  'RPC' if isinstance(session, LocalRPC) else session.client,
+                 session.recv_count, session.recv_size,
+                 session.send_count, session.send_size,
+                 session.error_count,
                  now - session.start)
                 for session in self.sessions]
 
@@ -211,7 +213,7 @@ class Session(JSONRPC):
                              'Sent {:,d} bytes in {:,d} messages {:,d} errors'
                              .format(self.peername(), self.send_size,
                                      self.send_count, self.error_count))
-        self.maanger.remove_session(self)
+        self.manager.remove_session(self)
 
     def method_handler(self, method):
         '''Return the handler that will handle the RPC method.'''
