@@ -35,38 +35,39 @@ class RPCClient(asyncio.Protocol):
         data = json.dumps(payload) + '\n'
         self.transport.write(data.encode())
 
+    def print_sessions(self, result):
+        def data_fmt(count, size):
+            return '{:,d}/{:,d}KB'.format(count, size // 1024)
+        def time_fmt(t):
+            t = int(t)
+            return ('{:3d}:{:02d}:{:02d}'
+                    .format(t // 3600, (t % 3600) // 60, t % 60))
+
+        fmt = ('{:<4} {:>23} {:>15} {:>5} '
+               '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
+        print(fmt.format('Type', 'Peer', 'Client', 'Subs',
+                         'Snt #', 'Snt KB', 'Rcv #', 'Rcv KB',
+                         'Errs', 'Time'))
+        for (kind, peer, subs, client, recv_count, recv_size,
+             send_count, send_size, error_count, time) in result:
+            print(fmt.format(kind, peer, client, '{:,d}'.format(subs),
+                             '{:,d}'.format(recv_count),
+                             '{:,d}'.format(recv_size // 1024),
+                             '{:,d}'.format(send_count),
+                             '{:,d}'.format(send_size // 1024),
+                             '{:,d}'.format(error_count),
+                             time_fmt(time)))
+
     def data_received(self, data):
         payload = json.loads(data.decode())
         self.transport.close()
         result = payload['result']
         error = payload['error']
-        if error:
-            print("ERROR: {}".format(error))
+        if not error and self.method == 'sessions':
+            self.print_sessions(result)
         else:
-            def data_fmt(count, size):
-                return '{:,d}/{:,d}KB'.format(count, size // 1024)
-            def time_fmt(t):
-                t = int(t)
-                return ('{:3d}:{:02d}:{:02d}'
-                        .format(t // 3600, (t % 3600) // 60, t % 60))
-
-            if self.method == 'sessions':
-                fmt = ('{:<4} {:>23} {:>15} {:>5} '
-                       '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
-                print(fmt.format('Type', 'Peer', 'Client', 'Subs',
-                                 'Snt #', 'Snt MB', 'Rcv #', 'Rcv MB',
-                                 'Errs', 'Time'))
-                for (kind, peer, subs, client, recv_count, recv_size,
-                     send_count, send_size, error_count, time) in result:
-                    print(fmt.format(kind, peer, client, '{:,d}'.format(subs),
-                                     '{:,d}'.format(recv_count),
-                                     '{:,.1f}'.format(recv_size / 1048576),
-                                     '{:,d}'.format(send_count),
-                                     '{:,.1f}'.format(send_size / 1048576),
-                                     '{:,d}'.format(error_count),
-                                     time_fmt(time)))
-            else:
-                print(json.dumps(result, indent=4, sort_keys=True))
+            value = {'error': error} if error else result
+            print(json.dumps(value, indent=4, sort_keys=True))
 
 def main():
     '''Send the RPC command to the server and print the result.'''
