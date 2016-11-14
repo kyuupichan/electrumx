@@ -139,11 +139,11 @@ class ServerManager(LoggedClass):
         while True:
             task = await self.tasks.get()
             try:
-                if task.session in self.sessions:
-                    self.current_task = task
-                    await task.job
-                else:
+                if not task.session in self.sessions:
+                    self.logger.info('cancelling task of gone session')
                     task.job.cancel()
+                self.current_task = task
+                await task.job
             except asyncio.CancelledError:
                 self.logger.info('cancelled task noted')
             except Exception:
