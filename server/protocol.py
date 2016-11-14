@@ -235,8 +235,10 @@ class Session(JSONRPC):
                 secs = time.time() - start
                 if secs > 1:
                     self.logger.warning('slow request for {} took {:.1f}s: {}'
-                                        .format(session.peername(), secs,
+                                        .format(self.peername(), secs,
                                                 request))
+            except asyncio.CancelledError:
+                break
             except Exception:
                 # Getting here should probably be considered a bug and fixed
                 self.logger.error('error handling request {}'.format(request))

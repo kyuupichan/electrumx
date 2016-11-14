@@ -91,6 +91,8 @@ class Prefetcher(LoggedClass):
                     await asyncio.sleep(0)
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
+            except asyncio.CancelledError:
+                break
 
     async def _caught_up(self):
         '''Poll for new blocks and mempool state.

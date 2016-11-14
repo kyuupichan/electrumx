@@ -51,6 +51,12 @@ class IRC(LoggedClass):
         self.peers = {}
 
     async def start(self):
+        try:
+            await self.join()
+        except asyncio.CancelledError:
+            pass
+
+    async def join(self):
         import irc.client as irc_client
 
         self.logger.info('joining IRC with nick "{}" and real name "{}"'
