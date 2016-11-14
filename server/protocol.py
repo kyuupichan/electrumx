@@ -157,7 +157,7 @@ class ServerManager(LoggedClass):
 
     def session_count(self):
         '''Returns a dictionary.'''
-        active = len(s for s in self.sessions if s.send_count)
+        active = len([s for s in self.sessions if s.send_count])
         total = len(self.sessions)
         return {'active': active, 'inert': total - active, 'total': total}
 
