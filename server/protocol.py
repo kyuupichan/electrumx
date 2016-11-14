@@ -126,7 +126,6 @@ class ServerManager(LoggedClass):
     def remove_session(self, session):
         self.sessions.remove(session)
         if self.current_task and session == self.current_task.session:
-            self.logger.info('cancelling running task')
             self.current_task.task.cancel()
 
     def add_task(self, session, request):
@@ -151,7 +150,7 @@ class ServerManager(LoggedClass):
                                         .format(session.peername(), secs,
                                                 request))
             except asyncio.CancelledError:
-                self.logger.info('cancelled task noted')
+                self.logger.info('running task cancelled')
             except Exception:
                 # Getting here should probably be considered a bug and fixed
                 self.logger.error('error handling request {}'.format(request))
