@@ -244,12 +244,12 @@ class Session(JSONRPC):
         self.manager.add_task(self, request)
 
     def peername(self, *, for_log=True):
-        # Anonymi{z, s}e all IP addresses that will be stored in a log
-        if for_log and self.env.anon_logs and self.peer_info:
-            info = ["XX.XX.XX.XX", "XX"]
-        else:
-            info = self.peer_info
-        return 'unknown' if not info else '{}:{}'.format(info[0], info[1])
+        if not self.peer_info:
+            return 'unknown'
+        # Anonymize IP addresses that will be logged
+        if for_log and self.env.anon_logs:
+            return 'xx.xx.xx.xx:xx'
+        return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
 
     def tx_hash_from_param(self, param):
         '''Raise an RPCError if the parameter is not a valid transaction
