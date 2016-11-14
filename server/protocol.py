@@ -95,8 +95,8 @@ class ServerManager(LoggedClass):
             await self.start_server('TCP', env.host, env.tcp_port)
 
         if env.ssl_port is not None:
-            # FIXME: update if we want to require Python >= 3.5.3
-            sslc = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            # Python 3.5.3: use PROTOCOL_TLS
+            sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
