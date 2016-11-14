@@ -172,7 +172,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         the connection is closing.
         '''
         if isinstance(request, list):
-            payload = self.batch_request_payload(request)
+            payload = await self.batch_request_payload(request)
         else:
             payload = await self.single_request_payload(request)
 
