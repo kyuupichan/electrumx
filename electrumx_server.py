@@ -32,22 +32,21 @@ def main_loop():
     def on_signal(signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
         logging.warning('received {} signal, shutting down'.format(signame))
-        for task in asyncio.Task.all_tasks():
-            task.cancel()
+        future.cancel()
+
+    server = BlockServer(Env())
+    future = asyncio.ensure_future(server.main_loop())
 
     # Install signal handlers
     for signame in ('SIGINT', 'SIGTERM'):
         loop.add_signal_handler(getattr(signal, signame),
                                 partial(on_signal, signame))
 
-    server = BlockServer(Env())
-    future = server.start()
     try:
         loop.run_until_complete(future)
     except asyncio.CancelledError:
         pass
     finally:
-        server.stop()
         loop.close()
 
 

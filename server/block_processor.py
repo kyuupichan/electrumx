@@ -329,6 +329,7 @@ class BlockProcessor(server.db.DB):
         self.daemon.debug_set_height(self.height)
         self.mempool = MemPool(self)
         self.touched = set()
+        self.futures = []
 
         # Meta
         self.utxo_MB = env.utxo_MB
@@ -371,23 +372,29 @@ class BlockProcessor(server.db.DB):
 
         self.clean_db()
 
-    def start(self):
-        '''Returns a future that starts the block processor when awaited.'''
-        return asyncio.gather(self.main_loop(),
-                              self.prefetcher.main_loop())
-
     async def main_loop(self):
         '''Main loop for block processing.
 
         Safely flushes the DB on clean shutdown.
         '''
+        self.futures.append(asyncio.ensure_future(self.prefetcher.main_loop()))
         try:
             while True:
                 await self._wait_for_update()
                 await asyncio.sleep(0)   # Yield
         except asyncio.CancelledError:
-            self.flush(True)
+            self.on_cancel()
+            # This lets the asyncio subsystem process futures cancellations
+            await asyncio.sleep(0)
             raise
+
+    def on_cancel(self):
+        '''Called when the main loop is cancelled.
+
+        Intended to be overridden in derived classes.'''
+        for future in self.futures:
+            future.cancel()
+        self.flush(True)
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks or a mempool update.
