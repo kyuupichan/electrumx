@@ -46,7 +46,7 @@ class RPCClient(asyncio.Protocol):
         fmt = ('{:<4} {:>23} {:>15} {:>5} '
                '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
         print(fmt.format('Type', 'Peer', 'Client', 'Subs',
-                         'Snt #', 'Snt KB', 'Rcv #', 'Rcv KB',
+                         'Recv #', 'Recv KB', 'Sent #', 'Sent KB',
                          'Errs', 'Time'))
         for (kind, peer, subs, client, recv_count, recv_size,
              send_count, send_size, error_count, time) in result:
