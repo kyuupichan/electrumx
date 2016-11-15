@@ -388,7 +388,6 @@ class BlockProcessor(server.db.DB):
             self.on_cancel()
             # This lets the asyncio subsystem process futures cancellations
             await asyncio.sleep(0)
-            raise
 
     def on_cancel(self):
         '''Called when the main loop is cancelled.

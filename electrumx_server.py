@@ -42,12 +42,8 @@ def main_loop():
         loop.add_signal_handler(getattr(signal, signame),
                                 partial(on_signal, signame))
 
-    try:
-        loop.run_until_complete(future)
-    except asyncio.CancelledError:
-        pass
-    finally:
-        loop.close()
+    loop.run_until_complete(future)
+    loop.close()
 
 
 def main():
