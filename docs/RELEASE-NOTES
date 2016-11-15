@@ -1,3 +1,43 @@
+version 0.5.1
+-------------
+
+- 0.5 changed some cache defaults, only partially intentionally.  For
+  some users, including me, the result was a regression (a 15hr HDD
+  sync became a 20hr sync).  Another user reported their fastest sync
+  yet (sub 10hr SSD sync).  What changed was memory accounting - all
+  releases until 0.5 were not properly accounting for memory usage of
+  unflushed transaction hashes.  In 0.5 they were accounted for in the
+  UTXO cache, which resulted in much earlier flushes.  0.5.1 flushes
+  the hashes at the same time as history so I now account for it
+  towards the history cache limit.  To get a reasonable comparison
+  with prior releases your HIST_MB environment variable should be
+  bumped by about 15% from 0.4 and earlier values.  This will not
+  result in greater memory consumption - the additional memory
+  consumption was being ignored before but is now being included.
+- 0.5.1 is the first release where Electrum client requests are queued
+  on a per-session basis.  Previously they were in a global queue.
+  This is the beginning of ensuring that expensive / DOS requests
+  mostly affect that user's session and not those of other users.  The
+  goal is that each session's requests run asynchronously parallel to
+  every other sessions's requests.  The missing part of the puzzle is
+  that Python's asyncio is co-operative, however at the moment
+  ElectrumX does not yield during expensive requests.  I intend that a
+  near upcoming release will ensure expensive requests yield the CPU
+  at regular fine-grained intervals.  The intended result is that, to
+  some extent, expensive requests mainly delay that and later requests
+  from the same session, and have minimal impact on the legitimate
+  requests of other sessions.  The extent to which this goal is
+  achieved will only be verifiable in practice.
+- more robust tracking and handling of asynchronous tasks.  I hope
+  this will reduce asyncio's logging messages, some of which I'm
+  becoming increasingly convinced I have no control over.  In
+  particular I learned earlier releases were unintentionally limiting
+  the universe of acceptable SSL protocols, and so I made them the
+  default that had been intended.
+- I added logging of expensive tasks, though I don't expect much real
+  information from this
+- various RPC improvements
+
 version 0.5
 -----------
 

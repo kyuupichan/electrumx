@@ -42,15 +42,16 @@ class BlockServer(BlockProcessor):
             self.bs_caught_up = True
         self.server_mgr.notify(self.height, self.touched)
 
-    def stop(self):
-        '''Close the listening servers.'''
+    def on_cancel(self):
+        '''Called when the main loop is cancelled.'''
         self.server_mgr.stop()
+        super().on_cancel()
 
 
 class ServerManager(LoggedClass):
     '''Manages the servers.'''
 
-    AsyncTask = namedtuple('AsyncTask', 'session job')
+    MgrTask = namedtuple('MgrTask', 'session task')
 
     def __init__(self, bp, env):
         super().__init__()
@@ -58,9 +59,8 @@ class ServerManager(LoggedClass):
         self.env = env
         self.servers = []
         self.irc = IRC(env)
-        self.sessions = set()
-        self.tasks = asyncio.Queue()
-        self.current_task = None
+        self.sessions = {}
+        self.futures = []  # At present just the IRC future, if any
 
     async def start_server(self, kind, *args, **kw_args):
         loop = asyncio.get_event_loop()
@@ -95,16 +95,14 @@ class ServerManager(LoggedClass):
             await self.start_server('TCP', env.host, env.tcp_port)
 
         if env.ssl_port is not None:
-            # FIXME: update if we want to require Python >= 3.5.3
-            sslc = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            # Python 3.5.3: use PROTOCOL_TLS
+            sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
-        asyncio.ensure_future(self.run_tasks())
-
         if env.irc:
             self.logger.info('starting IRC coroutine')
-            asyncio.ensure_future(self.irc.start())
+            self.futures.append(asyncio.ensure_future(self.irc.start()))
         else:
             self.logger.info('IRC disabled')
 
@@ -115,67 +113,54 @@ class ServerManager(LoggedClass):
         ElectrumX.notify(sessions, height, touched)
 
     def stop(self):
-        '''Close the listening servers.'''
+        '''Close listening servers.'''
         for server in self.servers:
             server.close()
+        self.servers = []
+        for future in self.futures:
+            future.cancel()
+        self.futures = []
+        sessions = list(self.sessions.keys())  # A copy
+        for session in sessions:
+            self.remove_session(session)
 
     def add_session(self, session):
         assert session not in self.sessions
-        self.sessions.add(session)
+        coro = session.serve_requests()
+        self.sessions[session] = asyncio.ensure_future(coro)
 
     def remove_session(self, session):
-        self.sessions.remove(session)
-        if self.current_task and session == self.current_task.session:
-            self.logger.info('cancelling running task')
-            self.current_task.job.cancel()
-
-    def add_task(self, session, job):
-        assert session in self.sessions
-        task = asyncio.ensure_future(job)
-        self.tasks.put_nowait(self.AsyncTask(session, task))
-
-    async def run_tasks(self):
-        '''Asynchronously run through the task queue.'''
-        while True:
-            task = await self.tasks.get()
-            try:
-                if task.session in self.sessions:
-                    self.current_task = task
-                    await task.job
-                else:
-                    task.job.cancel()
-            except asyncio.CancelledError:
-                self.logger.info('cancelled task noted')
-            except Exception:
-                # Getting here should probably be considered a bug and fixed
-                traceback.print_exc()
-            finally:
-                self.current_task = None
+        future = self.sessions.pop(session)
+        future.cancel()
 
     def irc_peers(self):
         return self.irc.peers
 
     def session_count(self):
-        return len(self.sessions)
+        '''Returns a dictionary.'''
+        active = len([s for s in self.sessions if s.send_count])
+        total = len(self.sessions)
+        return {'active': active, 'inert': total - active, 'total': total}
 
-    def info(self):
-        '''Returned in the RPC 'getinfo' call.'''
-        address_count = sum(len(session.hash168s)
-                            for session in self.sessions
-                            if isinstance(session, ElectrumX))
+    def address_count(self):
+        return sum(len(session.hash168s) for session in self.sessions
+                   if isinstance(session, ElectrumX))
+
+    async def rpc_getinfo(self, params):
+        '''The RPC 'getinfo' call.'''
         return {
             'blocks': self.bp.height,
-            'peers': len(self.irc_peers()),
+            'peers': len(self.irc.peers),
             'sessions': self.session_count(),
-            'watched': address_count,
+            'watched': self.address_count(),
             'cached': 0,
         }
 
-    def sessions_info(self):
+    async def rpc_sessions(self, params):
         '''Returned to the RPC 'sessions' call.'''
         now = time.time()
         return [(session.kind,
-                 session.peername(),
+                 session.peername(for_log=False),
                  len(session.hash168s),
                  'RPC' if isinstance(session, LocalRPC) else session.client,
                  session.recv_count, session.recv_size,
@@ -184,9 +169,23 @@ class ServerManager(LoggedClass):
                  now - session.start)
                 for session in self.sessions]
 
+    async def rpc_numsessions(self, params):
+        return self.session_count()
+
+    async def rpc_peers(self, params):
+        return self.irc.peers
+
+    async def rpc_numpeers(self, params):
+        return len(self.irc.peers)
+
 
 class Session(JSONRPC):
-    '''Base class of ElectrumX JSON session protocols.'''
+    '''Base class of ElectrumX JSON session protocols.
+
+    Each session runs its tasks in asynchronous parallelism with other
+    sessions.  To prevent some sessions blocking othersr, potentially
+    long-running requests should yield (not yet implemented).
+    '''
 
     def __init__(self, manager, bp, env, kind):
         super().__init__()
@@ -197,12 +196,14 @@ class Session(JSONRPC):
         self.coin = bp.coin
         self.kind = kind
         self.hash168s = set()
+        self.requests = asyncio.Queue()
+        self.current_task = None
         self.client = 'unknown'
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
-        self.logger.info('connection from {}'.format(self.peername(True)))
+        self.logger.info('connection from {}'.format(self.peername()))
         self.manager.add_session(self)
 
     def connection_lost(self, exc):
@@ -211,7 +212,7 @@ class Session(JSONRPC):
         if self.error_count or self.send_size >= 250000:
             self.logger.info('{} disconnected.  '
                              'Sent {:,d} bytes in {:,d} messages {:,d} errors'
-                             .format(self.peername(True), self.send_size,
+                             .format(self.peername(), self.send_size,
                                      self.send_count, self.error_count))
         self.manager.remove_session(self)
 
@@ -221,15 +222,35 @@ class Session(JSONRPC):
 
     def on_json_request(self, request):
         '''Queue the request for asynchronous handling.'''
-        self.manager.add_task(self, self.handle_json_request(request))
+        self.requests.put_nowait(request)
 
-    def peername(self, for_log=False):
-        # Anonymi{z, s}e all IP addresses that will be stored in a log
-        if for_log and self.env.anon_logs and self.peer_info:
-            info = ["XX.XX.XX.XX", "XX"]
-        else:
-            info = self.peer_info
-        return 'unknown' if not info else '{}:{}'.format(info[0], info[1])
+    async def serve_requests(self):
+        '''Asynchronously run through the task queue.'''
+        while True:
+            await asyncio.sleep(0)
+            request = await self.requests.get()
+            try:
+                start = time.time()
+                await self.handle_json_request(request)
+                secs = time.time() - start
+                if secs > 1:
+                    self.logger.warning('slow request for {} took {:.1f}s: {}'
+                                        .format(self.peername(), secs,
+                                                request))
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                # Getting here should probably be considered a bug and fixed
+                self.logger.error('error handling request {}'.format(request))
+                traceback.print_exc()
+
+    def peername(self, *, for_log=True):
+        if not self.peer_info:
+            return 'unknown'
+        # Anonymize IP addresses that will be logged
+        if for_log and self.env.anon_logs:
+            return 'xx.xx.xx.xx:xx'
+        return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
 
     def tx_hash_from_param(self, param):
         '''Raise an RPCError if the parameter is not a valid transaction
@@ -576,19 +597,5 @@ class LocalRPC(Session):
     def __init__(self, *args):
         super().__init__(*args)
         cmds = 'getinfo sessions numsessions peers numpeers'.split()
-        self.handlers = {cmd: getattr(self, cmd) for cmd in cmds}
-
-    async def getinfo(self, params):
-        return self.manager.info()
-
-    async def sessions(self, params):
-        return self.manager.sessions_info()
-
-    async def numsessions(self, params):
-        return self.manager.session_count()
-
-    async def peers(self, params):
-        return self.manager.irc_peers()
-
-    async def numpeers(self, params):
-        return len(self.manager.irc_peers())
+        self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
+                         for cmd in cmds}

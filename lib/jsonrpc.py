@@ -63,7 +63,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         def __init__(self, msg, code=-1, **kw_args):
             super().__init__(**kw_args)
             self.msg = msg
-            self.code
+            self.code = code
 
 
     def __init__(self):
@@ -172,7 +172,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         the connection is closing.
         '''
         if isinstance(request, list):
-            payload = self.batch_request_payload(request)
+            payload = await self.batch_request_payload(request)
         else:
             payload = await self.single_request_payload(request)
 
@@ -231,7 +231,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
         handler = self.method_handler(method)
         if not handler:
-            raise self.RPCError('unknown method: {}'.format(method),
+            raise self.RPCError('unknown method: "{}"'.format(method),
                                 self.METHOD_NOT_FOUND)
 
         return await handler(params)
