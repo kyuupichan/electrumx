@@ -108,9 +108,10 @@ class ServerManager(LoggedClass):
 
     def notify(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        sessions = [session for session in self.sessions
-                    if isinstance(session, ElectrumX)]
-        ElectrumX.notify(sessions, height, touched)
+        cache = {}
+        for session in self.sessions:
+            if isinstance(session, ElectrumX):
+                session.notify(height, touched, cache)
 
     def stop(self):
         '''Close listening servers.'''
@@ -324,36 +325,36 @@ class ElectrumX(Session):
                          for prefix, suffixes in rpcs
                          for suffix in suffixes.split()}
 
-    @classmethod
-    def notify(cls, sessions, height, touched):
-        headers_payload = height_payload = None
+    def notify(self, height, touched, cache):
+        '''Notify the client about changes in height and touched addresses.
 
-        for session in sessions:
-            if height != session.notified_height:
-                session.notified_height = height
-                if session.subscribe_headers:
-                    if headers_payload is None:
-                        headers_payload = json_notification_payload(
-                            'blockchain.headers.subscribe',
-                            (session.electrum_header(height), ),
-                        )
-                    session.send_json(headers_payload)
+        Cache is a shared cache for this update.
+        '''
+        if height != self.notified_height:
+            self.notified_height = height
+            if self.subscribe_headers:
+                key = 'headers_payload'
+                if key not in cache:
+                    cache[key] = json_notification_payload(
+                        'blockchain.headers.subscribe',
+                        (self.electrum_header(height), ),
+                    )
+                self.send_json(cache[key])
 
-                if session.subscribe_height:
-                    if height_payload is None:
-                        height_payload = json_notification_payload(
-                            'blockchain.numblocks.subscribe',
-                            (height, ),
-                        )
-                    session.send_json(height_payload)
-
-            hash168_to_address = session.coin.hash168_to_address
-            for hash168 in session.hash168s.intersection(touched):
-                address = hash168_to_address(hash168)
-                status = session.address_status(hash168)
+            if self.subscribe_height:
                 payload = json_notification_payload(
-                    'blockchain.address.subscribe', (address, status))
-                session.send_json(payload)
+                    'blockchain.numblocks.subscribe',
+                    (height, ),
+                )
+                self.send_json(payload)
+
+        hash168_to_address = self.coin.hash168_to_address
+        for hash168 in self.hash168s.intersection(touched):
+            address = hash168_to_address(hash168)
+            status = self.address_status(hash168)
+            payload = json_notification_payload(
+                'blockchain.address.subscribe', (address, status))
+            self.send_json(payload)
 
     def height(self):
         '''Return the block processor's current height.'''
