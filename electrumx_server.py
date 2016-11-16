@@ -19,6 +19,9 @@ from functools import partial
 from server.env import Env
 from server.protocol import BlockServer
 
+SUPPRESS_MESSAGES = [
+    'Fatal read error on socket transport',
+]
 
 def main_loop():
     '''Start the server.'''
@@ -34,6 +37,11 @@ def main_loop():
         logging.warning('received {} signal, shutting down'.format(signame))
         future.cancel()
 
+    def on_exception(loop, context):
+        message = context.get('message')
+        if not message in SUPPRESS_MESSAGES:
+            loop.default_exception_handler(context)
+
     server = BlockServer(Env())
     future = asyncio.ensure_future(server.main_loop())
 
@@ -42,6 +50,8 @@ def main_loop():
         loop.add_signal_handler(getattr(signal, signame),
                                 partial(on_signal, signame))
 
+    # Install exception handler
+    loop.set_exception_handler(on_exception)
     loop.run_until_complete(future)
     loop.close()
 
