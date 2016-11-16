@@ -350,7 +350,7 @@ class ElectrumX(Session):
         matches = self.hash168s.intersection(touched)
         for hash168 in matches:
             address = hash168_to_address(hash168)
-            status = self.address_status(hash168)
+            status = await self.address_status(hash168)
             payload = json_notification_payload(
                 'blockchain.address.subscribe', (address, status))
             self.send_json(payload)
@@ -374,11 +374,11 @@ class ElectrumX(Session):
         header = self.bp.read_headers(height, 1)
         return self.coin.electrum_header(header, height)
 
-    def address_status(self, hash168):
+    async def address_status(self, hash168):
         '''Returns status as 32 bytes.'''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = self.bp.get_history(hash168)
+        history = await self.async_get_history(hash168)
         mempool = self.bp.mempool_transactions(hash168)
 
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
@@ -411,10 +411,10 @@ class ElectrumX(Session):
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
 
-    def get_history(self, hash168):
+    async def get_history(self, hash168):
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = self.bp.get_history(hash168, limit=None)
+        history = await self.async_get_history(hash168)
         mempool = self.bp.mempool_transactions(hash168)
 
         conf = tuple({'tx_hash': hash_to_str(tx_hash), 'height': height}
@@ -431,27 +431,44 @@ class ElectrumX(Session):
         count = min(next_height - start_height, chunk_size)
         return self.bp.read_headers(start_height, count).hex()
 
-    def get_balance(self, hash168):
-        confirmed = self.bp.get_balance(hash168)
+    async def async_get_history(self, hash168):
+        # Python 3.6: use async generators; update callers
+        history = []
+        for item in self.bp.get_history(hash168, limit=None):
+            history.append(item)
+            if len(history) % 100 == 0:
+                await asyncio.sleep(0)
+        return history
+
+    async def get_utxos(self, hash168):
+        # Python 3.6: use async generators; update callers
+        utxos = []
+        for utxo in self.bp.get_utxos(hash168, limit=None):
+            utxos.append(utxo)
+            if len(utxos) % 25 == 0:
+                await asyncio.sleep(0)
+        return utxos
+
+    async def get_balance(self, hash168):
+        utxos = await self.get_utxos(hash168)
+        confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = self.bp.mempool_value(hash168)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
-    def list_unspent(self, hash168):
-        utxos = self.bp.get_utxos_sorted(hash168)
-        return tuple({'tx_hash': hash_to_str(utxo.tx_hash),
-                      'tx_pos': utxo.tx_pos, 'height': utxo.height,
-                      'value': utxo.value}
-                     for utxo in utxos)
+    async def list_unspent(self, hash168):
+        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in sorted(await self.get_utxos(hash168))]
 
     # --- blockchain commands
 
     async def address_get_balance(self, params):
         hash168 = self.extract_hash168(params)
-        return self.get_balance(hash168)
+        return await self.get_balance(hash168)
 
     async def address_get_history(self, params):
         hash168 = self.extract_hash168(params)
-        return self.get_history(hash168)
+        return await self.get_history(hash168)
 
     async def address_get_mempool(self, params):
         hash168 = self.extract_hash168(params)
@@ -463,12 +480,12 @@ class ElectrumX(Session):
 
     async def address_listunspent(self, params):
         hash168 = self.extract_hash168(params)
-        return self.list_unspent(hash168)
+        return await self.list_unspent(hash168)
 
     async def address_subscribe(self, params):
         hash168 = self.extract_hash168(params)
         self.hash168s.add(hash168)
-        return self.address_status(hash168)
+        return await self.address_status(hash168)
 
     async def block_get_chunk(self, params):
         index = self.extract_non_negative_integer(params)

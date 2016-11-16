@@ -208,11 +208,6 @@ class DB(LoggedClass):
             tx_hash, height = self.fs_tx_hash(tx_num)
             yield UTXO(tx_num, tx_pos, tx_hash, height, value)
 
-    def get_utxos_sorted(self, hash168):
-        '''Returns all the UTXOs for an address sorted by height and
-        position in the block.'''
-        return sorted(self.get_utxos(hash168, limit=None))
-
     def get_utxo_hash168(self, tx_hash, index):
         '''Returns the hash168 for a UTXO.
 
