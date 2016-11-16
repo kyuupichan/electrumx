@@ -1006,16 +1006,12 @@ class BlockProcessor(server.db.DB):
                                  self.utxo_cache_spends,
                                  self.db_deletes))
 
-        collisions = 0
-        new_utxos = len(self.utxo_cache)
-
         for cache_key, cache_value in self.utxo_cache.items():
             # Frist write to the hash168 lookup table
             # The 4 is the COMPRESSED_TX_HASH_LEN
             db_key = b'h' + cache_key[:4] + cache_key[-2:]
             prior_value = self.db_cache_get(db_key)
             if prior_value:   # Should rarely happen
-                collisions += 1
                 self.db_cache[db_key] = prior_value + cache_value[:25]
             else:
                 self.db_cache[db_key] = cache_value[:25]
@@ -1033,8 +1029,6 @@ class BlockProcessor(server.db.DB):
                 batch.put(key, value)
             else:  # b'' or None
                 batch.delete(key)
-
-        adds = new_utxos + self.utxo_cache_spends
 
         self.db_cache = {}
         self.utxo_cache_spends = self.db_deletes = 0
