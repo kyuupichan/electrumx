@@ -357,20 +357,19 @@ class BlockProcessor(server.db.DB):
         self.db_deletes = []
 
         # Log state
-        self.logger.info('{}/{} height: {:,d} tx count: {:,d} '
-                         'flush count: {:,d} utxo flush count: {:,d} '
-                         'sync time: {}'
-                         .format(self.coin.NAME, self.coin.NET, self.height,
-                                 self.tx_count, self.flush_count,
-                                 self.utxo_flush_count,
-                                 formatted_time(self.wall_time)))
-        self.logger.info('reorg limit of {:,d} blocks'
+        self.logger.info('coin: {}'.format(self.coin.NAME))
+        self.logger.info('network: {}'.format(self.coin.NET))
+        self.logger.info('height: {:,d}'.format(self.db_height))
+        self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
+        self.logger.info('reorg limit is {:,d} blocks'
                          .format(self.reorg_limit))
-        self.logger.info('flushing UTXO cache at {:,d} MB'
-                         .format(self.utxo_MB))
-        self.logger.info('flushing history cache at {:,d} MB'
-                         .format(self.hist_MB))
-
+        if self.first_sync:
+            self.logger.info('sync time so far: {}'
+                             .format(formatted_time(self.wall_time)))
+            self.logger.info('flushing UTXO cache at {:,d} MB'
+                             .format(self.utxo_MB))
+            self.logger.info('flushing history cache at {:,d} MB'
+                             .format(self.hist_MB))
         self.clean_db()
 
     async def main_loop(self):
