@@ -260,8 +260,8 @@ class Session(JSONRPC):
                 return param
             except ValueError:
                 pass
-        raise RPCError('parameter should be a transaction hash: {}'
-                       .format(param))
+        raise self.RPCError('parameter should be a transaction hash: {}'
+                            .format(param))
 
     def hash168_from_param(self, param):
         if isinstance(param, str):
@@ -269,7 +269,8 @@ class Session(JSONRPC):
                 return self.coin.address_to_hash168(param)
             except:
                 pass
-        raise RPCError('parameter should be a valid address: {}'.format(param))
+        raise self.RPCError('parameter should be a valid address: {}'
+                            .format(param))
 
     def non_negative_integer_from_param(self, param):
         try:
@@ -280,24 +281,24 @@ class Session(JSONRPC):
             if param >= 0:
                 return param
 
-        raise RPCError('param should be a non-negative integer: {}'
-                       .format(param))
+        raise self.RPCError('param should be a non-negative integer: {}'
+                            .format(param))
 
     def extract_hash168(self, params):
         if len(params) == 1:
             return self.hash168_from_param(params[0])
-        raise RPCError('params should contain a single address: {}'
-                       .format(params))
+        raise self.RPCError('params should contain a single address: {}'
+                            .format(params))
 
     def extract_non_negative_integer(self, params):
         if len(params) == 1:
             return self.non_negative_integer_from_param(params[0])
-        raise RPCError('params should contain a non-negative integer: {}'
-                       .format(params))
+        raise self.RPCError('params should contain a non-negative integer: {}'
+                            .format(params))
 
     def require_empty_params(self, params):
         if params:
-            raise RPCError('params should be empty: {}'.format(params))
+            raise self.RPCError('params should be empty: {}'.format(params))
 
 
 class ElectrumX(Session):
@@ -370,7 +371,7 @@ class ElectrumX(Session):
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
         if not 0 <= height <= self.height():
-            raise RPCError('height {:,d} out of range'.format(height))
+            raise self.RPCError('height {:,d} out of range'.format(height))
         header = self.bp.read_headers(height, 1)
         return self.coin.electrum_header(header, height)
 
@@ -472,11 +473,11 @@ class ElectrumX(Session):
 
     async def address_get_mempool(self, params):
         hash168 = self.extract_hash168(params)
-        raise RPCError('get_mempool is not yet implemented')
+        raise self.RPCError('get_mempool is not yet implemented')
 
     async def address_get_proof(self, params):
         hash168 = self.extract_hash168(params)
-        raise RPCError('get_proof is not yet implemented')
+        raise self.RPCError('get_proof is not yet implemented')
 
     async def address_listunspent(self, params):
         hash168 = self.extract_hash168(params)
@@ -550,7 +551,7 @@ class ElectrumX(Session):
             tx_hash = self.tx_hash_from_param(params[0])
             return await self.daemon.getrawtransaction(tx_hash)
 
-        raise RPCError('params wrong length: {}'.format(params))
+        raise self.RPCError('params wrong length: {}'.format(params))
 
     async def transaction_get_merkle(self, params):
         if len(params) == 2:
@@ -558,7 +559,8 @@ class ElectrumX(Session):
             height = self.non_negative_integer_from_param(params[1])
             return await self.tx_merkle(tx_hash, height)
 
-        raise RPCError('params should contain a transaction hash and height')
+        raise self.RPCError('params should contain a transaction hash '
+                            'and height')
 
     async def utxo_get_address(self, params):
         if len(params) == 2:
@@ -570,7 +572,8 @@ class ElectrumX(Session):
                 return self.coin.hash168_to_address(hash168)
             return None
 
-        raise RPCError('params should contain a transaction hash and index')
+        raise self.RPCError('params should contain a transaction hash '
+                            'and index')
 
     # --- server commands
 
