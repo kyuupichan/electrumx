@@ -30,6 +30,7 @@ class CoinError(Exception):
 class Coin(object):
     '''Base class of coin hierarchy.'''
 
+    REORG_LIMIT=200
     # Not sure if these are coin-specific
     HEADER_LEN = 80
     DEFAULT_RPC_PORT = 8332
@@ -244,6 +245,7 @@ class Bitcoin(Coin):
 class BitcoinTestnet(Coin):
     NAME = "Bitcoin"
     SHORTNAME = "XTN"
+    REORG_LIMIT = 2000
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")

@@ -29,7 +29,7 @@ class Env(LoggedClass):
         self.utxo_MB = self.integer('UTXO_MB', 1000)
         self.hist_MB = self.integer('HIST_MB', 300)
         self.host = self.default('HOST', 'localhost')
-        self.reorg_limit = self.integer('REORG_LIMIT', 200)
+        self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
         self.daemon_url = self.build_daemon_url()
         # Server stuff
         self.tcp_port = self.integer('TCP_PORT', None)
