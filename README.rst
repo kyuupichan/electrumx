@@ -50,52 +50,75 @@ testnets, of course.
 Implementation
 ==============
 
-ElectrumX does not currently do any pruning.  With luck it may never
-become necessary.  So how does it achieve a much more compact database
-than Electrum server, which prunes a lot of hisory, and also sync
-faster?
+ElectrumX does not do any pruning or throwing away of history.  It
+will retain this property for as long as feasible, and I believe it is
+efficiently achievable for the forseeable future with plain Python.
 
-All of the following likely play a part:
+So how does it achieve a much more compact database than Electrum
+server, which is forced to prune hisory for busy addresses, and yet
+sync roughly 2 orders of magnitude faster?
+
+I believe all of the following play a part:
 
 - aggressive caching and batching of DB writes
-- more compact representation of UTXOs, the address index, and
-  history.  Electrum server stores full transaction hash and height
-  for all UTXOs.  In its pruned history it does the same.  ElectrumX
-  just stores the transaction number in the linear history of
-  transactions.  For at least another 5 years the transaction number
-  will fit in a 4-byte integer.  ElectrumX calculates the height from
-  a simple lookup in a linear array which is stored on disk.
-  ElectrumX also stores transaction hashes in a linear array on disk.
-- storing static append-only metadata which is indexed by position on
-  disk rather than in levelDB.  It would be nice to do this for histories
-  but I cannot think how they could be easily indexable on a filesystem.
-- avoiding unnecessary or redundant computations
-- more efficient memory usage
-- asyncio and asynchronous prefetch of blocks.
+- more compact and efficient representation of UTXOs, address index,
+  and history.  Electrum-Server stores full transaction hash and
+  height for each UTXO, and does the same in its pruned history.  In
+  contrast ElectrumX just stores the transaction number in the linear
+  history of transactions.  For at least another 5 years this
+  transaction number will fit in a 4-byte integer, and when necessary
+  expanding to 5 or 6 bytes is trivial.  ElectrumX can determine block
+  height from a simple binary search of tx counts stored on disk.
+  ElectrumX stores historical transaction hashes in a linear array on
+  disk.
+- placing static append-only metadata indexable by position on disk
+  rather than in levelDB.  It would be nice to do this for histories
+  but I cannot think of a way.
+- avoiding unnecessary or redundant computations, such as converting
+  address hashes to human-readable ASCII strings with expensive bignum
+  arithmetic, and then back again.
+- better choice of Python data structures giving lower memory usage as
+  well as faster traversal
+- leveraging asyncio for asynchronous prefetch of blocks to mostly
+  eliminate CPU idling.  As a Python program ElectrumX is unavoidably
+  single-threaded in its essence; we must keep that CPU core busy.
 
-ElectrumX should not have any need of threads.
+Python's asyncio means ElectrumX has no (direct) use for threads and
+associated complications.  I cannot foresee any case where they might
+be necessary.
 
 
-Roadmap
-=======
+Roadmap Pre-1.0
+===============
 
-- come up with UTXO root logic and implement it
-- test a few more performance improvement ideas
-- implement light caching of client responses
-- yield during expensive requests and/or penalize the connection
+- minor code cleanups
+- minor additions of missing functionality
+- logging improvements, mostly post-sync.  Pre-sync logs seem decent.
+- at most 1 more DB format change; I will make a weak attempt to
+  retain 0.6 release's DB format if possible
+- provision of configurable ways to limit client connections so as to
+  mitigate intentional or unintentional degradation of server response
+  time to other clients.  Based on IRC discussion this will likely be a
+  combination of address subscription and bandwidth limits.
+
+
+Roadmap Post-1.0
+================
+
+- UTXO root logic and implementation
 - improve DB abstraction so LMDB is not penalized
+- investigate effects of cache defaults and DB configuration defaults
+  on sync time and simplify / optimize the default config accordingly
 - potentially move some functionality to C or C++
-
-The above are in no particular order.
 
 
 Database Format
 ===============
 
-The database and metadata formats of ElectrumX are certain to change
-in the future.  Such a change will render old DBs unusable.  For now I
-do not intend to provide converters as this is still non-production
-software.  Moreover from-genesis sync time is quite bearable.
+The database and metadata formats of ElectrumX are likely to change.
+Such changes will render old DBs unusable.  At least until 1.0 I do
+not intend to provide converters; moreover from-genesis sync time to
+create a pristine database is quite tolerable.
 
 
 Miscellany
