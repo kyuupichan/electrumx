@@ -102,17 +102,17 @@ Then copy the all sample scripts from the ElectrumX source tree there::
 
     cp -R /path/to/repo/electrumx/samples/scripts ~/scripts/electrumx
 
-This copies 4 things: the top level server run script, a log/ directory
-with the logger run script, an env/ directory, and a NOTES file.
+This copies 3 things: the top level server run script, a log/ directory
+with the logger run script, an env/ directory.
 
 You need to configure the environment variables under env/ to your
-setup, as explained in NOTES.  ElectrumX server currently takes no
-command line arguments; all of its configuration is taken from its
-environment which is set up according to env/ directory (see 'envdir'
-man page).  Finally you need to change the log/run script to use the
-directory where you want the logs to be written by multilog.  The
-directory need not exist as multilog will create it, but its parent
-directory must exist.
+setup, as explained in docs/ENV-NOTES.  ElectrumX server currently
+takes no command line arguments; all of its configuration is taken
+from its environment which is set up according to env/ directory (see
+'envdir' man page).  Finally you need to change the log/run script to
+use the directory where you want the logs to be written by multilog.
+The directory need not exist as multilog will create it, but its
+parent directory must exist.
 
 Now start the 'svscan' process.  This will not do much as the service
 directory is still empty::
@@ -143,7 +143,7 @@ The sample unit file assumes that the repository is located at
 change the unit file accordingly.
 
 You need to set a few configuration variables in :code:`/etc/electrumx.conf`,
-see `samples/NOTES` for the list of required variables.
+see `docs/ENV-NOTES` for the list of required variables.
 
 Now you can start ElectrumX using :code:`systemctl`::
 
@@ -172,7 +172,7 @@ machine doing the indexing is focussing on the one task and not the
 wider network.
 
 The HIST_MB and CACHE_MB environment variables control cache sizes
-before they spill to disk; see the NOTES file under samples/scripts.
+before they spill to disk; see the ENV-NOTES file under docs/.
 
 Here is my experience with the current codebase, to given heights and
 rough wall-time::

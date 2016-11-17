@@ -54,7 +54,7 @@ you set the sum of these to nothing over half your available physical
 RAM:
 
 HIST_MB   - amount of history cache, in MB, to retain before flushing to
-            disk.  Default is 250; probably no benefit being much larger
+            disk.  Default is 300; probably no benefit being much larger
             as history is append-only and not searched.
 
 UTXO_MB   - amount of UTXO and history cache, in MB, to retain before

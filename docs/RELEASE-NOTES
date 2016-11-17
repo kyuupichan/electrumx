@@ -1,3 +1,24 @@
+version 0.6.0
+-------------
+
+- DB format has changed again.  This doesn't give a performance gain
+  or reduction that I could measure, but is cleaner in that each table
+  entry is now a singleton and not an array, which I much prefer as a
+  cleaner solution.  It may enable other goodness in the future.
+- Logging is much less noisy when serving clients.  In fact anything
+  in your logs that isn't just status updates probably is a bug that I
+  would like to know about.  Unfortunately clean shutdown whilst
+  serving clients leads to massive log spew.  This is harmless and I
+  believe because of my noob status with asyncio.  I intend to fix
+  this in a nearby release.
+- expensive client requests are intended to yield to other requests
+  sufficiently frequently that there should be no noticeable delays or
+  pauses under normal load from hog clients.
+- Notifications to hog clients are now queued in sequence with their
+  request responses.  They used to be sent immediately regardless of
+  pending requests which seems less than ideal.
+- some trivial improvements and fixes to local RPC query output
+
 version 0.5.1
 -------------
 

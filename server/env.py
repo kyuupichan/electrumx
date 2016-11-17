@@ -27,7 +27,7 @@ class Env(LoggedClass):
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.db_dir = self.required('DB_DIRECTORY')
         self.utxo_MB = self.integer('UTXO_MB', 1000)
-        self.hist_MB = self.integer('HIST_MB', 250)
+        self.hist_MB = self.integer('HIST_MB', 300)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', 200)
         self.daemon_url = self.build_daemon_url()

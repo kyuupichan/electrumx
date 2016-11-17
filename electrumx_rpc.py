@@ -43,7 +43,7 @@ class RPCClient(asyncio.Protocol):
             return ('{:3d}:{:02d}:{:02d}'
                     .format(t // 3600, (t % 3600) // 60, t % 60))
 
-        fmt = ('{:<4} {:>23} {:>15} {:>5} '
+        fmt = ('{:<4} {:>23} {:>15} {:>7} '
                '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
         print(fmt.format('Type', 'Peer', 'Client', 'Subs',
                          'Recv #', 'Recv KB', 'Sent #', 'Sent KB',

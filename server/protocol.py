@@ -108,9 +108,11 @@ class ServerManager(LoggedClass):
 
     def notify(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        sessions = [session for session in self.sessions
-                    if isinstance(session, ElectrumX)]
-        ElectrumX.notify(sessions, height, touched)
+        cache = {}
+        for session in self.sessions:
+            if isinstance(session, ElectrumX):
+                # Use a tuple to distinguish from JSON
+                session.jobs.put_nowait((height, touched, cache))
 
     def stop(self):
         '''Close listening servers.'''
@@ -196,7 +198,7 @@ class Session(JSONRPC):
         self.coin = bp.coin
         self.kind = kind
         self.hash168s = set()
-        self.requests = asyncio.Queue()
+        self.jobs = asyncio.Queue()
         self.current_task = None
         self.client = 'unknown'
 
@@ -222,26 +224,23 @@ class Session(JSONRPC):
 
     def on_json_request(self, request):
         '''Queue the request for asynchronous handling.'''
-        self.requests.put_nowait(request)
+        self.jobs.put_nowait(request)
 
     async def serve_requests(self):
         '''Asynchronously run through the task queue.'''
         while True:
             await asyncio.sleep(0)
-            request = await self.requests.get()
+            job = await self.jobs.get()
             try:
-                start = time.time()
-                await self.handle_json_request(request)
-                secs = time.time() - start
-                if secs > 1:
-                    self.logger.warning('slow request for {} took {:.1f}s: {}'
-                                        .format(self.peername(), secs,
-                                                request))
+                if isinstance(job, tuple):  # Height / mempool notification
+                    await self.notify(*job)
+                else:
+                    await self.handle_json_request(job)
             except asyncio.CancelledError:
                 break
             except Exception:
                 # Getting here should probably be considered a bug and fixed
-                self.logger.error('error handling request {}'.format(request))
+                self.logger.error('error handling request {}'.format(job))
                 traceback.print_exc()
 
     def peername(self, *, for_log=True):
@@ -261,8 +260,8 @@ class Session(JSONRPC):
                 return param
             except ValueError:
                 pass
-        raise RPCError('parameter should be a transaction hash: {}'
-                       .format(param))
+        raise self.RPCError('parameter should be a transaction hash: {}'
+                            .format(param))
 
     def hash168_from_param(self, param):
         if isinstance(param, str):
@@ -270,7 +269,8 @@ class Session(JSONRPC):
                 return self.coin.address_to_hash168(param)
             except:
                 pass
-        raise RPCError('parameter should be a valid address: {}'.format(param))
+        raise self.RPCError('parameter should be a valid address: {}'
+                            .format(param))
 
     def non_negative_integer_from_param(self, param):
         try:
@@ -281,24 +281,24 @@ class Session(JSONRPC):
             if param >= 0:
                 return param
 
-        raise RPCError('param should be a non-negative integer: {}'
-                       .format(param))
+        raise self.RPCError('param should be a non-negative integer: {}'
+                            .format(param))
 
     def extract_hash168(self, params):
         if len(params) == 1:
             return self.hash168_from_param(params[0])
-        raise RPCError('params should contain a single address: {}'
-                       .format(params))
+        raise self.RPCError('params should contain a single address: {}'
+                            .format(params))
 
     def extract_non_negative_integer(self, params):
         if len(params) == 1:
             return self.non_negative_integer_from_param(params[0])
-        raise RPCError('params should contain a non-negative integer: {}'
-                       .format(params))
+        raise self.RPCError('params should contain a non-negative integer: {}'
+                            .format(params))
 
     def require_empty_params(self, params):
         if params:
-            raise RPCError('params should be empty: {}'.format(params))
+            raise self.RPCError('params should be empty: {}'.format(params))
 
 
 class ElectrumX(Session):
@@ -324,36 +324,41 @@ class ElectrumX(Session):
                          for prefix, suffixes in rpcs
                          for suffix in suffixes.split()}
 
-    @classmethod
-    def notify(cls, sessions, height, touched):
-        headers_payload = height_payload = None
+    async def notify(self, height, touched, cache):
+        '''Notify the client about changes in height and touched addresses.
 
-        for session in sessions:
-            if height != session.notified_height:
-                session.notified_height = height
-                if session.subscribe_headers:
-                    if headers_payload is None:
-                        headers_payload = json_notification_payload(
-                            'blockchain.headers.subscribe',
-                            (session.electrum_header(height), ),
-                        )
-                    session.send_json(headers_payload)
+        Cache is a shared cache for this update.
+        '''
+        if height != self.notified_height:
+            self.notified_height = height
+            if self.subscribe_headers:
+                key = 'headers_payload'
+                if key not in cache:
+                    cache[key] = json_notification_payload(
+                        'blockchain.headers.subscribe',
+                        (self.electrum_header(height), ),
+                    )
+                self.send_json(cache[key])
 
-                if session.subscribe_height:
-                    if height_payload is None:
-                        height_payload = json_notification_payload(
-                            'blockchain.numblocks.subscribe',
-                            (height, ),
-                        )
-                    session.send_json(height_payload)
-
-            hash168_to_address = session.coin.hash168_to_address
-            for hash168 in session.hash168s.intersection(touched):
-                address = hash168_to_address(hash168)
-                status = session.address_status(hash168)
+            if self.subscribe_height:
                 payload = json_notification_payload(
-                    'blockchain.address.subscribe', (address, status))
-                session.send_json(payload)
+                    'blockchain.numblocks.subscribe',
+                    (height, ),
+                )
+                self.send_json(payload)
+
+        hash168_to_address = self.coin.hash168_to_address
+        matches = self.hash168s.intersection(touched)
+        for hash168 in matches:
+            address = hash168_to_address(hash168)
+            status = await self.address_status(hash168)
+            payload = json_notification_payload(
+                'blockchain.address.subscribe', (address, status))
+            self.send_json(payload)
+
+        if matches:
+            self.logger.info('notified {} of {} addresses'
+                             .format(self.peername(), len(matches)))
 
     def height(self):
         '''Return the block processor's current height.'''
@@ -366,15 +371,15 @@ class ElectrumX(Session):
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
         if not 0 <= height <= self.height():
-            raise RPCError('height {:,d} out of range'.format(height))
+            raise self.RPCError('height {:,d} out of range'.format(height))
         header = self.bp.read_headers(height, 1)
         return self.coin.electrum_header(header, height)
 
-    def address_status(self, hash168):
+    async def address_status(self, hash168):
         '''Returns status as 32 bytes.'''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = self.bp.get_history(hash168)
+        history = await self.async_get_history(hash168)
         mempool = self.bp.mempool_transactions(hash168)
 
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
@@ -407,10 +412,10 @@ class ElectrumX(Session):
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
 
-    def get_history(self, hash168):
+    async def get_history(self, hash168):
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = self.bp.get_history(hash168, limit=None)
+        history = await self.async_get_history(hash168)
         mempool = self.bp.mempool_transactions(hash168)
 
         conf = tuple({'tx_hash': hash_to_str(tx_hash), 'height': height}
@@ -427,44 +432,61 @@ class ElectrumX(Session):
         count = min(next_height - start_height, chunk_size)
         return self.bp.read_headers(start_height, count).hex()
 
-    def get_balance(self, hash168):
-        confirmed = self.bp.get_balance(hash168)
+    async def async_get_history(self, hash168):
+        # Python 3.6: use async generators; update callers
+        history = []
+        for item in self.bp.get_history(hash168, limit=None):
+            history.append(item)
+            if len(history) % 100 == 0:
+                await asyncio.sleep(0)
+        return history
+
+    async def get_utxos(self, hash168):
+        # Python 3.6: use async generators; update callers
+        utxos = []
+        for utxo in self.bp.get_utxos(hash168, limit=None):
+            utxos.append(utxo)
+            if len(utxos) % 25 == 0:
+                await asyncio.sleep(0)
+        return utxos
+
+    async def get_balance(self, hash168):
+        utxos = await self.get_utxos(hash168)
+        confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = self.bp.mempool_value(hash168)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
-    def list_unspent(self, hash168):
-        utxos = self.bp.get_utxos_sorted(hash168)
-        return tuple({'tx_hash': hash_to_str(utxo.tx_hash),
-                      'tx_pos': utxo.tx_pos, 'height': utxo.height,
-                      'value': utxo.value}
-                     for utxo in utxos)
+    async def list_unspent(self, hash168):
+        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in sorted(await self.get_utxos(hash168))]
 
     # --- blockchain commands
 
     async def address_get_balance(self, params):
         hash168 = self.extract_hash168(params)
-        return self.get_balance(hash168)
+        return await self.get_balance(hash168)
 
     async def address_get_history(self, params):
         hash168 = self.extract_hash168(params)
-        return self.get_history(hash168)
+        return await self.get_history(hash168)
 
     async def address_get_mempool(self, params):
         hash168 = self.extract_hash168(params)
-        raise RPCError('get_mempool is not yet implemented')
+        raise self.RPCError('get_mempool is not yet implemented')
 
     async def address_get_proof(self, params):
         hash168 = self.extract_hash168(params)
-        raise RPCError('get_proof is not yet implemented')
+        raise self.RPCError('get_proof is not yet implemented')
 
     async def address_listunspent(self, params):
         hash168 = self.extract_hash168(params)
-        return self.list_unspent(hash168)
+        return await self.list_unspent(hash168)
 
     async def address_subscribe(self, params):
         hash168 = self.extract_hash168(params)
         self.hash168s.add(hash168)
-        return self.address_status(hash168)
+        return await self.address_status(hash168)
 
     async def block_get_chunk(self, params):
         index = self.extract_non_negative_integer(params)
@@ -529,7 +551,7 @@ class ElectrumX(Session):
             tx_hash = self.tx_hash_from_param(params[0])
             return await self.daemon.getrawtransaction(tx_hash)
 
-        raise RPCError('params wrong length: {}'.format(params))
+        raise self.RPCError('params wrong length: {}'.format(params))
 
     async def transaction_get_merkle(self, params):
         if len(params) == 2:
@@ -537,7 +559,8 @@ class ElectrumX(Session):
             height = self.non_negative_integer_from_param(params[1])
             return await self.tx_merkle(tx_hash, height)
 
-        raise RPCError('params should contain a transaction hash and height')
+        raise self.RPCError('params should contain a transaction hash '
+                            'and height')
 
     async def utxo_get_address(self, params):
         if len(params) == 2:
@@ -549,7 +572,8 @@ class ElectrumX(Session):
                 return self.coin.hash168_to_address(hash168)
             return None
 
-        raise RPCError('params should contain a transaction hash and index')
+        raise self.RPCError('params should contain a transaction hash '
+                            'and index')
 
     # --- server commands
 
