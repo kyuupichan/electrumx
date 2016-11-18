@@ -133,8 +133,7 @@ class Prefetcher(LoggedClass):
         hex_hashes = await self.daemon.block_hex_hashes(first, count)
         if caught_up:
             self.logger.info('new block height {:,d} hash {}'
-                             .format(first + count - 1,
-                                     hash_to_str(hex_hashes[-1])))
+                             .format(first + count - 1, hex_hashes[-1]))
 
         blocks = await self.daemon.raw_blocks(hex_hashes)
 
