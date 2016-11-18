@@ -415,17 +415,20 @@ class ElectrumX(Session):
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
 
-    async def get_history(self, hash168):
-        # Note history is ordered and mempool unordered in electrum-server
-        # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.async_get_history(hash168)
+    def unconfirmed_history(self, hash168):
+        # Note unconfirmed history is unordered in electrum-server
+        # Height is -1 if unconfirmed txins, otherwise 0
         mempool = self.bp.mempool_transactions(hash168)
+        return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
+                for tx_hash, fee, unconfirmed in mempool]
 
-        conf = tuple({'tx_hash': hash_to_str(tx_hash), 'height': height}
-                       for tx_hash, height in history)
-        unconf = tuple({'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
-                       for tx_hash, fee, unconfirmed in mempool)
-        return conf + unconf
+    async def get_history(self, hash168):
+        # Note history is ordered but unconfirmed is unordered in e-s
+        history = await self.async_get_history(hash168)
+        conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
+                for tx_hash, height in history]
+
+        return conf + self.unconfirmed_history(hash168)
 
     def get_chunk(self, index):
         '''Return header chunk as hex.  Index is a non-negative integer.'''
@@ -476,7 +479,7 @@ class ElectrumX(Session):
 
     async def address_get_mempool(self, params):
         hash168 = self.extract_hash168(params)
-        raise self.RPCError('get_mempool is not yet implemented')
+        return self.unconfirmed_history(hash168)
 
     async def address_get_proof(self, params):
         hash168 = self.extract_hash168(params)
