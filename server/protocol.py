@@ -14,11 +14,12 @@ import json
 import ssl
 import time
 import traceback
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from functools import partial
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.jsonrpc import JSONRPC, json_notification_payload
+from lib.tx import Deserializer
 from lib.util import LoggedClass
 from server.block_processor import BlockProcessor
 from server.daemon import DaemonError

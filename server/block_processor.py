@@ -21,7 +21,6 @@ from functools import partial
 from server.daemon import Daemon, DaemonError
 from server.version import VERSION
 from lib.hash import hash_to_str
-from lib.tx import Deserializer
 from lib.util import chunks, LoggedClass
 import server.db
 from server.storage import open_db
