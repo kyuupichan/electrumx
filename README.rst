@@ -92,8 +92,6 @@ Roadmap Pre-1.0
 ===============
 
 - minor code cleanups
-- minor additions of missing functionality
-- logging improvements, mostly post-sync.  Pre-sync logs seem decent.
 - at most 1 more DB format change; I will make a weak attempt to
   retain 0.6 release's DB format if possible
 - provision of configurable ways to limit client connections so as to
