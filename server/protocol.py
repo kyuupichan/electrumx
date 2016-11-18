@@ -395,8 +395,11 @@ class ElectrumX(Session):
         hex_hashes = await self.daemon.block_hex_hashes(height, 1)
         block = await self.daemon.deserialised_block(hex_hashes[0])
         tx_hashes = block['tx']
-        # This will throw if the tx_hash is bad
-        pos = tx_hashes.index(tx_hash)
+        try:
+            pos = tx_hashes.index(tx_hash)
+        except ValueError:
+            raise self.RPCError('tx hash {} not in block {} at height {:,d}'
+                                .format(tx_hash, hex_hashes[0], height))
 
         idx = pos
         hashes = [hex_str_to_hash(txh) for txh in tx_hashes]
