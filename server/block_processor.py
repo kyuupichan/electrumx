@@ -134,7 +134,6 @@ class Prefetcher(LoggedClass):
         if caught_up:
             self.logger.info('new block height {:,d} hash {}'
                              .format(first + count - 1, hex_hashes[-1]))
-
         blocks = await self.daemon.raw_blocks(hex_hashes)
 
         size = sum(len(block) for block in blocks)
@@ -386,7 +385,6 @@ class BlockProcessor(server.db.DB):
         try:
             while True:
                 await self._wait_for_update()
-                await asyncio.sleep(0)   # Yield
         except asyncio.CancelledError:
             self.on_cancel()
             # This lets the asyncio subsystem process futures cancellations
@@ -416,6 +414,9 @@ class BlockProcessor(server.db.DB):
         try:
             for block in blocks:
                 self.advance_block(block, caught_up)
+                if not caught_up and time.time() > self.next_cache_check:
+                    self.check_cache_size()
+                    self.next_cache_check = time.time() + 60
                 await asyncio.sleep(0)  # Yield
             if caught_up:
                 await self.caught_up(mempool_hashes)
@@ -700,8 +701,8 @@ class BlockProcessor(server.db.DB):
         self.logger.info('removed {:,d} history entries from {:,d} addresses'
                          .format(nremoves, len(hash168s)))
 
-    def cache_sizes(self):
-        '''Returns the approximate size of the cache, in MB.'''
+    def check_cache_size(self):
+        '''Flush a cache if it gets too big.'''
         # Good average estimates based on traversal of subobjects and
         # requesting size from Python (see deep_getsizeof).  For
         # whatever reason Python O/S mem usage is typically +30% or
@@ -718,7 +719,10 @@ class BlockProcessor(server.db.DB):
                          'UTXOs {:,d}MB  hist {:,d}MB'
                          .format(self.height, self.daemon.cached_height(),
                                  utxo_MB, hist_MB))
-        return utxo_MB, hist_MB
+
+        # Flush if a cache is too big
+        if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
+            self.flush(utxo_MB >= self.utxo_MB)
 
     def undo_key(self, height):
         '''DB key for undo information at the given height.'''
@@ -757,14 +761,6 @@ class BlockProcessor(server.db.DB):
         undo_info = self.advance_txs(tx_hashes, txs, touched)
         if self.daemon.cached_height() - self.height <= self.reorg_limit:
             self.write_undo_info(self.height, b''.join(undo_info))
-
-        # Check if we're getting full and time to flush?
-        now = time.time()
-        if now > self.next_cache_check:
-            self.next_cache_check = now + 60
-            utxo_MB, hist_MB = self.cache_sizes()
-            if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
-                self.flush(utxo_MB >= self.utxo_MB)
 
         if update_touched:
             self.touched.update(touched)
