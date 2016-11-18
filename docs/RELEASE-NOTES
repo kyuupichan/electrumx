@@ -1,3 +1,12 @@
+version 0.6.2
+-------------
+
+- handle daemon errors properly that result from client requests; pass the
+  error onto the client
+- start serving immediatley on catchup; don't wait for the mempool
+- logging improvements, in particular logging software and DB versions
+- issues closed: #29, #31, #32
+
 version 0.6.1
 -------------
 

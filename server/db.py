@@ -18,6 +18,7 @@ from collections import namedtuple
 from lib.util import chunks, LoggedClass
 from lib.hash import double_sha256, hash_to_str
 from server.storage import open_db
+from server.version import VERSION
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
@@ -29,7 +30,7 @@ class DB(LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    VERSIONS = [3]
+    DB_VERSIONS = [3]
 
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
@@ -77,6 +78,7 @@ class DB(LoggedClass):
             self.db_height = -1
             self.db_tx_count = 0
             self.db_tip = b'\0' * 32
+            self.db_version = max(self.DB_VERSIONS)
             self.flush_count = 0
             self.utxo_flush_count = 0
             self.wall_time = 0
@@ -87,11 +89,11 @@ class DB(LoggedClass):
                 state = ast.literal_eval(state.decode())
             if not isinstance(state, dict):
                 raise self.DBError('failed reading state from DB')
-            db_version = state.get('db_version', 0)
-            if db_version not in self.VERSIONS:
+            self.db_version = state['db_version']
+            if self.db_version not in self.DB_VERSIONS:
                 raise self.DBError('your DB version is {} but this software '
                                    'only handles versions {}'
-                                   .format(db_version, self.VERSIONS))
+                                   .format(db_version, self.DB_VERSIONS))
             if state['genesis'] != self.coin.GENESIS_HASH:
                 raise self.DBError('DB genesis hash {} does not match coin {}'
                                    .format(state['genesis_hash'],
@@ -104,6 +106,18 @@ class DB(LoggedClass):
             self.wall_time = state['wall_time']
             self.first_sync = state['first_sync']
 
+        self.logger.info('software version: {}'.format(VERSION))
+        self.logger.info('DB version: {:d}'.format(self.db_version))
+        self.logger.info('coin: {}'.format(self.coin.NAME))
+        self.logger.info('network: {}'.format(self.coin.NET))
+        self.logger.info('height: {:,d}'.format(self.db_height))
+        self.logger.info('tip: {}'.format(hash_to_str(self.db_tip)))
+        self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
+        if self.first_sync:
+            self.logger.info('sync time so far: {}'
+                             .format(formatted_time(self.wall_time)))
+
+
     def write_state(self, batch):
         '''Write chain state to the batch.'''
         state = {
@@ -115,7 +129,7 @@ class DB(LoggedClass):
             'utxo_flush_count': self.utxo_flush_count,
             'wall_time': self.wall_time,
             'first_sync': self.first_sync,
-            'db_version': max(self.VERSIONS),
+            'db_version': self.db_version,
         }
         batch.put(b'state', repr(state).encode())
 
