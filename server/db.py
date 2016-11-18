@@ -89,7 +89,7 @@ class DB(LoggedClass):
                 state = ast.literal_eval(state.decode())
             if not isinstance(state, dict):
                 raise self.DBError('failed reading state from DB')
-            self.db_version = state.get('db_version', 0)
+            self.db_version = state['db_version']
             if self.db_version not in self.DB_VERSIONS:
                 raise self.DBError('your DB version is {} but this software '
                                    'only handles versions {}'
@@ -106,8 +106,8 @@ class DB(LoggedClass):
             self.wall_time = state['wall_time']
             self.first_sync = state['first_sync']
 
-        self.logger.info('software version: {}', VERSION)
-        self.logger.info('DB version: {:d}', self.db_version)
+        self.logger.info('software version: {}'.format(VERSION))
+        self.logger.info('DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
         self.logger.info('network: {}'.format(self.coin.NET))
         self.logger.info('height: {:,d}'.format(self.db_height))
