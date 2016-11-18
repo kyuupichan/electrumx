@@ -19,6 +19,7 @@ from collections import defaultdict
 from functools import partial
 
 from server.daemon import Daemon, DaemonError
+from server.version import VERSION
 from lib.hash import hash_to_str
 from lib.tx import Deserializer
 from lib.util import chunks, LoggedClass
@@ -361,15 +362,9 @@ class BlockProcessor(server.db.DB):
         self.db_deletes = []
 
         # Log state
-        self.logger.info('coin: {}'.format(self.coin.NAME))
-        self.logger.info('network: {}'.format(self.coin.NET))
-        self.logger.info('height: {:,d}'.format(self.db_height))
-        self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
         self.logger.info('reorg limit is {:,d} blocks'
                          .format(self.reorg_limit))
         if self.first_sync:
-            self.logger.info('sync time so far: {}'
-                             .format(formatted_time(self.wall_time)))
             self.logger.info('flushing UTXO cache at {:,d} MB'
                              .format(self.utxo_MB))
             self.logger.info('flushing history cache at {:,d} MB'
@@ -431,7 +426,8 @@ class BlockProcessor(server.db.DB):
         self.flush(True)
         if self.first_sync:
             self.first_sync = False
-            self.logger.info('synced to height {:,d}'.format(self.height))
+            self.logger.info('{} synced to height {:,d}.  DB version:'
+                             .format(VERSION, self.height, self.db_version))
         self.touched.update(await self.mempool.update(mempool_hashes))
 
     async def handle_chain_reorg(self):
