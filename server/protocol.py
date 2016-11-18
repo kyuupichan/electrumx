@@ -438,6 +438,13 @@ class Session(JSONRPC):
     def sub_count(self):
         return 0
 
+    async def daemon_request(self, method, *args):
+        '''Catch a DaemonError and convert it to an RPCError.'''
+        try:
+            return await getattr(self.daemon, method)(*args)
+        except DaemonError as e:
+            raise RPCError('daemon error: {}'.format(e))
+
     def tx_hash_from_param(self, param):
         '''Raise an RPCError if the parameter is not a valid transaction
         hash.'''
@@ -583,8 +590,8 @@ class ElectrumX(Session):
 
     async def tx_merkle(self, tx_hash, height):
         '''tx_hash is a hex string.'''
-        hex_hashes = await self.daemon.block_hex_hashes(height, 1)
-        block = await self.daemon.deserialised_block(hex_hashes[0])
+        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
+        block = await self.daemon_request('deserialised_block', hex_hashes[0])
         tx_hashes = block['tx']
         try:
             pos = tx_hashes.index(tx_hash)
@@ -694,7 +701,7 @@ class ElectrumX(Session):
         return self.electrum_header(height)
 
     async def estimatefee(self, params):
-        return await self.daemon.estimatefee(params)
+        return await self.daemon_request('estimatefee', params)
 
     async def headers_subscribe(self, params):
         self.require_empty_params(params)
@@ -710,7 +717,7 @@ class ElectrumX(Session):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
         self.require_empty_params(params)
-        return await self.daemon.relayfee()
+        return await self.daemon_request('relayfee')
 
     async def transaction_broadcast(self, params):
         '''Pass through the parameters to the daemon.
@@ -746,7 +753,7 @@ class ElectrumX(Session):
         # in anticipation it might be dropped in the future.
         if 1 <= len(params) <= 2:
             tx_hash = self.tx_hash_from_param(params[0])
-            return await self.daemon.getrawtransaction(tx_hash)
+            return await self.daemon_request('getrawtransaction', tx_hash)
 
         raise self.RPCError('params wrong length: {}'.format(params))
 
