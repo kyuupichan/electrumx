@@ -211,7 +211,7 @@ class Session(JSONRPC):
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
         super().connection_lost(exc)
-        if self.error_count or self.send_size >= 250000:
+        if self.error_count or self.send_size >= 1024*1024:
             self.logger.info('{} disconnected.  '
                              'Sent {:,d} bytes in {:,d} messages {:,d} errors'
                              .format(self.peername(), self.send_size,

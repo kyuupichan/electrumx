@@ -715,8 +715,8 @@ class BlockProcessor(server.db.DB):
         utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
         hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
-        self.logger.info('our height: {:,d}  daemon: {:,d} '
-                         'UTXOs {:,d}MB  hist {:,d}MB'
+        self.logger.info('our height: {:,d} daemon: {:,d} '
+                         'UTXOs {:,d}MB hist {:,d}MB'
                          .format(self.height, self.daemon.cached_height(),
                                  utxo_MB, hist_MB))
 
