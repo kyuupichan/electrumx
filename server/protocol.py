@@ -163,8 +163,8 @@ class ServerManager(LoggedClass):
         now = time.time()
         return [(session.kind,
                  session.peername(for_log=False),
-                 len(session.hash168s),
-                 'RPC' if isinstance(session, LocalRPC) else session.client,
+                 session.sub_count(),
+                 session.client,
                  session.recv_count, session.recv_size,
                  session.send_count, session.send_size,
                  session.error_count,
@@ -197,9 +197,7 @@ class Session(JSONRPC):
         self.daemon = bp.daemon
         self.coin = bp.coin
         self.kind = kind
-        self.hash168s = set()
         self.jobs = asyncio.Queue()
-        self.current_task = None
         self.client = 'unknown'
 
     def connection_made(self, transport):
@@ -250,6 +248,9 @@ class Session(JSONRPC):
         if for_log and self.env.anon_logs:
             return 'xx.xx.xx.xx:xx'
         return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
+
+    def sub_count(self):
+        return 0
 
     def tx_hash_from_param(self, param):
         '''Raise an RPCError if the parameter is not a valid transaction
@@ -309,6 +310,7 @@ class ElectrumX(Session):
         self.subscribe_headers = False
         self.subscribe_height = False
         self.notified_height = None
+        self.hash168s = set()
         rpcs = [
             ('blockchain',
              'address.get_balance address.get_history address.get_mempool '
@@ -323,6 +325,9 @@ class ElectrumX(Session):
                          getattr(self, suffix.replace('.', '_'))
                          for prefix, suffixes in rpcs
                          for suffix in suffixes.split()}
+
+    def sub_count(self):
+        return len(self.hash168s)
 
     async def notify(self, height, touched, cache):
         '''Notify the client about changes in height and touched addresses.
@@ -629,3 +634,4 @@ class LocalRPC(Session):
         cmds = 'getinfo sessions numsessions peers numpeers'.split()
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}
+        self.client = 'RPC'
