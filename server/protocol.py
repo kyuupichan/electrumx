@@ -326,17 +326,17 @@ class ServerManager(LoggedClass):
         await asyncio.sleep(0)
         self.servers = []
         self.logger.info('server listening sockets closed')
-        limit = time.time() + 10
+        limit = time.time() + 15
         while self.sessions and time.time() < limit:
             self.logger.info('{:,d} sessions remaining'
                              .format(len(self.sessions)))
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
         if self.sessions:
             self.logger.info('forcibly closing {:,d} stragglers'
                              .format(len(self.sessions)))
             for future in self.sessions.values():
                 future.cancel()
-            await asyncio.sleep(0)
+            await asyncio.sleep(1)
 
     def add_session(self, session):
         assert self.servers
