@@ -21,21 +21,13 @@ from functools import partial
 from server.daemon import Daemon, DaemonError
 from server.version import VERSION
 from lib.hash import hash_to_str
-from lib.util import chunks, LoggedClass
+from lib.util import chunks, formatted_time, LoggedClass
 import server.db
 from server.storage import open_db
 
 # Limits single address history to ~ 65536 * HIST_ENTRIES_PER_KEY entries
 HIST_ENTRIES_PER_KEY = 1024
 HIST_VALUE_BYTES = HIST_ENTRIES_PER_KEY * 4
-
-
-def formatted_time(t):
-    '''Return a number of seconds as a string in days, hours, mins and
-    secs.'''
-    t = int(t)
-    return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
-        t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
 
 
 class ChainError(Exception):
@@ -216,8 +208,7 @@ class BlockProcessor(server.db.DB):
                 await self._wait_for_update()
         except asyncio.CancelledError:
             self.on_cancel()
-            # This lets the asyncio subsystem process futures cancellations
-            await asyncio.sleep(0)
+            await self.wait_shutdown()
 
     def on_cancel(self):
         '''Called when the main loop is cancelled.
@@ -226,6 +217,10 @@ class BlockProcessor(server.db.DB):
         for future in self.futures:
             future.cancel()
         self.flush(True)
+
+    async def wait_shutdown(self):
+        '''Wait for shutdown to complete cleanly, and return.'''
+        await asyncio.sleep(0)
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks or a mempool update.

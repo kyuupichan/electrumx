@@ -32,8 +32,20 @@ RPC_PORT      - Listen on this port for local RPC connections, defaults to
                 8000.
 BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
                 is re-read for each new client.
-DONATION_ADDRESS  - server donation address.  Defaults to none.
-ANON_LOGS - set to remove IP addresses from logs. Default: disabled
+ANON_LOGS     - set to anything non-empty to remove IP addresses from
+                logs. By default IP addresses will be logged.
+DONATION_ADDRESS - server donation address.  Defaults to none.
+
+These following environment variables are to help limit server
+resource consumption and to prevent simple DoS.  Address subscriptions
+in ElectrumX are very cheap - they consume about 100 bytes of memory
+each and are processed efficiently.  I feel the defaults are low and
+encourage you to raise them.
+
+MAX_SUBS         - maximum number of address subscriptions across all
+                   sessions.  Defaults to 250,000.
+MAX_SESSION_SUBS - maximum number of address subscriptions permitted to a
+                   single session.  Defaults to 50,000.
 
 If you want IRC connectivity to advertise your node:
 

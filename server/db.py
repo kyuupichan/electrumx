@@ -15,7 +15,7 @@ from struct import pack, unpack
 from bisect import bisect_right
 from collections import namedtuple
 
-from lib.util import chunks, LoggedClass
+from lib.util import chunks, formatted_time, LoggedClass
 from lib.hash import double_sha256, hash_to_str
 from server.storage import open_db
 from server.version import VERSION
