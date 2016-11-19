@@ -828,7 +828,7 @@ class BlockProcessor(server.db.DB):
 
     def read_headers(self, start, count):
         # Read some from disk
-        disk_count = min(count, self.fs_height + 1 - start)
+        disk_count = min(count, max(0, self.fs_height + 1 - start))
         result = self.fs_read_headers(start, disk_count)
         count -= disk_count
         start += disk_count
