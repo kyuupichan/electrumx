@@ -3,6 +3,8 @@ version 0.6.3
 
 - new environment variables MAX_SUBS and MAX_SESSION_SUBS.  Please read
   docs/ENV-NOTES - I encourage you to raise the default values.
+- fixed import bug in 0.6.2 that prevented initial sync
+- issues closed: #30.  Logs should be clean on shutdown now.
 
 version 0.6.2
 -------------
