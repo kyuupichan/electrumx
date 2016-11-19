@@ -208,8 +208,7 @@ class BlockProcessor(server.db.DB):
                 await self._wait_for_update()
         except asyncio.CancelledError:
             self.on_cancel()
-            # This lets the asyncio subsystem process futures cancellations
-            await asyncio.sleep(0)
+            await self.wait_shutdown()
 
     def on_cancel(self):
         '''Called when the main loop is cancelled.
@@ -218,6 +217,10 @@ class BlockProcessor(server.db.DB):
         for future in self.futures:
             future.cancel()
         self.flush(True)
+
+    async def wait_shutdown(self):
+        '''Wait for shutdown to complete cleanly, and return.'''
+        await asyncio.sleep(0)
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks or a mempool update.
