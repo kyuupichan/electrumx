@@ -46,6 +46,9 @@ class Env(LoggedClass):
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.debug = self.default('DEBUG', '')
         self.debug = [item.lower() for item in self.debug.split()]
+        # Subscription limits
+        self.max_subs = self.integer('MAX_SUBS', 250000)
+        self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         # IRC
         self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
         self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
