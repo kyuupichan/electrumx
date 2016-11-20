@@ -38,15 +38,16 @@ class BlockServer(BlockProcessor):
         super().__init__(env)
         self.server_mgr = ServerManager(self, env)
         self.mempool = MemPool(self)
-        self.caught_up_yet = False
 
-    async def caught_up(self, mempool_hashes):
-        # Call the base class to flush before doing anything else.
-        await super().caught_up(mempool_hashes)
-        if not self.caught_up_yet:
-            await self.server_mgr.start_servers()
-            self.caught_up_yet = True
-        self.touched.update(await self.mempool.update(mempool_hashes))
+    async def first_caught_up(self):
+        # Call the base class to flush and log first
+        await super().first_caught_up()
+        await self.server_mgr.start_servers()
+        self.futures.append(self.mempool.start())
+
+    def notify(self, touched):
+        '''Called when addresses are touched by new blocks or mempool
+        updates.'''
         self.server_mgr.notify(self.height, self.touched)
 
     def on_cancel(self):
@@ -97,13 +98,29 @@ class MemPool(LoggedClass):
         self.bp = bp
         self.count = -1
 
-    async def update(self, hex_hashes):
+    def start(self):
+        '''Starts the mempool synchronization mainloop.  Return a future.'''
+        return asyncio.ensure_future(self.main_loop())
+
+    async def main_loop(self):
+        '''Asynchronously maintain mempool status with daemon.'''
+        self.logger.info('maintaining state with daemon...')
+        while True:
+            try:
+                await self.update()
+                await asyncio.sleep(5)
+            except DaemonError as e:
+                self.logger.info('ignoring daemon error: {}'.format(e))
+            except asyncio.CancelledError:
+                break
+
+    async def update(self):
         '''Update state given the current mempool to the passed set of hashes.
 
         Remove transactions that are no longer in our mempool.
         Request new transactions we don't have then add to our mempool.
         '''
-        hex_hashes = set(hex_hashes)
+        hex_hashes = set(await self.bp.daemon.mempool_hashes())
         touched = set()
         missing_utxos = []
 
@@ -210,8 +227,7 @@ class MemPool(LoggedClass):
             self.logger.info('{:,d} txs touching {:,d} addresses'
                              .format(len(self.txs), len(self.hash168s)))
 
-        # Might include a None
-        return touched
+        self.bp.notify(touched)
 
     def transactions(self, hash168):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -295,7 +311,6 @@ class ServerManager(LoggedClass):
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
         if env.irc:
-            self.logger.info('starting IRC coroutine')
             self.irc_future = asyncio.ensure_future(self.irc.start())
         else:
             self.logger.info('IRC disabled')
@@ -310,11 +325,12 @@ class ServerManager(LoggedClass):
 
     def stop(self):
         '''Close listening servers.'''
-        self.logger.info('cleanly closing client sessions, please wait...')
         for server in self.servers:
             server.close()
         if self.irc_future:
             self.irc_future.cancel()
+        if self.sessions:
+            self.logger.info('cleanly closing client sessions, please wait...')
         for session in self.sessions:
             self.close_session(session)
 
