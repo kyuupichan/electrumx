@@ -358,6 +358,7 @@ class Dash(Coin):
     TX_COUNT_HEIGHT = 569399
     TX_COUNT = 2157510
     TX_PER_BLOCK = 4
+    DEFAULT_RPC_PORT = 9998
 
     @classmethod
     def header_hashes(cls, header):
@@ -379,3 +380,4 @@ class DashTestnet(Dash):
     TX_COUNT_HEIGHT = 101619
     TX_COUNT = 132681
     TX_PER_BLOCK = 1
+    DEFAULT_RPC_PORT = 19998
