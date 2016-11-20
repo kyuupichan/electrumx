@@ -48,7 +48,7 @@ class BlockServer(BlockProcessor):
     def notify(self, touched):
         '''Called when addresses are touched by new blocks or mempool
         updates.'''
-        self.server_mgr.notify(self.height, self.touched)
+        self.server_mgr.notify(self.height, touched)
 
     def on_cancel(self):
         '''Called when the main loop is cancelled.'''
@@ -354,6 +354,8 @@ class ServerManager(LoggedClass):
         coro = session.serve_requests()
         future = asyncio.ensure_future(coro)
         self.sessions[session] = future
+        self.logger.info('connection from {}, {:,d} total'
+                         .format(session.peername(), len(self.sessions)))
         # Some connections are acknowledged after the servers are closed
         if not self.servers:
             self.close_session(session)
@@ -437,7 +439,6 @@ class Session(JSONRPC):
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
-        self.logger.info('connection from {}'.format(self.peername()))
         self.manager.add_session(self)
 
     def connection_lost(self, exc):
