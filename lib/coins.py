@@ -14,6 +14,7 @@ necessary for appropriate handling.
 from decimal import Decimal
 from functools import partial
 import inspect
+import re
 import struct
 import sys
 
@@ -34,6 +35,7 @@ class Coin(object):
     # Not sure if these are coin-specific
     HEADER_LEN = 80
     DEFAULT_RPC_PORT = 8332
+    RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
     STRANGE_VERBYTE = 0xff
@@ -49,6 +51,23 @@ class Coin(object):
                 return coin
         raise CoinError('unknown coin {} and network {} combination'
                         .format(name, net))
+
+    @classmethod
+    def sanitize_url(cls, url):
+        # Remove surrounding ws and trailing /s
+        url = url.strip().rstrip('/')
+        match = cls.RPC_URL_REGEX.match(url)
+        if not match:
+            raise CoinError('invalid daemon URL: "{}"'.format(url))
+        if match.groups()[0] is None:
+            url += ':{:d}'.format(cls.DEFAULT_RPC_PORT)
+        if not url.startswith('http://'):
+            url = 'http://' + url
+        return url + '/'
+
+    @classmethod
+    def daemon_urls(cls, urls):
+        return [cls.sanitize_url(url) for url in urls.split(',')]
 
     @cachedproperty
     def hash168_handlers(cls):

@@ -30,7 +30,7 @@ class Env(LoggedClass):
         self.hist_MB = self.integer('HIST_MB', 300)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
-        self.daemon_url = self.build_daemon_url()
+        self.daemon_url = self.required('DAEMON_URL')
         # Server stuff
         self.tcp_port = self.integer('TCP_PORT', None)
         self.ssl_port = self.integer('SSL_PORT', None)
@@ -74,14 +74,3 @@ class Env(LoggedClass):
         except:
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
-
-    def build_daemon_url(self):
-        daemon_url = environ.get('DAEMON_URL')
-        if not daemon_url:
-            username = self.required('DAEMON_USERNAME')
-            password = self.required('DAEMON_PASSWORD')
-            host = self.required('DAEMON_HOST')
-            port = self.default('DAEMON_PORT', self.coin.DEFAULT_RPC_PORT)
-            daemon_url = ('http://{}:{}@{}:{}/'
-                          .format(username, password, host, port))
-        return daemon_url

@@ -1,3 +1,14 @@
+version 0.7
+-----------
+
+- daemon failover is now supported; see docs/ENV-NOTES.  As a result,
+  DAEMON_URL must now be supplied and DAEMON_USERNAME, DAEMON_PASSWORD,
+  DAEMON_HOST and DAEMON_PORT are no longer used.
+- fixed a bug introduced in 0.6 series where some client header requests
+  would fail
+- fully asynchronous mempool handling; blocks can be processed and clients
+  notified whilst the mempool is still being processed
+
 version 0.6.3
 -------------
 
