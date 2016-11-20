@@ -46,6 +46,28 @@ that could easily be reused for those alts that are reasonably
 compatible with Bitcoin.  Such an abstraction is also useful for
 testnets, of course.
 
+Features
+========
+
+- The full Electrum protocol is implemented with the exception of the
+  blockchain.address.get_proof RPC call, which is not used in normal
+  sessions and only sent from the Electrum command line.
+- Efficient synchronization from Genesis.  Recent hardware should
+  synchronize in well under 24 hours, possibly much faster for recent
+  CPUs or if you have an SSD.  The fastest time to height 439k (mid
+  November 2016) reported is under 5 hours.  Electrum-server would
+  probably take around 1 month.
+- Subscription limiting both per-connection and across all connections.
+- Minimal resource usage once caught up and serving clients; tracking the
+  transaction mempool seems to take the most memory.
+- Each client is served asynchronously to all other clients and tasks,
+  so busy clients do not reduce responsiveness of other clients'
+  requests and notifications, or the processing of incoming blocks.
+- Daemon failover.  More than one daemon can be specified; ElectrumX
+  will failover round-robin style if the current one fails for any
+  reason.
+- Coin abstraction makes compatible altcoin support easy.
+
 
 Implementation
 ==============
@@ -58,7 +80,7 @@ So how does it achieve a much more compact database than Electrum
 server, which is forced to prune hisory for busy addresses, and yet
 sync roughly 2 orders of magnitude faster?
 
-I believe all of the following play a part:
+I believe all of the following play a part::
 
 - aggressive caching and batching of DB writes
 - more compact and efficient representation of UTXOs, address index,
@@ -94,15 +116,15 @@ Roadmap Pre-1.0
 - minor code cleanups
 - at most 1 more DB format change; I will make a weak attempt to
   retain 0.6 release's DB format if possible
-- provision of configurable ways to limit client connections so as to
-  mitigate intentional or unintentional degradation of server response
-  time to other clients.  Based on IRC discussion this will likely be a
-  combination of address subscription and bandwidth limits.
+- provision of bandwidth limit controls
+- implement simple protocol to discover peers without resorting to IRC
 
 
 Roadmap Post-1.0
 ================
 
+- Python 3.6, which has several performance improvements relevant to
+  ElectrumX
 - UTXO root logic and implementation
 - improve DB abstraction so LMDB is not penalized
 - investigate effects of cache defaults and DB configuration defaults
@@ -114,9 +136,9 @@ Database Format
 ===============
 
 The database and metadata formats of ElectrumX are likely to change.
-Such changes will render old DBs unusable.  At least until 1.0 I do
-not intend to provide converters; moreover from-genesis sync time to
-create a pristine database is quite tolerable.
+Such changes will render old DBs unusable.  For now I do not intend to
+provide converters as the time taken from genesis to synchronize to a
+pristine database is quite tolerable.
 
 
 Miscellany

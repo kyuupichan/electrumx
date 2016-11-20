@@ -27,11 +27,15 @@ class Daemon(util.LoggedClass):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, url, debug):
+    def __init__(self, urls, debug):
         super().__init__()
-        self.url = url
+        if not urls:
+            raise DaemonError('no daemon URLs provided')
+        for url in urls:
+            self.logger.info('daemon at {}'.format(self.logged_url(url)))
+        self.urls = urls
+        self.url_index = 0
         self._height = None
-        self.logger.info('connecting at URL {}'.format(url))
         self.debug_caught_up = 'caught_up' in debug
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
@@ -64,10 +68,12 @@ class Daemon(util.LoggedClass):
 
         data = json.dumps(payload)
         secs = 1
+        max_secs = 16
         while True:
             try:
                 async with self.workqueue_semaphore:
-                    async with aiohttp.post(self.url, data=data) as resp:
+                    url = self.urls[self.url_index]
+                    async with aiohttp.post(url, data=data) as resp:
                         result = processor(await resp.json())
                         if self.prior_msg:
                             self.logger.info('connection restored')
@@ -86,8 +92,18 @@ class Daemon(util.LoggedClass):
                 raise
             except Exception as e:
                 log_error('request gave unexpected error: {}.'.format(e))
-            await asyncio.sleep(secs)
-            secs = min(16, secs * 2)
+            if secs >= max_secs and len(self.urls) > 1:
+                self.url_index = (self.url_index + 1) % len(self.urls)
+                logged_url = self.logged_url(self.urls[self.url_index])
+                self.logger.info('failing over to {}'.format(logged_url))
+                secs = 1
+            else:
+                await asyncio.sleep(secs)
+                secs = min(16, secs * 2)
+
+    def logged_url(self, url):
+        '''The host and port part, for logging.'''
+        return url[url.rindex('@') + 1:]
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
