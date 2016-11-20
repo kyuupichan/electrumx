@@ -317,6 +317,7 @@ class ServerManager(LoggedClass):
 
     def notify(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
+        self.logger.info('{:,d} addresses touched'.format(len(touched)))
         cache = {}
         for session in self.sessions:
             if isinstance(session, ElectrumX):
