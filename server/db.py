@@ -143,6 +143,7 @@ class DB(LoggedClass):
             raise
 
     def fs_read_headers(self, start, count):
+        '''Requires count >= 0.'''
         # Read some from disk
         disk_count = min(count, self.db_height + 1 - start)
         if start < 0 or count < 0 or disk_count != count:

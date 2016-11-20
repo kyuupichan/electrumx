@@ -55,6 +55,8 @@ class IRC(LoggedClass):
             await self.join()
         except asyncio.CancelledError:
             pass
+        except Exception as e:
+            self.logger.error(str(e))
 
     async def join(self):
         import irc.client as irc_client

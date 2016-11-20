@@ -38,16 +38,17 @@ class BlockServer(BlockProcessor):
         super().__init__(env)
         self.server_mgr = ServerManager(self, env)
         self.mempool = MemPool(self)
-        self.caught_up_yet = False
 
-    async def caught_up(self, mempool_hashes):
-        # Call the base class to flush before doing anything else.
-        await super().caught_up(mempool_hashes)
-        if not self.caught_up_yet:
-            await self.server_mgr.start_servers()
-            self.caught_up_yet = True
-        self.touched.update(await self.mempool.update(mempool_hashes))
-        self.server_mgr.notify(self.height, self.touched)
+    async def first_caught_up(self):
+        # Call the base class to flush and log first
+        await super().first_caught_up()
+        await self.server_mgr.start_servers()
+        self.futures.append(self.mempool.start())
+
+    def notify(self, touched):
+        '''Called when addresses are touched by new blocks or mempool
+        updates.'''
+        self.server_mgr.notify(self.height, touched)
 
     def on_cancel(self):
         '''Called when the main loop is cancelled.'''
@@ -97,13 +98,29 @@ class MemPool(LoggedClass):
         self.bp = bp
         self.count = -1
 
-    async def update(self, hex_hashes):
+    def start(self):
+        '''Starts the mempool synchronization mainloop.  Return a future.'''
+        return asyncio.ensure_future(self.main_loop())
+
+    async def main_loop(self):
+        '''Asynchronously maintain mempool status with daemon.'''
+        self.logger.info('maintaining state with daemon...')
+        while True:
+            try:
+                await self.update()
+                await asyncio.sleep(5)
+            except DaemonError as e:
+                self.logger.info('ignoring daemon error: {}'.format(e))
+            except asyncio.CancelledError:
+                break
+
+    async def update(self):
         '''Update state given the current mempool to the passed set of hashes.
 
         Remove transactions that are no longer in our mempool.
         Request new transactions we don't have then add to our mempool.
         '''
-        hex_hashes = set(hex_hashes)
+        hex_hashes = set(await self.bp.daemon.mempool_hashes())
         touched = set()
         missing_utxos = []
 
@@ -210,8 +227,7 @@ class MemPool(LoggedClass):
             self.logger.info('{:,d} txs touching {:,d} addresses'
                              .format(len(self.txs), len(self.hash168s)))
 
-        # Might include a None
-        return touched
+        self.bp.notify(touched)
 
     def transactions(self, hash168):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -295,13 +311,13 @@ class ServerManager(LoggedClass):
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
         if env.irc:
-            self.logger.info('starting IRC coroutine')
             self.irc_future = asyncio.ensure_future(self.irc.start())
         else:
             self.logger.info('IRC disabled')
 
     def notify(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
+        self.logger.info('{:,d} addresses touched'.format(len(touched)))
         cache = {}
         for session in self.sessions:
             if isinstance(session, ElectrumX):
@@ -310,39 +326,45 @@ class ServerManager(LoggedClass):
 
     def stop(self):
         '''Close listening servers.'''
-        self.logger.info('cleanly closing client sessions, please wait...')
         for server in self.servers:
             server.close()
         if self.irc_future:
             self.irc_future.cancel()
+        if self.sessions:
+            self.logger.info('cleanly closing client sessions, please wait...')
         for session in self.sessions:
-            session.transport.close()
+            self.close_session(session)
 
     async def wait_shutdown(self):
         # Wait for servers to close
         for server in self.servers:
             await server.wait_closed()
-        # Just in case a connection came in
-        await asyncio.sleep(0)
         self.servers = []
-        self.logger.info('server listening sockets closed')
-        limit = time.time() + 10
+
+        secs = 60
+        self.logger.info('server listening sockets closed, waiting '
+                         '{:d} seconds for socket cleanup'.format(secs))
+
+        limit = time.time() + secs
         while self.sessions and time.time() < limit:
+            await asyncio.sleep(4)
             self.logger.info('{:,d} sessions remaining'
                              .format(len(self.sessions)))
-            await asyncio.sleep(2)
-        if self.sessions:
-            self.logger.info('forcibly closing {:,d} stragglers'
-                             .format(len(self.sessions)))
-            for future in self.sessions.values():
-                future.cancel()
-            await asyncio.sleep(0)
 
     def add_session(self, session):
-        assert self.servers
-        assert session not in self.sessions
         coro = session.serve_requests()
-        self.sessions[session] = asyncio.ensure_future(coro)
+        future = asyncio.ensure_future(coro)
+        self.sessions[session] = future
+        self.logger.info('connection from {}, {:,d} total'
+                         .format(session.peername(), len(self.sessions)))
+        # Some connections are acknowledged after the servers are closed
+        if not self.servers:
+            self.close_session(session)
+
+    def close_session(self, session):
+        '''Close the session's transport and cancel its future.'''
+        session.transport.close()
+        self.sessions[session].cancel()
 
     def remove_session(self, session):
         self.subscription_count -= session.sub_count()
@@ -418,7 +440,6 @@ class Session(JSONRPC):
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
-        self.logger.info('connection from {}'.format(self.peername()))
         self.manager.add_session(self)
 
     def connection_lost(self, exc):

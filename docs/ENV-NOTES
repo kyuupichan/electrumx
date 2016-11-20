@@ -4,11 +4,13 @@ DB_DIRECTORY  - path to the database directory (if relative, to `run` script)
 USERNAME      - the username the server will run as if using `run` script
 ELECTRUMX     - path to the electrumx_server.py script (if relative,
                 to `run` script)
-DAEMON_URL    - the URL used to connect to the daemon.  Should be of the form
+DAEMON_URL    - A comma-separated list of daemon URLS.  If more than one is
+                provided ElectrumX will failover to the next when one stops
+                working.  The generic form is:
                     http://username:password@hostname:port/
-                Alternatively you can specify DAEMON_USERNAME, DAEMON_PASSWORD,
-                DAEMON_HOST and DAEMON_PORT.  DAEMON_PORT is optional and
-                will default appropriately for COIN.
+                The leading 'http://' is optional, as is the trailing
+                slash.  The ':port' part is also optional and will default
+                to the standard RPC port for COIN if omitted.
 
 The other environment variables are all optional and will adopt
 sensible defaults if not specified.
