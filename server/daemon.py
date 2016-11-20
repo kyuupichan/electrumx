@@ -99,7 +99,7 @@ class Daemon(util.LoggedClass):
                 secs = 1
             else:
                 await asyncio.sleep(secs)
-                secs = min(16, secs * 2)
+                secs = min(max_secs, secs * 2)
 
     def logged_url(self, url):
         '''The host and port part, for logging.'''
