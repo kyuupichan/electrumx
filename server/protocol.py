@@ -311,7 +311,6 @@ class ServerManager(LoggedClass):
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
         if env.irc:
-            self.logger.info('starting IRC coroutine')
             self.irc_future = asyncio.ensure_future(self.irc.start())
         else:
             self.logger.info('IRC disabled')
