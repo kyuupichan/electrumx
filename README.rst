@@ -84,7 +84,7 @@ I believe all of the following play a part::
 
 - aggressive caching and batching of DB writes
 - more compact and efficient representation of UTXOs, address index,
-  and history.  Electrum-Server stores full transaction hash and
+  and history.  Electrum Server stores full transaction hash and
   height for each UTXO, and does the same in its pruned history.  In
   contrast ElectrumX just stores the transaction number in the linear
   history of transactions.  For at least another 5 years this

@@ -1,3 +1,8 @@
+version 0.7.1
+-------------
+
+- fixes an unqualified use of RPCError
+
 version 0.7
 -----------
 

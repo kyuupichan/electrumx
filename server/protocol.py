@@ -492,7 +492,7 @@ class Session(JSONRPC):
         try:
             return await getattr(self.daemon, method)(*args)
         except DaemonError as e:
-            raise RPCError('daemon error: {}'.format(e))
+            raise self.RPCError('daemon error: {}'.format(e))
 
     def tx_hash_from_param(self, param):
         '''Raise an RPCError if the parameter is not a valid transaction
