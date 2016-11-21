@@ -117,7 +117,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             message = message.decode()
         except UnicodeDecodeError as e:
             msg = 'cannot decode binary bytes: {}'.format(e)
-            self.logger.warning(msg)
             self.send_json_error(msg, self.PARSE_ERROR)
             return
 
@@ -125,7 +124,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             message = json.loads(message)
         except json.JSONDecodeError as e:
             msg = 'cannot decode JSON: {}'.format(e)
-            self.logger.warning(msg)
             self.send_json_error(msg, self.PARSE_ERROR)
             return
 
@@ -133,52 +131,49 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def send_json_notification(self, method, params):
         '''Create a json notification.'''
-        return self.send_json(json_notification_payload(method, params))
+        self.send_json(json_notification_payload(method, params))
 
     def send_json_result(self, result, id_):
         '''Send a JSON result.'''
-        return self.send_json(json_result_payload(result, id_))
+        self.send_json(json_result_payload(result, id_))
 
     def send_json_error(self, message, code, id_=None):
         '''Send a JSON error.'''
+        self.send_json(json_error_payload(message, code, id_))
         self.error_count += 1
-        return self.send_json(json_error_payload(message, code, id_))
+        # Close abusive clients
+        if self.error_count >= 10:
+            self.transport.close()
 
     def send_json(self, payload):
         '''Send a JSON payload.'''
+        # Confirmed this happens, sometimes a lot
         if self.transport.is_closing():
-            # Confirmed this happens, sometimes a lot
-            return False
+            return
 
         try:
             data = (json.dumps(payload) + '\n').encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.logger.error(msg)
-            return self.send_json_error(msg, self.INTERNAL_ERROR,
-                                         payload.get('id'))
-
-        self.send_count += 1
-        self.send_size += len(data)
-        self.transport.write(data)
-        return True
+            self.send_json_error(msg, self.INTERNAL_ERROR, payload.get('id'))
+        else:
+            self.send_count += 1
+            self.send_size += len(data)
+            self.transport.write(data)
 
     async def handle_json_request(self, request):
         '''Asynchronously handle a JSON request.
 
-        Handles batch requests.  Returns True if the request response
-        was sent (or if nothing was sent because the request was a
-        notification).  Returns False if the send was aborted because
-        the connection is closing.
+        Handles batch requests.
         '''
         if isinstance(request, list):
             payload = await self.batch_request_payload(request)
         else:
             payload = await self.single_request_payload(request)
 
-        if not payload:
-            return True
-        return self.send_json(payload)
+        if payload:
+            self.send_json(payload)
 
     async def batch_request_payload(self, batch):
         '''Return the JSON payload corresponding to a batch JSON request.'''
