@@ -100,7 +100,7 @@ might do::
 
 Then copy the all sample scripts from the ElectrumX source tree there::
 
-    cp -R /path/to/repo/electrumx/samples/scripts ~/scripts/electrumx
+    cp -R /path/to/repo/electrumx/samples/daemontools ~/scripts/electrumx
 
 This copies 3 things: the top level server run script, a log/ directory
 with the logger run script, an env/ directory.
@@ -136,7 +136,7 @@ Using systemd
 This repository contains a sample systemd unit file that you can use to
 setup ElectrumX with systemd. Simply copy it to :code:`/etc/systemd/system`::
 
-    cp samples/systemd-unit /etc/systemd/system/electrumx.service
+    cp samples/systemd/electrumx.service /etc/systemd/system/
 
 The sample unit file assumes that the repository is located at
 :code:`/home/electrumx/electrumx`. If that differs on your system, you need to
