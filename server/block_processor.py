@@ -669,15 +669,19 @@ class BlockProcessor(server.db.DB):
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
+        script_hash168 = self.coin.hash168_from_script()
 
         rtxs = reversed(txs)
         rtx_hashes = reversed(tx_hashes)
 
         for tx_hash, tx in zip(rtx_hashes, rtxs):
-            # Spend the outputs
             for idx, txout in enumerate(tx.outputs):
-                cache_value = spend_utxo(tx_hash, idx)
-                touched.add(cache_value[:21])
+                # Spend the TX outputs.  Be careful with unspendable
+                # outputs - we didn't save those in the first place.
+                hash168 = script_hash168(txout.pk_script)
+                if hash168:
+                    cache_value = spend_utxo(tx_hash, idx)
+                    touched.add(cache_value[:21])
 
             # Restore the inputs
             if not tx.is_coinbase:
