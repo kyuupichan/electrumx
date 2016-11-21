@@ -1,3 +1,11 @@
+version 0.7.2
+-------------
+
+- don't log message decoding errors.  Cut off a connection after it has sent
+  10 ill-formed requests.
+- doc improvements (cluelessperson)
+- RPC ports for Dash (TheLazier)
+
 version 0.7.1
 -------------
 
