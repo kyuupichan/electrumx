@@ -650,6 +650,7 @@ class BlockProcessor(server.db.DB):
             assert self.height >= 0
             self.height -= 1
 
+        self.fs_height = self.height
         assert not self.headers
         assert not self.tx_hashes
 
