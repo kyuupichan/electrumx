@@ -6,10 +6,10 @@
 
 
 ## Features
-* Harder
-* Better
-* Faster
-* Stronger
+* Harder    (resilient)
+* Better    (easier)
+* Faster    (smaller)
+* Stronger  (client throttling)
 * Python 3
 * Alcoin Compatible
 * Client Throttling (for public serving)
