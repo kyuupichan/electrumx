@@ -14,7 +14,7 @@
 * Alcoin Compatible
 * Client Throttling (for public serving)
 
-## [Installation Instructions](https://github.com/kyuupichan/electrumx/blob/master/docs/install)
+## [Installation Instructions](tree/master/docs/install)
 
 ## License
 
