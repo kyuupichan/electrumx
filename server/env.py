@@ -53,7 +53,11 @@ class Env(LoggedClass):
         self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
         self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
         self.report_host = self.default('REPORT_HOST', self.host)
+        self.irc_prefix = self.default('IRC_PREFIX', 'E')
         self.irc_nick = self.default('IRC_NICK', None)
+        self.irc_channel = self.default('IRC_CHANNEL', 'electrum')
+        self.irc_server = self.default('IRC_SERVER', 'irc.freenode.net')
+        self.irc_port = self.default('IRC_PORT', 6667)
         self.irc = self.default('IRC', False)
 
     def default(self, envvar, default):

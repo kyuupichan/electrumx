@@ -30,7 +30,6 @@ def port_text(letter, port, default):
 
 class IRC(LoggedClass):
 
-    PEER_REGEXP = re.compile('(E_[^!]*)!')
     Peer = namedtuple('Peer', 'ip_addr host ports')
 
     class DisconnectedError(Exception):
@@ -45,9 +44,15 @@ class IRC(LoggedClass):
         version = '1.0'
         self.real_name = '{} v{} {} {}'.format(env.report_host, version,
                                                tcp_text, ssl_text)
-        self.nick = 'E_{}'.format(env.irc_nick if env.irc_nick else
+        self.prefix = '{}_'.format(env.irc_prefix[:1])
+        self.nick = '{}{}'.format(self.prefix,
+                                  env.irc_nick if env.irc_nick else
                                   double_sha256(env.report_host.encode())
                                   [:5].hex())
+        self.channel = '#{}'.format(env.irc_channel)
+        self.irc_server = env.irc_server
+        self.irc_port = env.irc_port
+        self.PEER_REGEXP = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
 
     async def start(self):
@@ -72,7 +77,7 @@ class IRC(LoggedClass):
         while True:
             try:
                 connection = reactor.server()
-                connection.connect('irc.freenode.net', 6667,
+                connection.connect(self.irc_server, self.irc_port,
                                    self.nick, ircname=self.real_name)
                 connection.set_keepalive(60)
                 while True:
@@ -90,7 +95,7 @@ class IRC(LoggedClass):
 
     def on_welcome(self, connection, event):
         '''Called when we connect to freenode.'''
-        connection.join('#electrum')
+        connection.join(self.channel)
 
     def on_disconnect(self, connection, event):
         '''Called if we are disconnected.'''
@@ -123,7 +128,7 @@ class IRC(LoggedClass):
         The users are space-separated in the 2nd argument.
         '''
         for peer in event.arguments[2].split():
-            if peer.startswith("E_"):
+            if peer.startswith(self.prefix):
                 connection.who(peer)
 
     def on_whoreply(self, connection, event):

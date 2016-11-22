@@ -52,8 +52,12 @@ MAX_SESSION_SUBS - maximum number of address subscriptions permitted to a
 If you want IRC connectivity to advertise your node:
 
 IRC             - set to anything non-empty
+IRC_PREFIX      - The default is 'E'.
 IRC_NICK        - the nick to use when connecting to IRC.  The default is a
-                  hash of REPORT_HOST.  Either way 'E_' will be prepended.
+                  hash of REPORT_HOST. Either way IRC_PREFIX_ will be prepended.
+IRC_CHANNEL     - The default is 'electrum'.
+IRC_SERVER      - The default is 'irc.freenode.net'.
+IRC_PORT        - The default is 6667.
 REPORT_HOST     - the host to advertise.  Defaults to HOST.
 REPORT_SSL_PORT - the SSL port to advertise.  Defaults to SSL_PORT.
 REPORT_TCP_PORT - the TCP port to advertise.  Defaults to TCP_PORT.
