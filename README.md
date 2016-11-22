@@ -14,7 +14,7 @@
 * Alcoin Compatible
 * Client Throttling (for public serving)
 
-## [Installation Instructions](tree/master/docs/install)
+## [Installation Instructions](tree/master/docs/install.md)
 
 ## License
 
