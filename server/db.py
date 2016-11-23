@@ -188,6 +188,18 @@ class DB(LoggedClass):
             keys.append(key)
         return keys
 
+    def undo_key(self, height):
+        '''DB key for undo information at the given height.'''
+        return b'U' + pack('>I', height)
+
+    def write_undo_info(self, height, undo_info):
+        '''Write out undo information for the current height.'''
+        self.db.put(self.undo_key(height), undo_info)
+
+    def read_undo_info(self, height):
+        '''Read undo information from a file for the current height.'''
+        return self.db.get(self.undo_key(height))
+
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
         try:

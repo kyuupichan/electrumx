@@ -452,18 +452,6 @@ class BlockProcessor(server.db.DB):
         if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
             self.flush(utxo_MB >= self.utxo_MB)
 
-    def undo_key(self, height):
-        '''DB key for undo information at the given height.'''
-        return b'U' + pack('>I', height)
-
-    def write_undo_info(self, height, undo_info):
-        '''Write out undo information for the current height.'''
-        self.db.put(self.undo_key(height), undo_info)
-
-    def read_undo_info(self, height):
-        '''Read undo information from a file for the current height.'''
-        return self.db.get(self.undo_key(height))
-
     def fs_advance_block(self, header, tx_hashes, txs):
         '''Update unflushed FS state for a new block.'''
         prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
