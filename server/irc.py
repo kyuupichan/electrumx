@@ -30,7 +30,6 @@ def port_text(letter, port, default):
 
 class IRC(LoggedClass):
 
-    PEER_REGEXP = re.compile('(E_[^!]*)!')
     Peer = namedtuple('Peer', 'ip_addr host ports')
 
     class DisconnectedError(Exception):
@@ -45,9 +44,15 @@ class IRC(LoggedClass):
         version = '1.0'
         self.real_name = '{} v{} {} {}'.format(env.report_host, version,
                                                tcp_text, ssl_text)
-        self.nick = 'E_{}'.format(env.irc_nick if env.irc_nick else
+        self.prefix = env.coin.IRC_PREFIX
+        self.nick = '{}{}'.format(self.prefix,
+                                  env.irc_nick if env.irc_nick else
                                   double_sha256(env.report_host.encode())
                                   [:5].hex())
+        self.channel = env.coin.IRC_CHANNEL
+        self.irc_server = env.coin.IRC_SERVER
+        self.irc_port = env.coin.IRC_PORT
+        self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
 
     async def start(self):
@@ -72,7 +77,7 @@ class IRC(LoggedClass):
         while True:
             try:
                 connection = reactor.server()
-                connection.connect('irc.freenode.net', 6667,
+                connection.connect(self.irc_server, self.irc_port,
                                    self.nick, ircname=self.real_name)
                 connection.set_keepalive(60)
                 while True:
@@ -89,8 +94,8 @@ class IRC(LoggedClass):
                          .format(event.type, event.source, event.arguments))
 
     def on_welcome(self, connection, event):
-        '''Called when we connect to freenode.'''
-        connection.join('#electrum')
+        '''Called when we connect to irc server.'''
+        connection.join(self.channel)
 
     def on_disconnect(self, connection, event):
         '''Called if we are disconnected.'''
@@ -99,20 +104,20 @@ class IRC(LoggedClass):
 
     def on_join(self, connection, event):
         '''Called when someone new connects to our channel, including us.'''
-        match = self.PEER_REGEXP.match(event.source)
+        match = self.peer_regexp.match(event.source)
         if match:
             connection.who(match.group(1))
 
     def on_quit(self, connection, event):
         '''Called when someone leaves our channel.'''
-        match = self.PEER_REGEXP.match(event.source)
+        match = self.peer_regexp.match(event.source)
         if match:
             self.peers.pop(match.group(1), None)
 
     def on_kick(self, connection, event):
         '''Called when someone is kicked from our channel.'''
         self.log_event(event)
-        match = self.PEER_REGEXP.match(event.arguments[0])
+        match = self.peer_regexp.match(event.arguments[0])
         if match:
             self.peers.pop(match.group(1), None)
 
@@ -123,7 +128,7 @@ class IRC(LoggedClass):
         The users are space-separated in the 2nd argument.
         '''
         for peer in event.arguments[2].split():
-            if peer.startswith("E_"):
+            if peer.startswith(self.prefix):
                 connection.who(peer)
 
     def on_whoreply(self, connection, event):
