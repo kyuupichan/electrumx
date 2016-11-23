@@ -44,8 +44,6 @@ class Env(LoggedClass):
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
-        self.debug = self.default('DEBUG', '')
-        self.debug = [item.lower() for item in self.debug.split()]
         # Subscription limits
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)

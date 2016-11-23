@@ -27,7 +27,7 @@ class Daemon(util.LoggedClass):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, urls, debug):
+    def __init__(self, urls):
         super().__init__()
         if not urls:
             raise DaemonError('no daemon URLs provided')
@@ -36,16 +36,9 @@ class Daemon(util.LoggedClass):
         self.urls = urls
         self.url_index = 0
         self._height = None
-        self.debug_caught_up = 'caught_up' in debug
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
-
-    def debug_set_height(self, height):
-        if self.debug_caught_up:
-            self.logger.info('pretending to have caught up to height {}'
-                             .format(height))
-            self._height = height
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -157,8 +150,6 @@ class Daemon(util.LoggedClass):
 
     async def mempool_hashes(self):
         '''Return the hashes of the txs in the daemon's mempool.'''
-        if self.debug_caught_up:
-            return []
         return await self._send_single('getrawmempool')
 
     async def estimatefee(self, params):
@@ -191,8 +182,7 @@ class Daemon(util.LoggedClass):
 
     async def height(self):
         '''Query the daemon for its current height.'''
-        if not self.debug_caught_up:
-            self._height = await self._send_single('getblockcount')
+        self._height = await self._send_single('getblockcount')
         return self._height
 
     def cached_height(self):

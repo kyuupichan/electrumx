@@ -142,8 +142,7 @@ class BlockProcessor(server.db.DB):
         self.tip = self.db_tip
         self.tx_count = self.db_tx_count
 
-        self.daemon = Daemon(self.coin.daemon_urls(env.daemon_url), env.debug)
-        self.daemon.debug_set_height(self.height)
+        self.daemon = Daemon(self.coin.daemon_urls(env.daemon_url))
         self.caught_up = False
         self.touched = set()
         self.futures = []
