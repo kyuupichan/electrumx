@@ -44,8 +44,6 @@ class Env(LoggedClass):
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
-        self.debug = self.default('DEBUG', '')
-        self.debug = [item.lower() for item in self.debug.split()]
         # Subscription limits
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
@@ -55,6 +53,8 @@ class Env(LoggedClass):
         self.report_host = self.default('REPORT_HOST', self.host)
         self.irc_nick = self.default('IRC_NICK', None)
         self.irc = self.default('IRC', False)
+        # Debugging
+        self.force_reorg = self.integer('FORCE_REORG', 0)
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
