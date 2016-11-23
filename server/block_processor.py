@@ -25,10 +25,6 @@ from lib.util import chunks, formatted_time, LoggedClass
 import server.db
 from server.storage import open_db
 
-# Limits single address history to ~ 65536 * HIST_ENTRIES_PER_KEY entries
-HIST_ENTRIES_PER_KEY = 1024
-HIST_VALUE_BYTES = HIST_ENTRIES_PER_KEY * 4
-
 
 class ChainError(Exception):
     pass
