@@ -53,6 +53,8 @@ class Env(LoggedClass):
         self.report_host = self.default('REPORT_HOST', self.host)
         self.irc_nick = self.default('IRC_NICK', None)
         self.irc = self.default('IRC', False)
+        # Debugging
+        self.force_reorg = self.integer('FORCE_REORG', 0)
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
