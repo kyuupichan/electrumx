@@ -1,3 +1,17 @@
+version 0.7.5
+-------------
+
+- refactoring of server manager and event handling.  One side effect
+  is to fix a bug in 0.7.4 where after a reorg ElectrumX might create
+  a second mempool and/or kick off more servers.  Your testing would
+  be appreciated.  This is part of the refactoring necessary to
+  process incoming blocks asynchronously so client connections are not
+  left waiting for several seconds
+- close connections on first bad JSON encoding.  Do not process buffered
+  requests of a closing connection
+- make IRC params a function of the coin (TheLazier) and supply them for
+  Dash
+
 version 0.7.4
 -------------
 
