@@ -10,6 +10,7 @@
 
 import array
 import ast
+import itertools
 import os
 from struct import pack, unpack
 from bisect import bisect_right
@@ -117,7 +118,6 @@ class DB(LoggedClass):
             self.logger.info('sync time so far: {}'
                              .format(formatted_time(self.wall_time)))
 
-
     def write_state(self, batch):
         '''Write chain state to the batch.'''
         state = {
@@ -142,7 +142,51 @@ class DB(LoggedClass):
                 return open(filename, 'wb+')
             raise
 
-    def fs_read_headers(self, start, count):
+    def fs_update(self, fs_height, headers, block_tx_hashes):
+        '''Write headers, the tx_count array and block tx hashes to disk.
+
+        Their first height is fs_height.  No recorded DB state is
+        updated.  These arrays are all append only, so in a crash we
+        just pick up again from the DB height.
+        '''
+        blocks_done = len(self.headers)
+        new_height = fs_height + blocks_done
+        prior_tx_count = (self.tx_counts[fs_height] if fs_height >= 0 else 0)
+        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+        txs_done = cur_tx_count - prior_tx_count
+
+        assert len(self.tx_hashes) == blocks_done
+        assert len(self.tx_counts) == new_height + 1
+
+        # First the headers
+        self.headers_file.seek((fs_height + 1) * self.coin.HEADER_LEN)
+        self.headers_file.write(b''.join(headers))
+        self.headers_file.flush()
+
+        # Then the tx counts
+        self.txcount_file.seek((fs_height + 1) * self.tx_counts.itemsize)
+        self.txcount_file.write(self.tx_counts[fs_height + 1:])
+        self.txcount_file.flush()
+
+        # Finally the hashes
+        hashes = memoryview(b''.join(itertools.chain(*block_tx_hashes)))
+        assert len(hashes) % 32 == 0
+        assert len(hashes) // 32 == txs_done
+        cursor = 0
+        file_pos = prior_tx_count * 32
+        while cursor < len(hashes):
+            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
+            filename = 'hashes{:04d}'.format(file_num)
+            with self.open_file(filename, create=True) as f:
+                f.seek(offset)
+                f.write(hashes[cursor:cursor + size])
+            cursor += size
+            file_pos += size
+
+        os.sync()
+
+    def read_headers(self, start, count):
         '''Requires count >= 0.'''
         # Read some from disk
         disk_count = min(count, self.db_height + 1 - start)
@@ -172,7 +216,7 @@ class DB(LoggedClass):
             return f.read(32), tx_height
 
     def fs_block_hashes(self, height, count):
-        headers = self.fs_read_headers(height, count)
+        headers = self.read_headers(height, count)
         # FIXME: move to coins.py
         hlen = self.coin.HEADER_LEN
         return [self.coin.header_hash(header)
