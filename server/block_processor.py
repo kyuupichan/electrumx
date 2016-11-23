@@ -645,6 +645,7 @@ class BlockProcessor(server.db.DB):
             self.tip = prev_hash
             assert self.height >= 0
             self.height -= 1
+            self.tx_counts.pop()
 
         self.fs_height = self.height
         assert not self.headers
