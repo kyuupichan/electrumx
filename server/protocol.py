@@ -52,12 +52,11 @@ class MemPool(util.LoggedClass):
         self.hash168s = defaultdict(set)  # None can be a key
         self.count = -1
 
-    def start(self):
-        '''Starts the mempool synchronization mainloop.  Return a future.'''
-        return asyncio.ensure_future(self.main_loop())
+    async def main_loop(self, caught_up):
+        '''Asynchronously maintain mempool status with daemon.
 
-    async def main_loop(self):
-        '''Asynchronously maintain mempool status with daemon.'''
+        Waits until the caught up event is signalled.'''
+        await caught_up.wait()
         self.logger.info('maintaining state with daemon...')
         while True:
             try:
@@ -181,7 +180,7 @@ class MemPool(util.LoggedClass):
             self.logger.info('{:,d} txs touching {:,d} addresses'
                              .format(len(self.txs), len(self.hash168s)))
 
-        self.maanger.notify(touched)
+        self.manager.notify(touched)
 
     def transactions(self, hash168):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -220,15 +219,14 @@ class ServerManager(util.LoggedClass):
     def __init__(self, env):
         super().__init__()
         self.bp = BlockProcessor(self, env)
-        self.mempool = MemPool(self.db.daemon, env.coin, self.bp, self)
+        self.mempool = MemPool(self.bp.daemon, env.coin, self.bp, self)
+        self.irc = IRC(env)
         self.env = env
         self.servers = []
-        self.irc = IRC(env)
         self.sessions = {}
         self.max_subs = env.max_subs
         self.subscription_count = 0
-        self.irc_future = None
-        self.mempool_future = None
+        self.futures = []
         self.logger.info('max subscriptions across all sessions: {:,d}'
                          .format(self.max_subs))
         self.logger.info('max subscriptions per session: {:,d}'
@@ -249,6 +247,24 @@ class ServerManager(util.LoggedClass):
         '''
         return self.mempool.value(hash168)
 
+    async def main_loop(self):
+        '''Server manager main loop.'''
+        def add_future(coro):
+            self.futures.append(asyncio.ensure_future(coro))
+
+        add_future(self.bp.main_loop())
+        add_future(self.bp.prefetcher.main_loop())
+        add_future(self.mempool.main_loop(self.bp.event))
+        add_future(self.irc.start(self.bp.event))
+        add_future(self.start_servers(self.bp.event))
+
+        for future in asyncio.as_completed(self.futures):
+            try:
+                await future  # Note: future is not one of self.futures
+            except asyncio.CancelledError:
+                break
+        await self.shutdown()
+
     async def start_server(self, kind, *args, **kw_args):
         loop = asyncio.get_event_loop()
         protocol_class = LocalRPC if kind == 'RPC' else ElectrumX
@@ -265,12 +281,14 @@ class ServerManager(util.LoggedClass):
             self.logger.info('{} server listening on {}:{:d}'
                              .format(kind, host, port))
 
-    async def start_servers(self):
+    async def start_servers(self, caught_up):
         '''Connect to IRC and start listening for incoming connections.
 
         Only connect to IRC if enabled.  Start listening on RCP, TCP
-        and SSL ports only if the port wasn pecified.
+        and SSL ports only if the port wasn't pecified.  Waits for the
+        caught_up event to be signalled.
         '''
+        await caught_up.wait()
         env = self.env
 
         if env.rpc_port is not None:
@@ -285,16 +303,6 @@ class ServerManager(util.LoggedClass):
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
-        if env.irc:
-            self.irc_future = asyncio.ensure_future(self.irc.start())
-        else:
-            self.logger.info('IRC disabled')
-
-    async def first_caught_up(self):
-        if not self.mempool_future:
-            self.mempool_future = self.mempool.start()
-            await self.server_mgr.start_servers()
-
     def notify(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
         cache = {}
@@ -305,18 +313,17 @@ class ServerManager(util.LoggedClass):
 
     async def shutdown(self):
         '''Call to shutdown the servers.  Returns when done.'''
+        for future in self.futures:
+            future.cancel()
         for server in self.servers:
             server.close()
-        for server in self.servers:
             await server.wait_closed()
-        self.servers = []
-
-        if self.irc_future:
-            self.irc_future.cancel()
-        if self.mempool_future:
-            self.mempool_future.cancel()
+        self.servers = [] # So add_session closes new sessions
+        while not all(future.done() for future in self.futures):
+            await asyncio.sleep(0)
         if self.sessions:
             await self.close_sessions()
+        await self.bp.shutdown()
 
     async def close_sessions(self, secs=60):
         self.logger.info('cleanly closing client sessions, please wait...')

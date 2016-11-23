@@ -147,6 +147,7 @@ class BlockProcessor(server.db.DB):
 
         self.daemon = Daemon(self.coin.daemon_urls(env.daemon_url))
         self.caught_up = False
+        self.event = asyncio.Event()
         self.touched = set()
 
         # Meta
@@ -182,27 +183,23 @@ class BlockProcessor(server.db.DB):
         self.clean_db()
 
     async def main_loop(self):
-        '''Main loop for block processing.
-
-        Safely flushes the DB on clean shutdown.
-        '''
-        prefetcher_loop = asyncio.ensure_future(self.prefetcher.main_loop())
-
-        # Simulate a reorg if requested
-        if self.env.force_reorg > 0:
-            self.logger.info('DEBUG: simulating chain reorg of {:,d} blocks'
-                             .format(self.env.force_reorg))
-            await self.handle_chain_reorg(self.env.force_reorg)
-
+        '''Main loop for block processing.'''
         try:
+            # Simulate a reorg if requested
+            if self.env.force_reorg > 0:
+                self.logger.info('DEBUG: simulating reorg of {:,d} blocks'
+                                 .format(self.env.force_reorg))
+                await self.handle_chain_reorg(self.env.force_reorg)
+
             while True:
                 await self._wait_for_update()
         except asyncio.CancelledError:
             pass
 
-        prefetcher_loop.cancel()
+    async def shutdown(self):
+        '''Shut down the DB cleanly.'''
+        self.logger.info('flushing state to DB for clean shutdown...')
         self.flush(True)
-        await self.client.shutdown()
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks.
@@ -211,7 +208,7 @@ class BlockProcessor(server.db.DB):
         '''
         blocks = await self.prefetcher.get_blocks()
         if not blocks:
-            await self.first_caught_up()
+            self.first_caught_up()
             return
 
         '''Strip the unspendable genesis coinbase.'''
@@ -235,7 +232,7 @@ class BlockProcessor(server.db.DB):
             self.next_cache_check = time.time() + 60
         self.touched = set()
 
-    async def first_caught_up(self):
+    def first_caught_up(self):
         '''Called when first caught up after start, or after a reorg.'''
         self.caught_up = True
         if self.first_sync:
@@ -243,7 +240,7 @@ class BlockProcessor(server.db.DB):
             self.logger.info('{} synced to height {:,d}.  DB version:'
                              .format(VERSION, self.height, self.db_version))
         self.flush(True)
-        await self.client.first_caught_up()
+        self.event.set()
 
     async def handle_chain_reorg(self, count):
         '''Handle a chain reorganisation.

@@ -54,10 +54,16 @@ class IRC(LoggedClass):
         self.irc_port = env.coin.IRC_PORT
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
+        self.disabled = env.irc is None
 
-    async def start(self):
+    async def start(self, caught_up):
+        '''Start IRC connections once caught up if enabled in environment.'''
+        await caught_up.wait()
         try:
-            await self.join()
+            if self.disabled:
+                self.logger.info('IRC is disabled')
+            else:
+                await self.join()
         except asyncio.CancelledError:
             pass
         except Exception as e:
