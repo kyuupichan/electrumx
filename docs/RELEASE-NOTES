@@ -1,3 +1,12 @@
+version 0.7.4
+-------------
+
+- really fix reorgs, they still triggered an assertion.  If you hit a reorg
+  I believe your DB is fine and all you need to do is restart with updated
+  software
+- introduced a new debug env var FORCE_REORG which I used to simulate a
+  reorg and confirm they should work
+
 version 0.7.3
 -------------
 
