@@ -20,63 +20,14 @@ from functools import partial
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.jsonrpc import JSONRPC, json_notification_payload
 from lib.tx import Deserializer
-from lib.util import LoggedClass
+import lib.util as util
 from server.block_processor import BlockProcessor
 from server.daemon import DaemonError
 from server.irc import IRC
 from server.version import VERSION
 
 
-class BlockServer(BlockProcessor):
-    '''Like BlockProcessor but also has a mempool and a server manager.
-
-    Servers are started immediately the block processor first catches
-    up with the daemon.
-    '''
-
-    def __init__(self, env):
-        super().__init__(env)
-        self.server_mgr = ServerManager(self, env)
-        self.mempool = MemPool(self)
-
-    async def first_caught_up(self):
-        # Call the base class to flush and log first
-        await super().first_caught_up()
-        await self.server_mgr.start_servers()
-        self.futures.append(self.mempool.start())
-
-    def notify(self, touched):
-        '''Called when addresses are touched by new blocks or mempool
-        updates.'''
-        self.server_mgr.notify(self.height, touched)
-
-    def on_cancel(self):
-        '''Called when the main loop is cancelled.'''
-        self.server_mgr.stop()
-        super().on_cancel()
-
-    async def wait_shutdown(self):
-        '''Wait for shutdown to complete cleanly, and return.'''
-        await self.server_mgr.wait_shutdown()
-        await super().wait_shutdown()
-
-    def mempool_transactions(self, hash168):
-        '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hash168.
-
-        unconfirmed is True if any txin is unconfirmed.
-        '''
-        return self.mempool.transactions(hash168)
-
-    def mempool_value(self, hash168):
-        '''Return the unconfirmed amount in the mempool for hash168.
-
-        Can be positive or negative.
-        '''
-        return self.mempool.value(hash168)
-
-
-class MemPool(LoggedClass):
+class MemPool(util.LoggedClass):
     '''Representation of the daemon's mempool.
 
     Updated regularly in caught-up state.  Goal is to enable efficient
@@ -91,19 +42,21 @@ class MemPool(LoggedClass):
     tx's txins are unconfirmed.  tx hashes are hex strings.
     '''
 
-    def __init__(self, bp):
+    def __init__(self, daemon, coin, db, manager):
         super().__init__()
+        self.daemon = daemon
+        self.coin = coin
+        self.db = db
+        self.manager = manager
         self.txs = {}
         self.hash168s = defaultdict(set)  # None can be a key
-        self.bp = bp
         self.count = -1
 
-    def start(self):
-        '''Starts the mempool synchronization mainloop.  Return a future.'''
-        return asyncio.ensure_future(self.main_loop())
+    async def main_loop(self, caught_up):
+        '''Asynchronously maintain mempool status with daemon.
 
-    async def main_loop(self):
-        '''Asynchronously maintain mempool status with daemon.'''
+        Waits until the caught up event is signalled.'''
+        await caught_up.wait()
         self.logger.info('maintaining state with daemon...')
         while True:
             try:
@@ -120,7 +73,7 @@ class MemPool(LoggedClass):
         Remove transactions that are no longer in our mempool.
         Request new transactions we don't have then add to our mempool.
         '''
-        hex_hashes = set(await self.bp.daemon.mempool_hashes())
+        hex_hashes = set(await self.daemon.mempool_hashes())
         touched = set()
         missing_utxos = []
 
@@ -145,7 +98,7 @@ class MemPool(LoggedClass):
         # ones the daemon no longer has (it will return None).  Put
         # them into a dictionary of hex hash to deserialized tx.
         hex_hashes.difference_update(self.txs)
-        raw_txs = await self.bp.daemon.getrawtransactions(hex_hashes)
+        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         if initial:
             self.logger.info('analysing {:,d} mempool txs'
                              .format(len(raw_txs)))
@@ -155,8 +108,8 @@ class MemPool(LoggedClass):
 
         # The mempool is unordered, so process all outputs first so
         # that looking for inputs has full info.
-        script_hash168 = self.bp.coin.hash168_from_script()
-        db_utxo_lookup = self.bp.db_utxo_lookup
+        script_hash168 = self.coin.hash168_from_script()
+        db_utxo_lookup = self.db.db_utxo_lookup
 
         def txout_pair(txout):
             return (script_hash168(txout.pk_script), txout.value)
@@ -195,7 +148,7 @@ class MemPool(LoggedClass):
             try:
                 infos = (txin_info(txin) for txin in tx.inputs)
                 txin_pairs, unconfs = zip(*infos)
-            except self.bp.MissingUTXOError:
+            except self.db.MissingUTXOError:
                 # Drop this TX.  If other mempool txs depend on it
                 # it's harmless - next time the mempool is refreshed
                 # they'll either be cleaned up or the UTXOs will no
@@ -227,7 +180,7 @@ class MemPool(LoggedClass):
             self.logger.info('{:,d} txs touching {:,d} addresses'
                              .format(len(self.txs), len(self.hash168s)))
 
-        self.bp.notify(touched)
+        self.manager.notify(touched)
 
     def transactions(self, hash168):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -254,25 +207,63 @@ class MemPool(LoggedClass):
         return value
 
 
-class ServerManager(LoggedClass):
-    '''Manages the servers.'''
+class ServerManager(util.LoggedClass):
+    '''Manages the client servers, a mempool, and a block processor.
+
+    Servers are started immediately the block processor first catches
+    up with the daemon.
+    '''
 
     MgrTask = namedtuple('MgrTask', 'session task')
 
-    def __init__(self, bp, env):
+    def __init__(self, env):
         super().__init__()
-        self.bp = bp
+        self.bp = BlockProcessor(self, env)
+        self.mempool = MemPool(self.bp.daemon, env.coin, self.bp, self)
+        self.irc = IRC(env)
         self.env = env
         self.servers = []
-        self.irc = IRC(env)
         self.sessions = {}
         self.max_subs = env.max_subs
         self.subscription_count = 0
-        self.irc_future = None
+        self.futures = []
         self.logger.info('max subscriptions across all sessions: {:,d}'
                          .format(self.max_subs))
         self.logger.info('max subscriptions per session: {:,d}'
                          .format(env.max_session_subs))
+
+    def mempool_transactions(self, hash168):
+        '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
+        entries for the hash168.
+
+        unconfirmed is True if any txin is unconfirmed.
+        '''
+        return self.mempool.transactions(hash168)
+
+    def mempool_value(self, hash168):
+        '''Return the unconfirmed amount in the mempool for hash168.
+
+        Can be positive or negative.
+        '''
+        return self.mempool.value(hash168)
+
+    async def main_loop(self):
+        '''Server manager main loop.'''
+        def add_future(coro):
+            self.futures.append(asyncio.ensure_future(coro))
+
+        add_future(self.bp.main_loop())
+        add_future(self.bp.prefetcher.main_loop())
+        add_future(self.mempool.main_loop(self.bp.event))
+        add_future(self.irc.start(self.bp.event))
+        add_future(self.start_servers(self.bp.event))
+
+        for future in asyncio.as_completed(self.futures):
+            try:
+                await future  # Note: future is not one of self.futures
+            except asyncio.CancelledError:
+                break
+        await self.shutdown()
 
     async def start_server(self, kind, *args, **kw_args):
         loop = asyncio.get_event_loop()
@@ -290,12 +281,14 @@ class ServerManager(LoggedClass):
             self.logger.info('{} server listening on {}:{:d}'
                              .format(kind, host, port))
 
-    async def start_servers(self):
+    async def start_servers(self, caught_up):
         '''Connect to IRC and start listening for incoming connections.
 
         Only connect to IRC if enabled.  Start listening on RCP, TCP
-        and SSL ports only if the port wasn pecified.
+        and SSL ports only if the port wasn't pecified.  Waits for the
+        caught_up event to be signalled.
         '''
+        await caught_up.wait()
         env = self.env
 
         if env.rpc_port is not None:
@@ -310,40 +303,34 @@ class ServerManager(LoggedClass):
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
-        if env.irc:
-            self.irc_future = asyncio.ensure_future(self.irc.start())
-        else:
-            self.logger.info('IRC disabled')
-
-    def notify(self, height, touched):
+    def notify(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
         cache = {}
         for session in self.sessions:
             if isinstance(session, ElectrumX):
                 # Use a tuple to distinguish from JSON
-                session.jobs.put_nowait((height, touched, cache))
+                session.jobs.put_nowait((self.bp.height, touched, cache))
 
-    def stop(self):
-        '''Close listening servers.'''
+    async def shutdown(self):
+        '''Call to shutdown the servers.  Returns when done.'''
+        for future in self.futures:
+            future.cancel()
         for server in self.servers:
             server.close()
-        if self.irc_future:
-            self.irc_future.cancel()
+            await server.wait_closed()
+        self.servers = [] # So add_session closes new sessions
+        while not all(future.done() for future in self.futures):
+            await asyncio.sleep(0)
         if self.sessions:
-            self.logger.info('cleanly closing client sessions, please wait...')
+            await self.close_sessions()
+        await self.bp.shutdown()
+
+    async def close_sessions(self, secs=60):
+        self.logger.info('cleanly closing client sessions, please wait...')
         for session in self.sessions:
             self.close_session(session)
-
-    async def wait_shutdown(self):
-        # Wait for servers to close
-        for server in self.servers:
-            await server.wait_closed()
-        self.servers = []
-
-        secs = 60
         self.logger.info('server listening sockets closed, waiting '
                          '{:d} seconds for socket cleanup'.format(secs))
-
         limit = time.time() + secs
         while self.sessions and time.time() < limit:
             await asyncio.sleep(4)
@@ -628,7 +615,7 @@ class ElectrumX(Session):
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
         history = await self.async_get_history(hash168)
-        mempool = self.bp.mempool_transactions(hash168)
+        mempool = self.manager.mempool_transactions(hash168)
 
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
                          for tx_hash, height in history)
@@ -666,7 +653,7 @@ class ElectrumX(Session):
     def unconfirmed_history(self, hash168):
         # Note unconfirmed history is unordered in electrum-server
         # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = self.bp.mempool_transactions(hash168)
+        mempool = self.manager.mempool_transactions(hash168)
         return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
                 for tx_hash, fee, unconfirmed in mempool]
 
@@ -707,7 +694,7 @@ class ElectrumX(Session):
     async def get_balance(self, hash168):
         utxos = await self.get_utxos(hash168)
         confirmed = sum(utxo.value for utxo in utxos)
-        unconfirmed = self.bp.mempool_value(hash168)
+        unconfirmed = self.manager.mempool_value(hash168)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
     async def list_unspent(self, hash168):

@@ -133,8 +133,10 @@ class BlockProcessor(server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env):
+    def __init__(self, client, env):
         super().__init__(env)
+
+        self.client = client
 
         # These are our state as we move ahead of DB state
         self.fs_height = self.db_height
@@ -145,8 +147,8 @@ class BlockProcessor(server.db.DB):
 
         self.daemon = Daemon(self.coin.daemon_urls(env.daemon_url))
         self.caught_up = False
+        self.event = asyncio.Event()
         self.touched = set()
-        self.futures = []
 
         # Meta
         self.utxo_MB = env.utxo_MB
@@ -181,36 +183,23 @@ class BlockProcessor(server.db.DB):
         self.clean_db()
 
     async def main_loop(self):
-        '''Main loop for block processing.
-
-        Safely flushes the DB on clean shutdown.
-        '''
-        self.futures.append(asyncio.ensure_future(self.prefetcher.main_loop()))
-
-        # Simulate a reorg if requested
-        if self.env.force_reorg > 0:
-            self.logger.info('DEBUG: simulating chain reorg of {:,d} blocks'
-                             .format(self.env.force_reorg))
-            await self.handle_chain_reorg(self.env.force_reorg)
-
+        '''Main loop for block processing.'''
         try:
+            # Simulate a reorg if requested
+            if self.env.force_reorg > 0:
+                self.logger.info('DEBUG: simulating reorg of {:,d} blocks'
+                                 .format(self.env.force_reorg))
+                await self.handle_chain_reorg(self.env.force_reorg)
+
             while True:
                 await self._wait_for_update()
         except asyncio.CancelledError:
-            self.on_cancel()
-            await self.wait_shutdown()
+            pass
 
-    def on_cancel(self):
-        '''Called when the main loop is cancelled.
-
-        Intended to be overridden in derived classes.'''
-        for future in self.futures:
-            future.cancel()
+    async def shutdown(self):
+        '''Shut down the DB cleanly.'''
+        self.logger.info('flushing state to DB for clean shutdown...')
         self.flush(True)
-
-    async def wait_shutdown(self):
-        '''Wait for shutdown to complete cleanly, and return.'''
-        await asyncio.sleep(0)
 
     async def _wait_for_update(self):
         '''Wait for the prefetcher to deliver blocks.
@@ -219,7 +208,7 @@ class BlockProcessor(server.db.DB):
         '''
         blocks = await self.prefetcher.get_blocks()
         if not blocks:
-            await self.first_caught_up()
+            self.first_caught_up()
             return
 
         '''Strip the unspendable genesis coinbase.'''
@@ -237,26 +226,21 @@ class BlockProcessor(server.db.DB):
             # Flush everything as queries are performed on the DB and
             # not in-memory.
             self.flush(True)
-            self.notify(self.touched)
+            self.client.notify(self.touched)
         elif time.time() > self.next_cache_check:
             self.check_cache_size()
             self.next_cache_check = time.time() + 60
         self.touched = set()
 
-    async def first_caught_up(self):
-        '''Called after each deamon poll if caught up.'''
+    def first_caught_up(self):
+        '''Called when first caught up after start, or after a reorg.'''
         self.caught_up = True
         if self.first_sync:
             self.first_sync = False
             self.logger.info('{} synced to height {:,d}.  DB version:'
                              .format(VERSION, self.height, self.db_version))
         self.flush(True)
-
-    def notify(self, touched):
-        '''Called with list of touched addresses by new blocks.
-
-        Only called for blocks found after first_caught_up is called.
-        Intended to be overridden in derived classes.'''
+        self.event.set()
 
     async def handle_chain_reorg(self, count):
         '''Handle a chain reorganisation.
