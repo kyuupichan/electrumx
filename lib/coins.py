@@ -39,6 +39,11 @@ class Coin(object):
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
     STRANGE_VERBYTE = 0xff
+    # IRC Defaults
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum"
+    IRC_SERVER = "irc.freenode.net"
+    IRC_PORT = 6667
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -359,6 +364,8 @@ class Dash(Coin):
     TX_COUNT = 2157510
     TX_PER_BLOCK = 4
     DEFAULT_RPC_PORT = 9998
+    IRC_PREFIX = "D_"
+    IRC_CHANNEL = "#electrum-dash"
 
     @classmethod
     def header_hashes(cls, header):
@@ -381,3 +388,4 @@ class DashTestnet(Dash):
     TX_COUNT = 132681
     TX_PER_BLOCK = 1
     DEFAULT_RPC_PORT = 19998
+    IRC_PREFIX = "d_"
