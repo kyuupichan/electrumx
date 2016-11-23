@@ -47,6 +47,8 @@ class DB(LoggedClass):
         self.logger.info('switching current directory to {}'
                          .format(env.db_dir))
         os.chdir(env.db_dir)
+        self.logger.info('reorg limit is {:,d} blocks'
+                         .format(self.env.reorg_limit))
 
         # Open DB and metadata files.  Record some of its state.
         db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
@@ -73,6 +75,7 @@ class DB(LoggedClass):
             assert self.db_tx_count == self.tx_counts[-1]
         else:
             assert self.db_tx_count == 0
+        self.clean_db()
 
     def read_state(self):
         if self.db.is_new:
@@ -117,6 +120,8 @@ class DB(LoggedClass):
         if self.first_sync:
             self.logger.info('sync time so far: {}'
                              .format(formatted_time(self.wall_time)))
+        if self.flush_count < self.utxo_flush_count:
+            raise self.DBError('DB corrupt: flush_count < utxo_flush_count')
 
     def write_state(self, batch):
         '''Write chain state to the batch.'''
@@ -132,6 +137,56 @@ class DB(LoggedClass):
             'db_version': self.db_version,
         }
         batch.put(b'state', repr(state).encode())
+
+    def clean_db(self):
+        '''Clean out stale DB items.
+
+        Stale DB items are excess history flushed since the most
+        recent UTXO flush (only happens on unclean shutdown), and aged
+        undo information.
+        '''
+        if self.flush_count > self.utxo_flush_count:
+            self.utxo_flush_count = self.flush_count
+            self.logger.info('DB shut down uncleanly.  Scanning for '
+                             'excess history flushes...')
+            history_keys = self.excess_history_keys()
+            self.logger.info('deleting {:,d} history entries'
+                             .format(len(history_keys)))
+        else:
+            history_keys = []
+
+        undo_keys = self.stale_undo_keys()
+        if undo_keys:
+            self.logger.info('deleting {:,d} stale undo entries'
+                             .format(len(undo_keys)))
+
+        with self.db.write_batch() as batch:
+            batch_delete = batch.delete
+            for key in history_keys:
+                batch_delete(key)
+            for key in undo_keys:
+                batch_delete(key)
+            self.write_state(batch)
+
+    def excess_history_keys(self):
+        prefix = b'H'
+        keys = []
+        for key, hist in self.db.iterator(prefix=prefix):
+            flush_id, = unpack('>H', key[-2:])
+            if flush_id > self.utxo_flush_count:
+                keys.append(key)
+        return keys
+
+    def stale_undo_keys(self):
+        prefix = b'U'
+        cutoff = self.db_height - self.env.reorg_limit
+        keys = []
+        for key, hist in self.db.iterator(prefix=prefix):
+            height, = unpack('>I', key[-4:])
+            if height > cutoff:
+                break
+            keys.append(key)
+        return keys
 
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
