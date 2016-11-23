@@ -41,6 +41,7 @@ class IRC(LoggedClass):
         ssl_text = port_text('s', env.report_ssl_port, 50002)
         # If this isn't something the client expects you won't appear
         # in the client's network dialog box
+        self.env = env
         version = '1.0'
         self.real_name = '{} v{} {} {}'.format(env.report_host, version,
                                                tcp_text, ssl_text)
@@ -54,16 +55,15 @@ class IRC(LoggedClass):
         self.irc_port = env.coin.IRC_PORT
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
-        self.disabled = env.irc is None
 
     async def start(self, caught_up):
         '''Start IRC connections once caught up if enabled in environment.'''
         await caught_up.wait()
         try:
-            if self.disabled:
-                self.logger.info('IRC is disabled')
-            else:
+            if self.env.irc:
                 await self.join()
+            else:
+                self.logger.info('IRC is disabled')
         except asyncio.CancelledError:
             pass
         except Exception as e:
