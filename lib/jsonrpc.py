@@ -97,6 +97,9 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         decode_message for handling.
         '''
         self.recv_size += len(data)
+        if self.transport.is_closing():
+            return
+
         while True:
             npos = data.find(ord('\n'))
             if npos == -1:
@@ -118,6 +121,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         except UnicodeDecodeError as e:
             msg = 'cannot decode binary bytes: {}'.format(e)
             self.send_json_error(msg, self.PARSE_ERROR)
+            self.transport.close()
             return
 
         try:
@@ -125,6 +129,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         except json.JSONDecodeError as e:
             msg = 'cannot decode JSON: {}'.format(e)
             self.send_json_error(msg, self.PARSE_ERROR)
+            self.transport.close()
             return
 
         self.on_json_request(message)
