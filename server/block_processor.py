@@ -511,6 +511,11 @@ class BlockProcessor(server.db.DB):
             for key, value in puts.items():
                 batch.put(key, value)
 
+        self.fs_height = self.height
+        self.fs_tx_count = self.tx_count
+        assert not self.headers
+        assert not self.tx_hashes
+
         self.logger.info('removed {:,d} history entries from {:,d} addresses'
                          .format(nremoves, len(hash168s)))
 
@@ -642,10 +647,6 @@ class BlockProcessor(server.db.DB):
             assert self.height >= 0
             self.height -= 1
             self.tx_counts.pop()
-
-        self.fs_height = self.height
-        assert not self.headers
-        assert not self.tx_hashes
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
