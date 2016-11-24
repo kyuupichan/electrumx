@@ -1,3 +1,11 @@
+version 0.7.7
+-------------
+
+- add MAX_HIST to throttle history requests; see docs/ENV-NOTES.  One
+  provider of ElectrumX services was attacked by a loser requesting
+  long histories; this environment variable allows you to limit what
+  you attempt to serve.
+
 version 0.7.6
 -------------
 

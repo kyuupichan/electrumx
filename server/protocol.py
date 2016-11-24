@@ -674,9 +674,11 @@ class ElectrumX(Session):
         return self.bp.read_headers(start_height, count).hex()
 
     async def async_get_history(self, hash168):
+        # Apply DoS limit
+        limit = self.env.max_hist
         # Python 3.6: use async generators; update callers
         history = []
-        for item in self.bp.get_history(hash168, limit=None):
+        for item in self.bp.get_history(hash168, limit=limit):
             history.append(item)
             if len(history) % 100 == 0:
                 await asyncio.sleep(0)
