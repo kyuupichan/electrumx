@@ -16,24 +16,30 @@ import json
 from functools import partial
 from os import environ
 
+from lib.jsonrpc import JSONRPC
 
-class RPCClient(asyncio.Protocol):
 
-    def __init__(self, loop):
-        self.loop = loop
-        self.method = None
+class RPCClient(JSONRPC):
 
-    def connection_made(self, transport):
-        self.transport = transport
+    async def send_and_wait(self, method, params, timeout=None):
+        self.send_json_request(method, id_=method, params=params)
 
-    def connection_lost(self, exc):
-        self.loop.stop()
+        future = asyncio.ensure_future(self.messages.get())
+        for f in asyncio.as_completed([future], timeout=timeout):
+            try:
+                message = await f
+            except asyncio.TimeoutError:
+                future.cancel()
+                print('request timed out')
+            else:
+                await self.handle_message(message)
 
-    def send(self, method, params):
-        self.method = method
-        payload = {'method': method, 'params': params, 'id': 'RPC'}
-        data = json.dumps(payload) + '\n'
-        self.transport.write(data.encode())
+    async def handle_response(self, result, error, method):
+        if result and method == 'sessions':
+            self.print_sessions(result)
+        else:
+            value = {'error': error} if error else result
+            print(json.dumps(value, indent=4, sort_keys=True))
 
     def print_sessions(self, result):
         def data_fmt(count, size):
@@ -58,17 +64,6 @@ class RPCClient(asyncio.Protocol):
                              '{:,d}'.format(error_count),
                              time_fmt(time)))
 
-    def data_received(self, data):
-        payload = json.loads(data.decode())
-        self.transport.close()
-        result = payload['result']
-        error = payload['error']
-        if not error and self.method == 'sessions':
-            self.print_sessions(result)
-        else:
-            value = {'error': error} if error else result
-            print(json.dumps(value, indent=4, sort_keys=True))
-
 def main():
     '''Send the RPC command to the server and print the result.'''
     parser = argparse.ArgumentParser('Send electrumx an RPC command' )
@@ -84,12 +79,11 @@ def main():
         args.port = int(environ.get('ELECTRUMX_RPC_PORT', 8000))
 
     loop = asyncio.get_event_loop()
-    proto_factory = partial(RPCClient, loop)
-    coro = loop.create_connection(proto_factory, 'localhost', args.port)
+    coro = loop.create_connection(RPCClient, 'localhost', args.port)
     try:
         transport, protocol = loop.run_until_complete(coro)
-        protocol.send(args.command[0], args.param)
-        loop.run_forever()
+        coro = protocol.send_and_wait(args.command[0], args.param, timeout=5)
+        loop.run_until_complete(coro)
     except OSError:
         print('error connecting - is ElectrumX catching up or not running?')
     finally:
