@@ -568,7 +568,6 @@ class BlockProcessor(server.db.DB):
         # the UTXO cache uses the FS cache via get_tx_hash() to
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
-        prev_hash, header_hash = self.coin.header_prevhash(header), self.coin.header_hash(header)
         if self.tip != self.coin.header_prevhash(header):
             raise ChainReorg
 
