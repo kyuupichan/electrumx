@@ -215,6 +215,16 @@ class Coin(object):
         return Base58.encode_check(payload)
 
     @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        return double_sha256(header)
+
+    @classmethod
+    def header_prevhash(cls, header):
+        '''Given a header return previous hash'''
+        return header[4:36]
+
+    @classmethod
     def header_hashes(cls, header):
         '''Given a header return the previous and current block hashes.'''
         return header[4:36], double_sha256(header)
@@ -366,6 +376,12 @@ class Dash(Coin):
     DEFAULT_RPC_PORT = 9998
     IRC_PREFIX = "D_"
     IRC_CHANNEL = "#electrum-dash"
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x11_hash
+        return x11_hash.getPoWHash(header)
 
     @classmethod
     def header_hashes(cls, header):
