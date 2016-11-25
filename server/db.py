@@ -16,7 +16,7 @@ from bisect import bisect_right
 from collections import namedtuple
 
 from lib.util import chunks, formatted_time, LoggedClass
-from lib.hash import double_sha256, hash_to_str
+from lib.hash import hash_to_str
 from server.storage import open_db
 from server.version import VERSION
 
@@ -175,7 +175,7 @@ class DB(LoggedClass):
         headers = self.fs_read_headers(height, count)
         # FIXME: move to coins.py
         hlen = self.coin.HEADER_LEN
-        return [double_sha256(header) for header in chunks(headers, hlen)]
+        return [self.coin.header_hash(header) for header in chunks(headers, hlen)]
 
     @staticmethod
     def _resolve_limit(limit):
