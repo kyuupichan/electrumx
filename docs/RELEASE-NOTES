@@ -1,3 +1,9 @@
+version 0.7.9
+-------------
+
+- rewrite jsonrpc.py to also operate as a client.  Use this class
+  for a robust electrumx_rpc.py.  Fixes issue #43
+
 version 0.7.8
 -------------
 
