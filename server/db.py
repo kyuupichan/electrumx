@@ -175,7 +175,8 @@ class DB(LoggedClass):
         headers = self.fs_read_headers(height, count)
         # FIXME: move to coins.py
         hlen = self.coin.HEADER_LEN
-        return [self.coin.header_hash(header) for header in chunks(headers, hlen)]
+        return [self.coin.header_hash(header)
+                for header in chunks(headers, hlen)]
 
     @staticmethod
     def _resolve_limit(limit):
