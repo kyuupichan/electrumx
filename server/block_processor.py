@@ -569,12 +569,12 @@ class BlockProcessor(server.db.DB):
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
         prev_hash, header_hash = self.coin.header_prevhash(header), self.coin.header_hash(header)
-        if prev_hash != self.tip:
+        if self.tip != self.coin.header_prevhash(header):
             raise ChainReorg
 
         touched = set()
         self.fs_advance_block(header, tx_hashes, txs)
-        self.tip = header_hash
+        self.tip = self.coin.header_hash(header)
         self.height += 1
         undo_info = self.advance_txs(tx_hashes, txs, touched)
         if self.daemon.cached_height() - self.height <= self.reorg_limit:
@@ -636,14 +636,14 @@ class BlockProcessor(server.db.DB):
         touched = set()
         for block in blocks:
             header, tx_hashes, txs = self.coin.read_block(block)
-            prev_hash, header_hash = self.coin.header_prevhash(header), self.coin.header_hash(header)
+            header_hash = self.coin.header_hash(header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} is not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
 
             self.backup_txs(tx_hashes, txs, touched)
-            self.tip = prev_hash
+            self.tip = self.coin.header_prevhash(header)
             assert self.height >= 0
             self.height -= 1
             self.tx_counts.pop()
