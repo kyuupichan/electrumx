@@ -225,11 +225,6 @@ class Coin(object):
         return header[4:36]
 
     @classmethod
-    def header_hashes(cls, header):
-        '''Given a header return the previous and current block hashes.'''
-        return header[4:36], double_sha256(header)
-
-    @classmethod
     def read_block(cls, block):
         '''Return a tuple (header, tx_hashes, txs) given a raw block.'''
         header, rest = block[:cls.HEADER_LEN], block[cls.HEADER_LEN:]
@@ -382,12 +377,6 @@ class Dash(Coin):
         '''Given a header return the hash.'''
         import x11_hash
         return x11_hash.getPoWHash(header)
-
-    @classmethod
-    def header_hashes(cls, header):
-        '''Given a header return the previous and current block hashes.'''
-        import x11_hash
-        return header[4:36], x11_hash.getPoWHash(header)
 
 class DashTestnet(Dash):
     NAME = "Dash"
