@@ -568,7 +568,7 @@ class BlockProcessor(server.db.DB):
         # the UTXO cache uses the FS cache via get_tx_hash() to
         # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
-        prev_hash, header_hash = self.coin.header_hashes(header)
+        prev_hash, header_hash = self.coin.header_prevhash(header), self.coin.header_hash(header)
         if prev_hash != self.tip:
             raise ChainReorg
 
@@ -636,7 +636,7 @@ class BlockProcessor(server.db.DB):
         touched = set()
         for block in blocks:
             header, tx_hashes, txs = self.coin.read_block(block)
-            prev_hash, header_hash = self.coin.header_hashes(header)
+            prev_hash, header_hash = self.coin.header_prevhash(header), self.coin.header_hash(header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} is not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
