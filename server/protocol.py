@@ -309,7 +309,7 @@ class ServerManager(util.LoggedClass):
         for session in self.sessions:
             if isinstance(session, ElectrumX):
                 # Use a tuple to distinguish from JSON
-                session.jobs.put_nowait((self.bp.height, touched, cache))
+                session.messages.put_nowait((self.bp.height, touched, cache))
 
     async def shutdown(self):
         '''Call to shutdown the servers.  Returns when done.'''
@@ -420,7 +420,6 @@ class Session(JSONRPC):
         self.daemon = bp.daemon
         self.coin = bp.coin
         self.kind = kind
-        self.jobs = asyncio.Queue()
         self.client = 'unknown'
 
     def connection_made(self, transport):
@@ -438,29 +437,30 @@ class Session(JSONRPC):
                                      self.send_count, self.error_count))
         self.manager.remove_session(self)
 
-    def method_handler(self, method):
-        '''Return the handler that will handle the RPC method.'''
-        return self.handlers.get(method)
+    async def handle_request(self, method, params):
+        '''Handle a request.'''
+        handler = self.handlers.get(method)
+        if not handler:
+            self.raise_unknown_method(method)
 
-    def on_json_request(self, request):
-        '''Queue the request for asynchronous handling.'''
-        self.jobs.put_nowait(request)
+        return await handler(params)
 
     async def serve_requests(self):
         '''Asynchronously run through the task queue.'''
         while True:
             await asyncio.sleep(0)
-            job = await self.jobs.get()
+            message = await self.messages.get()
             try:
-                if isinstance(job, tuple):  # Height / mempool notification
-                    await self.notify(*job)
+                # Height / mempool notification?
+                if isinstance(message, tuple):
+                    await self.notify(*message)
                 else:
-                    await self.handle_json_request(job)
+                    await self.handle_message(message)
             except asyncio.CancelledError:
                 break
             except Exception:
                 # Getting here should probably be considered a bug and fixed
-                self.logger.error('error handling request {}'.format(job))
+                self.logger.error('error handling request {}'.format(message))
                 traceback.print_exc()
 
     def peername(self, *, for_log=True):
