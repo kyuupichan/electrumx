@@ -462,9 +462,6 @@ class BlockProcessor(server.db.DB):
         self.tx_counts.append(prior_tx_count + len(txs))
 
     def advance_block(self, block, touched):
-        # We must update the FS cache before calling advance_txs() as
-        # the UTXO cache uses the FS cache via get_tx_hash() to
-        # resolve compressed key collisions
         header, tx_hashes, txs = self.coin.read_block(block)
         if self.tip != self.coin.header_prevhash(header):
             raise ChainReorg
@@ -665,8 +662,9 @@ class BlockProcessor(server.db.DB):
 
             if len(candidates) > 1:
                 tx_num, = unpack('<I', tx_num_packed)
-                hash, height = self.get_tx_hash(tx_num)
+                hash, height = self.fs_tx_hash(tx_num)
                 if hash != tx_hash:
+                    assert hash is not None  # Should always be found
                     continue
 
             # Key: b'u' + address_hash168 + tx_idx + tx_num
@@ -716,14 +714,3 @@ class BlockProcessor(server.db.DB):
         self.db_tx_count = self.tx_count
         self.db_height = self.height
         self.db_tip = self.tip
-
-    def get_tx_hash(self, tx_num):
-        '''Returns the tx_hash and height of a tx number.'''
-        tx_hash, tx_height = self.fs_tx_hash(tx_num)
-
-        # Is this unflushed?
-        if tx_hash is None:
-            tx_hashes = self.tx_hashes[tx_height - (self.fs_height + 1)]
-            tx_hash = tx_hashes[tx_num - self.tx_counts[tx_height - 1]]
-
-        return tx_hash, tx_height
