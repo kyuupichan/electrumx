@@ -10,7 +10,6 @@
 
 import array
 import asyncio
-import os
 from struct import pack, unpack
 import time
 from bisect import bisect_left
@@ -22,7 +21,6 @@ from server.version import VERSION
 from lib.hash import hash_to_str
 from lib.util import chunks, formatted_time, LoggedClass
 import server.db
-from server.storage import open_db
 
 
 class ChainError(Exception):
@@ -152,7 +150,6 @@ class BlockProcessor(server.db.DB):
         self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
-        self.reorg_limit = env.reorg_limit
 
         # Headers and tx_hashes have one entry per block
         self.history = defaultdict(partial(array.array, 'I'))
@@ -171,14 +168,11 @@ class BlockProcessor(server.db.DB):
         self.db_deletes = []
 
         # Log state
-        self.logger.info('reorg limit is {:,d} blocks'
-                         .format(self.reorg_limit))
         if self.first_sync:
             self.logger.info('flushing UTXO cache at {:,d} MB'
                              .format(self.utxo_MB))
             self.logger.info('flushing history cache at {:,d} MB'
                              .format(self.hist_MB))
-        self.clean_db()
 
     async def main_loop(self):
         '''Main loop for block processing.'''
@@ -294,52 +288,6 @@ class BlockProcessor(server.db.DB):
                          .format(count, start, start + count - 1))
 
         return self.fs_block_hashes(start, count)
-
-    def clean_db(self):
-        '''Clean out stale DB items.
-
-        Stale DB items are excess history flushed since the most
-        recent UTXO flush (only happens on unclean shutdown), and aged
-        undo information.
-        '''
-        if self.flush_count < self.utxo_flush_count:
-            raise ChainError('DB corrupt: flush_count < utxo_flush_count')
-        with self.db.write_batch() as batch:
-            if self.flush_count > self.utxo_flush_count:
-                self.logger.info('DB shut down uncleanly.  Scanning for '
-                                 'excess history flushes...')
-                self.remove_excess_history(batch)
-                self.utxo_flush_count = self.flush_count
-            self.remove_stale_undo_items(batch)
-            self.flush_state(batch)
-
-    def remove_excess_history(self, batch):
-        prefix = b'H'
-        keys = []
-        for key, hist in self.db.iterator(prefix=prefix):
-            flush_id, = unpack('>H', key[-2:])
-            if flush_id > self.utxo_flush_count:
-                keys.append(key)
-
-        self.logger.info('deleting {:,d} history entries'
-                         .format(len(keys)))
-        for key in keys:
-            batch.delete(key)
-
-    def remove_stale_undo_items(self, batch):
-        prefix = b'U'
-        cutoff = self.db_height - self.reorg_limit
-        keys = []
-        for key, hist in self.db.iterator(prefix=prefix):
-            height, = unpack('>I', key[-4:])
-            if height > cutoff:
-                break
-            keys.append(key)
-
-        self.logger.info('deleting {:,d} stale undo entries'
-                         .format(len(keys)))
-        for key in keys:
-            batch.delete(key)
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
@@ -537,7 +485,7 @@ class BlockProcessor(server.db.DB):
         self.tip = self.coin.header_hash(header)
         self.height += 1
         undo_info = self.advance_txs(tx_hashes, txs, touched)
-        if self.daemon.cached_height() - self.height <= self.reorg_limit:
+        if self.daemon.cached_height() - self.height <= self.env.reorg_limit:
             self.write_undo_info(self.height, b''.join(undo_info))
 
     def advance_txs(self, tx_hashes, txs, touched):
