@@ -1,7 +1,7 @@
 The following environment variables are required:
 
 DB_DIRECTORY  - path to the database directory (if relative, to `run` script)
-USERNAME      - the username the server will run as if using `run` script
+USERNAME      - the username the server will run as, if using `run` script
 ELECTRUMX     - path to the electrumx_server.py script (if relative,
                 to `run` script)
 DAEMON_URL    - A comma-separated list of daemon URLS.  If more than one is
@@ -101,5 +101,7 @@ UTXO_MB   - amount of UTXO and history cache, in MB, to retain before
 The following are for debugging purposes.
 
 FORCE_REORG - if set to a positive integer, it will simulate a reorg
-              of the blockchain for that number of blocks.  Do not set
-              to a value greater than REORG_LIMIT.
+              of the blockchain for that number of blocks on startup.
+              Although it should fail gracefully if set to a value
+              greater than REORG_LIMIT, I do not recommend it as I have
+              not tried it and there is a chance your DB might corrupt.
