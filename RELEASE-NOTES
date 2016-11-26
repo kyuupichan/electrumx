@@ -2,9 +2,17 @@ version 0.7.11
 --------------
 
 - increased MAX_SEND default value to 1 million bytes so as to be able
-  to serve large historical transactions of up to 500K in size.  The
+  to serve large historical transactions of up to ~500K in size.  The
   MAX_SEND floor remains at 350,000 bytes so you can reduct it if you
-  wish.
+  wish.  To serve any historical transaction for bitcoin youd should
+  set this to around 2,000,100 bytes (one byte becomes 2 ASCII hex chars)
+- issue #46: fix reorgs for coinbase-only blocks.  We would not distinguish
+  undo information being empty from it not existing
+- issue #47: IRC reconnects.  I don't get this issue so cannot be certain
+  it is resolved
+- $VERSION in your banner file is now replaced with your ElectrumX version
+- more work to isolate the DB from the block processor, working towards the
+  goal of asynchronous block updates
 
 version 0.7.10
 --------------
