@@ -837,6 +837,8 @@ class ElectrumX(Session):
             except Exception as e:
                 self.logger.error('reading banner file {}: {}'
                                   .format(self.env.banner_file, e))
+            else:
+                banner = banner.replace('$VERSION', VERSION)
         return banner
 
     async def donation_address(self, params):

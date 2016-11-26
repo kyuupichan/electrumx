@@ -33,7 +33,9 @@ SSL_PORT      - if set will serve Electrum SSL clients on that HOST:SSL_PORT
 RPC_PORT      - Listen on this port for local RPC connections, defaults to
                 8000.
 BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
-                is re-read for each new client.
+                is re-read for each new client.  The string $VERSION in your
+                banner file will be replaced with the ElectrumX version you
+                are runnning, such as 'ElectrumX 0.7.11'.
 ANON_LOGS     - set to anything non-empty to remove IP addresses from
                 logs. By default IP addresses will be logged.
 DONATION_ADDRESS - server donation address.  Defaults to none.
