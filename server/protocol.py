@@ -227,7 +227,7 @@ class ServerManager(util.LoggedClass):
         self.max_subs = env.max_subs
         self.subscription_count = 0
         self.futures = []
-        env.max_send = max(1000, env.max_send)
+        env.max_send = max(350000, env.max_send)
         self.logger.info('max response size {:,d} bytes'.format(env.max_send))
         self.logger.info('max subscriptions across all sessions: {:,d}'
                          .format(self.max_subs))
