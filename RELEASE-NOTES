@@ -1,3 +1,11 @@
+version 0.7.11
+--------------
+
+- increased MAX_SEND default value to 1 million bytes so as to be able
+  to serve large historical transactions of up to 500K in size.  The
+  MAX_SEND floor remains at 350,000 bytes so you can reduct it if you
+  wish.
+
 version 0.7.10
 --------------
 
