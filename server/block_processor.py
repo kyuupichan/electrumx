@@ -688,6 +688,7 @@ class BlockProcessor(server.db.DB):
         # UTXO state may have keys in common with our write cache or
         # may be in the DB already.
         flush_start = time.time()
+        delete_count = len(self.db_deletes) // 2
 
         batch_delete = batch.delete
         for key in self.db_deletes:
@@ -707,12 +708,10 @@ class BlockProcessor(server.db.DB):
                              'adds, {:,d} spends in {:.1f}s, committing...'
                              .format(self.height - self.db_height,
                                      self.tx_count - self.db_tx_count,
-                                     len(self.utxo_cache),
-                                     len(self.db_deletes) // 2,
+                                     len(self.utxo_cache), delete_count,
                                      time.time() - flush_start))
 
         self.utxo_cache = {}
-        self.db_deletes = []
         self.utxo_flush_count = self.flush_count
         self.db_tx_count = self.tx_count
         self.db_height = self.height
