@@ -551,7 +551,7 @@ class BlockProcessor(server.db.DB):
         # Prevout values, in order down the block (coinbase first if present)
         # undo_info is in reverse block order
         undo_info = self.read_undo_info(self.height)
-        if not undo_info:
+        if undo_info is None:
             raise ChainError('no undo information found for height {:,d}'
                              .format(self.height))
         n = len(undo_info)
