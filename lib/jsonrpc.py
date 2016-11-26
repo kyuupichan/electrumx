@@ -72,6 +72,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             self.msg = msg
             self.code = code
 
+    class LargeRequestError(Exception):
+        '''Raised if a large request was prevented from being sent.'''
+
+
     def __init__(self):
         super().__init__()
         self.start = time.time()
@@ -87,6 +91,20 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.error_count = 0
         self.peer_info = None
         self.messages = asyncio.Queue()
+        # Sends longer than max_send are prevented, instead returning
+        # an oversized request error to other end of the network
+        # connection.  The request causing it is logged.  Values under
+        # 1000 are treated as 1000.
+        self.max_send = 0
+        self.anon_logs = False
+
+    def peername(self, *, for_log=True):
+        '''Return the peer name of this connection.'''
+        if not self.peer_info:
+            return 'unknown'
+        if for_log and self.anon_logs:
+            return 'xx.xx.xx.xx:xx'
+        return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
@@ -175,9 +193,14 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             self.logger.error(msg)
             self.send_json_error(msg, self.INTERNAL_ERROR, payload.get('id'))
         else:
-            self.send_count += 1
-            self.send_size += len(data)
-            self.transport.write(data)
+            if len(data) > max(1000, self.max_send):
+                self.send_json_error('request too large', self.INVALID_REQUEST,
+                                     payload.get('id'))
+                raise self.LargeRequestError
+            else:
+                self.send_count += 1
+                self.send_size += len(data)
+                self.transport.write(data)
 
     async def handle_message(self, message):
         '''Asynchronously handle a JSON request or response.
@@ -190,7 +213,11 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             payload = await self.single_payload(message)
 
         if payload:
-            self.send_json(payload)
+            try:
+                self.send_json(payload)
+            except self.LargeRequestError:
+                self.logger.warning('blocked large request from {}: {}'
+                                    .format(self.peername(), message))
 
     async def batch_payload(self, batch):
         '''Return the JSON payload corresponding to a batch JSON request.'''

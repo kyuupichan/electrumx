@@ -44,17 +44,18 @@ in ElectrumX are very cheap - they consume about 100 bytes of memory
 each and are processed efficiently.  I feel the defaults are low and
 encourage you to raise them.
 
-MAX_HIST         - maximum number of historical transactions to serve for
-                   a single address.  The current Electrum protocol requires
-                   address histories be served en-masse or not at all,
-                   an obvious avenue for abuse.  This limit is a
-                   stop-gap until the protocol is improved to admit
-                   incremental history requests.  The default value is
-                   2,000 which should be ample for most legitimate
-                   users.  Increasing to around 10,000 is likely fine
-                   but bear in mind one client can request multiple
-                   addresses.  I welcome your experiences and suggestions
-                   for an appropriate value.
+MAX_SEND         - maximum size of a response message to send over the wire,
+                   in bytes.  Defaults to 250,000.  The current Electrum
+                   protocol has a flaw in that address histories must be
+                   served all at once or not at all, an obvious avenue for
+                   abuse.  This limit is a stop-gap until the protocol is
+                   improved to admit incremental history requests.
+                   Each history entry is appoximately 100 bytes so the
+                   default is equivalent to a history limit of around 2,500
+                   entries, which should be ample for most legitimate
+                   users.  Increasing by a single-digit factor is likely fine
+                   but bear in mind one client can request history for
+                   multiple addresses.
 MAX_SUBS         - maximum number of address subscriptions across all
                    sessions.  Defaults to 250,000.
 MAX_SESSION_SUBS - maximum number of address subscriptions permitted to a
