@@ -224,6 +224,7 @@ class BlockProcessor(server.db.DB):
         if self.caught_up:
             # Flush everything as queries are performed on the DB and
             # not in-memory.
+            await asyncio.sleep(0)
             self.flush(True)
             self.client.notify(touched)
         elif time.time() > self.next_cache_check:
@@ -498,43 +499,47 @@ class BlockProcessor(server.db.DB):
             self.write_undo_info(self.height, b''.join(undo_info))
 
     def advance_txs(self, tx_hashes, txs, touched):
-        put_utxo = self.utxo_cache.__setitem__
-        spend_utxo = self.spend_utxo
         undo_info = []
 
         # Use local vars for speed in the loops
         history = self.history
+        history_size = self.history_size
         tx_num = self.tx_count
         script_hash168 = self.coin.hash168_from_script()
         s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        spend_utxo = self.spend_utxo
+        undo_info_append = undo_info.append
 
         for tx, tx_hash in zip(txs, tx_hashes):
             hash168s = set()
+            add_hash168 = hash168s.add
             tx_numb = s_pack('<I', tx_num)
 
             # Spend the inputs
             if not tx.is_coinbase:
                 for txin in tx.inputs:
                     cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
-                    undo_info.append(cache_value)
-                    hash168s.add(cache_value[:21])
+                    undo_info_append(cache_value)
+                    add_hash168(cache_value[:21])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
                 # Get the hash168.  Ignore unspendable outputs
                 hash168 = script_hash168(txout.pk_script)
                 if hash168:
-                    hash168s.add(hash168)
+                    add_hash168(hash168)
                     put_utxo(tx_hash + s_pack('<H', idx),
                              hash168 + tx_numb + s_pack('<Q', txout.value))
 
             for hash168 in hash168s:
                 history[hash168].append(tx_num)
-            self.history_size += len(hash168s)
+            history_size += len(hash168s)
             touched.update(hash168s)
             tx_num += 1
 
         self.tx_count = tx_num
+        self.history_size = history_size
 
         return undo_info
 
