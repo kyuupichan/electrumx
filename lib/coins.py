@@ -34,14 +34,10 @@ class Coin(object):
     REORG_LIMIT=200
     # Not sure if these are coin-specific
     HEADER_LEN = 80
-    DEFAULT_RPC_PORT = 8332
     RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
     STRANGE_VERBYTE = 0xff
-    # IRC Defaults
-    IRC_PREFIX = "E_"
-    IRC_CHANNEL = "#electrum"
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
 
@@ -65,7 +61,7 @@ class Coin(object):
         if not match:
             raise CoinError('invalid daemon URL: "{}"'.format(url))
         if match.groups()[0] is None:
-            url += ':{:d}'.format(cls.DEFAULT_RPC_PORT)
+            url += ':{:d}'.format(cls.RPC_PORT)
         if not url.startswith('http://'):
             url = 'http://' + url
         return url + '/'
@@ -215,9 +211,14 @@ class Coin(object):
         return Base58.encode_check(payload)
 
     @classmethod
-    def header_hashes(cls, header):
-        '''Given a header return the previous and current block hashes.'''
-        return header[4:36], double_sha256(header)
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        return double_sha256(header)
+
+    @classmethod
+    def header_prevhash(cls, header):
+        '''Given a header return previous hash'''
+        return header[4:36]
 
     @classmethod
     def read_block(cls, block):
@@ -264,18 +265,20 @@ class Bitcoin(Coin):
     TX_COUNT = 142791895
     TX_COUNT_HEIGHT = 420976
     TX_PER_BLOCK = 1600
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum"
+    RPC_PORT = 8332
 
 
-class BitcoinTestnet(Coin):
-    NAME = "Bitcoin"
+class BitcoinTestnet(Bitcoin):
     SHORTNAME = "XTN"
-    REORG_LIMIT = 2000
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+    REORG_LIMIT = 2000
 
 
 # Source: pycoin and others
@@ -363,18 +366,17 @@ class Dash(Coin):
     TX_COUNT_HEIGHT = 569399
     TX_COUNT = 2157510
     TX_PER_BLOCK = 4
-    DEFAULT_RPC_PORT = 9998
+    RPC_PORT = 9998
     IRC_PREFIX = "D_"
     IRC_CHANNEL = "#electrum-dash"
 
     @classmethod
-    def header_hashes(cls, header):
-        '''Given a header return the previous and current block hashes.'''
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
         import x11_hash
-        return header[4:36], x11_hash.getPoWHash(header)
+        return x11_hash.getPoWHash(header)
 
 class DashTestnet(Dash):
-    NAME = "Dash"
     SHORTNAME = "tDASH"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("3a805837")
@@ -387,5 +389,5 @@ class DashTestnet(Dash):
     TX_COUNT_HEIGHT = 101619
     TX_COUNT = 132681
     TX_PER_BLOCK = 1
-    DEFAULT_RPC_PORT = 19998
+    RPC_PORT = 19998
     IRC_PREFIX = "d_"

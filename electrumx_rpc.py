@@ -30,7 +30,7 @@ class RPCClient(JSONRPC):
                 message = await f
             except asyncio.TimeoutError:
                 future.cancel()
-                print('request timed out')
+                print('request timed out after {}s'.format(timeout))
             else:
                 await self.handle_message(message)
 
@@ -82,7 +82,7 @@ def main():
     coro = loop.create_connection(RPCClient, 'localhost', args.port)
     try:
         transport, protocol = loop.run_until_complete(coro)
-        coro = protocol.send_and_wait(args.command[0], args.param, timeout=5)
+        coro = protocol.send_and_wait(args.command[0], args.param, timeout=15)
         loop.run_until_complete(coro)
     except OSError:
         print('error connecting - is ElectrumX catching up or not running?')

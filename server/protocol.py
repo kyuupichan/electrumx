@@ -227,6 +227,8 @@ class ServerManager(util.LoggedClass):
         self.max_subs = env.max_subs
         self.subscription_count = 0
         self.futures = []
+        env.max_send = max(350000, env.max_send)
+        self.logger.info('max response size {:,d} bytes'.format(env.max_send))
         self.logger.info('max subscriptions across all sessions: {:,d}'
                          .format(self.max_subs))
         self.logger.info('max subscriptions per session: {:,d}'
@@ -421,6 +423,8 @@ class Session(JSONRPC):
         self.coin = bp.coin
         self.kind = kind
         self.client = 'unknown'
+        self.anon_logs = env.anon_logs
+        self.max_send = env.max_send
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
@@ -462,14 +466,6 @@ class Session(JSONRPC):
                 # Getting here should probably be considered a bug and fixed
                 self.logger.error('error handling request {}'.format(message))
                 traceback.print_exc()
-
-    def peername(self, *, for_log=True):
-        if not self.peer_info:
-            return 'unknown'
-        # Anonymize IP addresses that will be logged
-        if for_log and self.env.anon_logs:
-            return 'xx.xx.xx.xx:xx'
-        return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
 
     def sub_count(self):
         return 0
@@ -674,8 +670,11 @@ class ElectrumX(Session):
         return self.bp.read_headers(start_height, count).hex()
 
     async def async_get_history(self, hash168):
-        # Apply DoS limit
-        limit = self.env.max_hist
+        # History DoS limit.  Each element of history is about 99
+        # bytes when encoded as JSON.  This limits resource usage on
+        # bloated history requests, and uses a smaller divisor so
+        # large requests are logged before refusing them.
+        limit = self.max_send // 97
         # Python 3.6: use async generators; update callers
         history = []
         for item in self.bp.get_history(hash168, limit=limit):
