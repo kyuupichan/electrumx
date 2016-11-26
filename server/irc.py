@@ -80,9 +80,9 @@ class IRC(LoggedClass):
                       'namreply', 'disconnect']:
             reactor.add_global_handler(event, getattr(self, 'on_' + event))
 
+        connection = reactor.server()
         while True:
             try:
-                connection = reactor.server()
                 connection.connect(self.irc_server, self.irc_port,
                                    self.nick, ircname=self.real_name)
                 connection.set_keepalive(60)
