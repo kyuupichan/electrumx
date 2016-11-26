@@ -311,7 +311,8 @@ class ServerManager(util.LoggedClass):
         for session in self.sessions:
             if isinstance(session, ElectrumX):
                 # Use a tuple to distinguish from JSON
-                session.messages.put_nowait((self.bp.height, touched, cache))
+                triple = (self.bp.db_height, touched, cache)
+                session.messages.put_nowait(triple)
 
     async def shutdown(self):
         '''Call to shutdown the servers.  Returns when done.'''
@@ -377,7 +378,7 @@ class ServerManager(util.LoggedClass):
     async def rpc_getinfo(self, params):
         '''The RPC 'getinfo' call.'''
         return {
-            'blocks': self.bp.height,
+            'blocks': self.bp.db_height,
             'peers': len(self.irc.peers),
             'sessions': self.session_count(),
             'watched': self.subscription_count,
@@ -592,8 +593,8 @@ class ElectrumX(Session):
                              .format(self.peername(), len(matches)))
 
     def height(self):
-        '''Return the block processor's current height.'''
-        return self.bp.height
+        '''Return the current flushed database height.'''
+        return self.bp.db_height
 
     def current_electrum_header(self):
         '''Used as response to a headers subscription request.'''

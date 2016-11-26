@@ -10,7 +10,6 @@
 
 import array
 import asyncio
-import itertools
 import os
 from struct import pack, unpack
 import time
@@ -437,47 +436,11 @@ class BlockProcessor(server.db.DB):
 
     def fs_flush(self):
         '''Flush the things stored on the filesystem.'''
-        blocks_done = len(self.headers)
-        prior_tx_count = (self.tx_counts[self.fs_height]
-                          if self.fs_height >= 0 else 0)
-        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
-        txs_done = cur_tx_count - prior_tx_count
+        assert self.fs_height + len(self.headers) == self.height
+        assert self.tx_count == self.tx_counts[-1] if self.tx_counts else 0
 
-        assert self.fs_height + blocks_done == self.height
-        assert len(self.tx_hashes) == blocks_done
-        assert len(self.tx_counts) == self.height + 1
-        assert cur_tx_count == self.tx_count, \
-            'cur: {:,d} new: {:,d}'.format(cur_tx_count, self.tx_count)
+        self.fs_update(self.fs_height, self.headers, self.tx_hashes)
 
-        # First the headers
-        headers = b''.join(self.headers)
-        header_len = self.coin.HEADER_LEN
-        self.headers_file.seek((self.fs_height + 1) * header_len)
-        self.headers_file.write(headers)
-        self.headers_file.flush()
-
-        # Then the tx counts
-        self.txcount_file.seek((self.fs_height + 1) * self.tx_counts.itemsize)
-        self.txcount_file.write(self.tx_counts[self.fs_height + 1:])
-        self.txcount_file.flush()
-
-        # Finally the hashes
-        hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
-        assert len(hashes) % 32 == 0
-        assert len(hashes) // 32 == txs_done
-        cursor = 0
-        file_pos = prior_tx_count * 32
-        while cursor < len(hashes):
-            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
-            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
-            filename = 'hashes{:04d}'.format(file_num)
-            with self.open_file(filename, create=True) as f:
-                f.seek(offset)
-                f.write(hashes[cursor:cursor + size])
-            cursor += size
-            file_pos += size
-
-        os.sync()
         self.fs_height = self.height
         self.fs_tx_count = self.tx_count
         self.tx_hashes = []
@@ -818,23 +781,6 @@ class BlockProcessor(server.db.DB):
         self.db_tx_count = self.tx_count
         self.db_height = self.height
         self.db_tip = self.tip
-
-    def read_headers(self, start, count):
-        # Read some from disk
-        disk_count = min(count, max(0, self.fs_height + 1 - start))
-        result = self.fs_read_headers(start, disk_count)
-        count -= disk_count
-        start += disk_count
-
-        # The rest from memory
-        if count:
-            start -= self.fs_height + 1
-            if not (count >= 0 and start + count <= len(self.headers)):
-                raise ChainError('{:,d} headers starting at {:,d} not on disk'
-                                 .format(count, start))
-            result += b''.join(self.headers[start: start + count])
-
-        return result
 
     def get_tx_hash(self, tx_num):
         '''Returns the tx_hash and height of a tx number.'''
