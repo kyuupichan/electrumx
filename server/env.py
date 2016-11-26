@@ -45,7 +45,7 @@ class Env(LoggedClass):
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         # Server limits to help prevent DoS
-        self.max_send = self.integer('MAX_SEND', 250000)
+        self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         # IRC

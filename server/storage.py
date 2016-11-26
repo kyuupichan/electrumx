@@ -77,7 +77,7 @@ class LevelDB(Storage):
 
     def open(self, name, create):
         self.db = self.module.DB(name, create_if_missing=create,
-                                 compression=None)
+                                 max_open_files=256, compression=None)
         self.get = self.db.get
         self.put = self.db.put
         self.iterator = self.db.iterator

@@ -10,8 +10,6 @@
 
 import array
 import asyncio
-import itertools
-import os
 from struct import pack, unpack
 import time
 from bisect import bisect_left
@@ -23,7 +21,6 @@ from server.version import VERSION
 from lib.hash import hash_to_str
 from lib.util import chunks, formatted_time, LoggedClass
 import server.db
-from server.storage import open_db
 
 
 class ChainError(Exception):
@@ -148,13 +145,11 @@ class BlockProcessor(server.db.DB):
         self.daemon = Daemon(self.coin.daemon_urls(env.daemon_url))
         self.caught_up = False
         self.event = asyncio.Event()
-        self.touched = set()
 
         # Meta
         self.utxo_MB = env.utxo_MB
         self.hist_MB = env.hist_MB
         self.next_cache_check = 0
-        self.reorg_limit = env.reorg_limit
 
         # Headers and tx_hashes have one entry per block
         self.history = defaultdict(partial(array.array, 'I'))
@@ -173,14 +168,11 @@ class BlockProcessor(server.db.DB):
         self.db_deletes = []
 
         # Log state
-        self.logger.info('reorg limit is {:,d} blocks'
-                         .format(self.reorg_limit))
         if self.first_sync:
             self.logger.info('flushing UTXO cache at {:,d} MB'
                              .format(self.utxo_MB))
             self.logger.info('flushing history cache at {:,d} MB'
                              .format(self.hist_MB))
-        self.clean_db()
 
     async def main_loop(self):
         '''Main loop for block processing.'''
@@ -189,7 +181,7 @@ class BlockProcessor(server.db.DB):
             if self.env.force_reorg > 0:
                 self.logger.info('DEBUG: simulating reorg of {:,d} blocks'
                                  .format(self.env.force_reorg))
-                await self.handle_chain_reorg(self.env.force_reorg)
+                await self.handle_chain_reorg(self.env.force_reorg, set())
 
             while True:
                 await self._wait_for_update()
@@ -215,22 +207,22 @@ class BlockProcessor(server.db.DB):
         if self.height == -1:
             blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
 
+        touched = set()
         try:
             for block in blocks:
-                self.advance_block(block, self.caught_up)
+                self.advance_block(block, touched)
                 await asyncio.sleep(0)  # Yield
         except ChainReorg:
-            await self.handle_chain_reorg(None)
+            await self.handle_chain_reorg(None, touched)
 
         if self.caught_up:
             # Flush everything as queries are performed on the DB and
             # not in-memory.
             self.flush(True)
-            self.client.notify(self.touched)
+            self.client.notify(touched)
         elif time.time() > self.next_cache_check:
             self.check_cache_size()
             self.next_cache_check = time.time() + 60
-        self.touched = set()
 
     def first_caught_up(self):
         '''Called when first caught up after start, or after a reorg.'''
@@ -242,7 +234,7 @@ class BlockProcessor(server.db.DB):
         self.flush(True)
         self.event.set()
 
-    async def handle_chain_reorg(self, count):
+    async def handle_chain_reorg(self, count, touched):
         '''Handle a chain reorganisation.
 
         Count is the number of blocks to simulate a reorg, or None for
@@ -256,7 +248,7 @@ class BlockProcessor(server.db.DB):
         hashes = [hash_to_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             blocks = await self.daemon.raw_blocks(hex_hashes)
-            self.backup_blocks(blocks)
+            self.backup_blocks(blocks, touched)
 
         await self.prefetcher.clear(self.height)
         self.logger.info('prefetcher reset')
@@ -291,57 +283,11 @@ class BlockProcessor(server.db.DB):
         else:
             start = (self.height - count) + 1
 
-        self.logger.info('chain was reorganised for {:,d} blocks over '
-                         'heights {:,d}-{:,d} inclusive'
+        self.logger.info('chain was reorganised: {:,d} blocks at '
+                         'heights {:,d}-{:,d} were replaced'
                          .format(count, start, start + count - 1))
 
         return self.fs_block_hashes(start, count)
-
-    def clean_db(self):
-        '''Clean out stale DB items.
-
-        Stale DB items are excess history flushed since the most
-        recent UTXO flush (only happens on unclean shutdown), and aged
-        undo information.
-        '''
-        if self.flush_count < self.utxo_flush_count:
-            raise ChainError('DB corrupt: flush_count < utxo_flush_count')
-        with self.db.write_batch() as batch:
-            if self.flush_count > self.utxo_flush_count:
-                self.logger.info('DB shut down uncleanly.  Scanning for '
-                                 'excess history flushes...')
-                self.remove_excess_history(batch)
-                self.utxo_flush_count = self.flush_count
-            self.remove_stale_undo_items(batch)
-            self.flush_state(batch)
-
-    def remove_excess_history(self, batch):
-        prefix = b'H'
-        keys = []
-        for key, hist in self.db.iterator(prefix=prefix):
-            flush_id, = unpack('>H', key[-2:])
-            if flush_id > self.utxo_flush_count:
-                keys.append(key)
-
-        self.logger.info('deleting {:,d} history entries'
-                         .format(len(keys)))
-        for key in keys:
-            batch.delete(key)
-
-    def remove_stale_undo_items(self, batch):
-        prefix = b'U'
-        cutoff = self.db_height - self.reorg_limit
-        keys = []
-        for key, hist in self.db.iterator(prefix=prefix):
-            height, = unpack('>I', key[-4:])
-            if height > cutoff:
-                break
-            keys.append(key)
-
-        self.logger.info('deleting {:,d} stale undo entries'
-                         .format(len(keys)))
-        for key in keys:
-            batch.delete(key)
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
@@ -438,47 +384,11 @@ class BlockProcessor(server.db.DB):
 
     def fs_flush(self):
         '''Flush the things stored on the filesystem.'''
-        blocks_done = len(self.headers)
-        prior_tx_count = (self.tx_counts[self.fs_height]
-                          if self.fs_height >= 0 else 0)
-        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
-        txs_done = cur_tx_count - prior_tx_count
+        assert self.fs_height + len(self.headers) == self.height
+        assert self.tx_count == self.tx_counts[-1] if self.tx_counts else 0
 
-        assert self.fs_height + blocks_done == self.height
-        assert len(self.tx_hashes) == blocks_done
-        assert len(self.tx_counts) == self.height + 1
-        assert cur_tx_count == self.tx_count, \
-            'cur: {:,d} new: {:,d}'.format(cur_tx_count, self.tx_count)
+        self.fs_update(self.fs_height, self.headers, self.tx_hashes)
 
-        # First the headers
-        headers = b''.join(self.headers)
-        header_len = self.coin.HEADER_LEN
-        self.headers_file.seek((self.fs_height + 1) * header_len)
-        self.headers_file.write(headers)
-        self.headers_file.flush()
-
-        # Then the tx counts
-        self.txcount_file.seek((self.fs_height + 1) * self.tx_counts.itemsize)
-        self.txcount_file.write(self.tx_counts[self.fs_height + 1:])
-        self.txcount_file.flush()
-
-        # Finally the hashes
-        hashes = memoryview(b''.join(itertools.chain(*self.tx_hashes)))
-        assert len(hashes) % 32 == 0
-        assert len(hashes) // 32 == txs_done
-        cursor = 0
-        file_pos = prior_tx_count * 32
-        while cursor < len(hashes):
-            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
-            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
-            filename = 'hashes{:04d}'.format(file_num)
-            with self.open_file(filename, create=True) as f:
-                f.seek(offset)
-                f.write(hashes[cursor:cursor + size])
-            cursor += size
-            file_pos += size
-
-        os.sync()
         self.fs_height = self.height
         self.fs_tx_count = self.tx_count
         self.tx_hashes = []
@@ -542,18 +452,6 @@ class BlockProcessor(server.db.DB):
         if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
             self.flush(utxo_MB >= self.utxo_MB)
 
-    def undo_key(self, height):
-        '''DB key for undo information at the given height.'''
-        return b'U' + pack('>I', height)
-
-    def write_undo_info(self, height, undo_info):
-        '''Write out undo information for the current height.'''
-        self.db.put(self.undo_key(height), undo_info)
-
-    def read_undo_info(self, height):
-        '''Read undo information from a file for the current height.'''
-        return self.db.get(self.undo_key(height))
-
     def fs_advance_block(self, header, tx_hashes, txs):
         '''Update unflushed FS state for a new block.'''
         prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
@@ -563,7 +461,7 @@ class BlockProcessor(server.db.DB):
         self.tx_hashes.append(tx_hashes)
         self.tx_counts.append(prior_tx_count + len(txs))
 
-    def advance_block(self, block, update_touched):
+    def advance_block(self, block, touched):
         # We must update the FS cache before calling advance_txs() as
         # the UTXO cache uses the FS cache via get_tx_hash() to
         # resolve compressed key collisions
@@ -571,16 +469,12 @@ class BlockProcessor(server.db.DB):
         if self.tip != self.coin.header_prevhash(header):
             raise ChainReorg
 
-        touched = set()
         self.fs_advance_block(header, tx_hashes, txs)
         self.tip = self.coin.header_hash(header)
         self.height += 1
         undo_info = self.advance_txs(tx_hashes, txs, touched)
-        if self.daemon.cached_height() - self.height <= self.reorg_limit:
+        if self.daemon.cached_height() - self.height <= self.env.reorg_limit:
             self.write_undo_info(self.height, b''.join(undo_info))
-
-        if update_touched:
-            self.touched.update(touched)
 
     def advance_txs(self, tx_hashes, txs, touched):
         put_utxo = self.utxo_cache.__setitem__
@@ -623,7 +517,7 @@ class BlockProcessor(server.db.DB):
 
         return undo_info
 
-    def backup_blocks(self, blocks):
+    def backup_blocks(self, blocks, touched):
         '''Backup the blocks and flush.
 
         The blocks should be in order of decreasing height.
@@ -632,7 +526,6 @@ class BlockProcessor(server.db.DB):
         self.logger.info('backing up {:,d} blocks'.format(len(blocks)))
         self.assert_flushed()
 
-        touched = set()
         for block in blocks:
             header, tx_hashes, txs = self.coin.read_block(block)
             header_hash = self.coin.header_hash(header)
@@ -649,7 +542,8 @@ class BlockProcessor(server.db.DB):
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
-        self.touched.update(touched)
+        # touched includes those passed into this function.  That will
+        # generally be empty but is harmless if not.
         flush_history = partial(self.backup_history, hash168s=touched)
         self.flush(True, flush_history=flush_history)
 
@@ -657,7 +551,7 @@ class BlockProcessor(server.db.DB):
         # Prevout values, in order down the block (coinbase first if present)
         # undo_info is in reverse block order
         undo_info = self.read_undo_info(self.height)
-        if not undo_info:
+        if undo_info is None:
             raise ChainError('no undo information found for height {:,d}'
                              .format(self.height))
         n = len(undo_info)
@@ -794,6 +688,7 @@ class BlockProcessor(server.db.DB):
         # UTXO state may have keys in common with our write cache or
         # may be in the DB already.
         flush_start = time.time()
+        delete_count = len(self.db_deletes) // 2
 
         batch_delete = batch.delete
         for key in self.db_deletes:
@@ -813,33 +708,14 @@ class BlockProcessor(server.db.DB):
                              'adds, {:,d} spends in {:.1f}s, committing...'
                              .format(self.height - self.db_height,
                                      self.tx_count - self.db_tx_count,
-                                     len(self.utxo_cache),
-                                     len(self.db_deletes) // 2,
+                                     len(self.utxo_cache), delete_count,
                                      time.time() - flush_start))
 
         self.utxo_cache = {}
-        self.db_deletes = []
         self.utxo_flush_count = self.flush_count
         self.db_tx_count = self.tx_count
         self.db_height = self.height
         self.db_tip = self.tip
-
-    def read_headers(self, start, count):
-        # Read some from disk
-        disk_count = min(count, max(0, self.fs_height + 1 - start))
-        result = self.fs_read_headers(start, disk_count)
-        count -= disk_count
-        start += disk_count
-
-        # The rest from memory
-        if count:
-            start -= self.fs_height + 1
-            if not (count >= 0 and start + count <= len(self.headers)):
-                raise ChainError('{:,d} headers starting at {:,d} not on disk'
-                                 .format(count, start))
-            result += b''.join(self.headers[start: start + count])
-
-        return result
 
     def get_tx_hash(self, tx_num):
         '''Returns the tx_hash and height of a tx number.'''

@@ -1,7 +1,7 @@
 The following environment variables are required:
 
 DB_DIRECTORY  - path to the database directory (if relative, to `run` script)
-USERNAME      - the username the server will run as if using `run` script
+USERNAME      - the username the server will run as, if using `run` script
 ELECTRUMX     - path to the electrumx_server.py script (if relative,
                 to `run` script)
 DAEMON_URL    - A comma-separated list of daemon URLS.  If more than one is
@@ -33,7 +33,9 @@ SSL_PORT      - if set will serve Electrum SSL clients on that HOST:SSL_PORT
 RPC_PORT      - Listen on this port for local RPC connections, defaults to
                 8000.
 BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
-                is re-read for each new client.
+                is re-read for each new client.  The string $VERSION in your
+                banner file will be replaced with the ElectrumX version you
+                are runnning, such as 'ElectrumX 0.7.11'.
 ANON_LOGS     - set to anything non-empty to remove IP addresses from
                 logs. By default IP addresses will be logged.
 DONATION_ADDRESS - server donation address.  Defaults to none.
@@ -45,20 +47,22 @@ each and are processed efficiently.  I feel the defaults are low and
 encourage you to raise them.
 
 MAX_SEND         - maximum size of a response message to send over the wire,
-                   in bytes.  Defaults to 350,000 and will treat smaller
-                   values as the same because standard Electrum protocol
-                   header chunk requests are nearly that large.
+                   in bytes.  Defaults to 1,000,000 and will treat values
+                   smaller than 350,000 as 350,000 because standard Electrum
+                   protocol header chunk requests are almost that large.
                    The Electrum protocol has a flaw in that address
                    histories must be served all at once or not at all,
                    an obvious avenue for abuse.  MAX_SEND is a
                    stop-gap until the protocol is improved to admit
                    incremental history requests.  Each history entry
                    is appoximately 100 bytes so the default is
-                   equivalent to a history limit of around 3,500
+                   equivalent to a history limit of around 10,000
                    entries, which should be ample for most legitimate
-                   users.  Increasing by a single-digit factor is
-                   likely fine but bear in mind one client can request
-                   history for multiple addresses.
+                   users.  If you increase this bear in mind one client
+                   can request history for multiple addresses.  Also,
+                   the largest raw transaction you will be able to serve
+                   to a client is just under half of MAX_SEND, as each raw
+                   byte becomes 2 hexadecimal ASCII characters on the wire.
 MAX_SUBS         - maximum number of address subscriptions across all
                    sessions.  Defaults to 250,000.
 MAX_SESSION_SUBS - maximum number of address subscriptions permitted to a
@@ -101,5 +105,7 @@ UTXO_MB   - amount of UTXO and history cache, in MB, to retain before
 The following are for debugging purposes.
 
 FORCE_REORG - if set to a positive integer, it will simulate a reorg
-              of the blockchain for that number of blocks.  Do not set
-              to a value greater than REORG_LIMIT.
+              of the blockchain for that number of blocks on startup.
+              Although it should fail gracefully if set to a value
+              greater than REORG_LIMIT, I do not recommend it as I have
+              not tried it and there is a chance your DB might corrupt.

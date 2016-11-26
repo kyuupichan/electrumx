@@ -10,6 +10,7 @@
 
 import array
 import ast
+import itertools
 import os
 from struct import pack, unpack
 from bisect import bisect_right
@@ -46,6 +47,8 @@ class DB(LoggedClass):
         self.logger.info('switching current directory to {}'
                          .format(env.db_dir))
         os.chdir(env.db_dir)
+        self.logger.info('reorg limit is {:,d} blocks'
+                         .format(self.env.reorg_limit))
 
         # Open DB and metadata files.  Record some of its state.
         db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
@@ -72,6 +75,7 @@ class DB(LoggedClass):
             assert self.db_tx_count == self.tx_counts[-1]
         else:
             assert self.db_tx_count == 0
+        self.clean_db()
 
     def read_state(self):
         if self.db.is_new:
@@ -116,7 +120,8 @@ class DB(LoggedClass):
         if self.first_sync:
             self.logger.info('sync time so far: {}'
                              .format(formatted_time(self.wall_time)))
-
+        if self.flush_count < self.utxo_flush_count:
+            raise self.DBError('DB corrupt: flush_count < utxo_flush_count')
 
     def write_state(self, batch):
         '''Write chain state to the batch.'''
@@ -133,6 +138,68 @@ class DB(LoggedClass):
         }
         batch.put(b'state', repr(state).encode())
 
+    def clean_db(self):
+        '''Clean out stale DB items.
+
+        Stale DB items are excess history flushed since the most
+        recent UTXO flush (only happens on unclean shutdown), and aged
+        undo information.
+        '''
+        if self.flush_count > self.utxo_flush_count:
+            self.utxo_flush_count = self.flush_count
+            self.logger.info('DB shut down uncleanly.  Scanning for '
+                             'excess history flushes...')
+            history_keys = self.excess_history_keys()
+            self.logger.info('deleting {:,d} history entries'
+                             .format(len(history_keys)))
+        else:
+            history_keys = []
+
+        undo_keys = self.stale_undo_keys()
+        if undo_keys:
+            self.logger.info('deleting {:,d} stale undo entries'
+                             .format(len(undo_keys)))
+
+        with self.db.write_batch() as batch:
+            batch_delete = batch.delete
+            for key in history_keys:
+                batch_delete(key)
+            for key in undo_keys:
+                batch_delete(key)
+            self.write_state(batch)
+
+    def excess_history_keys(self):
+        prefix = b'H'
+        keys = []
+        for key, hist in self.db.iterator(prefix=prefix):
+            flush_id, = unpack('>H', key[-2:])
+            if flush_id > self.utxo_flush_count:
+                keys.append(key)
+        return keys
+
+    def stale_undo_keys(self):
+        prefix = b'U'
+        cutoff = self.db_height - self.env.reorg_limit
+        keys = []
+        for key, hist in self.db.iterator(prefix=prefix):
+            height, = unpack('>I', key[-4:])
+            if height > cutoff:
+                break
+            keys.append(key)
+        return keys
+
+    def undo_key(self, height):
+        '''DB key for undo information at the given height.'''
+        return b'U' + pack('>I', height)
+
+    def write_undo_info(self, height, undo_info):
+        '''Write out undo information for the current height.'''
+        self.db.put(self.undo_key(height), undo_info)
+
+    def read_undo_info(self, height):
+        '''Read undo information from a file for the current height.'''
+        return self.db.get(self.undo_key(height))
+
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
         try:
@@ -142,7 +209,51 @@ class DB(LoggedClass):
                 return open(filename, 'wb+')
             raise
 
-    def fs_read_headers(self, start, count):
+    def fs_update(self, fs_height, headers, block_tx_hashes):
+        '''Write headers, the tx_count array and block tx hashes to disk.
+
+        Their first height is fs_height.  No recorded DB state is
+        updated.  These arrays are all append only, so in a crash we
+        just pick up again from the DB height.
+        '''
+        blocks_done = len(self.headers)
+        new_height = fs_height + blocks_done
+        prior_tx_count = (self.tx_counts[fs_height] if fs_height >= 0 else 0)
+        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
+        txs_done = cur_tx_count - prior_tx_count
+
+        assert len(self.tx_hashes) == blocks_done
+        assert len(self.tx_counts) == new_height + 1
+
+        # First the headers
+        self.headers_file.seek((fs_height + 1) * self.coin.HEADER_LEN)
+        self.headers_file.write(b''.join(headers))
+        self.headers_file.flush()
+
+        # Then the tx counts
+        self.txcount_file.seek((fs_height + 1) * self.tx_counts.itemsize)
+        self.txcount_file.write(self.tx_counts[fs_height + 1:])
+        self.txcount_file.flush()
+
+        # Finally the hashes
+        hashes = memoryview(b''.join(itertools.chain(*block_tx_hashes)))
+        assert len(hashes) % 32 == 0
+        assert len(hashes) // 32 == txs_done
+        cursor = 0
+        file_pos = prior_tx_count * 32
+        while cursor < len(hashes):
+            file_num, offset = divmod(file_pos, self.tx_hash_file_size)
+            size = min(len(hashes) - cursor, self.tx_hash_file_size - offset)
+            filename = 'hashes{:04d}'.format(file_num)
+            with self.open_file(filename, create=True) as f:
+                f.seek(offset)
+                f.write(hashes[cursor:cursor + size])
+            cursor += size
+            file_pos += size
+
+        os.sync()
+
+    def read_headers(self, start, count):
         '''Requires count >= 0.'''
         # Read some from disk
         disk_count = min(count, self.db_height + 1 - start)
@@ -172,7 +283,7 @@ class DB(LoggedClass):
             return f.read(32), tx_height
 
     def fs_block_hashes(self, height, count):
-        headers = self.fs_read_headers(height, count)
+        headers = self.read_headers(height, count)
         # FIXME: move to coins.py
         hlen = self.coin.HEADER_LEN
         return [self.coin.header_hash(header)
