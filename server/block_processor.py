@@ -229,9 +229,12 @@ class BlockProcessor(server.db.DB):
         self.caught_up = True
         if self.first_sync:
             self.first_sync = False
-            self.logger.info('{} synced to height {:,d}.  DB version:'
-                             .format(VERSION, self.height, self.db_version))
-        self.flush(True)
+            self.logger.info('{} synced to height {:,d}'
+                             .format(VERSION, self.height))
+            self.flush(True)
+            self.reopen_db(False)
+        else:
+            self.flush(True)
         self.event.set()
 
     async def handle_chain_reorg(self, count, touched):

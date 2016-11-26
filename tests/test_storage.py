@@ -21,7 +21,7 @@ for c in subclasses(Storage):
 def db(tmpdir, request):
     cwd = os.getcwd()
     os.chdir(str(tmpdir))
-    db = open_db("db", request.param)
+    db = open_db("db", request.param, False)
     os.chdir(cwd)
     yield db
     # Make sure all the locks and handles are closed

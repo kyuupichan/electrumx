@@ -50,16 +50,8 @@ class DB(LoggedClass):
         self.logger.info('reorg limit is {:,d} blocks'
                          .format(self.env.reorg_limit))
 
-        # Open DB and metadata files.  Record some of its state.
-        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
-        self.db = open_db(db_name, env.db_engine)
-        if self.db.is_new:
-            self.logger.info('created new {} database {}'
-                             .format(env.db_engine, db_name))
-        else:
-            self.logger.info('successfully opened {} database {}'
-                             .format(env.db_engine, db_name))
-        self.read_state()
+        self.db = None
+        self.reopen_db(True)
 
         create = self.db_height == -1
         self.headers_file = self.open_file('headers', create)
@@ -76,6 +68,43 @@ class DB(LoggedClass):
         else:
             assert self.db_tx_count == 0
         self.clean_db()
+
+    def reopen_db(self, first_sync):
+        '''Open the database.  If the database is already open, it is
+        closed (implicitly via GC) and re-opened.
+
+        Re-open to set the maximum number of open files appropriately.
+        '''
+        if self.db:
+            self.logger.info('closing DB to re-open')
+            self.db.close()
+
+        max_open_files = 1024 if first_sync else 256
+
+        # Open DB and metadata files.  Record some of its state.
+        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
+        self.db = open_db(db_name, self.env.db_engine, max_open_files)
+        if self.db.is_new:
+            self.logger.info('created new {} database {}'
+                             .format(self.env.db_engine, db_name))
+        else:
+            self.logger.info('successfully opened {} database {} for sync: {}'
+                             .format(self.env.db_engine, db_name, first_sync))
+        self.read_state()
+
+        if self.first_sync == first_sync:
+            self.logger.info('software version: {}'.format(VERSION))
+            self.logger.info('DB version: {:d}'.format(self.db_version))
+            self.logger.info('coin: {}'.format(self.coin.NAME))
+            self.logger.info('network: {}'.format(self.coin.NET))
+            self.logger.info('height: {:,d}'.format(self.db_height))
+            self.logger.info('tip: {}'.format(hash_to_str(self.db_tip)))
+            self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
+            if self.first_sync:
+                self.logger.info('sync time so far: {}'
+                                 .format(formatted_time(self.wall_time)))
+        else:
+            self.reopen_db(self.first_sync)
 
     def read_state(self):
         if self.db.is_new:
@@ -110,16 +139,6 @@ class DB(LoggedClass):
             self.wall_time = state['wall_time']
             self.first_sync = state['first_sync']
 
-        self.logger.info('software version: {}'.format(VERSION))
-        self.logger.info('DB version: {:d}'.format(self.db_version))
-        self.logger.info('coin: {}'.format(self.coin.NAME))
-        self.logger.info('network: {}'.format(self.coin.NET))
-        self.logger.info('height: {:,d}'.format(self.db_height))
-        self.logger.info('tip: {}'.format(hash_to_str(self.db_tip)))
-        self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
-        if self.first_sync:
-            self.logger.info('sync time so far: {}'
-                             .format(formatted_time(self.wall_time)))
         if self.flush_count < self.utxo_flush_count:
             raise self.DBError('DB corrupt: flush_count < utxo_flush_count')
 
