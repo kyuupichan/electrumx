@@ -277,7 +277,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         except RCPError:
             pass
         else:
-            self.handle_notification(method, params)
+            await self.handle_notification(method, params)
         return None
 
     async def json_request(self, message):
@@ -297,7 +297,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             await self.handle_response(message['result'], None, message['id'])
         return None
 
-    def raise_unknown_method(method):
+    def raise_unknown_method(self, method):
         '''Respond to a request with an unknown method.'''
         raise self.RPCError('unknown method: "{}"'.format(method),
                             self.METHOD_NOT_FOUND)

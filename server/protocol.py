@@ -254,6 +254,7 @@ class ServerManager(util.LoggedClass):
         def add_future(coro):
             self.futures.append(asyncio.ensure_future(coro))
 
+        # shutdown() assumes bp.main_loop() is first
         add_future(self.bp.main_loop())
         add_future(self.bp.prefetcher.main_loop())
         add_future(self.mempool.main_loop(self.bp.event))
@@ -316,7 +317,9 @@ class ServerManager(util.LoggedClass):
 
     async def shutdown(self):
         '''Call to shutdown the servers.  Returns when done.'''
-        for future in self.futures:
+        self.bp.shutdown()
+        # Don't cancel the block processor main loop - let it close itself
+        for future in self.futures[1:]:
             future.cancel()
         for server in self.servers:
             server.close()
@@ -326,7 +329,6 @@ class ServerManager(util.LoggedClass):
             await asyncio.sleep(0)
         if self.sessions:
             await self.close_sessions()
-        await self.bp.shutdown()
 
     async def close_sessions(self, secs=60):
         self.logger.info('cleanly closing client sessions, please wait...')

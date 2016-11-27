@@ -16,12 +16,12 @@ from functools import partial
 from lib.util import subclasses, increment_byte_string
 
 
-def open_db(name, db_engine):
+def open_db(name, db_engine, for_sync):
     '''Returns a database handle.'''
     for db_class in subclasses(Storage):
         if db_class.__name__.lower() == db_engine.lower():
             db_class.import_module()
-            return db_class(name)
+            return db_class(name, for_sync)
 
     raise RuntimeError('unrecognised DB engine "{}"'.format(db_engine))
 
@@ -29,9 +29,9 @@ def open_db(name, db_engine):
 class Storage(object):
     '''Abstract base class of the DB backend abstraction.'''
 
-    def __init__(self, name):
+    def __init__(self, name, for_sync):
         self.is_new = not os.path.exists(name)
-        self.open(name, create=self.is_new)
+        self.open(name, create=self.is_new, for_sync=for_sync)
 
     @classmethod
     def import_module(cls):
@@ -40,6 +40,10 @@ class Storage(object):
 
     def open(self, name, create):
         '''Open an existing database or create a new one.'''
+        raise NotImplementedError
+
+    def close(self):
+        '''Close an existing database.'''
         raise NotImplementedError
 
     def get(self, key):
@@ -75,9 +79,11 @@ class LevelDB(Storage):
         import plyvel
         cls.module = plyvel
 
-    def open(self, name, create):
+    def open(self, name, create, for_sync):
+        mof = 1024 if for_sync else 256
         self.db = self.module.DB(name, create_if_missing=create,
-                                 max_open_files=256, compression=None)
+                                 max_open_files=mof, compression=None)
+        self.close = self.db.close
         self.get = self.db.get
         self.put = self.db.put
         self.iterator = self.db.iterator
@@ -92,17 +98,24 @@ class RocksDB(Storage):
         import rocksdb
         cls.module = rocksdb
 
-    def open(self, name, create):
+    def open(self, name, create, for_sync):
+        mof = 1024 if for_sync else 256
         compression = "no"
         compression = getattr(self.module.CompressionType,
                               compression + "_compression")
         options = self.module.Options(create_if_missing=create,
                                       compression=compression,
                                       target_file_size_base=33554432,
-                                      max_open_files=1024)
+                                      max_open_files=mof)
         self.db = self.module.DB(name, options)
         self.get = self.db.get
         self.put = self.db.put
+
+    def close(self):
+        # PyRocksDB doesn't provide a close method; hopefully this is enough
+        self.db = None
+        import gc
+        gc.collect()
 
     class WriteBatch(object):
         def __init__(self, db):
@@ -157,10 +170,14 @@ class LMDB(Storage):
         import lmdb
         cls.module = lmdb
 
-    def open(self, name, create):
+    def open(self, name, create, for_sync):
+        # I don't see anything equivalent to max_open_files for for_sync
         self.env = LMDB.module.Environment('.', subdir=True, create=create,
                                           max_dbs=32, map_size=5 * 10 ** 10)
         self.db = self.env.open_db(create=create)
+
+    def close(self):
+        self.env.close()
 
     def get(self, key):
         with self.env.begin(db=self.db) as tx:
