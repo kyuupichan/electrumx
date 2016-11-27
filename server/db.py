@@ -349,7 +349,7 @@ class DB(LoggedClass):
             if limit == 0:
                 return
             limit -= 1
-            tx_num, tx_pos = s_unpack('<HI', db_key[-6:])
+            tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
             value, = unpack('<Q', db_value)
             tx_hash, height = self.fs_tx_hash(tx_num)
             yield UTXO(tx_num, tx_pos, tx_hash, height, value)
