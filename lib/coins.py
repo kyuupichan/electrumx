@@ -291,6 +291,14 @@ class Litecoin(Coin):
     P2PKH_VERBYTE = 0x30
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0xb0
+    GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
+                  b'4ff763ae46a2a6c172b3f1b60a8ce26f')
+    TX_COUNT = 8908766
+    TX_COUNT_HEIGHT = 1105256
+    TX_PER_BLOCK = 800
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-ltc"
+    RPC_PORT = 9332
 
 
 class LitecoinTestnet(Coin):
