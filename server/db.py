@@ -270,8 +270,6 @@ class DB(LoggedClass):
             cursor += size
             file_pos += size
 
-        os.sync()
-
     def read_headers(self, start, count):
         '''Requires count >= 0.'''
         # Read some from disk
