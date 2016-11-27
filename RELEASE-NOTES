@@ -1,3 +1,14 @@
+version 0.7.12
+--------------
+
+- minor bug fixes: 2 in JSON RPC, 1 in get_utxos (affected addresslistunspent)
+- leveldb / rocksdb are opened with a different maximum open files limit,
+  depending on whether the chain has been fully synced or not.  If synced
+  you want the files for network sockets, if not synced for the DB engines.
+  Once synced the DB will be reopened with the lower limit to free up the
+  files for serving network connections
+- various refactoring preparing for possible asynchronous block processing
+
 version 0.7.11
 --------------
 
