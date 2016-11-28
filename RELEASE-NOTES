@@ -1,3 +1,10 @@
+version 0.7.13
+--------------
+
+- the output of the RPC sessions and getinfo calls are now written to logs
+  periodically by default.  See LOG_SESSIONS in docs/ENV-NOTES
+- Litecoin update (santzi)
+
 version 0.7.12
 --------------
 
