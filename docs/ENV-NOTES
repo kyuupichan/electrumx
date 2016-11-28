@@ -36,6 +36,9 @@ BANNER_FILE   - a path to a banner file to serve to clients.  The banner file
                 is re-read for each new client.  The string $VERSION in your
                 banner file will be replaced with the ElectrumX version you
                 are runnning, such as 'ElectrumX 0.7.11'.
+LOG_SESSIONS  - the number of seconds between printing session statistics to
+                the log.  Defaults to 3600.  Set to zero to suppress this
+                logging.
 ANON_LOGS     - set to anything non-empty to remove IP addresses from
                 logs. By default IP addresses will be logged.
 DONATION_ADDRESS - server donation address.  Defaults to none.
