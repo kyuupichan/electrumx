@@ -17,6 +17,7 @@ from functools import partial
 from os import environ
 
 from lib.jsonrpc import JSONRPC
+from server.protocol import ServerManager
 
 
 class RPCClient(JSONRPC):
@@ -36,33 +37,12 @@ class RPCClient(JSONRPC):
 
     async def handle_response(self, result, error, method):
         if result and method == 'sessions':
-            self.print_sessions(result)
+            for line in ServerManager.sessions_text_lines(result):
+                print(line)
         else:
             value = {'error': error} if error else result
             print(json.dumps(value, indent=4, sort_keys=True))
 
-    def print_sessions(self, result):
-        def data_fmt(count, size):
-            return '{:,d}/{:,d}KB'.format(count, size // 1024)
-        def time_fmt(t):
-            t = int(t)
-            return ('{:3d}:{:02d}:{:02d}'
-                    .format(t // 3600, (t % 3600) // 60, t % 60))
-
-        fmt = ('{:<4} {:>23} {:>15} {:>7} '
-               '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
-        print(fmt.format('Type', 'Peer', 'Client', 'Subs',
-                         'Recv #', 'Recv KB', 'Sent #', 'Sent KB',
-                         'Errs', 'Time'))
-        for (kind, peer, subs, client, recv_count, recv_size,
-             send_count, send_size, error_count, time) in result:
-            print(fmt.format(kind, peer, client, '{:,d}'.format(subs),
-                             '{:,d}'.format(recv_count),
-                             '{:,d}'.format(recv_size // 1024),
-                             '{:,d}'.format(send_count),
-                             '{:,d}'.format(send_size // 1024),
-                             '{:,d}'.format(error_count),
-                             time_fmt(time)))
 
 def main():
     '''Send the RPC command to the server and print the result.'''
