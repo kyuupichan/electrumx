@@ -156,11 +156,15 @@ class Daemon(util.LoggedClass):
         '''Return the fee estimate for the given parameters.'''
         return await self._send_single('estimatefee', params)
 
+    async def getnetworkinfo(self):
+        '''Return the result of the 'getnetworkinfo' RPC call.'''
+        return await self._send_single('getnetworkinfo')
+
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
-        net_info = await self._send_single('getnetworkinfo')
-        return net_info['relayfee']
+        network_info = await self.getnetworkinfo()
+        return network_info['relayfee']
 
     async def getrawtransaction(self, hex_hash):
         '''Return the serialized raw transaction with the given hash.'''
