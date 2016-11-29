@@ -70,6 +70,19 @@ MAX_SUBS         - maximum number of address subscriptions across all
                    sessions.  Defaults to 250,000.
 MAX_SESSION_SUBS - maximum number of address subscriptions permitted to a
                    single session.  Defaults to 50,000.
+BANDWIDTH_LIMIT  - per-session periodic bandwith usage limit in bytes.
+                   Bandwidth usage over each period is totalled, and
+                   when this limit is exceeded each subsequent request
+                   is stalled by sleeping before handling it,
+                   effectively yielding processing resources to other
+                   sessions.  Each time this happens the event is
+                   logged.  The more bandwidth usage exceeds the limit
+                   the longer the next request will sleep.  Each sleep
+                   is a round number of seconds with a minimum of one.
+                   The bandwith usage counter is reset to zero at the
+                   end of each period.  Currently the period is
+                   hard-coded to be one hour.  The default limit value
+                   is 2 million bytes.
 
 If you want IRC connectivity to advertise your node:
 

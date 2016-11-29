@@ -1,3 +1,19 @@
+version 0.7.14
+--------------
+
+Improved DoS protection:
+
+- incoming network request buffers - which hold incomplete requests
+  are limited to 150,000 bytes, which I believe is large for genuine
+  clients.  I don't foresee a need to change this so it is hard-coded.
+  If an incoming request (for example, text without a newline) exceeds
+  this limit the connection is dropped and the event logged.
+- RPC connections have high MAX_SEND and incoming buffer limits as these
+  connections are assumed to be trusted.
+- new environment variable BANDWIDTH_LIMIT.  See docs/ENV-NOTES.
+- fixes: LOG_SESSIONS of 0.7.13 wasn't being properly interpreted.
+  Tweak to rocksdb close() that should permit db reopening to work.
+
 version 0.7.13
 --------------
 
