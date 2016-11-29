@@ -1,3 +1,16 @@
+version 0.7.15
+--------------
+
+The following meta variables in your banner file are now replaced in
+addition to $VERSION described in the notes to 0.17.11.  If you type
+getnetworkinfo in your daemon's debug console you will see what they
+are based on:
+
+- $DAEMON_VERSION is replaced with the daemon's version as a dot-separated
+  string.  For example "0.12.1".
+- $DAEMON_SUBVERSION is replaced with the daemon's user agent string.
+  For example, "/BitcoinUnlimited:0.12.1(EB16; AD4)/".
+
 version 0.7.14
 --------------
 
