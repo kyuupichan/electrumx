@@ -49,8 +49,8 @@ class Prefetcher(LoggedClass):
         synchronize.
         '''
         with await self.semaphore:
-            while not self.queue.empty():
-                self.queue.get_nowait()
+            while not self.tasks.empty():
+                self.tasks.get_nowait()
             self.cache = []
             self.cache_size = 0
             self.fetched_height = height
