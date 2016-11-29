@@ -113,7 +113,7 @@ class RocksDB(Storage):
 
     def close(self):
         # PyRocksDB doesn't provide a close method; hopefully this is enough
-        self.db = None
+        self.db = self.get = self.put = None
         import gc
         gc.collect()
 
