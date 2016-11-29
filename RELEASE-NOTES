@@ -1,3 +1,8 @@
+version 0.7.17
+--------------
+
+- upped read buffer limit to 1000000 bytes.
+
 version 0.7.16
 --------------
 
