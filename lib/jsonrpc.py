@@ -101,7 +101,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         # 1000 are treated as 1000.
         self.max_send = 0
         # If buffered incoming data exceeds this the connection is closed
-        self.max_buffer_size = 150000
+        self.max_buffer_size = 1000000
         self.anon_logs = False
 
     def peername(self, *, for_log=True):
