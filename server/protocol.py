@@ -230,6 +230,8 @@ class ServerManager(util.LoggedClass):
         self.subscription_count = 0
         self.futures = []
         env.max_send = max(350000, env.max_send)
+        self.logger.info('session bandwidth limit {:,d} bytes'
+                         .format(env.bandwidth_limit))
         self.logger.info('max response size {:,d} bytes'.format(env.max_send))
         self.logger.info('max subscriptions across all sessions: {:,d}'
                          .format(self.max_subs))
@@ -471,6 +473,7 @@ class Session(JSONRPC):
         self.client = 'unknown'
         self.anon_logs = env.anon_logs
         self.max_send = env.max_send
+        self.bandwidth_limit = env.bandwidth_limit
         self.txs_sent = 0
 
     def connection_made(self, transport):
@@ -923,3 +926,4 @@ class LocalRPC(Session):
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}
         self.client = 'RPC'
+        self.max_send = 5000000

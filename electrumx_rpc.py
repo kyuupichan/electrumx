@@ -23,6 +23,8 @@ from server.protocol import ServerManager
 class RPCClient(JSONRPC):
 
     async def send_and_wait(self, method, params, timeout=None):
+        # Raise incoming buffer size - presumably connection is trusted
+        self.max_buffer_size = 5000000
         self.send_json_request(method, id_=method, params=params)
 
         future = asyncio.ensure_future(self.messages.get())

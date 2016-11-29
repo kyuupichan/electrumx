@@ -49,6 +49,7 @@ class Env(LoggedClass):
         self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
+        self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         # IRC
         self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
         self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
