@@ -923,3 +923,4 @@ class LocalRPC(Session):
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}
         self.client = 'RPC'
+        self.max_send = 5000000

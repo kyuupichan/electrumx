@@ -96,6 +96,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         # connection.  The request causing it is logged.  Values under
         # 1000 are treated as 1000.
         self.max_send = 0
+        # If buffered incoming data exceeds this the connection is closed
+        self.max_buffer_size = 150000
         self.anon_logs = False
 
     def peername(self, *, for_log=True):
@@ -122,6 +124,17 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         decode_message for handling.
         '''
         self.recv_size += len(data)
+
+        # Close abuvsive connections where buffered data exceeds limit
+        buffer_size = len(data) + sum(len(part) for part in self.parts)
+        if buffer_size > self.max_buffer_size:
+            self.logger.error('read buffer of {:,d} bytes exceeds {:,d} '
+                              'byte limit, closing {}'
+                              .format(buffer_size, self.max_buffer_size,
+                                      self.peername()))
+            self.transport.close()
+
+        # Do nothing if this connection is closing
         if self.transport.is_closing():
             return
 
