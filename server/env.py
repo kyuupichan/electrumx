@@ -41,7 +41,7 @@ class Env(LoggedClass):
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
         self.anon_logs = self.default('ANON_LOGS', False)
-        self.log_sessions = self.default('LOG_SESSIONS', 3600)
+        self.log_sessions = self.integer('LOG_SESSIONS', 3600)
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
@@ -49,6 +49,7 @@ class Env(LoggedClass):
         self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
+        self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         # IRC
         self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
         self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
