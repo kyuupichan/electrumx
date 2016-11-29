@@ -889,7 +889,17 @@ class ElectrumX(Session):
                 self.logger.error('reading banner file {}: {}'
                                   .format(self.env.banner_file, e))
             else:
-                banner = banner.replace('$VERSION', VERSION)
+                network_info = await self.daemon.getnetworkinfo()
+                version = network_info['version']
+                major, minor = divmod(version, 1000000)
+                minor, revision = divmod(minor, 10000)
+                revision //= 100
+                version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
+                subversion = network_info['subversion']
+                banner = (banner.replace('$VERSION', VERSION)
+                          .replace('$DAEMON_VERSION', version)
+                          .replace('$DAEMON_SUBVERSION', subversion))
+
         return banner
 
     async def donation_address(self, params):
