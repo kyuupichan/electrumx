@@ -1,7 +1,7 @@
 version 0.7.17
 --------------
 
-- upped read buffer limit to 1000000 bytes.
+- upped read buffer limit to 1,000,000 bytes.
 
 version 0.7.16
 --------------
@@ -12,7 +12,7 @@ version 0.7.15
 --------------
 
 The following meta variables in your banner file are now replaced in
-addition to $VERSION described in the notes to 0.17.11.  If you type
+addition to $VERSION described in the notes to 0.7.11.  If you type
 getnetworkinfo in your daemon's debug console you will see what they
 are based on:
 
@@ -60,7 +60,7 @@ version 0.7.11
 
 - increased MAX_SEND default value to 1 million bytes so as to be able
   to serve large historical transactions of up to ~500K in size.  The
-  MAX_SEND floor remains at 350,000 bytes so you can reduct it if you
+  MAX_SEND floor remains at 350,000 bytes so you can reduce it if you
   wish.  To serve any historical transaction for bitcoin youd should
   set this to around 2,000,100 bytes (one byte becomes 2 ASCII hex chars)
 - issue #46: fix reorgs for coinbase-only blocks.  We would not distinguish
