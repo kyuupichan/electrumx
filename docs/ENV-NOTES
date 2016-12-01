@@ -90,8 +90,11 @@ IRC             - set to anything non-empty
 IRC_NICK        - the nick to use when connecting to IRC.  The default is a
                   hash of REPORT_HOST.  Either way 'E_' will be prepended.
 REPORT_HOST     - the host to advertise.  Defaults to HOST.
-REPORT_SSL_PORT - the SSL port to advertise.  Defaults to SSL_PORT.
+REPORT_HOST_TOR - Tor .onion address to advertise.  Uses TCP/SSL_PORT rather
+                - than REPORT_* ports.
 REPORT_TCP_PORT - the TCP port to advertise.  Defaults to TCP_PORT.
+                - '0' disables publishing the port for public use.
+REPORT_SSL_PORT - the SSL port to advertise.  Defaults to SSL_PORT.
 
 If synchronizing from the Genesis block your performance might change
 by tweaking the following cache variables.  Cache size is only checked

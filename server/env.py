@@ -54,6 +54,7 @@ class Env(LoggedClass):
         self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
         self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
         self.report_host = self.default('REPORT_HOST', self.host)
+        self.report_host_tor = self.default('REPORT_HOST_TOR', None)
         self.irc_nick = self.default('IRC_NICK', None)
         self.irc = self.default('IRC', False)
         # Debugging
