@@ -1,3 +1,10 @@
+version 0.7.18
+--------------
+
+- better IRC support for tor (valesi)
+- issues: suppressed some uninteresting socket logging to fix #52
+- mempool: fixed small memory leak
+
 version 0.7.17
 --------------
 
