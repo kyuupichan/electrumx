@@ -22,8 +22,8 @@ def db(tmpdir, request):
     cwd = os.getcwd()
     os.chdir(str(tmpdir))
     db = open_db("db", request.param, False)
-    os.chdir(cwd)
     yield db
+    os.chdir(cwd)
     # Make sure all the locks and handles are closed
     del db
     gc.collect()
@@ -67,3 +67,10 @@ def test_iterator_reverse(db):
             (b"abc" + str.encode(str(i)), str.encode(str(i))) for
             i in reversed(range(5))
         ]
+
+
+def test_close(db):
+    db.put(b"a", b"b")
+    db.close()
+    db = open_db("db", db.__class__.__name__, False)
+    assert db.get(b"a") == b"b"

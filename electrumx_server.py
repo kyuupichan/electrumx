@@ -21,6 +21,7 @@ from server.protocol import ServerManager
 
 SUPPRESS_MESSAGES = [
     'Fatal read error on socket transport',
+    'Fatal write error on socket transport',
 ]
 
 def main_loop():

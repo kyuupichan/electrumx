@@ -311,7 +311,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     async def json_notification(self, message):
         try:
             method, params = self.method_and_params(message)
-        except RCPError:
+        except self.RPCError:
             pass
         else:
             await self.handle_notification(method, params)
@@ -336,7 +336,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def raise_unknown_method(self, method):
         '''Respond to a request with an unknown method.'''
-        raise self.RPCError('unknown method: "{}"'.format(method),
+        raise self.RPCError("unknown method: '{}'".format(method),
                             self.METHOD_NOT_FOUND)
 
     # --- derived classes are intended to override these functions

@@ -20,14 +20,6 @@ from lib.hash import double_sha256
 from lib.util import LoggedClass
 
 
-def port_text(letter, port, default):
-    if not port:
-        return ''
-    if port == default:
-        return letter
-    return letter + str(port)
-
-
 class IRC(LoggedClass):
 
     Peer = namedtuple('Peer', 'ip_addr host ports')
@@ -37,22 +29,29 @@ class IRC(LoggedClass):
 
     def __init__(self, env):
         super().__init__()
-        tcp_text = port_text('t', env.report_tcp_port, 50001)
-        ssl_text = port_text('s', env.report_ssl_port, 50002)
-        # If this isn't something the client expects you won't appear
-        # in the client's network dialog box
         self.env = env
-        version = '1.0'
-        self.real_name = '{} v{} {} {}'.format(env.report_host, version,
-                                               tcp_text, ssl_text)
+
+        # If this isn't something a peer or client expects
+        # then you won't appear in the client's network dialog box
+        irc_address = (env.coin.IRC_SERVER, env.coin.IRC_PORT)
+        self.channel = env.coin.IRC_CHANNEL
         self.prefix = env.coin.IRC_PREFIX
+
+        self.clients = []
         self.nick = '{}{}'.format(self.prefix,
                                   env.irc_nick if env.irc_nick else
                                   double_sha256(env.report_host.encode())
                                   [:5].hex())
-        self.channel = env.coin.IRC_CHANNEL
-        self.irc_server = env.coin.IRC_SERVER
-        self.irc_port = env.coin.IRC_PORT
+        self.clients.append( IrcClient(irc_address, self.nick,
+                                       env.report_host,
+                                       env.report_tcp_port,
+                                       env.report_ssl_port) )
+        if env.report_host_tor:
+            self.clients.append( IrcClient(irc_address, self.nick + '_tor',
+                                           env.report_host_tor,
+                                           env.report_tcp_port_tor,
+                                           env.report_ssl_port_tor) )
+
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
 
@@ -72,20 +71,23 @@ class IRC(LoggedClass):
     async def join(self):
         import irc.client as irc_client
 
-        self.logger.info('joining IRC with nick "{}" and real name "{}"'
-                         .format(self.nick, self.real_name))
-
         reactor = irc_client.Reactor()
         for event in ['welcome', 'join', 'quit', 'kick', 'whoreply',
                       'namreply', 'disconnect']:
             reactor.add_global_handler(event, getattr(self, 'on_' + event))
 
-        connection = reactor.server()
+        # Note: Multiple nicks in same channel will trigger duplicate events
+        for client in self.clients:
+            client.connection = reactor.server()
+
         while True:
             try:
-                connection.connect(self.irc_server, self.irc_port,
-                                   self.nick, ircname=self.real_name)
-                connection.set_keepalive(60)
+                for client in self.clients:
+                    self.logger.info('Joining IRC in {} as "{}" with '
+                                     'real name "{}"'
+                                     .format(self.channel, client.nick,
+                                             client.realname))
+                    client.connect()
                 while True:
                     reactor.process_once()
                     await asyncio.sleep(2)
@@ -155,3 +157,36 @@ class IRC(LoggedClass):
             self.peers[nick] = peer
         except IndexError:
             pass
+
+
+class IrcClient(LoggedClass):
+
+    VERSION = '1.0'
+    DEFAULT_PORTS = {'t': 50001, 's': 50002}
+
+    def __init__(self, irc_address, nick, host, tcp_port, ssl_port):
+        super().__init__()
+        self.irc_host, self.irc_port = irc_address
+        self.nick = nick
+        self.realname = self.create_realname(host, tcp_port, ssl_port)
+        self.connection = None
+
+    def connect(self, keepalive=60):
+        '''Connect this client to its IRC server'''
+        self.connection.connect(self.irc_host, self.irc_port, self.nick,
+                                ircname=self.realname)
+        self.connection.set_keepalive(keepalive)
+
+    @classmethod
+    def create_realname(cls, host, tcp_port, ssl_port):
+        def port_text(letter, port):
+            if not port:
+                return ''
+            if port == cls.DEFAULT_PORTS.get(letter):
+                return ' ' + letter
+            else:
+                return ' ' + letter + str(port)
+
+        tcp = port_text('t', tcp_port)
+        ssl = port_text('s', ssl_port)
+        return '{} v{}{}{}'.format(host, cls.VERSION, tcp, ssl)
