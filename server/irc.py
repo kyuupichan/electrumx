@@ -20,10 +20,6 @@ from lib.hash import double_sha256
 from lib.util import LoggedClass
 
 
-VERSION = '1.0'
-DEFAULT_PORTS = {'t': 50001, 's': 50002}
-
-
 class IRC(LoggedClass):
 
     Peer = namedtuple('Peer', 'ip_addr host ports')
@@ -165,13 +161,15 @@ class IRC(LoggedClass):
 
 class IrcClient(LoggedClass):
 
+    VERSION = '1.0'
+    DEFAULT_PORTS = {'t': 50001, 's': 50002}
+
     def __init__(self, irc_address, nick, host, tcp_port, ssl_port):
         super().__init__()
         self.irc_host, self.irc_port = irc_address
         self.nick = nick
-        self.realname = IrcClient.create_realname(host, tcp_port, ssl_port)
+        self.realname = self.create_realname(host, tcp_port, ssl_port)
         self.connection = None
-
 
     def connect(self, keepalive=60):
         '''Connect this client to its IRC server'''
@@ -179,13 +177,16 @@ class IrcClient(LoggedClass):
                                 ircname=self.realname)
         self.connection.set_keepalive(keepalive)
 
-
-    def create_realname(host, tcp_port, ssl_port):
+    @classmethod
+    def create_realname(cls, host, tcp_port, ssl_port):
         def port_text(letter, port):
-            if letter in DEFAULT_PORTS and port == DEFAULT_PORTS[letter]:
-                return letter
+            if not port:
+                return ''
+            if port == cls.DEFAULT_PORTS.get(letter):
+                return ' ' + letter
             else:
-                return letter + str(port)
-        tcp = ' ' + port_text('t', tcp_port) if tcp_port else ''
-        ssl = ' ' + port_text('s', ssl_port) if ssl_port else ''
-        return '{} v{}{}{}'.format(host, VERSION, tcp, ssl)
+                return ' ' + letter + str(port)
+
+        tcp = port_text('t', tcp_port)
+        ssl = port_text('s', ssl_port)
+        return '{} v{}{}{}'.format(host, cls.VERSION, tcp, ssl)
