@@ -182,9 +182,10 @@ class IrcClient(LoggedClass):
 
     def create_realname(host, tcp_port, ssl_port):
         def port_text(letter, port):
-            return letter if letter in DEFAULT_PORTS
-                             and port == DEFAULT_PORTS[letter]
-                             else letter + str(port)
+            if letter in DEFAULT_PORTS and port == DEFAULT_PORTS[letter]:
+                return letter
+            else:
+                return letter + str(port)
         tcp = ' ' + port_text('t', tcp_port) if tcp_port else ''
         ssl = ' ' + port_text('s', ssl_port) if ssl_port else ''
         return '{} v{}{}{}'.format(host, VERSION, tcp, ssl)
