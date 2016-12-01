@@ -51,12 +51,20 @@ class Env(LoggedClass):
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         # IRC
+        self.irc = self.default('IRC', False)
+        self.irc_nick = self.default('IRC_NICK', None)
         self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
         self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
         self.report_host = self.default('REPORT_HOST', self.host)
+        self.report_tcp_port_tor = self.integer('REPORT_TCP_PORT_TOR',
+                                                self.report_tcp_port
+                                                if self.report_tcp_port else
+                                                self.tcp_port)
+        self.report_ssl_port_tor = self.integer('REPORT_SSL_PORT_TOR',
+                                                self.report_ssl_port
+                                                if self.report_ssl_port else
+                                                self.ssl_port)
         self.report_host_tor = self.default('REPORT_HOST_TOR', None)
-        self.irc_nick = self.default('IRC_NICK', None)
-        self.irc = self.default('IRC', False)
         # Debugging
         self.force_reorg = self.integer('FORCE_REORG', 0)
 

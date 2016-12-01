@@ -53,8 +53,8 @@ class IRC(LoggedClass):
         if env.report_host_tor:
             self.clients.append( IrcClient(irc_address, self.nick + '_tor',
                                            env.report_host_tor,
-                                           env.tcp_port,
-                                           env.ssl_port) )
+                                           env.report_tcp_port_tor,
+                                           env.report_ssl_port_tor) )
 
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
