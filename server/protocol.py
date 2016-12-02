@@ -77,16 +77,6 @@ class MemPool(util.LoggedClass):
         touched = set()
         missing_utxos = []
 
-        def drop_tx(hex_hash):
-            txin_pairs, txout_pairs, _u = self.txs.pop(hex_hash)
-            hash168s = set(hash168 for hash168, value in txin_pairs)
-            hash168s.update(hash168 for hash168, value in txout_pairs)
-            for hash168 in hash168s:
-                self.hash168s[hash168].remove(hex_hash)
-                if not self.hash168s[hash168]:
-                    del self.hash168s[hash168]
-            touched.update(hash168s)
-
         initial = self.count < 0
         if initial:
             self.logger.info('beginning import of {:,d} mempool txs'
@@ -95,7 +85,14 @@ class MemPool(util.LoggedClass):
         # Remove gone items
         gone = set(self.txs).difference(hex_hashes)
         for hex_hash in gone:
-            drop_tx(hex_hash)
+            txin_pairs, txout_pairs, unconfirmed = self.txs.pop(hex_hash)
+            hash168s = set(hash168 for hash168, value in txin_pairs)
+            hash168s.update(hash168 for hash168, value in txout_pairs)
+            for hash168 in hash168s:
+                self.hash168s[hash168].remove(hex_hash)
+                if not self.hash168s[hash168]:
+                    del self.hash168s[hash168]
+            touched.update(hash168s)
 
         # Get the raw transactions for the new hashes.  Ignore the
         # ones the daemon no longer has (it will return None).  Put
@@ -122,7 +119,7 @@ class MemPool(util.LoggedClass):
             if n % 20 == 0:
                 await asyncio.sleep(0)
             txout_pairs = [txout_pair(txout) for txout in tx.outputs]
-            self.txs[hex_hash] = ([], txout_pairs, None)
+            self.txs[hex_hash] = (None, txout_pairs, None)
 
         def txin_info(txin):
             hex_hash = hash_to_str(txin.prev_hash)
@@ -156,7 +153,7 @@ class MemPool(util.LoggedClass):
                 # it's harmless - next time the mempool is refreshed
                 # they'll either be cleaned up or the UTXOs will no
                 # longer be missing.
-                drop_tx(hex_hash)
+                del self.txs[hex_hash]
                 continue
             self.txs[hex_hash] = (txin_pairs, txout_pairs, any(unconfs))
 
