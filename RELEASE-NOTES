@@ -1,3 +1,17 @@
+version 0.8.2
+-------------
+
+- process new blocks in the asyncio executor; essentially a python thread.
+  This should eliminate latency during block processing that caused sessions
+  to be dropped.
+- bandwith limit is restored incrementally to a session over the hour
+  rather than in a lump when one hour has passed.  Also, only the
+  limit is refunded each hour; previously the entire usage would be
+  refunded.  So if the session uses 30MB bandwidth and your limit is
+  10MB, it will take 3 hrs before the session is considered to have
+  used none of its allotted bandwidth; previously it would happen after 1
+  hour.
+
 version 0.8.1
 -------------
 
