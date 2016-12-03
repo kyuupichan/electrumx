@@ -1,3 +1,22 @@
+verion 0.8.0
+------------
+
+- stale connections are periodically closed.  See docs/ENV-NOTES for
+  SESSION_TIMEOUT, default is 10 minutes.  Issue #56.
+- each session gets its own ID which is used in the logs instead of its
+  network address; the network address is still shown on initial connection.
+  Issue #55.
+- the session ID is also shown in the sessions list.  You can use this ID
+  with the following new RPC commands which take a list of session ids:
+
+     electrumx_rpc.py log
+     electrumx_rpc.py disconnect
+
+   The first will toggle logging of the sessions.  A logged sesssion
+   prints every incoming request to the logs.
+   The second will disconnect the sessions.
+   Example:  "electrumx_rpc.py log 15 369"
+
 version 0.7.20
 --------------
 
