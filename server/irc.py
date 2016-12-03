@@ -70,6 +70,11 @@ class IRC(LoggedClass):
 
     async def join(self):
         import irc.client as irc_client
+        from jaraco.stream import buffer
+
+        # see https://pypi.python.org/pypi/irc under DecodingInput
+        irc_client.ServerConnection.buffer_class = \
+            buffer.LenientDecodingLineBuffer
 
         reactor = irc_client.Reactor()
         for event in ['welcome', 'join', 'quit', 'kick', 'whoreply',

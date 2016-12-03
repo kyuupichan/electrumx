@@ -8,6 +8,7 @@ small - patches welcome.
 
 + Python3:  ElectrumX uses asyncio.  Python version >=3.5 is required.
 + plyvel:   Python interface to LevelDB.  I am using plyvel-0.9.
++ pylru:    Python LRU cache package.  I'm using 1.0.9.
 + aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
             communication with the daemon.  Version >= 1.0 required; I am
             using 1.0.5.

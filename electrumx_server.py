@@ -41,7 +41,7 @@ def main_loop():
     def on_exception(loop, context):
         '''Suppress spurious messages it appears we cannot control.'''
         message = context.get('message')
-        if not loop.is_closed() and not message in SUPPRESS_MESSAGES:
+        if not message in SUPPRESS_MESSAGES:
             if not ('task' in context and
                     'accept_connection2()' in repr(context.get('task'))):
                 loop.default_exception_handler(context)

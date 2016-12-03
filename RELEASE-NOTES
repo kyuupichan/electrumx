@@ -1,4 +1,12 @@
-verion 0.8.0
+version 0.8.1
+-------------
+
+** NOTE: this version has a new Python package dependency: pylru
+
+- fix for IRC encoding killing IRC connection
+- add lru cache for history
+
+version 0.8.0
 ------------
 
 - stale connections are periodically closed.  See docs/ENV-NOTES for
