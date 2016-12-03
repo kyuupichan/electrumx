@@ -201,6 +201,7 @@ class BlockProcessor(server.db.DB):
                 self.first_caught_up()
 
         self.flush(True)
+        self.logger.info('shut down complete')
 
     def shutdown(self):
         '''Call to shut down the block processor.'''
@@ -213,11 +214,16 @@ class BlockProcessor(server.db.DB):
         if self.height == -1:
             blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
 
-        touched = set()
-        try:
+        def do_it():
             for block in blocks:
+                if self._shutdown:
+                    break
                 self.advance_block(block, touched)
-                await asyncio.sleep(0)  # Yield
+
+        touched = set()
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, do_it)
         except ChainReorg:
             await self.handle_chain_reorg(touched)
 
