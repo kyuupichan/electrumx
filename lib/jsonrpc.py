@@ -129,10 +129,12 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def using_bandwidth(self, amount):
         now = time.time()
-        if now >= self.bandwidth_start + self.bandwidth_interval:
-            self.bandwidth_start = now
-            self.bandwidth_used = 0
-        self.bandwidth_used += amount
+        # Reduce the recorded usage in proportion to the elapsed time
+        elapsed = now - self.bandwidth_start
+        self.bandwidth_start = now
+        refund = int(elapsed / self.bandwidth_interval * self.bandwidth_limit)
+        refund = min(refund, self.bandwidth_used)
+        self.bandwidth_used += amount - refund
 
     def data_received(self, data):
         '''Handle incoming data (synchronously).
