@@ -1,3 +1,9 @@
+version 0.7.20
+--------------
+
+- fix for errors during batch requests (issue #54)
+- don't log errors on shutdown after giving sockets time to close
+
 version 0.7.19
 --------------
 

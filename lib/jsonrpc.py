@@ -211,16 +211,17 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         if self.transport.is_closing():
             return
 
+        id_ = payload.get('id') if isinstance(payload, dict) else None
         try:
             data = (json.dumps(payload) + '\n').encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.logger.error(msg)
-            self.send_json_error(msg, self.INTERNAL_ERROR, payload.get('id'))
+            self.send_json_error(msg, self.INTERNAL_ERROR, id_)
         else:
             if len(data) > max(1000, self.max_send):
-                self.send_json_error('request too large', self.INVALID_REQUEST,
-                                     payload.get('id'))
+                self.send_json_error('request too large',
+                                     self.INVALID_REQUEST, id_)
                 raise self.LargeRequestError
             else:
                 self.send_count += 1
