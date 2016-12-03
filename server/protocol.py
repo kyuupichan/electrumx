@@ -228,8 +228,11 @@ class ServerManager(util.LoggedClass):
         self.next_log_sessions = 0
         self.max_subs = env.max_subs
         self.subscription_count = 0
+        self.next_stale_check = 0
         self.futures = []
         env.max_send = max(350000, env.max_send)
+        self.logger.info('session timeout: {:,d} seconds'
+                         .format(env.session_timeout))
         self.logger.info('session bandwidth limit {:,d} bytes'
                          .format(env.bandwidth_limit))
         self.logger.info('max response size {:,d} bytes'.format(env.max_send))
@@ -354,24 +357,48 @@ class ServerManager(util.LoggedClass):
                              .format(len(self.sessions)))
 
     def add_session(self, session):
+        self.clear_stale_sessions()
         coro = session.serve_requests()
         future = asyncio.ensure_future(coro)
         self.sessions[session] = future
-        self.logger.info('connection from {}, {:,d} total'
+        session.log_info('connection from {}, {:,d} total'
                          .format(session.peername(), len(self.sessions)))
         # Some connections are acknowledged after the servers are closed
         if not self.servers:
             self.close_session(session)
 
-    def close_session(self, session):
-        '''Close the session's transport and cancel its future.'''
-        session.transport.close()
-        self.sessions[session].cancel()
-
     def remove_session(self, session):
         self.subscription_count -= session.sub_count()
         future = self.sessions.pop(session)
         future.cancel()
+
+    def close_session(self, session):
+        '''Close the session's transport and cancel its future.'''
+        session.transport.close()
+        self.sessions[session].cancel()
+        return '{:d} disconnected'.format(session.id_)
+
+    def toggle_logging(self, session):
+        '''Close the session's transport and cancel its future.'''
+        session.log_me = not session.log_me
+        if session.log_me:
+            return 'logging {:d}'.format(session.id_)
+        else:
+            return 'not logging {:d}'.format(session.id_)
+
+    def clear_stale_sessions(self):
+        '''Cut off sessions that haven't done anything for 10 minutes.'''
+        now = time.time()
+        if now > self.next_stale_check:
+            self.next_stale_check = now + 60
+            cutoff = now - self.env.session_timeout
+            stale = [session for session in self.sessions
+                     if session.last_recv < cutoff]
+            for session in stale:
+                self.close_session(session)
+            if stale:
+                self.logger.info('dropped {:,d} stale connections'
+                                 .format(len(stale)))
 
     def new_subscription(self):
         if self.subscription_count >= self.max_subs:
@@ -408,14 +435,15 @@ class ServerManager(util.LoggedClass):
             return ('{:3d}:{:02d}:{:02d}'
                     .format(t // 3600, (t % 3600) // 60, t % 60))
 
-        fmt = ('{:<4} {:>23} {:>15} {:>7} '
+        fmt = ('{:<4} {:>7} {:>23} {:>15} {:>7} '
                '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
-        yield fmt.format('Type', 'Peer', 'Client', 'Subs',
+        yield fmt.format('Type', 'ID ', 'Peer', 'Client', 'Subs',
                          'Recv', 'Recv KB', 'Sent', 'Sent KB',
                          'Txs', 'Time')
-        for (kind, peer, subs, client, recv_count, recv_size,
+        for (kind, id_, log_me, peer, subs, client, recv_count, recv_size,
              send_count, send_size, txs_sent, time) in data:
-            yield fmt.format(kind, peer, client,
+            yield fmt.format(kind, str(id_) + ('L' if log_me else ' '),
+                             peer, client,
                              '{:,d}'.format(subs),
                              '{:,d}'.format(recv_count),
                              '{:,d}'.format(recv_size // 1024),
@@ -429,6 +457,8 @@ class ServerManager(util.LoggedClass):
         now = time.time()
         sessions = sorted(self.sessions.keys(), key=lambda s: s.start)
         return [(session.kind,
+                 session.id_,
+                 session.log_me,
                  session.peername(for_log=for_log),
                  session.sub_count(),
                  session.client,
@@ -437,6 +467,33 @@ class ServerManager(util.LoggedClass):
                  session.txs_sent,
                  now - session.start)
                 for session in sessions]
+
+    def lookup_session(self, param):
+        try:
+            id_ = int(param)
+        except:
+            pass
+        else:
+            for session in self.sessions:
+                if session.id_ == id_:
+                    return session
+        return None
+
+    def for_each_session(self, params, operation):
+        result = []
+        for param in params:
+            session = self.lookup_session(param)
+            if session:
+                result.append(operation(session))
+            else:
+                result.append('unknown session: {}'.format(param))
+        return result
+
+    async def rpc_disconnect(self, params):
+        return self.for_each_session(params, self.close_session)
+
+    async def rpc_log(self, params):
+        return self.for_each_session(params, self.toggle_logging)
 
     async def rpc_getinfo(self, params):
         return self.server_summary()
@@ -485,10 +542,10 @@ class Session(JSONRPC):
         '''Handle client disconnection.'''
         super().connection_lost(exc)
         if self.error_count or self.send_size >= 1024*1024:
-            self.logger.info('{} disconnected.  '
-                             'Sent {:,d} bytes in {:,d} messages {:,d} errors'
-                             .format(self.peername(), self.send_size,
-                                     self.send_count, self.error_count))
+            self.log_info('disconnected.  Sent {:,d} bytes in {:,d} messages '
+                          '{:,d} errors'
+                          .format(self.send_size, self.send_count,
+                                  self.error_count))
         self.manager.remove_session(self)
 
     async def handle_request(self, method, params):
@@ -514,7 +571,7 @@ class Session(JSONRPC):
                 break
             except Exception:
                 # Getting here should probably be considered a bug and fixed
-                self.logger.error('error handling request {}'.format(message))
+                self.log_error('error handling request {}'.format(message))
                 traceback.print_exc()
 
     def sub_count(self):
@@ -638,8 +695,7 @@ class ElectrumX(Session):
             self.send_json(payload)
 
         if matches:
-            self.logger.info('notified {} of {} addresses'
-                             .format(self.peername(), len(matches)))
+            self.log_info('notified of {:,d} addresses'.format(len(matches)))
 
     def height(self):
         '''Return the current flushed database height.'''
@@ -825,12 +881,12 @@ class ElectrumX(Session):
             tx_hash = await self.daemon.sendrawtransaction(params)
             self.txs_sent += 1
             self.manager.txs_sent += 1
-            self.logger.info('sent tx: {}'.format(tx_hash))
+            self.log_info('sent tx: {}'.format(tx_hash))
             return tx_hash
         except DaemonError as e:
             error = e.args[0]
             message = error['message']
-            self.logger.info('sendrawtransaction: {}'.format(message))
+            self.log_info('sendrawtransaction: {}'.format(message))
             if 'non-mandatory-script-verify-flag' in message:
                 return (
                     'Your client produced a transaction that is not accepted '
@@ -886,8 +942,8 @@ class ElectrumX(Session):
                 with codecs.open(self.env.banner_file, 'r', 'utf-8') as f:
                     banner = f.read()
             except Exception as e:
-                self.logger.error('reading banner file {}: {}'
-                                  .format(self.env.banner_file, e))
+                self.log_error('reading banner file {}: {}'
+                               .format(self.env.banner_file, e))
             else:
                 network_info = await self.daemon.getnetworkinfo()
                 version = network_info['version']
@@ -932,7 +988,8 @@ class LocalRPC(Session):
 
     def __init__(self, *args):
         super().__init__(*args)
-        cmds = 'getinfo sessions numsessions peers numpeers'.split()
+        cmds = ('disconnect getinfo log numpeers numsessions peers sessions'
+                .split())
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}
         self.client = 'RPC'

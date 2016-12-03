@@ -50,6 +50,7 @@ class Env(LoggedClass):
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
+        self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         # IRC
         self.irc = self.default('IRC', False)
         self.irc_nick = self.default('IRC_NICK', None)
