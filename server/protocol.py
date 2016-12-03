@@ -341,7 +341,7 @@ class ServerManager(util.LoggedClass):
         if self.sessions:
             await self.close_sessions()
 
-    async def close_sessions(self, secs=60):
+    async def close_sessions(self, secs=30):
         self.logger.info('cleanly closing client sessions, please wait...')
         for session in self.sessions:
             self.close_session(session)
