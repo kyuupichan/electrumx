@@ -15,7 +15,9 @@ import ssl
 import time
 import traceback
 from collections import defaultdict, namedtuple
-from functools import partial
+from functools import partial, lru_cache
+
+import pylru
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.jsonrpc import JSONRPC, json_notification_payload
@@ -229,6 +231,7 @@ class ServerManager(util.LoggedClass):
         self.max_subs = env.max_subs
         self.subscription_count = 0
         self.next_stale_check = 0
+        self.history_cache = pylru.lrucache(512)
         self.futures = []
         env.max_send = max(350000, env.max_send)
         self.logger.info('session timeout: {:,d} seconds'
@@ -328,6 +331,25 @@ class ServerManager(util.LoggedClass):
                 self.logger.info(line)
             self.logger.info(json.dumps(self.server_summary()))
             self.next_log_sessions = time.time() + self.env.log_sessions
+
+    async def async_get_history(self, hash168):
+        if hash168 in self.history_cache:
+            return self.history_cache[hash168]
+
+        # History DoS limit.  Each element of history is about 99
+        # bytes when encoded as JSON.  This limits resource usage on
+        # bloated history requests, and uses a smaller divisor so
+        # large requests are logged before refusing them.
+        limit = self.env.max_send // 97
+        # Python 3.6: use async generators; update callers
+        history = []
+        for item in self.bp.get_history(hash168, limit=limit):
+            history.append(item)
+            if len(history) % 100 == 0:
+                await asyncio.sleep(0)
+
+        self.history_cache[hash168] = history
+        return history
 
     async def shutdown(self):
         '''Call to shutdown the servers.  Returns when done.'''
@@ -724,7 +746,7 @@ class ElectrumX(Session):
         '''Returns status as 32 bytes.'''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.async_get_history(hash168)
+        history = await self.manager.async_get_history(hash168)
         mempool = self.manager.mempool_transactions(hash168)
 
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
@@ -769,7 +791,7 @@ class ElectrumX(Session):
 
     async def get_history(self, hash168):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.async_get_history(hash168)
+        history = await self.manager.async_get_history(hash168)
         conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
 
@@ -782,20 +804,6 @@ class ElectrumX(Session):
         start_height = min(index * chunk_size, next_height)
         count = min(next_height - start_height, chunk_size)
         return self.bp.read_headers(start_height, count).hex()
-
-    async def async_get_history(self, hash168):
-        # History DoS limit.  Each element of history is about 99
-        # bytes when encoded as JSON.  This limits resource usage on
-        # bloated history requests, and uses a smaller divisor so
-        # large requests are logged before refusing them.
-        limit = self.max_send // 97
-        # Python 3.6: use async generators; update callers
-        history = []
-        for item in self.bp.get_history(hash168, limit=limit):
-            history.append(item)
-            if len(history) % 100 == 0:
-                await asyncio.sleep(0)
-        return history
 
     async def get_utxos(self, hash168):
         # Python 3.6: use async generators; update callers
