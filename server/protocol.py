@@ -376,15 +376,12 @@ class ServerManager(util.LoggedClass):
         '''Close the session's transport and cancel its future.'''
         session.transport.close()
         self.sessions[session].cancel()
-        return '{:d} disconnected'.format(session.id_)
+        return 'disconnected {:d}'.format(session.id_)
 
     def toggle_logging(self, session):
-        '''Close the session's transport and cancel its future.'''
+        '''Toggle logging of the session.'''
         session.log_me = not session.log_me
-        if session.log_me:
-            return 'logging {:d}'.format(session.id_)
-        else:
-            return 'not logging {:d}'.format(session.id_)
+        return 'log {:d}: {}'.format(session.id_, session.log_me)
 
     def clear_stale_sessions(self):
         '''Cut off sessions that haven't done anything for 10 minutes.'''
