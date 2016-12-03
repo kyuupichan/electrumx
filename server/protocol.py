@@ -228,8 +228,11 @@ class ServerManager(util.LoggedClass):
         self.next_log_sessions = 0
         self.max_subs = env.max_subs
         self.subscription_count = 0
+        self.next_stale_check = 0
         self.futures = []
         env.max_send = max(350000, env.max_send)
+        self.logger.info('session timeout: {:,d} seconds'
+                         .format(env.session_timeout))
         self.logger.info('session bandwidth limit {:,d} bytes'
                          .format(env.bandwidth_limit))
         self.logger.info('max response size {:,d} bytes'.format(env.max_send))
@@ -354,6 +357,7 @@ class ServerManager(util.LoggedClass):
                              .format(len(self.sessions)))
 
     def add_session(self, session):
+        self.clear_stale_sessions()
         coro = session.serve_requests()
         future = asyncio.ensure_future(coro)
         self.sessions[session] = future
@@ -372,6 +376,20 @@ class ServerManager(util.LoggedClass):
         self.subscription_count -= session.sub_count()
         future = self.sessions.pop(session)
         future.cancel()
+
+    def clear_stale_sessions(self):
+        '''Cut off sessions that haven't done anything for 10 minutes.'''
+        now = time.time()
+        if now > self.next_stale_check:
+            self.next_stale_check = now + 60
+            cutoff = now - self.env.session_timeout
+            stale = [session for session in self.sessions
+                     if session.last_recv < cutoff]
+            for session in stale:
+                self.close_session(session)
+            if stale:
+                self.logger.info('dropped {:,d} stale connections'
+                                 .format(len(stale)))
 
     def new_subscription(self):
         if self.subscription_count >= self.max_subs:

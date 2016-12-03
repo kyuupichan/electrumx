@@ -83,6 +83,9 @@ BANDWIDTH_LIMIT  - per-session periodic bandwith usage limit in bytes.
                    end of each period.  Currently the period is
                    hard-coded to be one hour.  The default limit value
                    is 2 million bytes.
+SESSION_TIMEOUT  - an integer number of seconds defaulting to 600.
+                   Sessions with no activity for longer than this are
+                   disconnected.
 
 If you want IRC connectivity to advertise your node:
 

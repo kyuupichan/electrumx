@@ -79,6 +79,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     def __init__(self):
         super().__init__()
         self.start = time.time()
+        self.last_recv = self.start
         self.bandwidth_start = self.start
         self.bandwidth_interval = 3600
         self.bandwidth_used = 0
@@ -155,6 +156,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             if npos == -1:
                 self.parts.append(data)
                 break
+            self.last_recv = time.time()
             self.recv_count += 1
             tail, data = data[:npos], data[npos + 1:]
             parts, self.parts = self.parts, []
