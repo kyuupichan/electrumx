@@ -64,6 +64,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     INTERNAL_ERROR = -32603
 
     ID_TYPES = (type(None), str, numbers.Number)
+    NEXT_SESSION_ID = 0
 
     class RPCError(Exception):
         '''RPC handlers raise this error.'''
@@ -104,6 +105,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         # If buffered incoming data exceeds this the connection is closed
         self.max_buffer_size = 1000000
         self.anon_logs = False
+        self.id_ = JSONRPC.NEXT_SESSION_ID
+        JSONRPC.NEXT_SESSION_ID += 1
+        self.log_prefix = '[{:d}] '.format(self.id_)
+        self.log_me = False
 
     def peername(self, *, for_log=True):
         '''Return the peer name of this connection.'''
@@ -141,10 +146,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         # Close abuvsive connections where buffered data exceeds limit
         buffer_size = len(data) + sum(len(part) for part in self.parts)
         if buffer_size > self.max_buffer_size:
-            self.logger.error('read buffer of {:,d} bytes exceeds {:,d} '
-                              'byte limit, closing {}'
-                              .format(buffer_size, self.max_buffer_size,
-                                      self.peername()))
+            self.log_error('read buffer of {:,d} bytes exceeds {:,d} '
+                           'byte limit, closing {}'
+                           .format(buffer_size, self.max_buffer_size,
+                                   self.peername()))
             self.transport.close()
 
         # Do nothing if this connection is closing
@@ -186,6 +191,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
         '''Queue the request for asynchronous handling.'''
         self.messages.put_nowait(message)
+        if self.log_me:
+            self.log_info('queued {}'.format(message))
 
     def send_json_notification(self, method, params):
         '''Create a json notification.'''
@@ -218,7 +225,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             data = (json.dumps(payload) + '\n').encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
-            self.logger.error(msg)
+            self.log_error(msg)
             self.send_json_error(msg, self.INTERNAL_ERROR, id_)
         else:
             if len(data) > max(1000, self.max_send):
@@ -241,10 +248,9 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         excess = self.bandwidth_used - self.bandwidth_limit
         if excess > 0:
             secs = 1 + excess // self.bandwidth_limit
-            self.logger.warning('{} has high bandwidth use of {:,d} bytes, '
-                                'sleeping {:d}s'
-                                .format(self.peername(), self.bandwidth_used,
-                                        secs))
+            self.log_warning('high bandwidth use of {:,d} bytes, '
+                             'sleeping {:d}s'
+                             .format(self.bandwidth_used, secs))
             await asyncio.sleep(secs)
 
         if isinstance(message, list):
@@ -256,8 +262,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             try:
                 self.send_json(payload)
             except self.LargeRequestError:
-                self.logger.warning('blocked large request from {}: {}'
-                                    .format(self.peername(), message))
+                self.log_warning('blocked large request {}'.format(message))
 
     async def batch_payload(self, batch):
         '''Return the JSON payload corresponding to a batch JSON request.'''
