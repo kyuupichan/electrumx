@@ -145,7 +145,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.recv_size += len(data)
         self.using_bandwidth(len(data))
 
-        # Close abuvsive connections where buffered data exceeds limit
+        # Close abusive connections where buffered data exceeds limit
         buffer_size = len(data) + sum(len(part) for part in self.parts)
         if buffer_size > self.max_buffer_size:
             self.log_error('read buffer of {:,d} bytes exceeds {:,d} '

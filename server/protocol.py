@@ -552,8 +552,8 @@ class Session(JSONRPC):
     '''Base class of ElectrumX JSON session protocols.
 
     Each session runs its tasks in asynchronous parallelism with other
-    sessions.  To prevent some sessions blocking othersr, potentially
-    long-running requests should yield (not yet implemented).
+    sessions.  To prevent some sessions blocking others, potentially
+    long-running requests should yield.
     '''
 
     def __init__(self, manager, bp, env, kind):
