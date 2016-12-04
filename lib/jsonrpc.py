@@ -216,7 +216,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         if self.error_count >= 10:
             self.transport.close()
 
-    def send_json(self, payload):
+    def send_json(self, payload, delimiter='\n'):
         '''Send a JSON payload.'''
         # Confirmed this happens, sometimes a lot
         if self.transport.is_closing():
@@ -224,7 +224,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
         id_ = payload.get('id') if isinstance(payload, dict) else None
         try:
-            data = (json.dumps(payload) + '\n').encode()
+            data = (json.dumps(payload) + delimiter).encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.log_error(msg)
@@ -236,9 +236,14 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
                 raise self.LargeRequestError
             else:
                 self.send_count += 1
-                self.send_size += len(data)
-                self.using_bandwidth(len(data))
-                self.transport.write(data)
+                self.send_bytes(data)
+
+    def send_bytes(self, data):
+        if self.transport.is_closing():
+            return
+        self.send_size += len(data)
+        self.using_bandwidth(len(data))
+        self.transport.write(data)
 
     async def handle_message(self, message):
         '''Asynchronously handle a JSON request or response.
@@ -256,30 +261,33 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             await asyncio.sleep(secs)
 
         if isinstance(message, list):
-            payload = await self.batch_payload(message)
+            await self.batch_payload(message)
         else:
             payload = await self.single_payload(message)
-
-        if payload:
-            try:
-                self.send_json(payload)
-            except self.LargeRequestError:
-                self.log_warning('blocked large request {}'.format(message))
+            if payload:
+                try:
+                    self.send_json(payload)
+                except self.LargeRequestError:
+                    self.log_warning('blocked large request {}'.format(message))
 
     async def batch_payload(self, batch):
         '''Return the JSON payload corresponding to a batch JSON request.'''
         # Batches must have at least one request.
         if not batch:
-            return json_error_payload('empty request list',
-                                      self.INVALID_REQUEST)
-
-        # PYTHON 3.6: use asynchronous comprehensions when supported
-        payload = []
+            self.send_json(json_error_payload('empty request list',
+                                      self.INVALID_REQUEST))
+        response_started = False
         for message in batch:
             message_payload = await self.single_payload(message)
             if message_payload:
-                payload.append(message_payload)
-        return payload
+                if not response_started:
+                    self.send_bytes(b"[")
+                    response_started = True
+                else:
+                    self.send_bytes(b', ')
+                self.send_json(message_payload, delimiter="")
+        if response_started:
+            self.send_bytes(b"]\n")
 
     async def single_payload(self, message):
         '''Return the JSON payload corresponding to a single JSON request,
