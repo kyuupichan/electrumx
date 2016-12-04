@@ -58,7 +58,7 @@ def main():
     args = parser.parse_args()
 
     if args.port is None:
-        args.port = int(environ.get('ELECTRUMX_RPC_PORT', 8000))
+        args.port = int(environ.get('RPC_PORT', 8000))
 
     loop = asyncio.get_event_loop()
     coro = loop.create_connection(RPCClient, 'localhost', args.port)
