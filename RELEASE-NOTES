@@ -1,3 +1,16 @@
+version 0.8.3
+-------------
+
+Minor tweaks to session logs:
+
+- sessions output now shows flags.  All sessions are listed.  The
+  session type column is gone, instead the first letter of RPC, SSL or
+  TCP is the first flag letter.  A 'C' flag indicates the session is closing.
+  An 'L' that it's being logged.
+- don't attempt to forcefully stale sockets; they remain in C state until
+  Python closes them (which can be a long time for some SSL sockets)
+- don't consider all seeing eye connections as stale
+
 version 0.8.2
 -------------
 
