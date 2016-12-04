@@ -993,8 +993,9 @@ class ElectrumX(Session):
 
     async def version(self, params):
         '''Return the server version as a string.'''
-        if len(params) == 2:
+        if params:
             self.client = str(params[0])
+        if len(params) > 1:
             self.protocol_version = params[1]
         return VERSION
 
