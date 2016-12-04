@@ -304,17 +304,18 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
         return await self.json_response(message)
 
-    def method_and_params(self, message):
+    @classmethod
+    def method_and_params(cls, message):
         method = message.get('method')
         params = message.get('params', [])
 
         if not isinstance(method, str):
-            raise self.RPCError('invalid method: {}'.format(method),
-                                self.INVALID_REQUEST)
+            raise cls.RPCError('invalid method: {}'.format(method),
+                               cls.INVALID_REQUEST)
 
         if not isinstance(params, list):
-            raise self.RPCError('params should be an array',
-                                self.INVALID_REQUEST)
+            raise cls.RPCError('params should be an array',
+                               cls.INVALID_REQUEST)
 
         return method, params
 
@@ -348,6 +349,34 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         '''Respond to a request with an unknown method.'''
         raise self.RPCError("unknown method: '{}'".format(method),
                             self.METHOD_NOT_FOUND)
+
+    # Common parameter verification routines
+    @classmethod
+    def param_to_non_negative_integer(cls, param):
+        '''Return param if it is or can be converted to a non-negative
+        integer, otherwise raise an RPCError.'''
+        try:
+            param = int(param)
+            if param >= 0:
+                return param
+        except ValueError:
+            pass
+
+        raise cls.RPCError('param {} should be a non-negative integer'
+                           .format(param))
+
+    @classmethod
+    def params_to_non_negative_integer(cls, params):
+        if len(params) == 1:
+            return cls.param_to_non_negative_integer(params[0])
+        raise cls.RPCError('params {} should contain one non-negative integer'
+                            .format(params))
+
+    @classmethod
+    def require_empty_params(cls, params):
+        if params:
+            raise cls.RPCError('params {} should be empty'.format(params))
+
 
     # --- derived classes are intended to override these functions
     async def handle_notification(self, method, params):
