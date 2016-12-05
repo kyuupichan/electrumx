@@ -113,10 +113,8 @@ be necessary.
 Roadmap Pre-1.0
 ===============
 
-- minor code cleanups
-- at most 1 more DB format change; I will make a weak attempt to
-  retain 0.6 release's DB format if possible
-- provision of bandwidth limit controls
+- minor code cleanups.  It is unlikely DB format will change
+- better DoS protections and mempool handling
 - implement simple protocol to discover peers without resorting to IRC
 
 
