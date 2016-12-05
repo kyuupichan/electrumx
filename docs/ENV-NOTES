@@ -83,9 +83,6 @@ BANDWIDTH_LIMIT  - per-session periodic bandwith usage limit in bytes.
                    end of each period.  Currently the period is
                    hard-coded to be one hour.  The default limit value
                    is 2 million bytes.
-CONN_LIMIT       - the number of new incoming connections is limited to
-CONN_LIMIT_SECS    CONN_LIMIT connections every CONN_LIMIT_SECS.
-                   The default is 10 every 10 seconds.
 SESSION_TIMEOUT  - an integer number of seconds defaulting to 600.
                    Sessions with no activity for longer than this are
                    disconnected.
