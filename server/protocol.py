@@ -15,7 +15,7 @@ import ssl
 import time
 import traceback
 from collections import defaultdict, namedtuple
-from functools import partial, lru_cache
+from functools import partial
 
 import pylru
 
@@ -231,7 +231,7 @@ class ServerManager(util.LoggedClass):
         self.max_subs = env.max_subs
         self.subscription_count = 0
         self.next_stale_check = 0
-        self.history_cache = pylru.lrucache(512)
+        self.history_cache = pylru.lrucache(128)
         self.futures = []
         env.max_send = max(350000, env.max_send)
         self.logger.info('session timeout: {:,d} seconds'
@@ -318,6 +318,10 @@ class ServerManager(util.LoggedClass):
 
     def notify(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
+        # Remove invalidated history cache
+        hc = self.history_cache
+        for hash168 in set(hc).intersection(touched):
+            del hc[hash168]
         cache = {}
         for session in self.sessions:
             if isinstance(session, ElectrumX):
