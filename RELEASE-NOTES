@@ -1,3 +1,8 @@
+version 0.8.4
+-------------
+
+- remove invalidated histories from cache on new block
+
 version 0.8.3
 -------------
 
