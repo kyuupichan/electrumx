@@ -419,7 +419,6 @@ class ServerManager(util.LoggedClass):
             cutoff = now - self.env.session_timeout
             stale = [session for session in self.sessions
                      if session.last_recv < cutoff
-                     and session.client != 'all_seeing_eye'
                      and not session.is_closing()]
             for session in stale:
                 self.close_session(session)
@@ -623,7 +622,7 @@ class Session(JSONRPC):
         except DaemonError as e:
             raise self.RPCError('daemon error: {}'.format(e))
 
-    def tx_hash_from_param(self, param):
+    def param_to_tx_hash(self, param):
         '''Raise an RPCError if the parameter is not a valid transaction
         hash.'''
         if isinstance(param, str) and len(param) == 64:
@@ -635,42 +634,19 @@ class Session(JSONRPC):
         raise self.RPCError('parameter should be a transaction hash: {}'
                             .format(param))
 
-    def hash168_from_param(self, param):
+    def param_to_hash168(self, param):
         if isinstance(param, str):
             try:
                 return self.coin.address_to_hash168(param)
             except:
                 pass
-        raise self.RPCError('parameter should be a valid address: {}'
-                            .format(param))
+        raise self.RPCError('param {} is not a valid address'.format(param))
 
-    def non_negative_integer_from_param(self, param):
-        try:
-            param = int(param)
-        except ValueError:
-            pass
-        else:
-            if param >= 0:
-                return param
-
-        raise self.RPCError('param should be a non-negative integer: {}'
-                            .format(param))
-
-    def extract_hash168(self, params):
+    def params_to_hash168(self, params):
         if len(params) == 1:
-            return self.hash168_from_param(params[0])
-        raise self.RPCError('params should contain a single address: {}'
+            return self.param_to_hash168(params[0])
+        raise self.RPCError('params {} should contain a single address'
                             .format(params))
-
-    def extract_non_negative_integer(self, params):
-        if len(params) == 1:
-            return self.non_negative_integer_from_param(params[0])
-        raise self.RPCError('params should contain a non-negative integer: {}'
-                            .format(params))
-
-    def require_empty_params(self, params):
-        if params:
-            raise self.RPCError('params should be empty: {}'.format(params))
 
 
 class ElectrumX(Session):
@@ -715,14 +691,14 @@ class ElectrumX(Session):
                         'blockchain.headers.subscribe',
                         (self.electrum_header(height), ),
                     )
-                self.send_json(cache[key])
+                self.encode_and_send_payload(cache[key])
 
             if self.subscribe_height:
                 payload = json_notification_payload(
                     'blockchain.numblocks.subscribe',
                     (height, ),
                 )
-                self.send_json(payload)
+                self.encode_and_send_payload(payload)
 
         hash168_to_address = self.coin.hash168_to_address
         matches = self.hash168s.intersection(touched)
@@ -731,7 +707,7 @@ class ElectrumX(Session):
             status = await self.address_status(hash168)
             payload = json_notification_payload(
                 'blockchain.address.subscribe', (address, status))
-            self.send_json(payload)
+            self.encode_and_send_payload(payload)
 
         if matches:
             self.log_info('notified of {:,d} addresses'.format(len(matches)))
@@ -837,27 +813,27 @@ class ElectrumX(Session):
     # --- blockchain commands
 
     async def address_get_balance(self, params):
-        hash168 = self.extract_hash168(params)
+        hash168 = self.params_to_hash168(params)
         return await self.get_balance(hash168)
 
     async def address_get_history(self, params):
-        hash168 = self.extract_hash168(params)
+        hash168 = self.params_to_hash168(params)
         return await self.get_history(hash168)
 
     async def address_get_mempool(self, params):
-        hash168 = self.extract_hash168(params)
+        hash168 = self.params_to_hash168(params)
         return self.unconfirmed_history(hash168)
 
     async def address_get_proof(self, params):
-        hash168 = self.extract_hash168(params)
+        hash168 = self.params_to_hash168(params)
         raise self.RPCError('get_proof is not yet implemented')
 
     async def address_listunspent(self, params):
-        hash168 = self.extract_hash168(params)
+        hash168 = self.params_to_hash168(params)
         return await self.list_unspent(hash168)
 
     async def address_subscribe(self, params):
-        hash168 = self.extract_hash168(params)
+        hash168 = self.params_to_hash168(params)
         if len(self.hash168s) >= self.max_subs:
             raise self.RPCError('your address subscription limit {:,d} reached'
                                 .format(self.max_subs))
@@ -868,11 +844,11 @@ class ElectrumX(Session):
         return result
 
     async def block_get_chunk(self, params):
-        index = self.extract_non_negative_integer(params)
+        index = self.params_to_non_negative_integer(params)
         return self.get_chunk(index)
 
     async def block_get_header(self, params):
-        height = self.extract_non_negative_integer(params)
+        height = self.params_to_non_negative_integer(params)
         return self.electrum_header(height)
 
     async def estimatefee(self, params):
@@ -929,15 +905,15 @@ class ElectrumX(Session):
         # For some reason Electrum passes a height.  Don't require it
         # in anticipation it might be dropped in the future.
         if 1 <= len(params) <= 2:
-            tx_hash = self.tx_hash_from_param(params[0])
+            tx_hash = self.param_to_tx_hash(params[0])
             return await self.daemon_request('getrawtransaction', tx_hash)
 
         raise self.RPCError('params wrong length: {}'.format(params))
 
     async def transaction_get_merkle(self, params):
         if len(params) == 2:
-            tx_hash = self.tx_hash_from_param(params[0])
-            height = self.non_negative_integer_from_param(params[1])
+            tx_hash = self.param_to_tx_hash(params[0])
+            height = self.param_to_non_negative_integer(params[1])
             return await self.tx_merkle(tx_hash, height)
 
         raise self.RPCError('params should contain a transaction hash '
@@ -945,8 +921,8 @@ class ElectrumX(Session):
 
     async def utxo_get_address(self, params):
         if len(params) == 2:
-            tx_hash = self.tx_hash_from_param(params[0])
-            index = self.non_negative_integer_from_param(params[1])
+            tx_hash = self.param_to_tx_hash(params[0])
+            index = self.param_to_non_negative_integer(params[1])
             tx_hash = hex_str_to_hash(tx_hash)
             hash168 = self.bp.get_utxo_hash168(tx_hash, index)
             if hash168:
