@@ -692,14 +692,14 @@ class ElectrumX(Session):
                         'blockchain.headers.subscribe',
                         (self.electrum_header(height), ),
                     )
-                self.send_json(cache[key])
+                self.encode_and_send_payload(cache[key])
 
             if self.subscribe_height:
                 payload = json_notification_payload(
                     'blockchain.numblocks.subscribe',
                     (height, ),
                 )
-                self.send_json(payload)
+                self.encode_and_send_payload(payload)
 
         hash168_to_address = self.coin.hash168_to_address
         matches = self.hash168s.intersection(touched)
@@ -708,7 +708,7 @@ class ElectrumX(Session):
             status = await self.address_status(hash168)
             payload = json_notification_payload(
                 'blockchain.address.subscribe', (address, status))
-            self.send_json(payload)
+            self.encode_and_send_payload(payload)
 
         if matches:
             self.log_info('notified of {:,d} addresses'.format(len(matches)))
