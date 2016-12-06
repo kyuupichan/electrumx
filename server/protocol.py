@@ -419,7 +419,6 @@ class ServerManager(util.LoggedClass):
             cutoff = now - self.env.session_timeout
             stale = [session for session in self.sessions
                      if session.last_recv < cutoff
-                     and session.client != 'all_seeing_eye'
                      and not session.is_closing()]
             for session in stale:
                 self.close_session(session)
