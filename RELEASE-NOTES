@@ -1,3 +1,12 @@
+version 0.8.5
+-------------
+
+- rework of JSON layer to better handle batch requests.  This is
+  preparatory work for improved DoS resistance.
+
+I'm aware recent versions don't sync efficiently; please use 0.8.0 to sync
+until I find time to fix it.
+
 version 0.8.4
 -------------
 
