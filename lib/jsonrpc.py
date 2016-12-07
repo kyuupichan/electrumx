@@ -15,28 +15,6 @@ import time
 from lib.util import LoggedClass
 
 
-def json_response_payload(result, id_):
-    # We should not respond to notifications
-    assert id_ is not None
-    return {'jsonrpc': '2.0', 'result': result, 'id': id_}
-
-def json_error_payload(message, code, id_=None):
-    error = {'message': message, 'code': code}
-    return {'jsonrpc': '2.0', 'error': error, 'id': id_}
-
-def json_request_payload(method, id_, params=None):
-    payload = {'jsonrpc': '2.0', 'id': id_, 'method': method}
-    if params:
-        payload['params'] = params
-    return payload
-
-def json_notification_payload(method, params=None):
-    return json_request_payload(method, None, params)
-
-def json_payload_id(payload):
-    return payload.get('id') if isinstance(payload, dict) else None
-
-
 class JSONRPC(asyncio.Protocol, LoggedClass):
     '''Manages a JSONRPC connection.
 
@@ -56,7 +34,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     handle_notification() and handle_response() should not return
     anything or raise any exceptions.  All three functions have
     default "ignore" implementations supplied by this class.
-
     '''
 
     # See http://www.jsonrpc.org/specification
@@ -79,6 +56,31 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     class LargeRequestError(Exception):
         '''Raised if a large request was prevented from being sent.'''
 
+    @classmethod
+    def request_payload(cls, method, id_, params=None):
+        payload = {'jsonrpc': '2.0', 'id': id_, 'method': method}
+        if params:
+            payload['params'] = params
+        return payload
+
+    @classmethod
+    def response_payload(cls, result, id_):
+        # We should not respond to notifications
+        assert id_ is not None
+        return {'jsonrpc': '2.0', 'result': result, 'id': id_}
+
+    @classmethod
+    def notification_payload(cls, method, params=None):
+        return cls.request_payload(method, None, params)
+
+    @classmethod
+    def error_payload(cls, message, code, id_=None):
+        error = {'message': message, 'code': code}
+        return {'jsonrpc': '2.0', 'error': error, 'id': id_}
+
+    @classmethod
+    def payload_id(cls, payload):
+        return payload.get('id') if isinstance(payload, dict) else None
 
     def __init__(self):
         super().__init__()
@@ -182,14 +184,14 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             message = message.decode()
         except UnicodeDecodeError as e:
             msg = 'cannot decode binary bytes: {}'.format(e)
-            self.send_json_error(msg, self.INVALID_REQUEST)
+            self.send_json_error(msg, self.PARSE_ERROR)
             return
 
         try:
             message = json.loads(message)
         except json.JSONDecodeError as e:
             msg = 'cannot decode JSON: {}'.format(e)
-            self.send_json_error(msg, self.INVALID_REQUEST)
+            self.send_json_error(msg, self.PARSE_ERROR)
             return
 
         '''Queue the request for asynchronous handling.'''
@@ -199,53 +201,53 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def encode_payload(self, payload):
         try:
-            text = (json.dumps(payload) + '\n').encode()
+            binary = json.dumps(payload).encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.log_error(msg)
             return self.json_error(msg, self.INTERNAL_ERROR,
-                                   json_payload_id(payload))
+                                   self.payload_id(payload))
 
-        self.check_oversized_request(len(text))
-        if 'error' in payload:
-            self.error_count += 1
+        self.check_oversized_request(len(binary))
         self.send_count += 1
-        self.send_size += len(text)
-        self.using_bandwidth(len(text))
-        return text
+        self.send_size += len(binary)
+        self.using_bandwidth(len(binary))
+        return binary
 
-    def send_text(self, text, close):
+    def _send_bytes(self, text, close):
         '''Send JSON text over the transport.  Close it if close is True.'''
         # Confirmed this happens, sometimes a lot
         if self.transport.is_closing():
             return
         self.transport.write(text)
+        self.transport.write(b'\n')
         if close:
             self.transport.close()
 
     def send_json_error(self, message, code, id_=None, close=True):
         '''Send a JSON error and close the connection by default.'''
-        self.send_text(self.json_error_text(message, code, id_), close)
+        self._send_bytes(self.json_error_bytes(message, code, id_), close)
 
     def encode_and_send_payload(self, payload):
         '''Encode the payload and send it.'''
-        self.send_text(self.encode_payload(payload), False)
+        self._send_bytes(self.encode_payload(payload), False)
 
-    def json_notification_text(self, method, params):
-        '''Return the text of a json notification.'''
-        return self.encode_payload(json_notification_payload(method, params))
+    def json_notification_bytes(self, method, params):
+        '''Return the bytes of a json notification.'''
+        return self.encode_payload(self.notification_payload(method, params))
 
-    def json_request_text(self, method, id_, params=None):
-        '''Return the text of a JSON request.'''
-        return self.encode_payload(json_request_payload(method, params))
+    def json_request_bytes(self, method, id_, params=None):
+        '''Return the bytes of a JSON request.'''
+        return self.encode_payload(self.request_payload(method, id_, params))
 
-    def json_response_text(self, result, id_):
-        '''Return the text of a JSON response.'''
-        return self.encode_payload(json_response_payload(result, id_))
+    def json_response_bytes(self, result, id_):
+        '''Return the bytes of a JSON response.'''
+        return self.encode_payload(self.response_payload(result, id_))
 
-    def json_error_text(self, message, code, id_=None):
-        '''Return the text of a JSON error.'''
-        return self.encode_payload(json_error_payload(message, code, id_))
+    def json_error_bytes(self, message, code, id_=None):
+        '''Return the bytes of a JSON error.'''
+        self.error_count += 1
+        return self.encode_payload(self.error_payload(message, code, id_))
 
     async def handle_message(self, payload):
         '''Asynchronously handle a JSON request or response.
@@ -254,21 +256,21 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         '''
         try:
             if isinstance(payload, list):
-                text = await self.process_json_batch(payload)
+                binary = await self.process_json_batch(payload)
             else:
-                text = await self.process_single_json(payload)
+                binary = await self.process_single_json(payload)
         except self.RPCError as e:
-            text = self.json_error_text(e.msg, e.code,
-                                        json_payload_id(payload))
+            binary = self.json_error_bytes(e.msg, e.code,
+                                           self.payload_id(payload))
 
-        if text:
-            self.send_text(text, self.error_count > 10)
+        if binary:
+            self._send_bytes(binary, self.error_count > 10)
 
     async def process_json_batch(self, batch):
         '''Return the text response to a JSON batch request.'''
         # Batches must have at least one request.
         if not batch:
-            return self.json_error_text('empty batch', self.INVALID_REQUEST)
+            return self.json_error_bytes('empty batch', self.INVALID_REQUEST)
 
         # PYTHON 3.6: use asynchronous comprehensions when supported
         parts = []
@@ -280,8 +282,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
                 total_len += len(part) + 2
                 self.check_oversized_request(total_len)
         if parts:
-            return '{' + ', '.join(parts) + '}'
-        return ''
+            return b'[' + b', '.join(parts) + b']'
+        return b''
 
     async def process_single_json(self, payload):
         '''Return the JSON result of a single JSON request, response or
@@ -300,16 +302,16 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             await asyncio.sleep(secs)
 
         if not isinstance(payload, dict):
-            return self.json_error_text('request must be a dict',
-                                        self.INVALID_REQUEST)
+            return self.json_error_bytes('request must be a dict',
+                                         self.INVALID_REQUEST)
 
         if not 'id' in payload:
             return await self.process_json_notification(payload)
 
         id_ = payload['id']
         if not isinstance(id_, self.ID_TYPES):
-            return self.json_error_text('invalid id: {}'.format(id_),
-                                        self.INVALID_REQUEST)
+            return self.json_error_bytes('invalid id: {}'.format(id_),
+                                         self.INVALID_REQUEST)
 
         if 'method' in payload:
             return await self.process_json_request(payload)
@@ -338,12 +340,12 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             pass
         else:
             await self.handle_notification(method, params)
-        return ''
+        return b''
 
     async def process_json_request(self, payload):
         method, params = self.method_and_params(payload)
         result = await self.handle_request(method, params)
-        return self.json_response_text(result, payload['id'])
+        return self.json_response_bytes(result, payload['id'])
 
     async def process_json_response(self, payload):
         # Only one of result and error should exist; we go with 'error'
@@ -352,7 +354,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             await self.handle_response(None, payload['error'], payload['id'])
         elif 'result' in payload:
             await self.handle_response(payload['result'], None, payload['id'])
-        return ''
+        return b''
 
     def check_oversized_request(self, total_len):
         if total_len > max(1000, self.max_send):
