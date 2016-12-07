@@ -1,3 +1,9 @@
+version 0.8.6
+-------------
+
+- fix JSON bugs from 0.8.5
+- fix issue #61 (valesi)
+
 version 0.8.5
 -------------
 
