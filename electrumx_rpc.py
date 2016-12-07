@@ -31,12 +31,12 @@ class RPCClient(JSONRPC):
         future = asyncio.ensure_future(self.messages.get())
         for f in asyncio.as_completed([future], timeout=timeout):
             try:
-                message = await f
+                request = await f
             except asyncio.TimeoutError:
                 future.cancel()
                 print('request timed out after {}s'.format(timeout))
             else:
-                await self.handle_message(message)
+                await request.process()
 
     async def handle_response(self, result, error, method):
         if result and method == 'sessions':

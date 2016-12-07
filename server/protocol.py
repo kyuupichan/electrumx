@@ -316,6 +316,10 @@ class ServerManager(util.LoggedClass):
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 
+    class NotificationRequest(object):
+        def __init__(self, fn_call):
+            self.process = fn_call
+
     def notify(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
         # Remove invalidated history cache
@@ -325,9 +329,9 @@ class ServerManager(util.LoggedClass):
         cache = {}
         for session in self.sessions:
             if isinstance(session, ElectrumX):
-                # Use a tuple to distinguish from JSON
-                triple = (self.bp.db_height, touched, cache)
-                session.messages.put_nowait(triple)
+                fn_call = partial(session.notify, self.bp.db_height, touched,
+                                  cache)
+                session.enqueue_request(self.NotificationRequest(fn_call))
         # Periodically log sessions
         if self.env.log_sessions and time.time() > self.next_log_sessions:
             data = self.session_data(for_log=True)
@@ -597,19 +601,14 @@ class Session(JSONRPC):
     async def serve_requests(self):
         '''Asynchronously run through the task queue.'''
         while True:
-            await asyncio.sleep(0)
-            message = await self.messages.get()
+            request = await self.messages.get()
             try:
-                # Height / mempool notification?
-                if isinstance(message, tuple):
-                    await self.notify(*message)
-                else:
-                    await self.handle_message(message)
+                await request.process()
             except asyncio.CancelledError:
                 break
             except Exception:
                 # Getting here should probably be considered a bug and fixed
-                self.log_error('error handling request {}'.format(message))
+                self.log_error('error handling request {}'.format(request))
                 traceback.print_exc()
 
     def sub_count(self):
