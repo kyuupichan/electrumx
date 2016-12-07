@@ -237,7 +237,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def json_request_text(self, method, id_, params=None):
         '''Return the text of a JSON request.'''
-        return self.encode_payload(json_request_payload(method, params))
+        return self.encode_payload(json_request_payload(method, id_, params))
 
     def json_response_text(self, result, id_):
         '''Return the text of a JSON response.'''
