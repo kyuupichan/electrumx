@@ -20,7 +20,7 @@ from functools import partial
 import pylru
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
-from lib.jsonrpc import JSONRPC, json_notification_payload
+from lib.jsonrpc import JSONRPC
 from lib.tx import Deserializer
 import lib.util as util
 from server.block_processor import BlockProcessor
@@ -687,14 +687,14 @@ class ElectrumX(Session):
             if self.subscribe_headers:
                 key = 'headers_payload'
                 if key not in cache:
-                    cache[key] = json_notification_payload(
+                    cache[key] = self.notification_payload(
                         'blockchain.headers.subscribe',
                         (self.electrum_header(height), ),
                     )
                 self.encode_and_send_payload(cache[key])
 
             if self.subscribe_height:
-                payload = json_notification_payload(
+                payload = self.notification_payload(
                     'blockchain.numblocks.subscribe',
                     (height, ),
                 )
@@ -705,7 +705,7 @@ class ElectrumX(Session):
         for hash168 in matches:
             address = hash168_to_address(hash168)
             status = await self.address_status(hash168)
-            payload = json_notification_payload(
+            payload = self.notification_payload(
                 'blockchain.address.subscribe', (address, status))
             self.encode_and_send_payload(payload)
 
