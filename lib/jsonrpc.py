@@ -15,6 +15,53 @@ import time
 from lib.util import LoggedClass
 
 
+class SingleRequest(object):
+    '''An object that represents a single request.'''
+    def __init__(self, session, payload):
+        self.payload = payload
+        self.session = session
+
+    async def process(self):
+        '''Asynchronously handle the JSON request.'''
+        binary = await self.session.process_single_payload(self.payload)
+        if binary:
+            self.session._send_bytes(binary)
+
+
+class BatchRequest(object):
+    '''An object that represents a batch request and its processing state.
+
+    Batches are processed in parts chunks.
+    '''
+
+    CUHNK_SIZE = 3
+
+    def __init__(self, session, payload):
+        self.session = session
+        self.payload = payload
+        self.done = 0
+        self.parts = []
+
+    async def process(self):
+        '''Asynchronously handle the JSON batch according to the JSON 2.0
+        spec.'''
+        for n in range(self.CHUNK_SIZE):
+            if self.done >= len(self.payload):
+                if self.parts:
+                    binary = b'[' + b', '.join(self.parts) + b']'
+                    self.session._send_bytes(binary)
+                return
+            item = self.payload[self.done]
+            part = await self.session.process_single_payload(item)
+            if part:
+                self.parts.append(part)
+            self.done += 1
+
+        # Re-enqueue to continue the rest later
+        self.session.enqueue_request(self)
+        return b''
+
+
 class JSONRPC(asyncio.Protocol, LoggedClass):
     '''Manages a JSONRPC connection.
 
@@ -53,48 +100,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             self.msg = msg
             self.code = code
 
-    class SingleRequest(object):
-        '''An object that represents a single request.'''
-        def __init__(self, session, payload):
-            self.payload = payload
-            self.session = session
-
-        async def process(self):
-            '''Asynchronously handle the JSON request.'''
-            binary = await self.session.process_single_payload(self.payload)
-            if binary:
-                self.session._send_bytes(binary)
-
-    class BatchRequest(object):
-        '''An object that represents a batch request and its processing
-        state.'''
-        def __init__(self, session, payload):
-            self.session = session
-            self.payload = payload
-            self.done = 0
-            self.parts = []
-
-        async def process(self):
-            '''Asynchronously handle the JSON batch according to the JSON 2.0
-            spec.'''
-            if not self.payload:
-                raise JSONRPC.RPCError('empty batch', self.INVALID_REQUEST)
-            for n in range(self.session.batch_limit):
-                if self.done >= len(self.payload):
-                    if self.parts:
-                        binary = b'[' + b', '.join(self.parts) + b']'
-                        self.session._send_bytes(binary)
-                    return
-                item = self.payload[self.done]
-                part = await self.session.process_single_payload(item)
-                if part:
-                    self.parts.append(part)
-                self.done += 1
-
-            # Re-enqueue to continue the rest later
-            self.session.enqueue_request(self)
-            return b''
-
     @classmethod
     def request_payload(cls, method, id_, params=None):
         payload = {'jsonrpc': '2.0', 'id': id_, 'method': method}
@@ -129,7 +134,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.bandwidth_interval = 3600
         self.bandwidth_used = 0
         self.bandwidth_limit = 5000000
-        self.batch_limit = 4
         self.transport = None
         # Parts of an incomplete JSON line.  We buffer them until
         # getting a newline.
@@ -239,9 +243,9 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             if not message:
                 self.send_json_error('empty batch', self.INVALID_REQUEST)
                 return
-            request = self.BatchRequest(self, message)
+            request = BatchRequest(self, message)
         else:
-            request = self.SingleRequest(self, message)
+            request = SingleRequest(self, message)
 
         '''Queue the request for asynchronous handling.'''
         self.enqueue_request(request)
