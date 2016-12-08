@@ -1,3 +1,10 @@
+version 0.8.7
+-------------
+
+- update systemd config (bauerj)
+- temporary fix for initial sync times
+- continued JSON code refactoring
+
 version 0.8.6
 -------------
 
