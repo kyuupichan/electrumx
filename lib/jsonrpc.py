@@ -67,8 +67,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     Assumes JSON messages are newline-separated and that newlines
     cannot appear in the JSON other than to separate lines.  Incoming
-    messages are queued on the messages queue for later asynchronous
-    processing, and should be passed to the handle_request() function.
+    requests are passed to enqueue_request(), which should arrange for
+    their asynchronous handling via the request's process() method.
 
     Derived classes may want to override connection_made() and
     connection_lost() but should be sure to call the implementation in
@@ -145,7 +145,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.send_size = 0
         self.error_count = 0
         self.peer_info = None
-        self.messages = asyncio.Queue()
         # Sends longer than max_send are prevented, instead returning
         # an oversized request error to other end of the network
         # connection.  The request causing it is logged.  Values under
@@ -408,7 +407,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     # --- derived classes are intended to override these functions
     def enqueue_request(self, request):
         '''Enqueue a request for later asynchronous processing.'''
-        self.messages.put_nowait(request)
+        raise NotImplementedError
 
     async def handle_notification(self, method, params):
         '''Handle a notification.'''
