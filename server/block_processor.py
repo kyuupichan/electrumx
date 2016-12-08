@@ -223,7 +223,10 @@ class BlockProcessor(server.db.DB):
         touched = set()
         loop = asyncio.get_event_loop()
         try:
-            await loop.run_in_executor(None, do_it)
+            if self.caught_up:
+                await loop.run_in_executor(None, do_it)
+            else:
+                do_it()
         except ChainReorg:
             await self.handle_chain_reorg(touched)
 
