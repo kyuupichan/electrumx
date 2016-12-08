@@ -218,8 +218,13 @@ class ServerManager(util.LoggedClass):
 
     MgrTask = namedtuple('MgrTask', 'session task')
 
+    class NotificationRequest(object):
+        def __init__(self, fn_call):
+            self.process = fn_call
+
     def __init__(self, env):
         super().__init__()
+        self.start = time.time()
         self.bp = BlockProcessor(self, env)
         self.mempool = MemPool(self.bp.daemon, env.coin, self.bp, self)
         self.irc = IRC(env)
@@ -231,7 +236,9 @@ class ServerManager(util.LoggedClass):
         self.max_subs = env.max_subs
         self.subscription_count = 0
         self.next_stale_check = 0
-        self.history_cache = pylru.lrucache(128)
+        self.history_cache = pylru.lrucache(256)
+        self.header_cache = pylru.lrucache(8)
+        self.height = 0
         self.futures = []
         env.max_send = max(350000, env.max_send)
         self.logger.info('session timeout: {:,d} seconds'
@@ -318,16 +325,18 @@ class ServerManager(util.LoggedClass):
 
     def notify(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        # Remove invalidated history cache
+        # Invalidate caches
         hc = self.history_cache
         for hash168 in set(hc).intersection(touched):
             del hc[hash168]
-        cache = {}
+        if self.bp.db_height != self.height:
+            self.height = self.bp.db_height
+            self.header_cache.clear()
+
         for session in self.sessions:
             if isinstance(session, ElectrumX):
-                # Use a tuple to distinguish from JSON
-                triple = (self.bp.db_height, touched, cache)
-                session.messages.put_nowait(triple)
+                fn_call = partial(session.notify, self.bp.db_height, touched)
+                session.enqueue_request(self.NotificationRequest(fn_call))
         # Periodically log sessions
         if self.env.log_sessions and time.time() > self.next_log_sessions:
             data = self.session_data(for_log=True)
@@ -335,6 +344,17 @@ class ServerManager(util.LoggedClass):
                 self.logger.info(line)
             self.logger.info(json.dumps(self.server_summary()))
             self.next_log_sessions = time.time() + self.env.log_sessions
+
+    def electrum_header(self, height):
+        '''Return the binary header at the given height.'''
+        if not 0 <= height <= self.bp.db_height:
+            raise self.RPCError('height {:,d} out of range'.format(height))
+        if height in self.header_cache:
+            return self.header_cache[height]
+        header = self.bp.read_headers(height, 1)
+        header = self.env.coin.electrum_header(header, height)
+        self.header_cache[height] = header
+        return header
 
     async def async_get_history(self, hash168):
         if hash168 in self.history_cache:
@@ -557,6 +577,7 @@ class Session(JSONRPC):
         self.max_send = env.max_send
         self.bandwidth_limit = env.bandwidth_limit
         self.txs_sent = 0
+        self.bucket = int(self.start - self.manager.start) // 60
 
     def is_closing(self):
         '''True if this session is closing.'''
@@ -597,19 +618,14 @@ class Session(JSONRPC):
     async def serve_requests(self):
         '''Asynchronously run through the task queue.'''
         while True:
-            await asyncio.sleep(0)
-            message = await self.messages.get()
+            request = await self.messages.get()
             try:
-                # Height / mempool notification?
-                if isinstance(message, tuple):
-                    await self.notify(*message)
-                else:
-                    await self.handle_message(message)
+                await request.process()
             except asyncio.CancelledError:
                 break
             except Exception:
                 # Getting here should probably be considered a bug and fixed
-                self.log_error('error handling request {}'.format(message))
+                self.log_error('error handling request {}'.format(request))
                 traceback.print_exc()
 
     def sub_count(self):
@@ -677,7 +693,7 @@ class ElectrumX(Session):
     def sub_count(self):
         return len(self.hash168s)
 
-    async def notify(self, height, touched, cache):
+    async def notify(self, height, touched):
         '''Notify the client about changes in height and touched addresses.
 
         Cache is a shared cache for this update.
@@ -685,13 +701,11 @@ class ElectrumX(Session):
         if height != self.notified_height:
             self.notified_height = height
             if self.subscribe_headers:
-                key = 'headers_payload'
-                if key not in cache:
-                    cache[key] = self.notification_payload(
-                        'blockchain.headers.subscribe',
-                        (self.electrum_header(height), ),
-                    )
-                self.encode_and_send_payload(cache[key])
+                payload = self.notification_payload(
+                    'blockchain.headers.subscribe',
+                    (self.manager.electrum_header(height), ),
+                )
+                self.encode_and_send_payload(payload)
 
             if self.subscribe_height:
                 payload = self.notification_payload(
@@ -718,14 +732,7 @@ class ElectrumX(Session):
 
     def current_electrum_header(self):
         '''Used as response to a headers subscription request.'''
-        return self.electrum_header(self.height())
-
-    def electrum_header(self, height):
-        '''Return the binary header at the given height.'''
-        if not 0 <= height <= self.height():
-            raise self.RPCError('height {:,d} out of range'.format(height))
-        header = self.bp.read_headers(height, 1)
-        return self.coin.electrum_header(header, height)
+        return self.manager.electrum_header(self.height())
 
     async def address_status(self, hash168):
         '''Returns status as 32 bytes.'''
@@ -849,7 +856,7 @@ class ElectrumX(Session):
 
     async def block_get_header(self, params):
         height = self.params_to_non_negative_integer(params)
-        return self.electrum_header(height)
+        return self.manager.electrum_header(height)
 
     async def estimatefee(self, params):
         return await self.daemon_request('estimatefee', params)

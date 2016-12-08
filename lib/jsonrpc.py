@@ -15,13 +15,60 @@ import time
 from lib.util import LoggedClass
 
 
+class SingleRequest(object):
+    '''An object that represents a single request.'''
+    def __init__(self, session, payload):
+        self.payload = payload
+        self.session = session
+
+    async def process(self):
+        '''Asynchronously handle the JSON request.'''
+        binary = await self.session.process_single_payload(self.payload)
+        if binary:
+            self.session._send_bytes(binary)
+
+
+class BatchRequest(object):
+    '''An object that represents a batch request and its processing state.
+
+    Batches are processed in parts chunks.
+    '''
+
+    CUHNK_SIZE = 3
+
+    def __init__(self, session, payload):
+        self.session = session
+        self.payload = payload
+        self.done = 0
+        self.parts = []
+
+    async def process(self):
+        '''Asynchronously handle the JSON batch according to the JSON 2.0
+        spec.'''
+        for n in range(self.CHUNK_SIZE):
+            if self.done >= len(self.payload):
+                if self.parts:
+                    binary = b'[' + b', '.join(self.parts) + b']'
+                    self.session._send_bytes(binary)
+                return
+            item = self.payload[self.done]
+            part = await self.session.process_single_payload(item)
+            if part:
+                self.parts.append(part)
+            self.done += 1
+
+        # Re-enqueue to continue the rest later
+        self.session.enqueue_request(self)
+        return b''
+
+
 class JSONRPC(asyncio.Protocol, LoggedClass):
     '''Manages a JSONRPC connection.
 
     Assumes JSON messages are newline-separated and that newlines
     cannot appear in the JSON other than to separate lines.  Incoming
     messages are queued on the messages queue for later asynchronous
-    processing, and should be passed to the handle_message() function.
+    processing, and should be passed to the handle_request() function.
 
     Derived classes may want to override connection_made() and
     connection_lost() but should be sure to call the implementation in
@@ -52,9 +99,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             super().__init__(**kw_args)
             self.msg = msg
             self.code = code
-
-    class LargeRequestError(Exception):
-        '''Raised if a large request was prevented from being sent.'''
 
     @classmethod
     def request_payload(cls, method, id_, params=None):
@@ -184,18 +228,27 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             message = message.decode()
         except UnicodeDecodeError as e:
             msg = 'cannot decode binary bytes: {}'.format(e)
-            self.send_json_error(msg, self.PARSE_ERROR)
+            self.send_json_error(msg, self.PARSE_ERROR, close=True)
             return
 
         try:
             message = json.loads(message)
         except json.JSONDecodeError as e:
             msg = 'cannot decode JSON: {}'.format(e)
-            self.send_json_error(msg, self.PARSE_ERROR)
+            self.send_json_error(msg, self.PARSE_ERROR, close=True)
             return
 
+        if isinstance(message, list):
+            # Batches must have at least one request.
+            if not message:
+                self.send_json_error('empty batch', self.INVALID_REQUEST)
+                return
+            request = BatchRequest(self, message)
+        else:
+            request = SingleRequest(self, message)
+
         '''Queue the request for asynchronous handling.'''
-        self.messages.put_nowait(message)
+        self.enqueue_request(request)
         if self.log_me:
             self.log_info('queued {}'.format(message))
 
@@ -214,23 +267,23 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.using_bandwidth(len(binary))
         return binary
 
-    def _send_bytes(self, text, close):
+    def _send_bytes(self, binary, close=False):
         '''Send JSON text over the transport.  Close it if close is True.'''
         # Confirmed this happens, sometimes a lot
         if self.transport.is_closing():
             return
-        self.transport.write(text)
+        self.transport.write(binary)
         self.transport.write(b'\n')
-        if close:
+        if close or self.error_count > 10:
             self.transport.close()
 
-    def send_json_error(self, message, code, id_=None, close=True):
+    def send_json_error(self, message, code, id_=None, close=False):
         '''Send a JSON error and close the connection by default.'''
         self._send_bytes(self.json_error_bytes(message, code, id_), close)
 
     def encode_and_send_payload(self, payload):
         '''Encode the payload and send it.'''
-        self._send_bytes(self.encode_payload(payload), False)
+        self._send_bytes(self.encode_payload(payload))
 
     def json_notification_bytes(self, method, params):
         '''Return the bytes of a json notification.'''
@@ -249,74 +302,33 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.error_count += 1
         return self.encode_payload(self.error_payload(message, code, id_))
 
-    async def handle_message(self, payload):
-        '''Asynchronously handle a JSON request or response.
-
-        Handles batches according to the JSON 2.0 spec.
-        '''
-        try:
-            if isinstance(payload, list):
-                binary = await self.process_json_batch(payload)
-            else:
-                binary = await self.process_single_json(payload)
-        except self.RPCError as e:
-            binary = self.json_error_bytes(e.msg, e.code,
-                                           self.payload_id(payload))
-
-        if binary:
-            self._send_bytes(binary, self.error_count > 10)
-
-    async def process_json_batch(self, batch):
-        '''Return the text response to a JSON batch request.'''
-        # Batches must have at least one request.
-        if not batch:
-            return self.json_error_bytes('empty batch', self.INVALID_REQUEST)
-
-        # PYTHON 3.6: use asynchronous comprehensions when supported
-        parts = []
-        total_len = 0
-        for item in batch:
-            part = await self.process_single_json(item)
-            if part:
-                parts.append(part)
-                total_len += len(part) + 2
-                self.check_oversized_request(total_len)
-        if parts:
-            return b'[' + b', '.join(parts) + b']'
-        return b''
-
-    async def process_single_json(self, payload):
-        '''Return the JSON result of a single JSON request, response or
+    async def process_single_payload(self, payload):
+        '''Return the binary JSON result of a single JSON request, response or
         notification.
 
-        Return None if the request is a notification or a response.
+        The result is empty if nothing is to be sent.
         '''
-        # Throttle high-bandwidth connections by delaying processing
-        # their requests.  Delay more the higher the excessive usage.
-        excess = self.bandwidth_used - self.bandwidth_limit
-        if excess > 0:
-            secs = 1 + excess // self.bandwidth_limit
-            self.log_warning('high bandwidth use of {:,d} bytes, '
-                             'sleeping {:d}s'
-                             .format(self.bandwidth_used, secs))
-            await asyncio.sleep(secs)
 
         if not isinstance(payload, dict):
             return self.json_error_bytes('request must be a dict',
                                          self.INVALID_REQUEST)
 
-        if not 'id' in payload:
-            return await self.process_json_notification(payload)
+        try:
+            if not 'id' in payload:
+                return await self.process_json_notification(payload)
 
-        id_ = payload['id']
-        if not isinstance(id_, self.ID_TYPES):
-            return self.json_error_bytes('invalid id: {}'.format(id_),
-                                         self.INVALID_REQUEST)
+            id_ = payload['id']
+            if not isinstance(id_, self.ID_TYPES):
+                return self.json_error_bytes('invalid id: {}'.format(id_),
+                                             self.INVALID_REQUEST)
 
-        if 'method' in payload:
-            return await self.process_json_request(payload)
+            if 'method' in payload:
+                return await self.process_json_request(payload)
 
-        return await self.process_json_response(payload)
+            return await self.process_json_response(payload)
+        except self.RPCError as e:
+            return self.json_error_bytes(e.msg, e.code,
+                                         self.payload_id(payload))
 
     @classmethod
     def method_and_params(cls, payload):
@@ -394,6 +406,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
 
     # --- derived classes are intended to override these functions
+    def enqueue_request(self, request):
+        '''Enqueue a request for later asynchronous processing.'''
+        self.messages.put_nowait(request)
+
     async def handle_notification(self, method, params):
         '''Handle a notification.'''
 
