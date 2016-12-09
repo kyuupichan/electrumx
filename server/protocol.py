@@ -555,15 +555,15 @@ class ServerManager(util.LoggedClass):
 
         fmt = ('{:<6} {:<5} {:>23} {:>15} {:>7} '
                '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
-        yield fmt.format('ID', 'Flags', 'Peer', 'Client', 'Subs',
-                         'Reqs', 'Txs', 'Recv', 'Recv KB', 'Sent',
+        yield fmt.format('ID', 'Flags', 'Peer', 'Client', 'Reqs',
+                         'Txs', 'Subs', 'Recv', 'Recv KB', 'Sent',
                          'Sent KB', 'Time')
-        for (id_, flags, peer, client, subs, reqs, txs_sent,
+        for (id_, flags, peer, client, reqs, txs_sent, subs,
              recv_count, recv_size, send_count, send_size, time) in data:
             yield fmt.format(id_, flags, peer, client,
-                             '{:,d}'.format(subs),
                              '{:,d}'.format(reqs),
                              '{:,d}'.format(txs_sent),
+                             '{:,d}'.format(subs),
                              '{:,d}'.format(recv_count),
                              '{:,d}'.format(recv_size // 1024),
                              '{:,d}'.format(send_count),
