@@ -145,6 +145,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     def __init__(self):
         super().__init__()
         self.start = time.time()
+        self.stop = 0
         self.last_recv = self.start
         self.bandwidth_start = self.start
         self.bandwidth_interval = 3600
@@ -195,9 +196,9 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         pass
 
     def close_connection(self):
+        self.stop = time.time()
         if self.transport:
             self.transport.close()
-            self.socket.shutdown(socket.SHUT_RDWR)
 
     def using_bandwidth(self, amount):
         now = time.time()

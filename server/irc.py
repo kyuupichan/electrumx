@@ -156,11 +156,12 @@ class IRC(LoggedClass):
             try:
                 ip_addr = socket.gethostbyname(line[1])
             except socket.error:
-                # No IPv4 address could be resolved. Could be .onion or IPv6.
+                # Could be .onion or IPv6.
                 ip_addr = line[1]
             peer = self.Peer(ip_addr, line[1], line[2:])
             self.peers[nick] = peer
-        except IndexError:
+        except (IndexError, UnicodeError):
+            # UnicodeError comes from invalid domains (issue #68)
             pass
 
 

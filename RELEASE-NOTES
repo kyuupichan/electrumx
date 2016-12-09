@@ -1,3 +1,9 @@
+version 0.8.9
+-------------
+
+- RPC groups and sessions calls improved
+- issues fixed: #62, #68  (slow socket closing, IRC)
+
 version 0.8.8
 -------------
 
