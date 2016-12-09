@@ -462,11 +462,12 @@ class ServerManager(util.LoggedClass):
         self.logger.info('cleanly closing client sessions, please wait...')
         for session in self.sessions:
             self.close_session(session)
-        self.logger.info('server listening sockets closed, waiting '
+        self.logger.info('listening sockets closed, waiting up to '
                          '{:d} seconds for socket cleanup'.format(secs))
         limit = time.time() + secs
         while self.sessions and time.time() < limit:
-            await asyncio.sleep(4)
+            self.clear_stale_sessions(grace=secs//2)
+            await asyncio.sleep(2)
             self.logger.info('{:,d} sessions remaining'
                              .format(len(self.sessions)))
 
@@ -474,7 +475,10 @@ class ServerManager(util.LoggedClass):
         # Some connections are acknowledged after the servers are closed
         if not self.servers:
             return
-        self.clear_stale_sessions()
+        now = time.time()
+        if now > self.next_stale_check:
+            self.next_stale_check = now + 60
+            self.clear_stale_sessions()
         group = self.groups[int(session.start - self.start) // 60]
         group.add(session)
         self.sessions[session] = group
@@ -496,23 +500,30 @@ class ServerManager(util.LoggedClass):
         session.log_me = not session.log_me
         return 'log {:d}: {}'.format(session.id_, session.log_me)
 
-    def clear_stale_sessions(self):
-        '''Cut off sessions that haven't done anything for 10 minutes.'''
+    def clear_stale_sessions(self, grace=15):
+        '''Cut off sessions that haven't done anything for 10 minutes.  Force
+        close stubborn connections that won't close cleanly after a
+        short grace period.
+        '''
         now = time.time()
-        if now > self.next_stale_check:
-            self.next_stale_check = now + 60
-            # Clear out empty groups
-            for key in [k for k, v in self.groups.items() if not v]:
-                del self.groups[key]
-            cutoff = now - self.env.session_timeout
-            stale = [session for session in self.sessions
-                     if session.last_recv < cutoff
-                     and not session.is_closing()]
-            for session in stale:
-                self.close_session(session)
-            if stale:
-                self.logger.info('closing stale connections {}'
-                                 .format([session.id_ for session in stale]))
+        shutdown_cutoff = now - grace
+        stale_cutoff = now - self.env.session_timeout
+
+        stale = []
+        for session in self.sessions:
+            if session.is_closing():
+                if session.stop <= shutdown_cutoff and session.socket:
+                    # Should trigger a call to connection_lost very soon
+                    self.socket.shutdown(socket.SHUT_RDWR)
+            else:
+                if session.last_recv < stale_cutoff:
+                    self.close_session(session)
+                    stale.append(session.id_)
+        if stale:
+            self.logger.info('closing stale connections {}'.format(stale))
+        # Clear out empty groups
+        for key in [k for k, v in self.groups.items() if not v]:
+            del self.groups[key]
 
     def new_subscription(self):
         if self.subscription_count >= self.max_subs:

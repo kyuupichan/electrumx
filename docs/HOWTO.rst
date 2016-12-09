@@ -75,6 +75,21 @@ on an SSD::
     mkdir /path/to/db_directory
     chown electrumx /path/to/db_directory
 
+Process limits
+--------------
+
+You should ensure the ElectrumX process has a large open file limit.
+During sync it should not need more than about 1,024 open files.  When
+serving it will use approximately 256 for LevelDB plus the number of
+incoming connections.  It is not unusual to have 1,000 to 2,000
+connections being served, so I suggest you set your open files limit
+to at least 2,500.
+
+Note that setting the limit in your shell does NOT affect ElectrumX
+unless you are invoking ElectrumX directly from your shell.  If you
+are using systemd, you need to set it in the .service file (see
+samples/systemd/electrumx.service in the ElectrumX source).
+
 
 Using daemontools
 -----------------
@@ -157,6 +172,10 @@ You can use :code:`journalctl` to check the log output::
 Once configured, you may want to start ElectrumX at boot::
 
     systemctl enable electrumx
+
+systemd is aggressive in shutting down processes.  ElectrumX can need
+several minutes to flush cached data to disk during sync.  You should
+set TimeoutStopSec to at least 10 mins in your .service file.
 
 
 Sync Progress
