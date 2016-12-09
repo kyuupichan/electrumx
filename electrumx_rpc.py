@@ -46,8 +46,8 @@ class RPCClient(JSONRPC):
                 await request.process(1)
 
     async def handle_response(self, result, error, method):
-        if result and method == 'sessions':
-            for line in ServerManager.sessions_text_lines(result):
+        if result and method in ('groups', 'sessions'):
+            for line in ServerManager.text_lines(method, result):
                 print(line)
         else:
             value = {'error': error} if error else result
