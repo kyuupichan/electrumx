@@ -10,6 +10,7 @@
 import asyncio
 import json
 import numbers
+import socket
 import time
 
 from lib.util import LoggedClass
@@ -20,21 +21,28 @@ class SingleRequest(object):
     def __init__(self, session, payload):
         self.payload = payload
         self.session = session
+        self.count = 1
 
-    async def process(self):
+    def remaining(self):
+        return self.count
+
+    async def process(self, limit):
         '''Asynchronously handle the JSON request.'''
         binary = await self.session.process_single_payload(self.payload)
         if binary:
             self.session._send_bytes(binary)
+        self.count = 0
+        return 1
+
+    def __str__(self):
+        return str(self.payload)
 
 
 class BatchRequest(object):
     '''An object that represents a batch request and its processing state.
 
-    Batches are processed in parts chunks.
+    Batches are processed in chunks.
     '''
-
-    CUHNK_SIZE = 3
 
     def __init__(self, session, payload):
         self.session = session
@@ -42,24 +50,32 @@ class BatchRequest(object):
         self.done = 0
         self.parts = []
 
-    async def process(self):
+    def remaining(self):
+        return len(self.payload) - self.done
+
+    async def process(self, limit):
         '''Asynchronously handle the JSON batch according to the JSON 2.0
         spec.'''
-        for n in range(self.CHUNK_SIZE):
-            if self.done >= len(self.payload):
-                if self.parts:
-                    binary = b'[' + b', '.join(self.parts) + b']'
-                    self.session._send_bytes(binary)
-                return
+        count = min(limit, self.remaining())
+        for n in range(count):
             item = self.payload[self.done]
             part = await self.session.process_single_payload(item)
             if part:
                 self.parts.append(part)
             self.done += 1
 
-        # Re-enqueue to continue the rest later
-        self.session.enqueue_request(self)
-        return b''
+        total_len = sum(len(part) + 2 for part in self.parts)
+        self.session.check_oversized_request(total_len)
+
+        if not self.remaining():
+            if self.parts:
+                binary = b'[' + b', '.join(self.parts) + b']'
+                self.session._send_bytes(binary)
+
+        return count
+
+    def __str__(self):
+        return str(self.payload)
 
 
 class JSONRPC(asyncio.Protocol, LoggedClass):
@@ -135,6 +151,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.bandwidth_used = 0
         self.bandwidth_limit = 5000000
         self.transport = None
+        self.socket = None
         # Parts of an incomplete JSON line.  We buffer them until
         # getting a newline.
         self.parts = []
@@ -170,10 +187,17 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         '''Handle an incoming client connection.'''
         self.transport = transport
         self.peer_info = transport.get_extra_info('peername')
+        self.socket = transport.get_extra_info('socket')
+        self.socket.settimeout(10)
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
         pass
+
+    def close_connection(self):
+        if self.transport:
+            self.transport.close()
+            self.socket.shutdown(socket.SHUT_RDWR)
 
     def using_bandwidth(self, amount):
         now = time.time()
@@ -200,7 +224,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
                            'byte limit, closing {}'
                            .format(buffer_size, self.max_buffer_size,
                                    self.peername()))
-            self.transport.close()
+            self.close_connection()
 
         # Do nothing if this connection is closing
         if self.transport.is_closing():
@@ -274,7 +298,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.transport.write(binary)
         self.transport.write(b'\n')
         if close or self.error_count > 10:
-            self.transport.close()
+            self.close_connection()
 
     def send_json_error(self, message, code, id_=None, close=False):
         '''Send a JSON error and close the connection by default.'''

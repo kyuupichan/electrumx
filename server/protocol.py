@@ -67,8 +67,6 @@ class MemPool(util.LoggedClass):
                 await asyncio.sleep(5)
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
-            except asyncio.CancelledError:
-                break
 
     async def update(self):
         '''Update state given the current mempool to the passed set of hashes.
@@ -217,12 +215,18 @@ class ServerManager(util.LoggedClass):
     up with the daemon.
     '''
 
-    MgrTask = namedtuple('MgrTask', 'session task')
-    N = 5
+    BANDS = 5
 
     class NotificationRequest(object):
         def __init__(self, fn_call):
-            self.process = fn_call
+            self.fn_call = fn_call
+
+        def remaining(self):
+            return 0
+
+        async def process(self, limit):
+            await self.fn_call()
+            return 0
 
     def __init__(self, env):
         super().__init__()
@@ -242,8 +246,8 @@ class ServerManager(util.LoggedClass):
         self.history_cache = pylru.lrucache(256)
         self.header_cache = pylru.lrucache(8)
         self.queue = asyncio.PriorityQueue()
-        self.delayed_queue = []
-        self.next_request_id = 0
+        self.delayed_sessions = []
+        self.next_queue_id = 0
         self.height = 0
         self.futures = []
         env.max_send = max(350000, env.max_send)
@@ -273,27 +277,14 @@ class ServerManager(util.LoggedClass):
         '''
         return self.mempool.value(hash168)
 
-    async def serve_requests(self):
-        '''Asynchronously run through the task queue.'''
-        while True:
-            priority_, id_, request = await self.queue.get()
-            try:
-                await request.process()
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                # Getting here should probably be considered a bug and fixed
-                self.log_error('error handling request {}'.format(request))
-                traceback.print_exc()
-
     def setup_bands(self):
         bands = []
-        limit = env.bandwidth_limit
-        for n in range(self.N):
+        limit = self.env.bandwidth_limit
+        for n in range(self.BANDS):
             bands.append(limit)
             limit //= 4
-        limit = env.bandwidth_limit
-        for n in range(self.N):
+        limit = self.env.bandwidth_limit
+        for n in range(self.BANDS):
             limit += limit // 2
             bands.append(limit)
         self.bands = sorted(bands)
@@ -306,16 +297,39 @@ class ServerManager(util.LoggedClass):
         return (bisect_left(self.bands, session.bandwidth_used)
                 + bisect_left(self.bands, group_bandwidth) + 1) // 2
 
-    def enqueue_request(self, session, request):
-        priority = self.session_priority(session)
-        item = (priority, self.next_request_id, request)
-        self.next_request_id += 1
+    async def enqueue_delayed_sessions(self):
+        now = time.time()
+        keep = []
+        for pair in self.delayed_sessions:
+            timeout, session = pair
+            if timeout <= now:
+                self.queue.put_nowait(session)
+            else:
+                keep.append(pair)
+        self.delayed_sessions = keep
+        await asyncio.sleep(1)
 
-        secs = priority - self.N
+    def enqueue_session(self, session):
+        # Might have disconnected whilst waiting
+        if not session in self.sessions:
+            return
+        priority = self.session_priority(session)
+        item = (priority, self.next_queue_id, session)
+        self.next_queue_id += 1
+
+        secs = priority - self.BANDS
         if secs >= 0:
-            self.delayed_queue.append((time.time() + secs, item))
+            session.log_info('delaying response {:d}s'.format(secs))
+            self.delayed_sessions.append((time.time() + secs, item))
         else:
             self.queue.put_nowait(item)
+
+    async def serve_requests(self):
+        '''Asynchronously run through the task queue.'''
+        while True:
+            priority_, id_, session = await self.queue.get()
+            if session in self.sessions:
+                await session.serve_requests()
 
     async def main_loop(self):
         '''Server manager main loop.'''
@@ -328,6 +342,7 @@ class ServerManager(util.LoggedClass):
         add_future(self.mempool.main_loop(self.bp.event))
         add_future(self.irc.start(self.bp.event))
         add_future(self.start_servers(self.bp.event))
+        add_future(self.enqueue_delayed_sessions())
         for n in range(4):
             add_future(self.serve_requests())
 
@@ -460,7 +475,7 @@ class ServerManager(util.LoggedClass):
         if not self.servers:
             return
         self.clear_stale_sessions()
-        group = self.groups[int(self.start - self.manager.start) // 60]
+        group = self.groups[int(session.start - self.start) // 60]
         group.add(session)
         self.sessions[session] = group
         session.log_info('connection from {}, {:,d} total'
@@ -473,7 +488,7 @@ class ServerManager(util.LoggedClass):
 
     def close_session(self, session):
         '''Close the session's transport and cancel its future.'''
-        session.transport.close()
+        session.close_connection()
         return 'disconnected {:d}'.format(session.id_)
 
     def toggle_logging(self, session):
@@ -488,7 +503,7 @@ class ServerManager(util.LoggedClass):
             self.next_stale_check = now + 60
             # Clear out empty groups
             for key in [k for k, v in self.groups.items() if not v]:
-                del self.groups[k]
+                del self.groups[key]
             cutoff = now - self.env.session_timeout
             stale = [session for session in self.sessions
                      if session.last_recv < cutoff
@@ -518,8 +533,10 @@ class ServerManager(util.LoggedClass):
             'blocks': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'errors': sum(s.error_count for s in self.sessions),
+            'groups': len(self.groups),
             'logged': len([s for s in self.sessions if s.log_me]),
             'peers': len(self.irc.peers),
+            'requests': sum(s.requests_remaining() for s in self.sessions),
             'sessions': self.session_count(),
             'txs_sent': self.txs_sent,
             'watched': self.subscription_count,
@@ -539,17 +556,18 @@ class ServerManager(util.LoggedClass):
         fmt = ('{:<6} {:<5} {:>23} {:>15} {:>7} '
                '{:>7} {:>7} {:>7} {:>7} {:>5} {:>9}')
         yield fmt.format('ID', 'Flags', 'Peer', 'Client', 'Subs',
-                         'Recv', 'Recv KB', 'Sent', 'Sent KB',
-                         'Txs', 'Time')
-        for (id_, flags, peer, subs, client, recv_count, recv_size,
-             send_count, send_size, txs_sent, time) in data:
+                         'Reqs', 'Txs', 'Recv', 'Recv KB', 'Sent',
+                         'Sent KB', 'Time')
+        for (id_, flags, peer, client, subs, reqs, txs_sent,
+             recv_count, recv_size, send_count, send_size, time) in data:
             yield fmt.format(id_, flags, peer, client,
                              '{:,d}'.format(subs),
+                             '{:,d}'.format(reqs),
+                             '{:,d}'.format(txs_sent),
                              '{:,d}'.format(recv_count),
                              '{:,d}'.format(recv_size // 1024),
                              '{:,d}'.format(send_count),
                              '{:,d}'.format(send_size // 1024),
-                             '{:,d}'.format(txs_sent),
                              time_fmt(time))
 
     def session_data(self, for_log):
@@ -559,11 +577,12 @@ class ServerManager(util.LoggedClass):
         return [(session.id_,
                  session.flags(),
                  session.peername(for_log=for_log),
-                 session.sub_count(),
                  session.client,
+                 session.requests_remaining(),
+                 session.txs_sent,
+                 session.sub_count(),
                  session.recv_count, session.recv_size,
                  session.send_count, session.send_size,
-                 session.txs_sent,
                  now - session.start)
                 for session in sessions]
 
@@ -596,6 +615,15 @@ class ServerManager(util.LoggedClass):
 
     async def rpc_getinfo(self, params):
         return self.server_summary()
+
+    async def rpc_groups(self, params):
+        result = {}
+        msg = '{:,d} sessions, {:,d} requests, {:,d}KB b/w quota used'
+        for group, sessions in self.groups.items():
+            bandwidth = sum(s.bandwidth_used for s in sessions)
+            reqs = sum(s.requests_remaining() for s in sessions)
+            result[group] = msg.format(len(sessions), reqs, bandwidth // 1024)
+        return result
 
     async def rpc_sessions(self, params):
         return self.session_data(for_log=False)
@@ -631,7 +659,7 @@ class Session(JSONRPC):
         self.max_send = env.max_send
         self.bandwidth_limit = env.bandwidth_limit
         self.txs_sent = 0
-        self.priority = 1
+        self.requests = []
 
     def is_closing(self):
         '''True if this session is closing.'''
@@ -644,10 +672,44 @@ class Session(JSONRPC):
             status += 'C'
         if self.log_me:
             status += 'L'
+        status += str(self.manager.session_priority(self))
         return status
 
+    def requests_remaining(self):
+        return sum(request.remaining() for request in self.requests)
+
     def enqueue_request(self, request):
-        self.manager.enqueue_request(self, request)
+        '''Add a request to the session's list.'''
+        if not self.requests:
+            self.manager.enqueue_session(self)
+        self.requests.append(request)
+
+    async def serve_requests(self):
+        '''Serve requests in batches.'''
+        done_reqs = 0
+        done_jobs = 0
+        limit = 4
+        for request in self.requests:
+            try:
+                done_jobs += await request.process(limit - done_jobs)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Getting here should probably be considered a bug and fixed
+                self.log_error('error handling request {}'.format(request))
+                traceback.print_exc()
+                done_reqs += 1
+            else:
+                if not request.remaining():
+                    done_reqs += 1
+            if done_jobs >= limit:
+                break
+
+        # Remove completed requests and re-enqueue ourself if any remain.
+        if done_reqs:
+            self.requests = self.requests[done_reqs:]
+        if self.requests:
+            self.manager.enqueue_session(self)
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
@@ -1030,7 +1092,7 @@ class ElectrumX(Session):
     async def version(self, params):
         '''Return the server version as a string.'''
         if params:
-            self.client = str(params[0])
+            self.client = str(params[0])[:15]
         if len(params) > 1:
             self.protocol_version = params[1]
         return VERSION
@@ -1041,7 +1103,8 @@ class LocalRPC(Session):
 
     def __init__(self, *args):
         super().__init__(*args)
-        cmds = ('disconnect getinfo log numpeers numsessions peers sessions'
+        cmds = ('disconnect getinfo groups log numpeers numsessions '
+                'peers sessions'
                 .split())
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}

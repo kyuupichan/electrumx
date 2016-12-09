@@ -22,13 +22,20 @@ from server.protocol import ServerManager
 
 class RPCClient(JSONRPC):
 
+    def __init__(self):
+        super().__init__()
+        self.queue = asyncio.Queue()
+
+    def enqueue_request(self, request):
+        self.queue.put_nowait(request)
+
     async def send_and_wait(self, method, params, timeout=None):
         # Raise incoming buffer size - presumably connection is trusted
         self.max_buffer_size = 5000000
         payload = self.request_payload(method, id_=method, params=params)
         self.encode_and_send_payload(payload)
 
-        future = asyncio.ensure_future(self.messages.get())
+        future = asyncio.ensure_future(self.queue.get())
         for f in asyncio.as_completed([future], timeout=timeout):
             try:
                 request = await f
@@ -36,7 +43,7 @@ class RPCClient(JSONRPC):
                 future.cancel()
                 print('request timed out after {}s'.format(timeout))
             else:
-                await request.process()
+                await request.process(1)
 
     async def handle_response(self, result, error, method):
         if result and method == 'sessions':
