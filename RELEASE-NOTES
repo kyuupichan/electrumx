@@ -1,3 +1,15 @@
+version 0.8.8
+-------------
+
+- put sessions in a priority queue to better prioritise serving.  Low-bandwidth
+  sessions get served first
+- new RPC command "groups" - shows information about session groups
+- sessions output: session priority shown under Flags column; the lower the
+  number the higher the priority.  txs column moved, new column reqs showns
+  the number of outstanding requests for that connection (includes subrequests
+  of batches)
+- issued fixed: #67
+
 version 0.8.7
 -------------
 
