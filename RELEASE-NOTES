@@ -1,3 +1,9 @@
+version 0.8.11
+--------------
+
+- catch harmless socket exception
+- show session count in groups RPC call
+
 version 0.8.10
 --------------
 

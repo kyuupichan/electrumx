@@ -471,6 +471,7 @@ class ServerManager(util.LoggedClass):
             await asyncio.sleep(2)
             self.logger.info('{:,d} sessions remaining'
                              .format(len(self.sessions)))
+        await asyncio.sleep(1)
 
     def add_session(self, session):
         # Some connections are acknowledged after the servers are closed
