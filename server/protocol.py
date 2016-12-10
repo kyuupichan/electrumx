@@ -11,6 +11,7 @@
 import asyncio
 import codecs
 import json
+import socket
 import ssl
 import time
 import traceback
@@ -514,7 +515,7 @@ class ServerManager(util.LoggedClass):
             if session.is_closing():
                 if session.stop <= shutdown_cutoff and session.socket:
                     # Should trigger a call to connection_lost very soon
-                    self.socket.shutdown(socket.SHUT_RDWR)
+                    session.socket.shutdown(socket.SHUT_RDWR)
             else:
                 if session.last_recv < stale_cutoff:
                     self.close_session(session)

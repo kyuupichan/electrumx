@@ -26,7 +26,8 @@ REORG_LIMIT   - maximum number of blocks to be able to handle in a chain
                 undo information for this many blocks in levelDB.
                 Default is 200.
 HOST          - the host that the TCP and SSL servers will use.  Defaults to
-                localhost.
+                localhost.  Set to blank to listen on all addresses (IPv4
+                and IPv6).
 TCP_PORT      - if set will serve Electrum TCP clients on that HOST:TCP_PORT
 SSL_PORT      - if set will serve Electrum SSL clients on that HOST:SSL_PORT
                 If set, SSL_CERTFILE and SSL_KEYFILE must be filesystem paths.
