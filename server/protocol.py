@@ -514,14 +514,19 @@ class ServerManager(util.LoggedClass):
         for session in self.sessions:
             if session.is_closing():
                 if session.stop <= shutdown_cutoff and session.socket:
-                    # Should trigger a call to connection_lost very soon
-                    session.socket.shutdown(socket.SHUT_RDWR)
+                    try:
+                        # Force shut down - a call to connection_lost
+                        # should come soon after
+                        session.socket.shutdown(socket.SHUT_RDWR)
+                    except socket.error:
+                        pass
             else:
                 if session.last_recv < stale_cutoff:
                     self.close_session(session)
                     stale.append(session.id_)
         if stale:
             self.logger.info('closing stale connections {}'.format(stale))
+
         # Clear out empty groups
         for key in [k for k, v in self.groups.items() if not v]:
             del self.groups[key]
