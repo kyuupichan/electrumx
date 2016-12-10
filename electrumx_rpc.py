@@ -43,7 +43,7 @@ class RPCClient(JSONRPC):
                 future.cancel()
                 print('request timed out after {}s'.format(timeout))
             else:
-                await request.process(1)
+                await request.process(self)
 
     async def handle_response(self, result, error, method):
         if result and method in ('groups', 'sessions'):

@@ -10,69 +10,64 @@
 import asyncio
 import json
 import numbers
-import socket
 import time
 
 from lib.util import LoggedClass
 
 
-class SingleRequest(object):
+class RequestBase(object):
+    '''An object that represents a queued request.'''
+
+    def __init__(self, remaining):
+        self.remaining = remaining
+
+class SingleRequest(RequestBase):
     '''An object that represents a single request.'''
-    def __init__(self, session, payload):
+
+    def __init__(self, payload):
+        super().__init__(1)
         self.payload = payload
-        self.session = session
-        self.count = 1
 
-    def remaining(self):
-        return self.count
-
-    async def process(self, limit):
+    async def process(self, session):
         '''Asynchronously handle the JSON request.'''
-        binary = await self.session.process_single_payload(self.payload)
+        self.remaining = 0
+        binary = await session.process_single_payload(self.payload)
         if binary:
-            self.session._send_bytes(binary)
-        self.count = 0
-        return 1
+            session._send_bytes(binary)
 
     def __str__(self):
         return str(self.payload)
 
 
-class BatchRequest(object):
+class BatchRequest(RequestBase):
     '''An object that represents a batch request and its processing state.
 
     Batches are processed in chunks.
     '''
 
-    def __init__(self, session, payload):
-        self.session = session
+    def __init__(self, payload):
+        super().__init__(len(payload))
         self.payload = payload
-        self.done = 0
         self.parts = []
 
-    def remaining(self):
-        return len(self.payload) - self.done
-
-    async def process(self, limit):
+    async def process(self, session):
         '''Asynchronously handle the JSON batch according to the JSON 2.0
         spec.'''
-        count = min(limit, self.remaining())
-        for n in range(count):
-            item = self.payload[self.done]
-            part = await self.session.process_single_payload(item)
+        target = max(self.remaining - 4, 0)
+        while self.remaining > target:
+            item = self.payload[len(self.payload) - self.remaining]
+            self.remaining -= 1
+            part = await session.process_single_payload(item)
             if part:
                 self.parts.append(part)
-            self.done += 1
 
         total_len = sum(len(part) + 2 for part in self.parts)
-        self.session.check_oversized_request(total_len)
+        session.check_oversized_request(total_len)
 
-        if not self.remaining():
+        if not self.remaining:
             if self.parts:
                 binary = b'[' + b', '.join(self.parts) + b']'
-                self.session._send_bytes(binary)
-
-        return count
+                session._send_bytes(binary)
 
     def __str__(self):
         return str(self.payload)
@@ -152,7 +147,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.bandwidth_used = 0
         self.bandwidth_limit = 5000000
         self.transport = None
-        self.socket = None
+        self.pause = False
         # Parts of an incomplete JSON line.  We buffer them until
         # getting a newline.
         self.parts = []
@@ -188,12 +183,21 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         '''Handle an incoming client connection.'''
         self.transport = transport
         self.peer_info = transport.get_extra_info('peername')
-        self.socket = transport.get_extra_info('socket')
-        self.socket.settimeout(10)
+        transport.set_write_buffer_limits(high=500000)
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
         pass
+
+    def pause_writing(self):
+        '''Called by asyncio when the write buffer is full.'''
+        self.log_info('pausing writing')
+        self.pause = True
+
+    def resume_writing(self):
+        '''Called by asyncio when the write buffer has room.'''
+        self.log_info('resuming writing')
+        self.pause = False
 
     def close_connection(self):
         self.stop = time.time()
@@ -267,9 +271,9 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             if not message:
                 self.send_json_error('empty batch', self.INVALID_REQUEST)
                 return
-            request = BatchRequest(self, message)
+            request = BatchRequest(message)
         else:
-            request = SingleRequest(self, message)
+            request = SingleRequest(message)
 
         '''Queue the request for asynchronous handling.'''
         self.enqueue_request(request)

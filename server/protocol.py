@@ -11,7 +11,6 @@
 import asyncio
 import codecs
 import json
-import socket
 import ssl
 import time
 import traceback
@@ -22,7 +21,7 @@ from functools import partial
 import pylru
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
-from lib.jsonrpc import JSONRPC
+from lib.jsonrpc import JSONRPC, RequestBase
 from lib.tx import Deserializer
 import lib.util as util
 from server.block_processor import BlockProcessor
@@ -218,16 +217,15 @@ class ServerManager(util.LoggedClass):
 
     BANDS = 5
 
-    class NotificationRequest(object):
-        def __init__(self, fn_call):
-            self.fn_call = fn_call
+    class NotificationRequest(RequestBase):
+        def __init__(self, height, touched):
+            super().__init__(1)
+            self.height = height
+            self.touched = touched
 
-        def remaining(self):
-            return 0
-
-        async def process(self, limit):
-            await self.fn_call()
-            return 0
+        async def process(self, session):
+            self.remaining = 0
+            await session.notify(self.height, self.touched)
 
     def __init__(self, env):
         super().__init__()
@@ -295,8 +293,8 @@ class ServerManager(util.LoggedClass):
         if isinstance(session, LocalRPC):
             return 0
         group_bandwidth = sum(s.bandwidth_used for s in self.sessions[session])
-        return (bisect_left(self.bands, session.bandwidth_used)
-                + bisect_left(self.bands, group_bandwidth) + 1) // 2
+        return 1 + (bisect_left(self.bands, session.bandwidth_used)
+                    + bisect_left(self.bands, group_bandwidth) + 1) // 2
 
     async def enqueue_delayed_sessions(self):
         now = time.time()
@@ -318,9 +316,14 @@ class ServerManager(util.LoggedClass):
         item = (priority, self.next_queue_id, session)
         self.next_queue_id += 1
 
-        secs = priority - self.BANDS
-        if secs >= 0:
+        secs = int(session.pause)
+        if secs:
+            session.log_info('delaying processing whilst paused')
+        excess = priority - self.BANDS
+        if excess > 0:
+            secs = excess
             session.log_info('delaying response {:d}s'.format(secs))
+        if secs:
             self.delayed_sessions.append((time.time() + secs, item))
         else:
             self.queue.put_nowait(item)
@@ -404,8 +407,8 @@ class ServerManager(util.LoggedClass):
 
         for session in self.sessions:
             if isinstance(session, ElectrumX):
-                fn_call = partial(session.notify, self.bp.db_height, touched)
-                session.enqueue_request(self.NotificationRequest(fn_call))
+                request = self.NotificationRequest(self.bp.db_height, touched)
+                session.enqueue_request(request)
         # Periodically log sessions
         if self.env.log_sessions and time.time() > self.next_log_sessions:
             data = self.session_data(for_log=True)
@@ -481,7 +484,7 @@ class ServerManager(util.LoggedClass):
         if now > self.next_stale_check:
             self.next_stale_check = now + 60
             self.clear_stale_sessions()
-        group = self.groups[int(session.start - self.start) // 60]
+        group = self.groups[int(session.start - self.start) // 180]
         group.add(session)
         self.sessions[session] = group
         session.log_info('connection from {}, {:,d} total'
@@ -514,22 +517,22 @@ class ServerManager(util.LoggedClass):
         stale = []
         for session in self.sessions:
             if session.is_closing():
-                if session.stop <= shutdown_cutoff and session.socket:
-                    try:
-                        # Force shut down - a call to connection_lost
-                        # should come soon after
-                        session.socket.shutdown(socket.SHUT_RDWR)
-                    except socket.error:
-                        pass
+                if session.stop <= shutdown_cutoff:
+                    session.transport.abort()
             elif session.last_recv < stale_cutoff:
                 self.close_session(session)
                 stale.append(session.id_)
         if stale:
             self.logger.info('closing stale connections {}'.format(stale))
 
-        # Clear out empty groups
-        for key in [k for k, v in self.groups.items() if not v]:
-            del self.groups[key]
+        # Consolidate small groups
+        keys = [k for k, v in self.groups.items() if len(v) <= 2
+                and sum(session.bandwidth_used for session in v) < 10000]
+        if len(keys) > 1:
+            group = set.union(*(self.groups[key] for key in keys))
+            for key in keys:
+                del self.groups[key]
+            self.groups[max(keys)] = group
 
     def new_subscription(self):
         if self.subscription_count >= self.max_subs:
@@ -574,7 +577,7 @@ class ServerManager(util.LoggedClass):
 
         fmt = ('{:<6} {:>9} {:>9} {:>6} {:>6} {:>8}'
                '{:>7} {:>9} {:>7} {:>9}')
-        yield fmt.format('ID', 'Sessions', 'Bw Qta KB', 'Reqs', 'Txs', 'Subs',
+        yield fmt.format('ID', 'Sessions', 'Bwidth KB', 'Reqs', 'Txs', 'Subs',
                          'Recv', 'Recv KB', 'Sent', 'Sent KB')
         for (id_, session_count, bandwidth, reqs, txs_sent, subs,
              recv_count, recv_size, send_count, send_size) in data:
@@ -734,7 +737,7 @@ class Session(JSONRPC):
         return status
 
     def requests_remaining(self):
-        return sum(request.remaining() for request in self.requests)
+        return sum(request.remaining for request in self.requests)
 
     def enqueue_request(self, request):
         '''Add a request to the session's list.'''
@@ -744,28 +747,27 @@ class Session(JSONRPC):
 
     async def serve_requests(self):
         '''Serve requests in batches.'''
-        done_reqs = 0
-        done_jobs = 0
-        limit = 4
+        total = 0
+        errs = []
+        # Process 8 items at a time
         for request in self.requests:
             try:
-                done_jobs += await request.process(limit - done_jobs)
+                initial = request.remaining
+                await request.process(self)
+                total += initial - request.remaining
             except asyncio.CancelledError:
                 raise
             except Exception:
-                # Getting here should probably be considered a bug and fixed
+                # Should probably be considered a bug and fixed
                 self.log_error('error handling request {}'.format(request))
                 traceback.print_exc()
-                done_reqs += 1
-            else:
-                if not request.remaining():
-                    done_reqs += 1
-            if done_jobs >= limit:
+                errs.append(request)
+            if total >= 8:
                 break
 
         # Remove completed requests and re-enqueue ourself if any remain.
-        if done_reqs:
-            self.requests = self.requests[done_reqs:]
+        self.requests = [req for req in self.requests
+                         if req.remaining and not req in errs]
         if self.requests:
             self.manager.enqueue_session(self)
 
