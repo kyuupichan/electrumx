@@ -520,10 +520,9 @@ class ServerManager(util.LoggedClass):
                         session.socket.shutdown(socket.SHUT_RDWR)
                     except socket.error:
                         pass
-            else:
-                if session.last_recv < stale_cutoff:
-                    self.close_session(session)
-                    stale.append(session.id_)
+            elif session.last_recv < stale_cutoff:
+                self.close_session(session)
+                stale.append(session.id_)
         if stale:
             self.logger.info('closing stale connections {}'.format(stale))
 
@@ -572,13 +571,14 @@ class ServerManager(util.LoggedClass):
 
         data is the return value of rpc_groups().'''
 
-        fmt = ('{:<6} {:>9} {:>6} {:>6} {:>8}'
+        fmt = ('{:<6} {:>9} {:>9} {:>6} {:>6} {:>8}'
                '{:>7} {:>9} {:>7} {:>9}')
-        yield fmt.format('ID', 'Bw Qta KB', 'Reqs', 'Txs', 'Subs',
+        yield fmt.format('ID', 'Sessions', 'Bw Qta KB', 'Reqs', 'Txs', 'Subs',
                          'Recv', 'Recv KB', 'Sent', 'Sent KB')
-        for (id_, bandwidth, reqs, txs_sent, subs,
+        for (id_, session_count, bandwidth, reqs, txs_sent, subs,
              recv_count, recv_size, send_count, send_size) in data:
             yield fmt.format(id_,
+                             '{:,d}'.format(session_count),
                              '{:,d}'.format(bandwidth // 1024),
                              '{:,d}'.format(reqs),
                              '{:,d}'.format(txs_sent),
@@ -594,6 +594,7 @@ class ServerManager(util.LoggedClass):
         for group_id in sorted(self.groups.keys()):
             sessions = self.groups[group_id]
             result.append([group_id,
+                           len(sessions),
                            sum(s.bandwidth_used for s in sessions),
                            sum(s.requests_remaining() for s in sessions),
                            sum(s.txs_sent for s in sessions),
