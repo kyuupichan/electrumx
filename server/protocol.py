@@ -765,7 +765,6 @@ class Session(JSONRPC):
             if total >= 8:
                 break
 
-        self.log_info('done {:,d} items'.format(total))
         # Remove completed requests and re-enqueue ourself if any remain.
         self.requests = [req for req in self.requests
                          if req.remaining and not req in errs]
