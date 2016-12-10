@@ -568,7 +568,7 @@ class ServerManager(util.LoggedClass):
 
         fmt = ('{:<6} {:>9} {:>9} {:>6} {:>6} {:>8}'
                '{:>7} {:>9} {:>7} {:>9}')
-        yield fmt.format('ID', 'Sessions', 'Bw Qta KB', 'Reqs', 'Txs', 'Subs',
+        yield fmt.format('ID', 'Sessions', 'Bwidth KB', 'Reqs', 'Txs', 'Subs',
                          'Recv', 'Recv KB', 'Sent', 'Sent KB')
         for (id_, session_count, bandwidth, reqs, txs_sent, subs,
              recv_count, recv_size, send_count, send_size) in data:
