@@ -189,7 +189,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.transport = transport
         self.peer_info = transport.get_extra_info('peername')
         self.socket = transport.get_extra_info('socket')
-        self.socket.settimeout(10)
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
