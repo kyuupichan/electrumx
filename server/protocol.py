@@ -11,7 +11,6 @@
 import asyncio
 import codecs
 import json
-import socket
 import ssl
 import time
 import traceback
@@ -514,13 +513,8 @@ class ServerManager(util.LoggedClass):
         stale = []
         for session in self.sessions:
             if session.is_closing():
-                if session.stop <= shutdown_cutoff and session.socket:
-                    try:
-                        # Force shut down - a call to connection_lost
-                        # should come soon after
-                        session.socket.shutdown(socket.SHUT_RDWR)
-                    except socket.error:
-                        pass
+                if session.stop <= shutdown_cutoff:
+                    session.transport.abort()
             elif session.last_recv < stale_cutoff:
                 self.close_session(session)
                 stale.append(session.id_)

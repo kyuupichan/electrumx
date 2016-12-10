@@ -10,7 +10,6 @@
 import asyncio
 import json
 import numbers
-import socket
 import time
 
 from lib.util import LoggedClass
@@ -152,7 +151,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.bandwidth_used = 0
         self.bandwidth_limit = 5000000
         self.transport = None
-        self.socket = None
         # Parts of an incomplete JSON line.  We buffer them until
         # getting a newline.
         self.parts = []
@@ -188,7 +186,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         '''Handle an incoming client connection.'''
         self.transport = transport
         self.peer_info = transport.get_extra_info('peername')
-        self.socket = transport.get_extra_info('socket')
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
