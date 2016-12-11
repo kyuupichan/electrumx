@@ -91,11 +91,12 @@ class MemPool(util.LoggedClass):
                 if self.touched:
                     self.touched_event.set()
 
-                if log_secs <= 0 and not unprocessed:
-                    log_secs = log_every
-                    self.logger.info('{:,d} txs touching {:,d} addresses'
-                                     .format(len(self.txs),
-                                             len(self.hash168s)))
+                if not unprocessed:
+                    if log_secs <= 0:
+                        log_secs = log_every
+                        self.logger.info('{:,d} txs touching {:,d} addresses'
+                                         .format(len(self.txs),
+                                                 len(self.hash168s)))
                     await asyncio.sleep(1)
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
