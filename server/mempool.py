@@ -268,12 +268,11 @@ class MemPool(util.LoggedClass):
             item = self.txs.get(hex_hash)
             if not item or not raw_tx:
                 continue
-            tx = Deserializer(raw_tx).read_tx()
             txin_pairs, txout_pairs = item
             tx_fee = (sum(v for hash168, v in txin_pairs)
                       - sum(v for hash168, v in txout_pairs))
-            unconfirmed = any(txin.prev_hash not in self.txs
-                              for txin in tx.inputs)
+            tx = Deserializer(raw_tx).read_tx()
+            unconfirmed = any(txin.prev_hash in self.txs for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result
 
