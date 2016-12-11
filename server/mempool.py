@@ -257,7 +257,7 @@ class MemPool(util.LoggedClass):
             return []
 
         hex_hashes = self.hash168s[hash168]
-        raw_txs = self.bp.daemon.getrawtransactions(hex_hashes)
+        raw_txs = self.daemon.getrawtransactions(hex_hashes)
         result = []
         for hex_hash, raw_tx in zip(hex_hashes, raw_txs):
             item = self.txs.get(hex_hash)
