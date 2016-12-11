@@ -1,3 +1,15 @@
+version 0.9.0
+-------------
+
+- complete rewrite of mempool code to have minimal latency and fix a
+  couple of minor bugs.  When a new block is found, ideally this
+  should be communicated to clients who addresses are affected with a
+  single notification.  Previously this would happen with two
+  notifications: one because the TX got in the block, and one because
+  that TX was no longer in the mempool.  Fundamentally this a race
+  condition that cannot be eliminated but its occurrence should be
+  minimized.
+
 version 0.8.12
 --------------
 
