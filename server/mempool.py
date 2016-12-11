@@ -133,9 +133,10 @@ class MemPool(util.LoggedClass):
         loop = asyncio.get_event_loop()
         pending = []
         txs = self.txs
+        first = True
 
         async def process(unprocessed):
-            nonlocal pending
+            nonlocal first, pending
 
             raw_txs = {}
             while unprocessed and len(raw_txs) < limit:
@@ -163,9 +164,12 @@ class MemPool(util.LoggedClass):
                         hash168s[hash168].add(hex_hash)
 
             to_do = len(unfetched) + len(unprocessed)
-            if to_do:
-                percent = (len(txs) - to_do) * 100 // len(txs)
+            if to_do and txs:
+                percent = max(0, len(txs) - to_do) * 100 // len(txs)
                 self.logger.info('catchup {:d}% complete'.format(percent))
+            elif first:
+                first = False
+                self.logger.info('caught up')
 
         return process
 
@@ -257,7 +261,7 @@ class MemPool(util.LoggedClass):
             return []
 
         hex_hashes = self.hash168s[hash168]
-        raw_txs = self.daemon.getrawtransactions(hex_hashes)
+        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         result = []
         for hex_hash, raw_tx in zip(hex_hashes, raw_txs):
             item = self.txs.get(hex_hash)

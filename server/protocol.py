@@ -183,7 +183,7 @@ class ServerManager(util.LoggedClass):
             except asyncio.CancelledError:
                 break
         await self.shutdown()
-        await util.asyncio_clean_shutdown()
+        await asyncio.sleep(1)
 
     async def start_server(self, kind, *args, **kw_args):
         protocol_class = LocalRPC if kind == 'RPC' else ElectrumX

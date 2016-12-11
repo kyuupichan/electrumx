@@ -133,12 +133,3 @@ def increment_byte_string(bs):
         # This can only happen if all characters are 0xff
         bs = bytes([1]) + bs
     return bytes(bs)
-
-async def asyncio_clean_shutdown(loop=None):
-    while True:
-        pending_tasks = [task for task in asyncio.Task.all_tasks(loop)
-                         if not task.done()]
-        if len(pending_tasks) <= 1:
-            break
-        await asyncio.sleep(0)
-    await asyncio.sleep(1)
