@@ -132,10 +132,8 @@ class BlockProcessor(server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, client, env):
+    def __init__(self, env, touched, touched_event):
         super().__init__(env)
-
-        self.client = client
 
         # The block processor reads its tasks from this queue
         self.tasks = asyncio.Queue()
@@ -151,6 +149,8 @@ class BlockProcessor(server.db.DB):
         self.caught_up = False
         self._shutdown = False
         self.event = asyncio.Event()
+        self.touched = touched
+        self.touched_event = touched_event
 
         # Meta
         self.utxo_MB = env.utxo_MB
@@ -218,9 +218,8 @@ class BlockProcessor(server.db.DB):
             for block in blocks:
                 if self._shutdown:
                     break
-                self.advance_block(block, touched)
+                self.advance_block(block, self.touched)
 
-        touched = set()
         loop = asyncio.get_event_loop()
         try:
             if self.caught_up:
@@ -228,14 +227,14 @@ class BlockProcessor(server.db.DB):
             else:
                 do_it()
         except ChainReorg:
-            await self.handle_chain_reorg(touched)
+            await self.handle_chain_reorg(self.touched)
 
         if self.caught_up:
             # Flush everything as queries are performed on the DB and
             # not in-memory.
             await asyncio.sleep(0)
             self.flush(True)
-            self.client.notify(touched)
+            self.touched_event.set()
         elif time.time() > self.next_cache_check:
             self.check_cache_size()
             self.next_cache_check = time.time() + 60
