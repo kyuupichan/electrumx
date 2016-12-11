@@ -113,9 +113,11 @@ be necessary.
 Roadmap Pre-1.0
 ===============
 
-- minor code cleanups.  It is unlikely DB format will change
-- better DoS protections and mempool handling
-- implement simple protocol to discover peers without resorting to IRC
+- minor code cleanups.
+- there may be a DB format change to index the DB in a way purely
+  dependent on the script and not on address prefix
+- implement simple protocol to discover peers without resorting to IRC.
+  This may slip to post 1.0
 
 
 Roadmap Post-1.0
