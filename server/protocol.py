@@ -523,14 +523,8 @@ class ServerManager(util.LoggedClass):
     async def rpc_sessions(self, params):
         return self.session_data(for_log=False)
 
-    async def rpc_numsessions(self, params):
-        return self.session_count()
-
     async def rpc_peers(self, params):
         return self.irc.peers
-
-    async def rpc_numpeers(self, params):
-        return len(self.irc.peers)
 
 
 class Session(JSONRPC):
@@ -998,9 +992,7 @@ class LocalRPC(Session):
 
     def __init__(self, *args):
         super().__init__(*args)
-        cmds = ('disconnect getinfo groups log numpeers numsessions '
-                'peers sessions'
-                .split())
+        cmds = 'disconnect getinfo groups log peers sessions'.split()
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}
         self.client = 'RPC'
