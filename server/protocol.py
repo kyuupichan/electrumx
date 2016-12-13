@@ -313,9 +313,9 @@ class ServerManager(util.LoggedClass):
             return
         now = time.time()
         if now > self.next_stale_check:
-            self.next_stale_check = now + 60
+            self.next_stale_check = now + 300
             self.clear_stale_sessions()
-        group = self.groups[int(session.start - self.start) // 180]
+        group = self.groups[int(session.start - self.start) // 900]
         group.add(session)
         self.sessions[session] = group
         session.log_info('connection from {}, {:,d} total'
@@ -360,7 +360,7 @@ class ServerManager(util.LoggedClass):
             self.logger.info('closing stale connections {}'.format(stale))
 
         # Consolidate small groups
-        keys = [k for k, v in self.groups.items() if len(v) <= 2
+        keys = [k for k, v in self.groups.items() if len(v) <= 4
                 and sum(session.bandwidth_used for session in v) < 10000]
         if len(keys) > 1:
             group = set.union(*(self.groups[key] for key in keys))
