@@ -1,3 +1,12 @@
+version 0.9.4
+-------------
+
+- new env var MAX_SESSIONS, see docs/ENV-NOTES.  The default limit is
+  1,000 sessions so raise this if you want to be able to take more.
+- a couple of minor bug fixes relating to paused connections
+- removed RPC calls numsessions and numpeers.  They're not very interesting
+  and all that and more is in getinfo.
+
 version 0.9.3
 -------------
 
