@@ -132,7 +132,7 @@ class ServerManager(util.LoggedClass):
             now = time.time()
             keep = []
             for pair in self.delayed_sessions:
-                timeout, session = pair
+                timeout, (priority, queue_id, session) = pair
                 if not session.pause and timeout <= now:
                     self.queue.put_nowait(session)
                 else:
