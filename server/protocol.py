@@ -283,21 +283,20 @@ class ServerManager(util.LoggedClass):
         return header
 
     async def async_get_history(self, hash168):
+        '''Get history asynchronously to reduce latency.'''
         if hash168 in self.history_cache:
             return self.history_cache[hash168]
 
-        # History DoS limit.  Each element of history is about 99
-        # bytes when encoded as JSON.  This limits resource usage on
-        # bloated history requests, and uses a smaller divisor so
-        # large requests are logged before refusing them.
-        limit = self.env.max_send // 97
-        # Python 3.6: use async generators; update callers
-        history = []
-        for item in self.bp.get_history(hash168, limit=limit):
-            history.append(item)
-            if len(history) % 100 == 0:
-                await asyncio.sleep(0)
+        def job():
+            # History DoS limit.  Each element of history is about 99
+            # bytes when encoded as JSON.  This limits resource usage
+            # on bloated history requests, and uses a smaller divisor
+            # so large requests are logged before refusing them.
+            limit = self.env.max_send // 97
+            return list(self.bp.get_history(hash168, limit=limit))
 
+        loop = asyncio.get_event_loop()
+        history = await loop.run_in_executor(None, job)
         self.history_cache[hash168] = history
         return history
 
@@ -814,13 +813,11 @@ class ElectrumX(Session):
         return self.bp.read_headers(start_height, count).hex()
 
     async def get_utxos(self, hash168):
-        # Python 3.6: use async generators; update callers
-        utxos = []
-        for utxo in self.bp.get_utxos(hash168, limit=None):
-            utxos.append(utxo)
-            if len(utxos) % 25 == 0:
-                await asyncio.sleep(0)
-        return utxos
+        '''Get UTXOs asynchronously to reduce latency.'''
+        def job():
+            return list(self.bp.get_utxos(hash168, limit=None))
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, job)
 
     async def get_balance(self, hash168):
         utxos = await self.get_utxos(hash168)
