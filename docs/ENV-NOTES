@@ -50,6 +50,9 @@ in ElectrumX are very cheap - they consume about 100 bytes of memory
 each and are processed efficiently.  I feel the defaults are low and
 encourage you to raise them.
 
+MAX_SESSIONS     - maximum number of sessions.  Once reached, TCP and SSL
+                   listening sockets are closed until the session count drops
+                   naturally to 95% of the limit.  Defaults to 1,000.
 MAX_SEND         - maximum size of a response message to send over the wire,
                    in bytes.  Defaults to 1,000,000 and will treat values
                    smaller than 350,000 as 350,000 because standard Electrum

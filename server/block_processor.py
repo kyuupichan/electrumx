@@ -632,9 +632,9 @@ class BlockProcessor(server.db.DB):
       Value:  HASH168 + TX_NUM + VALUE   (21 + 4 + 8 = 33 bytes)
 
     That's 67 bytes of raw data.  Python dictionary overhead means
-    each entry actually uses about 187 bytes of memory.  So almost
-    11.5 million UTXOs can fit in 2GB of RAM.  There are approximately
-    42 million UTXOs on bitcoin mainnet at height 433,000.
+    each entry actually uses about 187 bytes of memory.  So over 5
+    million UTXOs can fit in 1GB of RAM.  There are approximately 42
+    million UTXOs on bitcoin mainnet at height 433,000.
 
     Semantics:
 

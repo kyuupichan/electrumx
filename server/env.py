@@ -48,6 +48,7 @@ class Env(LoggedClass):
         # Server limits to help prevent DoS
         self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
+        self.max_sessions = self.integer('MAX_SESSIONS', 1000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
