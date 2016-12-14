@@ -88,7 +88,8 @@ class MemPool(util.LoggedClass):
                 if unprocessed:
                     await process_some(unprocessed)
 
-                if self.touched:
+                # Avoid double notifications if processing a block
+                if self.touched and not self.processing_new_block():
                     self.touched_event.set()
 
                 if not unprocessed:
@@ -100,6 +101,10 @@ class MemPool(util.LoggedClass):
                     await asyncio.sleep(1)
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
+
+    def processing_new_block(self):
+        '''Return True if we're processing a new block.'''
+        return self.daemon.cached_height() > self.db.db_height
 
     async def new_hashes(self, unprocessed, unfetched):
         '''Get the current list of hashes in the daemon's mempool.
