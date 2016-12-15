@@ -85,9 +85,13 @@ class Prefetcher(LoggedClass):
 
     async def _prefetch(self):
         '''Prefetch blocks unless the prefetch queue is full.'''
+        # Refresh the mempool after updating the daemon height, if and
+        # only if we've caught up
         daemon_height = await self.daemon.height()
-        cache_room = self.target_cache_size // self.ave_size
+        if self.caught_up:
+            await self.daemon.refresh_mempool_hashes()
 
+        cache_room = self.target_cache_size // self.ave_size
         with await self.semaphore:
             # Try and catch up all blocks but limit to room in cache.
             # Constrain count to between 0 and 4000 regardless
@@ -132,7 +136,7 @@ class BlockProcessor(server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, touched, touched_event):
+    def __init__(self, env):
         super().__init__(env)
 
         # The block processor reads its tasks from this queue
@@ -149,8 +153,6 @@ class BlockProcessor(server.db.DB):
         self.caught_up = False
         self._shutdown = False
         self.event = asyncio.Event()
-        self.touched = touched
-        self.touched_event = touched_event
 
         # Meta
         self.utxo_MB = env.utxo_MB
@@ -180,7 +182,7 @@ class BlockProcessor(server.db.DB):
             self.logger.info('flushing history cache at {:,d} MB'
                              .format(self.hist_MB))
 
-    async def main_loop(self):
+    async def main_loop(self, touched):
         '''Main loop for block processing.'''
 
         # Simulate a reorg if requested
@@ -195,7 +197,7 @@ class BlockProcessor(server.db.DB):
                 break
             blocks = self.prefetcher.get_blocks()
             if blocks:
-                await self.advance_blocks(blocks)
+                await self.advance_blocks(blocks, touched)
             elif not self.caught_up:
                 self.caught_up = True
                 self.first_caught_up()
@@ -209,7 +211,7 @@ class BlockProcessor(server.db.DB):
         self._shutdown = True
         self.tasks.put_nowait(None)
 
-    async def advance_blocks(self, blocks):
+    async def advance_blocks(self, blocks, touched):
         '''Strip the unspendable genesis coinbase.'''
         if self.height == -1:
             blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
@@ -218,7 +220,7 @@ class BlockProcessor(server.db.DB):
             for block in blocks:
                 if self._shutdown:
                     break
-                self.advance_block(block, self.touched)
+                self.advance_block(block, touched)
 
         loop = asyncio.get_event_loop()
         try:
@@ -227,14 +229,13 @@ class BlockProcessor(server.db.DB):
             else:
                 do_it()
         except ChainReorg:
-            await self.handle_chain_reorg(self.touched)
+            await self.handle_chain_reorg(touched)
 
         if self.caught_up:
             # Flush everything as queries are performed on the DB and
             # not in-memory.
             await asyncio.sleep(0)
             self.flush(True)
-            self.touched_event.set()
         elif time.time() > self.next_cache_check:
             self.check_cache_size()
             self.next_cache_check = time.time() + 60
