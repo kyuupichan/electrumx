@@ -68,7 +68,7 @@ class Prefetcher(LoggedClass):
     async def main_loop(self):
         '''Loop forever polling for more blocks.'''
         daemon_height = await self.daemon.height()
-        if daemon_height > height:
+        if daemon_height > self.fetched_height:
             log_msg = 'catching up to daemon height {:,d}...'
         else:
             log_msg = 'caught up to daemon height {:,d}'

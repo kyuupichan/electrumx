@@ -11,7 +11,6 @@ import asyncio
 import itertools
 import time
 from collections import defaultdict
-from functools import partial
 
 from lib.hash import hash_to_str, hex_str_to_hash
 from lib.tx import Deserializer
@@ -40,9 +39,15 @@ class MemPool(util.LoggedClass):
         self.db = db
         self.touched = set()
         self.touched_event = asyncio.Event()
+        self.prioritized = set()
         self.stop = False
         self.txs = {}
         self.hash168s = defaultdict(set)  # None can be a key
+
+    def prioritize(self, tx_hash):
+        '''Prioritize processing the given hash.  This is important during
+        initial mempool sync.'''
+        self.prioritized.add(tx_hash)
 
     def resync_daemon_hashes(self, unprocessed, unfetched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
@@ -105,6 +110,7 @@ class MemPool(util.LoggedClass):
                         self.logger.info('{:,d} txs touching {:,d} addresses'
                                          .format(len(txs), len(self.hash168s)))
                         next_log = now + 150
+                    self.prioritized.clear()
                     await self.daemon.mempool_refresh_event.wait()
 
                 self.resync_daemon_hashes(unprocessed, unfetched)
@@ -137,6 +143,11 @@ class MemPool(util.LoggedClass):
             nonlocal pending
 
             raw_txs = {}
+
+            for hex_hash in self.prioritized:
+                if hex_hash in unprocessed:
+                    raw_txs[hex_hash] = unprocessed.pop(hex_hash)
+
             while unprocessed and len(raw_txs) < limit:
                 hex_hash, raw_tx = unprocessed.popitem()
                 raw_txs[hex_hash] = raw_tx
@@ -147,9 +158,9 @@ class MemPool(util.LoggedClass):
                 deferred = pending
                 pending = []
 
-            process_raw_txs = partial(self.process_raw_txs, raw_txs, deferred)
-            result, deferred = (
-                await loop.run_in_executor(None, process_raw_txs))
+            def job():
+                return self.process_raw_txs(raw_txs, deferred)
+            result, deferred = await loop.run_in_executor(None, job)
 
             pending.extend(deferred)
             hash168s = self.hash168s
