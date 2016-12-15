@@ -1,3 +1,9 @@
+version 0.9.9
+-------------
+
+- prioritize mempool processing of sent txs.  Closes issue 73.
+- mempool tx processing needs to handle DBError exceptions.  Fixes issue 74.
+
 version 0.9.8
 -------------
 
