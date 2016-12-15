@@ -67,8 +67,13 @@ class Prefetcher(LoggedClass):
 
     async def main_loop(self):
         '''Loop forever polling for more blocks.'''
-        self.logger.info('catching up to daemon height {:,d}...'
-                         .format(await self.daemon.height()))
+        daemon_height = await self.daemon.height()
+        if daemon_height > height:
+            log_msg = 'catching up to daemon height {:,d}...'
+        else:
+            log_msg = 'caught up to daemon height {:,d}'
+        self.logger.info(log_msg.format(daemon_height))
+
         while True:
             try:
                 secs = 0
@@ -87,10 +92,7 @@ class Prefetcher(LoggedClass):
         '''Prefetch blocks unless the prefetch queue is full.'''
         # Refresh the mempool after updating the daemon height, if and
         # only if we've caught up
-        daemon_height = await self.daemon.height()
-        if self.caught_up:
-            await self.daemon.refresh_mempool_hashes()
-
+        daemon_height = await self.daemon.height(mempool=self.caught_up)
         cache_room = self.target_cache_size // self.ave_size
         with await self.semaphore:
             # Try and catch up all blocks but limit to room in cache.

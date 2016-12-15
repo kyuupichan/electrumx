@@ -54,7 +54,7 @@ class MemPool(util.LoggedClass):
         hash168s = self.hash168s
         touched = self.touched
 
-        hashes = self.daemon.mempool_hashes
+        hashes = self.daemon.cached_mempool_hashes()
         gone = set(txs).difference(hashes)
         for hex_hash in gone:
             unfetched.discard(hex_hash)
