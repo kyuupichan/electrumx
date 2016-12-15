@@ -104,6 +104,11 @@ class ServerManager(util.LoggedClass):
         '''
         return self.mempool.value(hash168)
 
+    def sent_tx(self, tx_hash):
+        '''Call when a TX is sent.  Tells mempool to prioritize it.'''
+        self.txs_sent += 1
+        self.mempool.prioritize(tx_hash)
+
     def setup_bands(self):
         bands = []
         limit = self.env.bandwidth_limit
@@ -898,8 +903,8 @@ class ElectrumX(Session):
         try:
             tx_hash = await self.daemon.sendrawtransaction(params)
             self.txs_sent += 1
-            self.manager.txs_sent += 1
             self.log_info('sent tx: {}'.format(tx_hash))
+            self.manager.sent_tx(tx_hash)
             return tx_hash
         except DaemonError as e:
             error = e.args[0]
