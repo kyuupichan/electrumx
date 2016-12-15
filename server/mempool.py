@@ -242,10 +242,11 @@ class MemPool(util.LoggedClass):
                     elif not mempool_missing:
                         prev_hash = hex_str_to_hash(prev_hex_hash)
                         txin_pairs.append(db_utxo_lookup(prev_hash, prev_idx))
-            except self.db.MissingUTXOError:
-                # This typically happens just after the daemon has
-                # accepted a new block and the new mempool has deps on
-                # new txs in that block.
+            except (self.db.MissingUTXOError, self.db.DBError):
+                # DBError can happen when flushing a newly processed
+                # block.  MissingUTXOError typically happens just
+                # after the daemon has accepted a new block and the
+                # new mempool has deps on new txs in that block.
                 continue
 
             if mempool_missing:
