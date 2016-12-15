@@ -73,20 +73,20 @@ class Controller(util.LoggedClass):
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
 
-    async def mempool_transactions(self, hash168):
+    async def mempool_transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hash168.
+        entries for the hashX.
 
         unconfirmed is True if any txin is unconfirmed.
         '''
-        return await self.mempool.transactions(hash168)
+        return await self.mempool.transactions(hashX)
 
-    def mempool_value(self, hash168):
-        '''Return the unconfirmed amount in the mempool for hash168.
+    def mempool_value(self, hashX):
+        '''Return the unconfirmed amount in the mempool for hashX.
 
         Can be positive or negative.
         '''
-        return self.mempool.value(hash168)
+        return self.mempool.value(hashX)
 
     def sent_tx(self, tx_hash):
         '''Call when a TX is sent.  Tells mempool to prioritize it.'''
@@ -255,8 +255,8 @@ class Controller(util.LoggedClass):
 
             # Invalidate caches
             hc = self.history_cache
-            for hash168 in set(hc).intersection(touched):
-                del hc[hash168]
+            for hashX in set(hc).intersection(touched):
+                del hc[hashX]
             if self.bp.db_height != self.height:
                 self.height = self.bp.db_height
                 self.header_cache.clear()
@@ -286,10 +286,10 @@ class Controller(util.LoggedClass):
         self.header_cache[height] = header
         return header
 
-    async def async_get_history(self, hash168):
+    async def async_get_history(self, hashX):
         '''Get history asynchronously to reduce latency.'''
-        if hash168 in self.history_cache:
-            return self.history_cache[hash168]
+        if hashX in self.history_cache:
+            return self.history_cache[hashX]
 
         def job():
             # History DoS limit.  Each element of history is about 99
@@ -297,11 +297,11 @@ class Controller(util.LoggedClass):
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
             limit = self.env.max_send // 97
-            return list(self.bp.get_history(hash168, limit=limit))
+            return list(self.bp.get_history(hashX, limit=limit))
 
         loop = asyncio.get_event_loop()
         history = await loop.run_in_executor(None, job)
-        self.history_cache[hash168] = history
+        self.history_cache[hashX] = history
         return history
 
     async def shutdown(self):

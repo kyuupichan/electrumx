@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -13,13 +13,14 @@ necessary for appropriate handling.
 
 from decimal import Decimal
 from functools import partial
+from hashlib import sha256
 import inspect
 import re
 import struct
 import sys
 
-from lib.hash import Base58, hash160, double_sha256, hash_to_str
-from lib.script import ScriptPubKey, Script
+from lib.hash import Base58, hash160, ripemd160, double_sha256, hash_to_str
+from lib.script import ScriptPubKey
 from lib.tx import Deserializer
 from lib.util import cachedproperty, subclasses
 
@@ -37,9 +38,9 @@ class Coin(object):
     RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
-    STRANGE_VERBYTE = 0xff
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
+    HASHX_LEN = 11
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -70,20 +71,28 @@ class Coin(object):
     def daemon_urls(cls, urls):
         return [cls.sanitize_url(url) for url in urls.split(',')]
 
+    @classmethod
+    def hashX_from_script(cls, script):
+        '''Returns a hashX from a script.'''
+        script = ScriptPubKey.hashX_script(script)
+        if script is None:
+            return None
+        return sha256(script).digest()[:cls.HASHX_LEN]
+
     @cachedproperty
-    def hash168_handlers(cls):
+    def address_handlers(cls):
         return ScriptPubKey.PayToHandlers(
-            address = cls.P2PKH_hash168_from_hash160,
-            script_hash = cls.P2SH_hash168_from_hash160,
-            pubkey = cls.P2PKH_hash168_from_pubkey,
-            unspendable = cls.hash168_from_unspendable,
-            strange = cls.hash168_from_strange,
+            address = cls.P2PKH_address_from_hash160,
+            script_hash = cls.P2SH_address_from_hash160,
+            pubkey = cls.P2PKH_address_from_pubkey,
+            unspendable = lambda : None,
+            strange = lambda script: None,
         )
 
     @classmethod
-    def hash168_from_script(cls):
-        '''Returns a function that is passed a script to return a hash168.'''
-        return partial(ScriptPubKey.pay_to, cls.hash168_handlers)
+    def address_from_script(cls, script):
+        '''Given a pk_script, return the adddress it pays to, or None.'''
+        return ScriptPubKey.pay_to(cls.address_handlers, script)
 
     @staticmethod
     def lookup_xverbytes(verbytes):
@@ -97,47 +106,15 @@ class Coin(object):
         raise CoinError('version bytes unrecognised')
 
     @classmethod
-    def address_to_hash168(cls, addr):
-        '''Return a 21-byte hash given an address.
-
-        This is the hash160 prefixed by the address version byte.
-        '''
-        result = Base58.decode_check(addr)
-        if len(result) != 21:
-            raise CoinError('invalid address: {}'.format(addr))
-        return result
-
-    @classmethod
-    def hash168_to_address(cls, hash168):
-        '''Return an address given a 21-byte hash.'''
-        return Base58.encode_check(hash168)
-
-    @classmethod
-    def hash168_from_unspendable(cls):
-        '''Return a hash168 for an unspendable script.'''
-        return None
-
-    @classmethod
-    def hash168_from_strange(cls, script):
-        '''Return a hash168 for a strange script.'''
-        return bytes([cls.STRANGE_VERBYTE]) + hash160(script)
-
-    @classmethod
-    def P2PKH_hash168_from_hash160(cls, hash160):
-        '''Return a hash168 if hash160 is 160 bits otherwise None.'''
-        if len(hash160) == 20:
-            return bytes([cls.P2PKH_VERBYTE]) + hash160
-        return None
-
-    @classmethod
-    def P2PKH_hash168_from_pubkey(cls, pubkey):
-        return cls.P2PKH_hash168_from_hash160(hash160(pubkey))
+    def address_to_hashX(cls, address):
+        '''Return a hashX given a coin address.'''
+        return cls.hashX_from_script(cls.pay_to_address_script(address))
 
     @classmethod
     def P2PKH_address_from_hash160(cls, hash160):
         '''Return a P2PKH address given a public key.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2PKH_hash168_from_hash160(hash160))
+        return Base58.encode_check(bytes([cls.P2PKH_VERBYTE]) + hash160)
 
     @classmethod
     def P2PKH_address_from_pubkey(cls, pubkey):
@@ -145,17 +122,10 @@ class Coin(object):
         return cls.P2PKH_address_from_hash160(hash160(pubkey))
 
     @classmethod
-    def P2SH_hash168_from_hash160(cls, hash160):
-        '''Return a hash168 if hash160 is 160 bits otherwise None.'''
-        if len(hash160) == 20:
-            return bytes([cls.P2SH_VERBYTE]) + hash160
-        return None
-
-    @classmethod
     def P2SH_address_from_hash160(cls, hash160):
         '''Return a coin address given a hash160.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2SH_hash168_from_hash160(hash160))
+        return Base58.encode_check(bytes([cls.P2SH_VERBYTE]) + hash160)
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
@@ -195,7 +165,7 @@ class Coin(object):
         if len(raw) == 21:
             verbyte, hash_bytes = raw[0], raw[1:]
 
-        if verbyte == cls.P2PKH_VERYBYTE:
+        if verbyte == cls.P2PKH_VERBYTE:
             return ScriptPubKey.P2PKH_script(hash_bytes)
         if verbyte == cls.P2SH_VERBYTE:
             return ScriptPubKey.P2SH_script(hash_bytes)
@@ -262,9 +232,9 @@ class Bitcoin(Coin):
     WIF_BYTE = 0x80
     GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
                   b'4ff763ae46a2a6c172b3f1b60a8ce26f')
-    TX_COUNT = 142791895
-    TX_COUNT_HEIGHT = 420976
-    TX_PER_BLOCK = 1600
+    TX_COUNT = 156335304
+    TX_COUNT_HEIGHT = 429972
+    TX_PER_BLOCK = 1800
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332

@@ -172,8 +172,7 @@ class BlockProcessor(server.db.DB):
         self.caught_up_event = asyncio.Event()
 
         # Meta
-        self.utxo_MB = env.utxo_MB
-        self.hist_MB = env.hist_MB
+        self.cache_MB = env.cache_MB
         self.next_cache_check = 0
 
         # Headers and tx_hashes have one entry per block
@@ -194,10 +193,8 @@ class BlockProcessor(server.db.DB):
 
         # Log state
         if self.first_sync:
-            self.logger.info('flushing UTXO cache at {:,d} MB'
-                             .format(self.utxo_MB))
-            self.logger.info('flushing history cache at {:,d} MB'
-                             .format(self.hist_MB))
+            self.logger.info('flushing DB cache at {:,d} MB'
+                             .format(self.cache_MB))
 
     async def main_loop(self, touched):
         '''Main loop for block processing.'''
@@ -242,7 +239,7 @@ class BlockProcessor(server.db.DB):
             touched.clear()
             if time.time() > self.next_cache_check:
                 self.check_cache_size()
-                self.next_cache_check = time.time() + 60
+                self.next_cache_check = time.time() + 30
 
         if not self.first_sync:
             s = '' if len(blocks) == 1 else 's'
@@ -391,8 +388,8 @@ class BlockProcessor(server.db.DB):
 
         flush_id = pack('>H', self.flush_count)
 
-        for hash168, hist in self.history.items():
-            key = b'H' + hash168 + flush_id
+        for hashX, hist in self.history.items():
+            key = b'H' + hashX + flush_id
             batch.put(key, hist.tobytes())
 
         if self.first_sync:
@@ -415,10 +412,10 @@ class BlockProcessor(server.db.DB):
         self.tx_hashes = []
         self.headers = []
 
-    def backup_flush(self, hash168s):
+    def backup_flush(self, hashXs):
         '''Like flush() but when backing up.  All UTXOs are flushed.
 
-        hash168s - sequence of hash168s which were touched by backing
+        hashXs - sequence of hashXs which were touched by backing
         up.  Searched for history entries to remove after the backup
         height.
         '''
@@ -430,7 +427,7 @@ class BlockProcessor(server.db.DB):
 
         with self.db.write_batch() as batch:
             # Flush state last as it reads the wall time.
-            self.backup_history(batch, hash168s)
+            self.backup_history(batch, hashXs)
             self.flush_utxos(batch)
             self.flush_state(batch)
 
@@ -444,10 +441,10 @@ class BlockProcessor(server.db.DB):
                                  self.last_flush - flush_start,
                                  self.height, self.tx_count))
 
-    def backup_history(self, batch, hash168s):
+    def backup_history(self, batch, hashXs):
         nremoves = 0
-        for hash168 in sorted(hash168s):
-            prefix = b'H' + hash168
+        for hashX in sorted(hashXs):
+            prefix = b'H' + hashX
             deletes = []
             puts = {}
             for key, hist in self.db.iterator(prefix=prefix, reverse=True):
@@ -472,17 +469,15 @@ class BlockProcessor(server.db.DB):
         assert not self.tx_hashes
 
         self.logger.info('backing up removed {:,d} history entries from '
-                         '{:,d} addresses'.format(nremoves, len(hash168s)))
+                         '{:,d} addresses'.format(nremoves, len(hashXs)))
 
     def check_cache_size(self):
         '''Flush a cache if it gets too big.'''
         # Good average estimates based on traversal of subobjects and
-        # requesting size from Python (see deep_getsizeof).  For
-        # whatever reason Python O/S mem usage is typically +30% or
-        # more, so we scale our already bloated object sizes.
-        one_MB = int(1048576 / 1.3)
-        utxo_cache_size = len(self.utxo_cache) * 187
-        db_deletes_size = len(self.db_deletes) * 61
+        # requesting size from Python (see deep_getsizeof).
+        one_MB = 1000*1000
+        utxo_cache_size = len(self.utxo_cache) * 205
+        db_deletes_size = len(self.db_deletes) * 57
         hist_cache_size = len(self.history) * 180 + self.history_size * 4
         tx_hash_size = (self.tx_count - self.fs_tx_count) * 74
         utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
@@ -493,9 +488,10 @@ class BlockProcessor(server.db.DB):
                          .format(self.height, self.daemon.cached_height(),
                                  utxo_MB, hist_MB))
 
-        # Flush if a cache is too big
-        if utxo_MB >= self.utxo_MB or hist_MB >= self.hist_MB:
-            self.flush(utxo_MB >= self.utxo_MB)
+        # Flush history if it takes up over 20% of cache memory.
+        # Flush UTXOs once they take up 80% of cache memory.
+        if utxo_MB + hist_MB >= self.cache_MB or hist_MB >= self.cache_MB // 5:
+            self.flush(utxo_MB >= self.cache_MB * 4 // 5)
 
     def fs_advance_block(self, header, tx_hashes, txs):
         '''Update unflushed FS state for a new block.'''
@@ -525,15 +521,15 @@ class BlockProcessor(server.db.DB):
         history = self.history
         history_size = self.history_size
         tx_num = self.tx_count
-        script_hash168 = self.coin.hash168_from_script()
+        script_hashX = self.coin.hashX_from_script
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
         undo_info_append = undo_info.append
 
         for tx, tx_hash in zip(txs, tx_hashes):
-            hash168s = set()
-            add_hash168 = hash168s.add
+            hashXs = set()
+            add_hashX = hashXs.add
             tx_numb = s_pack('<I', tx_num)
 
             # Spend the inputs
@@ -541,21 +537,21 @@ class BlockProcessor(server.db.DB):
                 for txin in tx.inputs:
                     cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                     undo_info_append(cache_value)
-                    add_hash168(cache_value[:21])
+                    add_hashX(cache_value[:-12])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
-                # Get the hash168.  Ignore unspendable outputs
-                hash168 = script_hash168(txout.pk_script)
-                if hash168:
-                    add_hash168(hash168)
+                # Get the hashX.  Ignore unspendable outputs
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    add_hashX(hashX)
                     put_utxo(tx_hash + s_pack('<H', idx),
-                             hash168 + tx_numb + s_pack('<Q', txout.value))
+                             hashX + tx_numb + s_pack('<Q', txout.value))
 
-            for hash168 in hash168s:
-                history[hash168].append(tx_num)
-            history_size += len(hash168s)
-            touched.update(hash168s)
+            for hashX in hashXs:
+                history[hashX].append(tx_num)
+            history_size += len(hashXs)
+            touched.update(hashXs)
             tx_num += 1
 
         self.tx_count = tx_num
@@ -605,7 +601,8 @@ class BlockProcessor(server.db.DB):
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
-        script_hash168 = self.coin.hash168_from_script()
+        script_hashX = self.coin.hashX_from_script
+        undo_entry_len = 12 + self.coin.HASHX_LEN
 
         rtxs = reversed(txs)
         rtx_hashes = reversed(tx_hashes)
@@ -614,19 +611,19 @@ class BlockProcessor(server.db.DB):
             for idx, txout in enumerate(tx.outputs):
                 # Spend the TX outputs.  Be careful with unspendable
                 # outputs - we didn't save those in the first place.
-                hash168 = script_hash168(txout.pk_script)
-                if hash168:
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
                     cache_value = spend_utxo(tx_hash, idx)
-                    touched.add(cache_value[:21])
+                    touched.add(cache_value[:-12])
 
             # Restore the inputs
             if not tx.is_coinbase:
                 for txin in reversed(tx.inputs):
-                    n -= 33
-                    undo_item = undo_info[n:n + 33]
+                    n -= undo_entry_len
+                    undo_item = undo_info[n:n + undo_entry_len]
                     put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
                              undo_item)
-                    touched.add(undo_item[:21])
+                    touched.add(undo_item[:-12])
 
         assert n == 0
         self.tx_count -= len(txs)
@@ -642,12 +639,13 @@ class BlockProcessor(server.db.DB):
     binary keys and values.
 
       Key:    TX_HASH + TX_IDX           (32 + 2 = 34 bytes)
-      Value:  HASH168 + TX_NUM + VALUE   (21 + 4 + 8 = 33 bytes)
+      Value:  HASHX + TX_NUM + VALUE     (11 + 4 + 8 = 23 bytes)
 
-    That's 67 bytes of raw data.  Python dictionary overhead means
-    each entry actually uses about 187 bytes of memory.  So over 5
-    million UTXOs can fit in 1GB of RAM.  There are approximately 42
-    million UTXOs on bitcoin mainnet at height 433,000.
+    That's 57 bytes of raw data in-memory.  Python dictionary overhead
+    means each entry actually uses about 205 bytes of memory.  So
+    almost 5 million UTXOs can fit in 1GB of RAM.  There are
+    approximately 42 million UTXOs on bitcoin mainnet at height
+    433,000.
 
     Semantics:
 
@@ -670,11 +668,11 @@ class BlockProcessor(server.db.DB):
 
     To this end we maintain two "tables", one for each point above:
 
-      1.  Key: b'u' + address_hash168 + tx_idx + tx_num
+      1.  Key: b'u' + address_hashX + tx_idx + tx_num
           Value: the UTXO value as a 64-bit unsigned integer
 
       2.  Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-          Value: hash168
+          Value: hashX
 
     The compressed tx hash is just the first few bytes of the hash of
     the tx in which the UTXO was created.  As this is not unique there
@@ -700,12 +698,12 @@ class BlockProcessor(server.db.DB):
         # Spend it from the DB.
 
         # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-        # Value: hash168
+        # Value: hashX
         prefix = b'h' + tx_hash[:4] + idx_packed
-        candidates = {db_key: hash168 for db_key, hash168
+        candidates = {db_key: hashX for db_key, hashX
                       in self.db.iterator(prefix=prefix)}
 
-        for hdb_key, hash168 in candidates.items():
+        for hdb_key, hashX in candidates.items():
             tx_num_packed = hdb_key[-4:]
 
             if len(candidates) > 1:
@@ -715,15 +713,15 @@ class BlockProcessor(server.db.DB):
                     assert hash is not None  # Should always be found
                     continue
 
-            # Key: b'u' + address_hash168 + tx_idx + tx_num
+            # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
-            udb_key = b'u' + hash168 + hdb_key[-6:]
+            udb_key = b'u' + hashX + hdb_key[-6:]
             utxo_value_packed = self.db.get(udb_key)
             if utxo_value_packed:
                 # Remove both entries for this UTXO
                 self.db_deletes.append(hdb_key)
                 self.db_deletes.append(udb_key)
-                return hash168 + tx_num_packed + utxo_value_packed
+                return hashX + tx_num_packed + utxo_value_packed
 
         raise ChainError('UTXO {} / {:,d} not found in "h" table'
                          .format(hash_to_str(tx_hash), tx_idx))
@@ -743,11 +741,11 @@ class BlockProcessor(server.db.DB):
 
         batch_put = batch.put
         for cache_key, cache_value in self.utxo_cache.items():
-            # suffix = tx_num + tx_idx
-            hash168 = cache_value[:21]
-            suffix =  cache_key[-2:] + cache_value[21:25]
-            batch_put(b'h' + cache_key[:4] + suffix, hash168)
-            batch_put(b'u' + hash168 + suffix, cache_value[25:])
+            # suffix = tx_idx + tx_num
+            hashX = cache_value[:-12]
+            suffix =  cache_key[-2:] + cache_value[-12:-8]
+            batch_put(b'h' + cache_key[:4] + suffix, hashX)
+            batch_put(b'u' + hashX + suffix, cache_value[-8:])
 
         if self.first_sync:
             self.logger.info('flushed {:,d} blocks with {:,d} txs, {:,d} UTXO '

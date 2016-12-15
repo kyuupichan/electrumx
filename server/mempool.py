@@ -27,9 +27,9 @@ class MemPool(util.LoggedClass):
     To that end we maintain the following maps:
 
        tx_hash -> (txin_pairs, txout_pairs)
-       hash168 -> set of all tx hashes in which the hash168 appears
+       hashX   -> set of all tx hashes in which the hashX appears
 
-    A pair is a (hash168, value) tuple.  tx hashes are hex strings.
+    A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
     def __init__(self, daemon, coin, db):
@@ -42,7 +42,7 @@ class MemPool(util.LoggedClass):
         self.prioritized = set()
         self.stop = False
         self.txs = {}
-        self.hash168s = defaultdict(set)  # None can be a key
+        self.hashXs = defaultdict(set)  # None can be a key
 
     def prioritize(self, tx_hash):
         '''Prioritize processing the given hash.  This is important during
@@ -56,7 +56,7 @@ class MemPool(util.LoggedClass):
         unfetched.  Add new ones to unprocessed.
         '''
         txs = self.txs
-        hash168s = self.hash168s
+        hashXs = self.hashXs
         touched = self.touched
 
         hashes = self.daemon.cached_mempool_hashes()
@@ -67,13 +67,13 @@ class MemPool(util.LoggedClass):
             item = txs.pop(hex_hash)
             if item:
                 txin_pairs, txout_pairs = item
-                tx_hash168s = set(hash168 for hash168, value in txin_pairs)
-                tx_hash168s.update(hash168 for hash168, value in txout_pairs)
-                for hash168 in tx_hash168s:
-                    hash168s[hash168].remove(hex_hash)
-                    if not hash168s[hash168]:
-                        del hash168s[hash168]
-                touched.update(tx_hash168s)
+                tx_hashXs = set(hashX for hashX, value in txin_pairs)
+                tx_hashXs.update(hashX for hashX, value in txout_pairs)
+                for hashX in tx_hashXs:
+                    hashXs[hashX].remove(hex_hash)
+                    if not hashXs[hashX]:
+                        del hashXs[hashX]
+                touched.update(tx_hashXs)
 
         new = hashes.difference(txs)
         unfetched.update(new)
@@ -114,7 +114,7 @@ class MemPool(util.LoggedClass):
                 now = time.time()
                 if now >= next_log and loops:
                     self.logger.info('{:,d} txs touching {:,d} addresses'
-                                     .format(len(txs), len(self.hash168s)))
+                                     .format(len(txs), len(self.hashXs)))
                     next_log = now + 150
 
             try:
@@ -168,14 +168,14 @@ class MemPool(util.LoggedClass):
             result, deferred = await loop.run_in_executor(None, job)
 
             pending.extend(deferred)
-            hash168s = self.hash168s
+            hashXs = self.hashXs
             touched = self.touched
             for hex_hash, in_out_pairs in result.items():
                 if hex_hash in txs:
                     txs[hex_hash] = in_out_pairs
-                    for hash168, value in itertools.chain(*in_out_pairs):
-                        touched.add(hash168)
-                        hash168s[hash168].add(hex_hash)
+                    for hashX, value in itertools.chain(*in_out_pairs):
+                        touched.add(hashX)
+                        hashXs[hashX].add(hex_hash)
 
         return process
 
@@ -199,7 +199,7 @@ class MemPool(util.LoggedClass):
         variables it doesn't own.  Atomic reads of self.txs that do
         not depend on the result remaining the same are fine.
         '''
-        script_hash168 = self.coin.hash168_from_script()
+        script_hashX = self.coin.hashX_from_script
         db_utxo_lookup = self.db.db_utxo_lookup
         txs = self.txs
 
@@ -209,8 +209,8 @@ class MemPool(util.LoggedClass):
                 continue
             tx = Deserializer(raw_tx).read_tx()
 
-            # Convert the tx outputs into (hash168, value) pairs
-            txout_pairs = [(script_hash168(txout.pk_script), txout.value)
+            # Convert the tx outputs into (hashX, value) pairs
+            txout_pairs = [(script_hashX(txout.pk_script), txout.value)
                            for txout in tx.outputs]
 
             # Convert the tx inputs to ([prev_hex_hash, prev_idx) pairs
@@ -261,17 +261,17 @@ class MemPool(util.LoggedClass):
 
         return result, deferred
 
-    async def transactions(self, hash168):
+    async def transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hash168.
+        entries for the hashX.
 
         unconfirmed is True if any txin is unconfirmed.
         '''
-        # hash168s is a defaultdict
-        if not hash168 in self.hash168s:
+        # hashXs is a defaultdict
+        if not hashX in self.hashXs:
             return []
 
-        hex_hashes = self.hash168s[hash168]
+        hex_hashes = self.hashXs[hashX]
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         result = []
         for hex_hash, raw_tx in zip(hex_hashes, raw_txs):
@@ -279,23 +279,23 @@ class MemPool(util.LoggedClass):
             if not item or not raw_tx:
                 continue
             txin_pairs, txout_pairs = item
-            tx_fee = (sum(v for hash168, v in txin_pairs)
-                      - sum(v for hash168, v in txout_pairs))
+            tx_fee = (sum(v for hashX, v in txin_pairs)
+                      - sum(v for hashX, v in txout_pairs))
             tx = Deserializer(raw_tx).read_tx()
             unconfirmed = any(txin.prev_hash in self.txs for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result
 
-    def value(self, hash168):
-        '''Return the unconfirmed amount in the mempool for hash168.
+    def value(self, hashX):
+        '''Return the unconfirmed amount in the mempool for hashX.
 
         Can be positive or negative.
         '''
         value = 0
-        # hash168s is a defaultdict
-        if hash168 in self.hash168s:
-            for hex_hash in self.hash168s[hash168]:
+        # hashXs is a defaultdict
+        if hashX in self.hashXs:
+            for hex_hash in self.hashXs[hashX]:
                 txin_pairs, txout_pairs = self.txs[hex_hash]
-                value -= sum(v for h168, v in txin_pairs if h168 == hash168)
-                value += sum(v for h168, v in txout_pairs if h168 == hash168)
+                value -= sum(v for h168, v in txin_pairs if h168 == hashX)
+                value += sum(v for h168, v in txout_pairs if h168 == hashX)
         return value

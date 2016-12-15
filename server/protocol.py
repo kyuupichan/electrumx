@@ -14,6 +14,7 @@ import traceback
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.jsonrpc import JSONRPC
+from lib.tx import Deserializer
 from server.daemon import DaemonError
 from server.version import VERSION
 
@@ -138,17 +139,17 @@ class Session(JSONRPC):
         raise self.RPCError('parameter should be a transaction hash: {}'
                             .format(param))
 
-    def param_to_hash168(self, param):
+    def param_to_hashX(self, param):
         if isinstance(param, str):
             try:
-                return self.coin.address_to_hash168(param)
+                return self.coin.address_to_hashX(param)
             except:
                 pass
         raise self.RPCError('param {} is not a valid address'.format(param))
 
-    def params_to_hash168(self, params):
+    def params_to_hashX(self, params):
         if len(params) == 1:
-            return self.param_to_hash168(params[0])
+            return self.param_to_hashX(params[0])
         raise self.RPCError('params {} should contain a single address'
                             .format(params))
 
@@ -162,7 +163,7 @@ class ElectrumX(Session):
         self.subscribe_height = False
         self.notified_height = None
         self.max_subs = self.env.max_session_subs
-        self.hash168s = set()
+        self.hashX_subs = {}
         rpcs = [
             ('blockchain',
              'address.get_balance address.get_history address.get_mempool '
@@ -179,7 +180,7 @@ class ElectrumX(Session):
                          for suffix in suffixes.split()}
 
     def sub_count(self):
-        return len(self.hash168s)
+        return len(self.hashX_subs)
 
     async def notify(self, height, touched):
         '''Notify the client about changes in height and touched addresses.
@@ -202,11 +203,10 @@ class ElectrumX(Session):
                 )
                 self.encode_and_send_payload(payload)
 
-        hash168_to_address = self.coin.hash168_to_address
-        matches = self.hash168s.intersection(touched)
-        for hash168 in matches:
-            address = hash168_to_address(hash168)
-            status = await self.address_status(hash168)
+        matches = touched.intersection(self.hashX_subs)
+        for hashX in matches:
+            address = self.hashX_subs[hashX]
+            status = await self.address_status(hashX)
             payload = self.notification_payload(
                 'blockchain.address.subscribe', (address, status))
             self.encode_and_send_payload(payload)
@@ -222,12 +222,12 @@ class ElectrumX(Session):
         '''Used as response to a headers subscription request.'''
         return self.manager.electrum_header(self.height())
 
-    async def address_status(self, hash168):
+    async def address_status(self, hashX):
         '''Returns status as 32 bytes.'''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.manager.async_get_history(hash168)
-        mempool = await self.manager.mempool_transactions(hash168)
+        history = await self.manager.async_get_history(hashX)
+        mempool = await self.manager.mempool_transactions(hashX)
 
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
                          for tx_hash, height in history)
@@ -262,20 +262,20 @@ class ElectrumX(Session):
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
 
-    async def unconfirmed_history(self, hash168):
+    async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
         # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = await self.manager.mempool_transactions(hash168)
+        mempool = await self.manager.mempool_transactions(hashX)
         return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
                 for tx_hash, fee, unconfirmed in mempool]
 
-    async def get_history(self, hash168):
+    async def get_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.manager.async_get_history(hash168)
+        history = await self.manager.async_get_history(hashX)
         conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
 
-        return conf + await self.unconfirmed_history(hash168)
+        return conf + await self.unconfirmed_history(hashX)
 
     def get_chunk(self, index):
         '''Return header chunk as hex.  Index is a non-negative integer.'''
@@ -285,55 +285,55 @@ class ElectrumX(Session):
         count = min(next_height - start_height, chunk_size)
         return self.bp.read_headers(start_height, count).hex()
 
-    async def get_utxos(self, hash168):
+    async def get_utxos(self, hashX):
         '''Get UTXOs asynchronously to reduce latency.'''
         def job():
-            return list(self.bp.get_utxos(hash168, limit=None))
+            return list(self.bp.get_utxos(hashX, limit=None))
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, job)
 
-    async def get_balance(self, hash168):
-        utxos = await self.get_utxos(hash168)
+    async def get_balance(self, hashX):
+        utxos = await self.get_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
-        unconfirmed = self.manager.mempool_value(hash168)
+        unconfirmed = self.manager.mempool_value(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
-    async def list_unspent(self, hash168):
+    async def list_unspent(self, hashX):
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
-                for utxo in sorted(await self.get_utxos(hash168))]
+                for utxo in sorted(await self.get_utxos(hashX))]
 
     # --- blockchain commands
 
     async def address_get_balance(self, params):
-        hash168 = self.params_to_hash168(params)
-        return await self.get_balance(hash168)
+        hashX = self.params_to_hashX(params)
+        return await self.get_balance(hashX)
 
     async def address_get_history(self, params):
-        hash168 = self.params_to_hash168(params)
-        return await self.get_history(hash168)
+        hashX = self.params_to_hashX(params)
+        return await self.get_history(hashX)
 
     async def address_get_mempool(self, params):
-        hash168 = self.params_to_hash168(params)
-        return await self.unconfirmed_history(hash168)
+        hashX = self.params_to_hashX(params)
+        return await self.unconfirmed_history(hashX)
 
     async def address_get_proof(self, params):
-        hash168 = self.params_to_hash168(params)
+        hashX = self.params_to_hashX(params)
         raise self.RPCError('get_proof is not yet implemented')
 
     async def address_listunspent(self, params):
-        hash168 = self.params_to_hash168(params)
-        return await self.list_unspent(hash168)
+        hashX = self.params_to_hashX(params)
+        return await self.list_unspent(hashX)
 
     async def address_subscribe(self, params):
-        hash168 = self.params_to_hash168(params)
-        if len(self.hash168s) >= self.max_subs:
+        hashX = self.params_to_hashX(params)
+        if len(self.hashX_subs) >= self.max_subs:
             raise self.RPCError('your address subscription limit {:,d} reached'
                                 .format(self.max_subs))
-        result = await self.address_status(hash168)
+        result = await self.address_status(hashX)
         # add_subscription can raise so call it before adding
         self.manager.new_subscription()
-        self.hash168s.add(hash168)
+        self.hashX_subs[hashX] = params[0]
         return result
 
     async def block_get_chunk(self, params):
@@ -414,14 +414,23 @@ class ElectrumX(Session):
                             'and height')
 
     async def utxo_get_address(self, params):
+        '''Returns the address for a TXO.
+
+        Used only for electrum client command-line requests.  We no
+        longer index by address, so need to request the raw
+        transaction.  So it works for any TXO not just UTXOs.
+        '''
         if len(params) == 2:
             tx_hash = self.param_to_tx_hash(params[0])
             index = self.param_to_non_negative_integer(params[1])
-            tx_hash = hex_str_to_hash(tx_hash)
-            hash168 = self.bp.get_utxo_hash168(tx_hash, index)
-            if hash168:
-                return self.coin.hash168_to_address(hash168)
-            return None
+            raw_tx = await self.daemon_request('getrawtransaction', tx_hash)
+            if not raw_tx:
+                return None
+            raw_tx = bytes.fromhex(raw_tx)
+            tx = Deserializer(raw_tx).read_tx()
+            if index >= len(tx.outputs):
+                return None
+            return self.coin.address_from_script(tx.outputs[index].pk_script)
 
         raise self.RPCError('params should contain a transaction hash '
                             'and index')

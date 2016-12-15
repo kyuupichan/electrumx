@@ -290,8 +290,8 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.log_error(msg)
-            return self.json_error(msg, self.INTERNAL_ERROR,
-                                   self.payload_id(payload))
+            return self.send_json_error(msg, self.INTERNAL_ERROR,
+                                        self.payload_id(payload))
 
         self.check_oversized_request(len(binary))
         self.send_count += 1

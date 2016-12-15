@@ -31,7 +31,7 @@ class DB(LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [3]
+    DB_VERSIONS = [4]
 
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
@@ -319,7 +319,7 @@ class DB(LoggedClass):
         assert isinstance(limit, int) and limit >= 0
         return limit
 
-    def get_history(self, hash168, limit=1000):
+    def get_history(self, hashX, limit=1000):
         '''Generator that returns an unpruned, sorted list of (tx_hash,
         height) tuples of confirmed transactions that touched the address,
         earliest in the blockchain first.  Includes both spending and
@@ -327,7 +327,7 @@ class DB(LoggedClass):
         Set limit to None to get them all.
         '''
         limit = self._resolve_limit(limit)
-        prefix = b'H' + hash168
+        prefix = b'H' + hashX
         for key, hist in self.db.iterator(prefix=prefix):
             a = array.array('I')
             a.frombytes(hist)
@@ -337,20 +337,20 @@ class DB(LoggedClass):
                 yield self.fs_tx_hash(tx_num)
                 limit -= 1
 
-    def get_balance(self, hash168):
+    def get_balance(self, hashX):
         '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hash168, limit=None))
+        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
 
-    def get_utxos(self, hash168, limit=1000):
+    def get_utxos(self, hashX, limit=1000):
         '''Generator that yields all UTXOs for an address sorted in no
         particular order.  By default yields at most 1000 entries.
         Set limit to None to get them all.
         '''
         limit = self._resolve_limit(limit)
         s_unpack = unpack
-        # Key: b'u' + address_hash168 + tx_idx + tx_num
+        # Key: b'u' + address_hashX + tx_idx + tx_num
         # Value: the UTXO value as a 64-bit unsigned integer
-        prefix = b'u' + hash168
+        prefix = b'u' + hashX
         for db_key, db_value in self.db.iterator(prefix=prefix):
             if limit == 0:
                 return
@@ -360,56 +360,43 @@ class DB(LoggedClass):
             tx_hash, height = self.fs_tx_hash(tx_num)
             yield UTXO(tx_num, tx_pos, tx_hash, height, value)
 
-    def get_utxo_hash168(self, tx_hash, index):
-        '''Returns the hash168 for a UTXO.
-
-        Used only for electrum client command-line requests.
-        '''
-        hash168 = None
-        if 0 <= index <= 65535:
-            idx_packed = pack('<H', index)
-            hash168, tx_num_packed = self.db_hash168(tx_hash, idx_packed)
-        return hash168
-
-    def db_hash168(self, tx_hash, idx_packed):
-        '''Return (hash168, tx_num_packed) for the given TXO.
+    def db_hashX(self, tx_hash, idx_packed):
+        '''Return (hashX, tx_num_packed) for the given TXO.
 
         Both are None if not found.'''
         # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-        # Value: hash168
+        # Value: hashX
         prefix = b'h' + tx_hash[:4] + idx_packed
 
         # Find which entry, if any, the TX_HASH matches.
-        for db_key, hash168 in self.db.iterator(prefix=prefix):
-            assert len(hash168) == 21
-
+        for db_key, hashX in self.db.iterator(prefix=prefix):
             tx_num_packed = db_key[-4:]
             tx_num, = unpack('<I', tx_num_packed)
             hash, height = self.fs_tx_hash(tx_num)
             if hash == tx_hash:
-                return hash168, tx_num_packed
+                return hashX, tx_num_packed
 
         return None, None
 
     def db_utxo_lookup(self, tx_hash, tx_idx):
-        '''Given a prevout return a (hash168, value) pair.
+        '''Given a prevout return a (hashX, value) pair.
 
         Raises MissingUTXOError if the UTXO is not found.  Used by the
         mempool code.
         '''
         idx_packed = pack('<H', tx_idx)
-        hash168, tx_num_packed = self.db_hash168(tx_hash, idx_packed)
-        if not hash168:
+        hashX, tx_num_packed = self.db_hashX(tx_hash, idx_packed)
+        if not hashX:
             # This can happen when the daemon is a block ahead of us
             # and has mempool txs spending outputs from that new block
             raise self.MissingUTXOError
 
-        # Key: b'u' + address_hash168 + tx_idx + tx_num
+        # Key: b'u' + address_hashX + tx_idx + tx_num
         # Value: the UTXO value as a 64-bit unsigned integer
-        key = b'u' + hash168 + idx_packed + tx_num_packed
+        key = b'u' + hashX + idx_packed + tx_num_packed
         db_value = self.db.get(key)
         if not db_value:
             raise self.DBError('UTXO {} / {:,d} in one table only'
                                .format(hash_to_str(tx_hash), tx_idx))
         value, = unpack('<Q', db_value)
-        return hash168, value
+        return hashX, value

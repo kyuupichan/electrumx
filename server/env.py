@@ -22,12 +22,12 @@ class Env(LoggedClass):
 
     def __init__(self):
         super().__init__()
+        self.obsolete(['UTXO_MB', 'HIST_MB'])
         coin_name = self.default('COIN', 'Bitcoin')
         network = self.default('NETWORK', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.db_dir = self.required('DB_DIRECTORY')
-        self.utxo_MB = self.integer('UTXO_MB', 1000)
-        self.hist_MB = self.integer('HIST_MB', 300)
+        self.cache_MB = self.integer('CACHE_MB', 1250)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
         self.daemon_url = self.required('DAEMON_URL')
@@ -88,3 +88,9 @@ class Env(LoggedClass):
         except:
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
+
+    def obsolete(self, envvars):
+        bad = [envvar for envvar in envvars if environ.get(envvar)]
+        if bad:
+            raise self.Error('remove obsolete environment variables {}'
+                             .format(bad))

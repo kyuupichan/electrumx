@@ -26,15 +26,17 @@ def count_entries(db):
         utxos += 1
     print("UTXO count:", utxos)
 
-    hash168 = 0
+    hashX = 0
     for key in db.iterator(prefix=b'h', include_value=False):
-        hash168 += 1
-    print("Hash168 count:", hash168)
+        hashX += 1
+    print("HashX count:", hashX)
 
     hist = 0
-    for key in db.iterator(prefix=b'H', include_value=False):
+    hist_len = 0
+    for key, value in db.iterator(prefix=b'H'):
         hist += 1
-    print("History rows:", hist)
+        hist_len += len(value) // 4
+    print("History rows {:,d} entries {:,d}", hist, hist_len)
 
 
 def main():
@@ -52,27 +54,20 @@ def main():
         limit = 10
     for addr in sys.argv[argc:]:
         print('Address: ', addr)
-        hash168 = coin.address_to_hash168(addr)
-
-        hist = 0
-        hist_len = 0
-        for key, value in bp.db.iterator(prefix=b'H'+hash168):
-            hist += 1
-            hist_len += len(value) // 4
-        print("History: {:,d} rows with {:,d} entries".format(hist, hist_len))
+        hashX = coin.address_to_hashX(addr)
 
         n = None
-        for n, (tx_hash, height) in enumerate(bp.get_history(hash168, limit)):
+        for n, (tx_hash, height) in enumerate(bp.get_history(hashX, limit)):
             print('History #{:d}: hash: {} height: {:d}'
                   .format(n + 1, hash_to_str(tx_hash), height))
         n = None
-        for n, utxo in enumerate(bp.get_utxos(hash168, limit)):
+        for n, utxo in enumerate(bp.get_utxos(hashX, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
                   .format(n + 1, hash_to_str(utxo.tx_hash),
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')
-        balance = bp.get_balance(hash168)
+        balance = bp.get_balance(hashX)
         print('Balance: {} {}'.format(coin.decimal_value(balance),
                                       coin.SHORTNAME))
 
