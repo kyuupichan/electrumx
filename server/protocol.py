@@ -589,9 +589,9 @@ class Session(JSONRPC):
 
     def enqueue_request(self, request):
         '''Add a request to the session's list.'''
-        if not self.requests:
-            self.manager.enqueue_session(self)
         self.requests.append(request)
+        if len(self.requests) == 1:
+            self.manager.enqueue_session(self)
 
     async def serve_requests(self):
         '''Serve requests in batches.'''
