@@ -53,12 +53,9 @@ class ServerManager(util.LoggedClass):
     def __init__(self, env):
         super().__init__()
         self.loop = asyncio.get_event_loop()
-        self.touched = set()
-        self.touched_event = asyncio.Event()
         self.start = time.time()
-        self.bp = BlockProcessor(env, self.touched, self.touched_event)
-        self.mempool = MemPool(self.bp.daemon, env.coin, self.bp,
-                               self.touched, self.touched_event)
+        self.bp = BlockProcessor(env)
+        self.mempool = MemPool(self.bp.daemon, env.coin, self.bp)
         self.irc = IRC(env)
         self.env = env
         self.servers = {}
@@ -178,11 +175,11 @@ class ServerManager(util.LoggedClass):
             self.futures.append(asyncio.ensure_future(coro))
 
         # shutdown() assumes bp.main_loop() is first
-        add_future(self.bp.main_loop())
+        add_future(self.bp.main_loop(self.mempool.touched))
         add_future(self.bp.prefetcher.main_loop())
         add_future(self.irc.start(self.bp.event))
         add_future(self.start_servers(self.bp.event))
-        add_future(self.mempool.main_loop(self.bp.event))
+        add_future(self.mempool.main_loop())
         add_future(self.enqueue_delayed_sessions())
         add_future(self.notify())
         for n in range(4):
@@ -245,10 +242,10 @@ class ServerManager(util.LoggedClass):
     async def notify(self):
         '''Notify sessions about height changes and touched addresses.'''
         while True:
-            await self.touched_event.wait()
-            touched = self.touched.copy()
-            self.touched.clear()
-            self.touched_event.clear()
+            await self.mempool.touched_event.wait()
+            touched = self.mempool.touched.copy()
+            self.mempool.touched.clear()
+            self.mempool.touched_event.clear()
 
             # Invalidate caches
             hc = self.history_cache

@@ -36,6 +36,8 @@ class Daemon(util.LoggedClass):
         self.urls = urls
         self.url_index = 0
         self._height = None
+        self.mempool_hashes = set()
+        self.mempool_refresh_event = asyncio.Event()
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
@@ -148,9 +150,10 @@ class Daemon(util.LoggedClass):
         # Convert hex string to bytes
         return [bytes.fromhex(block) for block in blocks]
 
-    async def mempool_hashes(self):
-        '''Return the hashes of the txs in the daemon's mempool.'''
-        return await self._send_single('getrawmempool')
+    async def refresh_mempool_hashes(self):
+        '''Update our record of the daemon's mempool hashes.'''
+        self.mempool_hashes = set(await self._send_single('getrawmempool'))
+        self.mempool_refresh_event.set()
 
     async def estimatefee(self, params):
         '''Return the fee estimate for the given parameters.'''

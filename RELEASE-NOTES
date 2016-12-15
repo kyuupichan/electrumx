@@ -1,3 +1,9 @@
+version 0.9.8
+-------------
+
+- cleanup up mempool handling, notify of addresses only once when a new block
+  comes in.  Fixes issue 70.
+
 version 0.9.7
 -------------
 

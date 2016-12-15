@@ -33,92 +33,31 @@ class MemPool(util.LoggedClass):
     A pair is a (hash168, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, daemon, coin, db, touched, touched_event):
+    def __init__(self, daemon, coin, db):
         super().__init__()
         self.daemon = daemon
         self.coin = coin
         self.db = db
-        self.touched = touched
-        self.touched_event = touched_event
+        self.touched = set()
+        self.touched_event = asyncio.Event()
         self.stop = False
         self.txs = {}
         self.hash168s = defaultdict(set)  # None can be a key
 
-    async def main_loop(self, caught_up):
-        '''Asynchronously maintain mempool status with daemon.
+    def resync_daemon_hashes(self, unprocessed, unfetched):
+        '''Re-sync self.txs with the list of hashes in the daemon's mempool.
 
-        Waits until the caught up event is signalled.'''
-        await caught_up.wait()
-        self.logger.info('beginning processing of daemon mempool.  '
-                         'This can take some time...')
-        try:
-            await self.fetch_and_process()
-        except asyncio.CancelledError:
-            # This aids clean shutdowns
-            self.stop = True
-
-    async def fetch_and_process(self):
-        '''The inner loop unprotected by try / except.'''
-        unfetched = set()
-        unprocessed = {}
-        log_every = 150
-        log_secs = 0
-        fetch_size = 400
-        process_some = self.async_process_some(unfetched, fetch_size // 2)
-        next_refresh = 0
-        # The list of mempool hashes is fetched no more frequently
-        # than this number of seconds
-        refresh_secs = 5
-
-        while True:
-            try:
-                now = time.time()
-                if now >= next_refresh:
-                    await self.new_hashes(unprocessed, unfetched)
-                    next_refresh = now + refresh_secs
-                    log_secs -= refresh_secs
-
-                # Fetch some txs if unfetched ones remain
-                if unfetched:
-                    count = min(len(unfetched), fetch_size)
-                    hex_hashes = [unfetched.pop() for n in range(count)]
-                    unprocessed.update(await self.fetch_raw_txs(hex_hashes))
-
-                # Process some txs if unprocessed ones remain
-                if unprocessed:
-                    await process_some(unprocessed)
-
-                # Avoid double notifications if processing a block
-                if self.touched and not self.processing_new_block():
-                    self.touched_event.set()
-
-                if not unprocessed:
-                    if log_secs <= 0:
-                        log_secs = log_every
-                        self.logger.info('{:,d} txs touching {:,d} addresses'
-                                         .format(len(self.txs),
-                                                 len(self.hash168s)))
-                    await asyncio.sleep(1)
-            except DaemonError as e:
-                self.logger.info('ignoring daemon error: {}'.format(e))
-
-    def processing_new_block(self):
-        '''Return True if we're processing a new block.'''
-        return self.daemon.cached_height() > self.db.db_height
-
-    async def new_hashes(self, unprocessed, unfetched):
-        '''Get the current list of hashes in the daemon's mempool.
-
-        Remove ones that have disappeared from self.txs and unprocessed.
+        Additionally, remove gone hashes from unprocessed and
+        unfetched.  Add new ones to unprocessed.
         '''
         txs = self.txs
         hash168s = self.hash168s
         touched = self.touched
 
-        hashes = set(await self.daemon.mempool_hashes())
-        new = hashes.difference(txs)
+        hashes = self.daemon.mempool_hashes
         gone = set(txs).difference(hashes)
         for hex_hash in gone:
+            unfetched.discard(hex_hash)
             unprocessed.pop(hex_hash, None)
             item = txs.pop(hex_hash)
             if item:
@@ -131,18 +70,71 @@ class MemPool(util.LoggedClass):
                         del hash168s[hash168]
                 touched.update(tx_hash168s)
 
+        new = hashes.difference(txs)
         unfetched.update(new)
         for hex_hash in new:
             txs[hex_hash] = None
+
+    async def main_loop(self):
+        '''Asynchronously maintain mempool status with daemon.
+
+        Processes the mempool each time the daemon's mempool refresh
+        event is signalled.
+        '''
+        unprocessed = {}
+        unfetched = set()
+        txs = self.txs
+        fetch_size = 400
+        process_some = self.async_process_some(unfetched, fetch_size // 2)
+
+        await self.daemon.mempool_refresh_event.wait()
+        self.logger.info ('beginning processing of daemon mempool.  '
+                          'This can take some time...')
+        next_log = time.time() + 0.1
+
+        while True:
+            try:
+                todo = len(unfetched) + len(unprocessed)
+                if todo:
+                    pct = (len(txs) - todo) * 100 // len(txs) if txs else 0
+                    self.logger.info('catchup {:d}% complete ({:,d} txs left)'
+                                     .format(pct, todo))
+                else:
+                    now = time.time()
+                    if now >= next_log:
+                        self.logger.info('{:,d} txs touching {:,d} addresses'
+                                         .format(len(txs), len(self.hash168s)))
+                        next_log = now + 150
+                    await self.daemon.mempool_refresh_event.wait()
+
+                self.resync_daemon_hashes(unprocessed, unfetched)
+                self.daemon.mempool_refresh_event.clear()
+
+                if unfetched:
+                    count = min(len(unfetched), fetch_size)
+                    hex_hashes = [unfetched.pop() for n in range(count)]
+                    unprocessed.update(await self.fetch_raw_txs(hex_hashes))
+
+                if unprocessed:
+                    await process_some(unprocessed)
+
+                # Avoid double notifications if processing a block
+                if self.touched and not self.processing_new_block():
+                    self.touched_event.set()
+            except DaemonError as e:
+                self.logger.info('ignoring daemon error: {}'.format(e))
+            except asyncio.CancelledError:
+                # This aids clean shutdowns
+                self.stop = True
+                break
 
     def async_process_some(self, unfetched, limit):
         loop = asyncio.get_event_loop()
         pending = []
         txs = self.txs
-        first = True
 
         async def process(unprocessed):
-            nonlocal first, pending
+            nonlocal pending
 
             raw_txs = {}
             while unprocessed and len(raw_txs) < limit:
@@ -169,15 +161,11 @@ class MemPool(util.LoggedClass):
                         touched.add(hash168)
                         hash168s[hash168].add(hex_hash)
 
-            to_do = len(unfetched) + len(unprocessed)
-            if to_do and txs:
-                percent = max(0, len(txs) - to_do) * 100 // len(txs)
-                self.logger.info('catchup {:d}% complete'.format(percent))
-            elif first:
-                first = False
-                self.logger.info('caught up')
-
         return process
+
+    def processing_new_block(self):
+        '''Return True if we're processing a new block.'''
+        return self.daemon.cached_height() > self.db.db_height
 
     async def fetch_raw_txs(self, hex_hashes):
         '''Fetch a list of mempool transactions.'''
