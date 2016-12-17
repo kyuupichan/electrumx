@@ -1,3 +1,11 @@
+** Please don't run version 0.10.0, it will corrupt your DB.
+
+version 0.9.10
+--------------
+
+- logging improvements
+- fixed issue #76 (RPCError namespace)
+
 version 0.9.9
 -------------
 
