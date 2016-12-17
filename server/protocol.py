@@ -224,10 +224,9 @@ class ServerManager(util.LoggedClass):
 
     async def start_servers(self, caught_up):
         '''Start RPC, TCP and SSL servers once caught up.'''
-        await caught_up.wait()
-
         if self.env.rpc_port is not None:
             await self.start_server('RPC', 'localhost', self.env.rpc_port)
+        await caught_up.wait()
         await self.start_external_servers()
 
     async def start_external_servers(self):
