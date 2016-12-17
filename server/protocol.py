@@ -479,13 +479,13 @@ class ServerManager(util.LoggedClass):
             return ('{:3d}:{:02d}:{:02d}'
                     .format(t // 3600, (t % 3600) // 60, t % 60))
 
-        fmt = ('{:<6} {:<5} {:>23} {:>15} {:>5} {:>5} '
-               '{:>7} {:>7} {:>7} {:>7} {:>7} {:>9}')
-        yield fmt.format('ID', 'Flags', 'Peer', 'Client', 'Reqs', 'Txs',
-                         'Subs', 'Recv', 'Recv KB', 'Sent', 'Sent KB', 'Time')
+        fmt = ('{:<6} {:<5} {:>15} {:>5} {:>5} '
+               '{:>7} {:>7} {:>7} {:>7} {:>7} {:>9} {:>21}')
+        yield fmt.format('ID', 'Flags', 'Client', 'Reqs', 'Txs', 'Subs',
+                         'Recv', 'Recv KB', 'Sent', 'Sent KB', 'Time', 'Peer')
         for (id_, flags, peer, client, reqs, txs_sent, subs,
              recv_count, recv_size, send_count, send_size, time) in data:
-            yield fmt.format(id_, flags, peer, client,
+            yield fmt.format(id_, flags, client,
                              '{:,d}'.format(reqs),
                              '{:,d}'.format(txs_sent),
                              '{:,d}'.format(subs),
@@ -493,7 +493,7 @@ class ServerManager(util.LoggedClass):
                              '{:,d}'.format(recv_size // 1024),
                              '{:,d}'.format(send_count),
                              '{:,d}'.format(send_size // 1024),
-                             time_fmt(time))
+                             time_fmt(time), peer)
 
     def session_data(self, for_log):
         '''Returned to the RPC 'sessions' call.'''
