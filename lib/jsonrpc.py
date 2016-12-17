@@ -177,7 +177,10 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             return 'unknown'
         if for_log and self.anon_logs:
             return 'xx.xx.xx.xx:xx'
-        return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
+        if ':' in self.peer_info[0]:
+            return '[{}]:{}'.format(self.peer_info[0], self.peer_info[1])
+        else:
+            return '{}:{}'.format(self.peer_info[0], self.peer_info[1])
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
