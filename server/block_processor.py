@@ -199,7 +199,11 @@ class BlockProcessor(server.db.DB):
                 break
             blocks = self.prefetcher.get_blocks()
             if blocks:
+                start = time.time()
                 await self.advance_blocks(blocks, touched)
+                s = '' if len(blocks) == 1 else 's'
+                self.logger.info('processed {:,d} block{} in {:.1f}s'
+                                 .format(len(blocks), s, time.time() - start))
             elif not self.caught_up:
                 self.caught_up = True
                 self.first_caught_up()

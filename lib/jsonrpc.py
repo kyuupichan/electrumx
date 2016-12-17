@@ -191,12 +191,12 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def pause_writing(self):
         '''Called by asyncio when the write buffer is full.'''
-        self.log_info('pausing writing')
+        self.log_info('pausing request processing whilst socket drains')
         self.pause = True
 
     def resume_writing(self):
         '''Called by asyncio when the write buffer has room.'''
-        self.log_info('resuming writing')
+        self.log_info('resuming request processing')
         self.pause = False
 
     def close_connection(self):
