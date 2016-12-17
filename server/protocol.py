@@ -276,7 +276,7 @@ class ServerManager(util.LoggedClass):
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
         if not 0 <= height <= self.bp.db_height:
-            raise self.RPCError('height {:,d} out of range'.format(height))
+            raise JSONRPC.RPCError('height {:,d} out of range'.format(height))
         if height in self.header_cache:
             return self.header_cache[height]
         header = self.bp.read_headers(height, 1)
