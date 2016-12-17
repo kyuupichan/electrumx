@@ -1,3 +1,14 @@
+version 0.9.11
+--------------
+
+- rework the fetch-and-process blocks loop.  This regains some of the
+  sync efficiency we lost during 0.8.x and that was poorly hacked
+  around earlier in 0.9.x.  Continuing to investigate where the rest
+  went.
+- logging of block processing times fixes #58
+- moved the peer column to the end of the sessions RPC so that IPv6 addrs
+  don't mess up the formatting
+
 ** Please don't run version 0.10.0, it will corrupt your DB.
 
 version 0.9.10
