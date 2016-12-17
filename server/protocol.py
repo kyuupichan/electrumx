@@ -183,8 +183,8 @@ class ServerManager(util.LoggedClass):
         # shutdown() assumes bp.main_loop() is first
         add_future(self.bp.main_loop(self.mempool.touched))
         add_future(self.bp.prefetcher.main_loop())
-        add_future(self.irc.start(self.bp.event))
-        add_future(self.start_servers(self.bp.event))
+        add_future(self.irc.start(self.bp.caught_up_event))
+        add_future(self.start_servers(self.bp.caught_up_event))
         add_future(self.mempool.main_loop())
         add_future(self.enqueue_delayed_sessions())
         add_future(self.notify())
@@ -307,12 +307,12 @@ class ServerManager(util.LoggedClass):
         '''Call to shutdown everything.  Returns when done.'''
         self.state = self.SHUTTING_DOWN
         self.close_servers(list(self.servers.keys()))
-        self.bp.shutdown()
         # Don't cancel the block processor main loop - let it close itself
         for future in self.futures[1:]:
             future.cancel()
         if self.sessions:
             await self.close_sessions()
+        await self.futures[0]
 
     async def close_sessions(self, secs=30):
         self.logger.info('cleanly closing client sessions, please wait...')
