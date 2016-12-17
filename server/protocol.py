@@ -408,7 +408,8 @@ class ServerManager(util.LoggedClass):
     def server_summary(self):
         '''A one-line summary of server state.'''
         return {
-            'blocks': self.bp.db_height,
+            'daemon_height': self.bp.daemon.cached_height(),
+            'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'errors': sum(s.error_count for s in self.sessions),
             'groups': len(self.groups),
@@ -416,8 +417,8 @@ class ServerManager(util.LoggedClass):
             'peers': len(self.irc.peers),
             'requests': sum(s.requests_remaining() for s in self.sessions),
             'sessions': self.session_count(),
+            'subs': self.subscription_count,
             'txs_sent': self.txs_sent,
-            'watched': self.subscription_count,
         }
 
     @staticmethod
