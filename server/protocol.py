@@ -11,6 +11,7 @@
 import asyncio
 import codecs
 import json
+import os
 import ssl
 import time
 import traceback
@@ -413,6 +414,7 @@ class ServerManager(util.LoggedClass):
             'errors': sum(s.error_count for s in self.sessions),
             'groups': len(self.groups),
             'logged': len([s for s in self.sessions if s.log_me]),
+            'pid': os.getpid(),
             'peers': len(self.irc.peers),
             'requests': sum(s.requests_remaining() for s in self.sessions),
             'sessions': self.session_count(),
