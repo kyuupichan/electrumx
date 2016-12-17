@@ -11,6 +11,7 @@
 import asyncio
 import codecs
 import json
+import os
 import ssl
 import time
 import traceback
@@ -224,10 +225,9 @@ class ServerManager(util.LoggedClass):
 
     async def start_servers(self, caught_up):
         '''Start RPC, TCP and SSL servers once caught up.'''
-        await caught_up.wait()
-
         if self.env.rpc_port is not None:
             await self.start_server('RPC', 'localhost', self.env.rpc_port)
+        await caught_up.wait()
         await self.start_external_servers()
 
     async def start_external_servers(self):
@@ -408,16 +408,18 @@ class ServerManager(util.LoggedClass):
     def server_summary(self):
         '''A one-line summary of server state.'''
         return {
-            'blocks': self.bp.db_height,
+            'daemon_height': self.bp.daemon.cached_height(),
+            'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'errors': sum(s.error_count for s in self.sessions),
             'groups': len(self.groups),
             'logged': len([s for s in self.sessions if s.log_me]),
+            'pid': os.getpid(),
             'peers': len(self.irc.peers),
             'requests': sum(s.requests_remaining() for s in self.sessions),
             'sessions': self.session_count(),
+            'subs': self.subscription_count,
             'txs_sent': self.txs_sent,
-            'watched': self.subscription_count,
         }
 
     @staticmethod
