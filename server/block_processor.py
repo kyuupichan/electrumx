@@ -235,11 +235,12 @@ class BlockProcessor(server.db.DB):
         if self.caught_up_event.is_set():
             # Flush everything as queries are performed on the DB and
             # not in-memory.
-            await asyncio.sleep(0)
             self.flush(True)
-        elif time.time() > self.next_cache_check:
-            self.check_cache_size()
-            self.next_cache_check = time.time() + 60
+        else:
+            touched.clear()
+            if time.time() > self.next_cache_check:
+                self.check_cache_size()
+                self.next_cache_check = time.time() + 60
 
         if not self.first_sync:
             s = '' if len(blocks) == 1 else 's'
