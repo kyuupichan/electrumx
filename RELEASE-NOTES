@@ -1,3 +1,13 @@
+version 0.9.12
+--------------
+
+- enchancements to RPC and logging.  getinfo output has changed, a couple
+  of fields renamed.
+  issue 77: add PID to getinfo
+  issue 78: start RPC immediately, don't wait for catch-up
+  issue 79: show IPv6 address-port combinations properly in []
+  issue 80: show DB and daemon heights in getinfo
+
 version 0.9.11
 --------------
 
