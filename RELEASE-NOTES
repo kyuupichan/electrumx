@@ -1,3 +1,11 @@
+version 0.9.13
+--------------
+
+- fix to reduce verbosity of logging of deprioritised sessions.  Sessions
+  are deprioritised if they are using high bandwidth, or if they are part
+  of a group using high bandwidth.  Previously each delayed request scheduling
+  would be logged, now only changes in the delay (up or down) are logged.
+
 version 0.9.12
 --------------
 
