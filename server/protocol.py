@@ -158,14 +158,17 @@ class ServerManager(util.LoggedClass):
         item = (priority, self.next_queue_id, session)
         self.next_queue_id += 1
 
-        secs = int(session.pause)
-        excess = priority - self.BANDS
-        if excess > 0:
-            secs = excess
-            session.log_info('delaying response to low-priority session {:d}s'
-                             .format(secs))
-        if secs:
-            self.delayed_sessions.append((time.time() + secs, item))
+        excess = max(0, priority - self.BANDS)
+        if excess != session.last_delay:
+            session.last_delay = excess
+            if excess:
+                session.log_info('high bandwidth use, deprioritizing by '
+                                 'delaying responses {:d}s'.format(excess))
+            else:
+                session.log_info('stopped delaying responses')
+        delay = max(int(session.pause), excess)
+        if delay:
+            self.delayed_sessions.append((time.time() + delay, item))
         else:
             self.queue.put_nowait(item)
 
@@ -573,6 +576,7 @@ class Session(JSONRPC):
         self.anon_logs = env.anon_logs
         self.max_send = env.max_send
         self.bandwidth_limit = env.bandwidth_limit
+        self.last_delay = 0
         self.txs_sent = 0
         self.requests = []
 
