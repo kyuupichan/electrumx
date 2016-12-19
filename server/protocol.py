@@ -79,16 +79,6 @@ class ServerManager(util.LoggedClass):
         self.futures = []
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
-        self.logger.info('max session count: {:,d}'.format(self.max_sessions))
-        self.logger.info('session timeout: {:,d} seconds'
-                         .format(env.session_timeout))
-        self.logger.info('session bandwidth limit {:,d} bytes'
-                         .format(env.bandwidth_limit))
-        self.logger.info('max response size {:,d} bytes'.format(env.max_send))
-        self.logger.info('max subscriptions across all sessions: {:,d}'
-                         .format(self.max_subs))
-        self.logger.info('max subscriptions per session: {:,d}'
-                         .format(env.max_session_subs))
 
     async def mempool_transactions(self, hash168):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -186,7 +176,7 @@ class ServerManager(util.LoggedClass):
 
         # shutdown() assumes bp.main_loop() is first
         add_future(self.bp.main_loop(self.mempool.touched))
-        add_future(self.bp.prefetcher.main_loop())
+        add_future(self.bp.prefetcher.main_loop(self.bp.caught_up_event))
         add_future(self.irc.start(self.bp.caught_up_event))
         add_future(self.start_servers(self.bp.caught_up_event))
         add_future(self.mempool.main_loop())
@@ -231,6 +221,17 @@ class ServerManager(util.LoggedClass):
         if self.env.rpc_port is not None:
             await self.start_server('RPC', 'localhost', self.env.rpc_port)
         await caught_up.wait()
+        self.logger.info('max session count: {:,d}'.format(self.max_sessions))
+        self.logger.info('session timeout: {:,d} seconds'
+                         .format(self.env.session_timeout))
+        self.logger.info('session bandwidth limit {:,d} bytes'
+                         .format(self.env.bandwidth_limit))
+        self.logger.info('max response size {:,d} bytes'
+                         .format(self.env.max_send))
+        self.logger.info('max subscriptions across all sessions: {:,d}'
+                         .format(self.max_subs))
+        self.logger.info('max subscriptions per session: {:,d}'
+                         .format(self.env.max_session_subs))
         await self.start_external_servers()
 
     async def start_external_servers(self):

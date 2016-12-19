@@ -77,7 +77,7 @@ class Prefetcher(LoggedClass):
             self.refill_event.set()
         return blocks
 
-    async def main_loop(self):
+    async def main_loop(self, caught_up_event):
         '''Loop forever polling for more blocks.'''
         daemon_height = await self.daemon.height()
         if self.fetched_height >= daemon_height:
@@ -89,7 +89,7 @@ class Prefetcher(LoggedClass):
         while True:
             try:
                 with await self.semaphore:
-                    await self._prefetch_blocks()
+                    await self._prefetch_blocks(caught_up_event.is_set())
                 await self.refill_event.wait()
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
@@ -97,13 +97,13 @@ class Prefetcher(LoggedClass):
                 await self.clear(-1)
                 return
 
-    async def _prefetch_blocks(self):
+    async def _prefetch_blocks(self, mempool):
         '''Prefetch some blocks and put them on the queue.
 
         Repeats until the queue is full or caught up.  If caught up,
         sleep for a period of time before returning.
         '''
-        daemon_height = await self.daemon.height(mempool=self.caught_up)
+        daemon_height = await self.daemon.height(mempool)
         while self.cache_size < self.min_cache_size:
             # Try and catch up all blocks but limit to room in cache.
             # Constrain fetch count to between 0 and 2500 regardless.
