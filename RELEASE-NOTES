@@ -1,3 +1,9 @@
+version 0.9.14
+--------------
+
+- don't start processing mempool until block processor has caught up.
+  Print server settings when servers start, not at startup.
+
 version 0.9.13
 --------------
 
