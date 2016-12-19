@@ -418,6 +418,7 @@ class ServerManager(util.LoggedClass):
             'errors': sum(s.error_count for s in self.sessions),
             'groups': len(self.groups),
             'logged': len([s for s in self.sessions if s.log_me]),
+            'paused': sum(s.pause for s in self.sessions),
             'pid': os.getpid(),
             'peers': len(self.irc.peers),
             'requests': sum(s.requests_remaining() for s in self.sessions),
@@ -639,7 +640,8 @@ class Session(JSONRPC):
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
         super().connection_lost(exc)
-        if self.error_count or self.send_size >= 1024*1024:
+        if (self.pause or self.manager.session_priority(self) >= 5
+                 or self.send_size >= 1024*1024 or self.error_count):
             self.log_info('disconnected.  Sent {:,d} bytes in {:,d} messages '
                           '{:,d} errors'
                           .format(self.send_size, self.send_count,
