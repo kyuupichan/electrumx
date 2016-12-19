@@ -585,8 +585,9 @@ class BlockProcessor(server.db.DB):
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
-        # touched includes those passed into this function.  That will
-        # generally be empty but is harmless if not.
+        # touched includes those passed into this function.  That likely
+        # has additional addresses which is harmless.  Remove None.
+        touched.discard(None)
         self.backup_flush(touched)
 
     def backup_txs(self, tx_hashes, txs, touched):
