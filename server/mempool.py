@@ -95,21 +95,30 @@ class MemPool(util.LoggedClass):
         await self.daemon.mempool_refresh_event.wait()
         self.logger.info ('beginning processing of daemon mempool.  '
                           'This can take some time...')
-        next_log = time.time() + 0.1
+        next_log = 0
+        loops = -1  # Zero during initial catchup
 
         while True:
+            # Avoid double notifications if processing a block
+            if self.touched and not self.processing_new_block():
+                self.touched_event.set()
+
+            # Log progress / state
+            todo = len(unfetched) + len(unprocessed)
+            if loops == 0:
+                pct = (len(txs) - todo) * 100 // len(txs) if txs else 0
+                self.logger.info('catchup {:d}% complete '
+                                 '({:,d} txs left)'.format(pct, todo))
+            if not todo:
+                loops += 1
+                now = time.time()
+                if now >= next_log and loops:
+                    self.logger.info('{:,d} txs touching {:,d} addresses'
+                                     .format(len(txs), len(self.hash168s)))
+                    next_log = now + 150
+
             try:
-                todo = len(unfetched) + len(unprocessed)
-                if todo:
-                    pct = (len(txs) - todo) * 100 // len(txs) if txs else 0
-                    self.logger.info('catchup {:d}% complete ({:,d} txs left)'
-                                     .format(pct, todo))
-                else:
-                    now = time.time()
-                    if now >= next_log:
-                        self.logger.info('{:,d} txs touching {:,d} addresses'
-                                         .format(len(txs), len(self.hash168s)))
-                        next_log = now + 150
+                if not todo:
                     self.prioritized.clear()
                     await self.daemon.mempool_refresh_event.wait()
 
@@ -123,10 +132,6 @@ class MemPool(util.LoggedClass):
 
                 if unprocessed:
                     await process_some(unprocessed)
-
-                # Avoid double notifications if processing a block
-                if self.touched and not self.processing_new_block():
-                    self.touched_event.set()
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
             except asyncio.CancelledError:
