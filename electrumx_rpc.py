@@ -25,6 +25,7 @@ class RPCClient(JSONRPC):
     def __init__(self):
         super().__init__()
         self.queue = asyncio.Queue()
+        self.max_send = 1000000
 
     def enqueue_request(self, request):
         self.queue.put_nowait(request)

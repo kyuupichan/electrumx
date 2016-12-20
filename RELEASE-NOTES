@@ -1,3 +1,9 @@
+version 0.9.16
+--------------
+
+- logging improvements, including throttling of abusive logs
+- permit large RPC requests (issue 85)
+
 version 0.9.15
 --------------
 
