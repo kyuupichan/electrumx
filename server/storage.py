@@ -87,7 +87,8 @@ class LevelDB(Storage):
         self.get = self.db.get
         self.put = self.db.put
         self.iterator = self.db.iterator
-        self.write_batch = partial(self.db.write_batch, transaction=True)
+        self.write_batch = partial(self.db.write_batch, transaction=True,
+                                   sync=True)
 
 
 class RocksDB(Storage):
@@ -105,6 +106,7 @@ class RocksDB(Storage):
                               compression + "_compression")
         options = self.module.Options(create_if_missing=create,
                                       compression=compression,
+                                      use_fsync=True,
                                       target_file_size_base=33554432,
                                       max_open_files=mof)
         self.db = self.module.DB(name, options)
