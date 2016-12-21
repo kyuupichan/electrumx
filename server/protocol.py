@@ -987,10 +987,13 @@ class ElectrumX(Session):
                 minor, revision = divmod(minor, 10000)
                 revision //= 100
                 version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
-                subversion = network_info['subversion']
-                banner = (banner.replace('$VERSION', VERSION)
-                          .replace('$DAEMON_VERSION', version)
-                          .replace('$DAEMON_SUBVERSION', subversion))
+                for pair in [
+                    ('$VERSION', VERSION),
+                    ('$DAEMON_VERSION', version),
+                    ('$DAEMON_SUBVERSION', network_info['subversion']),
+                    ('$DONATION_ADDRESS', self.env.donation_address),
+                ]:
+                    banner = banner.replace(*pair)
 
         return banner
 
