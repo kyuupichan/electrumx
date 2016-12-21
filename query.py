@@ -34,7 +34,7 @@ def count_entries(db):
     hist = 0
     for key in db.iterator(prefix=b'H', include_value=False):
         hist += 1
-    print("History addresses:", hist)
+    print("History rows:", hist)
 
 
 def main():
@@ -53,12 +53,18 @@ def main():
     for addr in sys.argv[argc:]:
         print('Address: ', addr)
         hash168 = coin.address_to_hash168(addr)
+
+        hist = 0
+        hist_len = 0
+        for key, value in bp.db.iterator(prefix=b'H'+hash168):
+            hist += 1
+            hist_len += len(value) // 4
+        print("History: {:,d} rows with {:,d} entries".format(hist, hist_len))
+
         n = None
         for n, (tx_hash, height) in enumerate(bp.get_history(hash168, limit)):
             print('History #{:d}: hash: {} height: {:d}'
                   .format(n + 1, hash_to_str(tx_hash), height))
-        if n is None:
-            print('No history')
         n = None
         for n, utxo in enumerate(bp.get_utxos(hash168, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
