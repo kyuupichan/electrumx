@@ -215,6 +215,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         refund = int(elapsed / self.bandwidth_interval * self.bandwidth_limit)
         refund = min(refund, self.bandwidth_used)
         self.bandwidth_used += amount - refund
+        self.throttled = max(0, self.throttled - int(elapsed) // 60)
 
     def data_received(self, data):
         '''Handle incoming data (synchronously).

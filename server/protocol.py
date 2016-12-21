@@ -339,7 +339,7 @@ class ServerManager(util.LoggedClass):
         group = self.groups[int(session.start - self.start) // 900]
         group.add(session)
         self.sessions[session] = group
-        session.log_info('{} from {}, {:,d} total'
+        session.log_info('{} {}, {:,d} total'
                          .format(session.kind, session.peername(),
                                  len(self.sessions)))
         if (len(self.sessions) >= self.max_sessions
@@ -920,7 +920,8 @@ class ElectrumX(Session):
         except DaemonError as e:
             error = e.args[0]
             message = error['message']
-            self.log_info('sendrawtransaction: {}'.format(message))
+            self.log_info('sendrawtransaction: {}'.format(message),
+                          throttle=True)
             if 'non-mandatory-script-verify-flag' in message:
                 return (
                     'Your client produced a transaction that is not accepted '
