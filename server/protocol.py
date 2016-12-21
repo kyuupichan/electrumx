@@ -111,7 +111,6 @@ class ServerManager(util.LoggedClass):
             limit += limit // 2
             bands.append(limit)
         self.bands = sorted(bands)
-        self.logger.info('bands: {}'.format(self.bands))
 
     def session_priority(self, session):
         if isinstance(session, LocalRPC):
@@ -119,6 +118,9 @@ class ServerManager(util.LoggedClass):
         group_bandwidth = sum(s.bandwidth_used for s in self.sessions[session])
         return 1 + (bisect_left(self.bands, session.bandwidth_used)
                     + bisect_left(self.bands, group_bandwidth) + 1) // 2
+
+    def is_deprioritized(self, session):
+        return self.session_priority(session) > self.BANDS
 
     async def enqueue_delayed_sessions(self):
         while True:
@@ -232,6 +234,7 @@ class ServerManager(util.LoggedClass):
                          .format(self.max_subs))
         self.logger.info('max subscriptions per session: {:,d}'
                          .format(self.env.max_session_subs))
+        self.logger.info('bands: {}'.format(self.bands))
         await self.start_external_servers()
 
     async def start_external_servers(self):
@@ -641,7 +644,7 @@ class Session(JSONRPC):
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
         super().connection_lost(exc)
-        if (self.pause or self.manager.session_priority(self) >= 5
+        if (self.pause or self.manager.is_deprioritized(self)
                  or self.send_size >= 1024*1024 or self.error_count):
             self.log_info('disconnected.  Sent {:,d} bytes in {:,d} messages '
                           '{:,d} errors'
