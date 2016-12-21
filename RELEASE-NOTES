@@ -1,3 +1,10 @@
+version 0.9.17
+--------------
+
+- have all the DBs use fsync on write; hopefully means DB won't corrupt in
+  case of a kernel panic (issue 75)
+- replace $DONATION_ADDRESS in banner file
+
 version 0.9.16
 --------------
 
