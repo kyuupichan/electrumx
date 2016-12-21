@@ -272,10 +272,11 @@ class ServerManager(util.LoggedClass):
                     session.enqueue_request(request)
             # Periodically log sessions
             if self.env.log_sessions and time.time() > self.next_log_sessions:
-                data = self.session_data(for_log=True)
-                for line in ServerManager.sessions_text_lines(data):
-                    self.logger.info(line)
-                self.logger.info(json.dumps(self.server_summary()))
+                if self.next_log_sessions:
+                    data = self.session_data(for_log=True)
+                    for line in ServerManager.sessions_text_lines(data):
+                        self.logger.info(line)
+                    self.logger.info(json.dumps(self.server_summary()))
                 self.next_log_sessions = time.time() + self.env.log_sessions
 
     def electrum_header(self, height):
