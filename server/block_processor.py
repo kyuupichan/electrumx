@@ -89,7 +89,9 @@ class Prefetcher(LoggedClass):
         while True:
             try:
                 with await self.semaphore:
-                    await self._prefetch_blocks(caught_up_event.is_set())
+                    fetched = await self._prefetch_blocks(caught_up_event.is_set())
+                if not fetched:
+                    await asyncio.sleep(5)
                 await self.refill_event.wait()
             except DaemonError as e:
                 self.logger.info('ignoring daemon error: {}'.format(e))
@@ -113,8 +115,7 @@ class Prefetcher(LoggedClass):
             if not count:
                 self.cache.put_nowait(([], 0))
                 self.caught_up = True
-                await asyncio.sleep(5)
-                return
+                return False
 
             first = self.fetched_height + 1
             hex_hashes = await self.daemon.block_hex_hashes(first, count)
@@ -140,7 +141,7 @@ class Prefetcher(LoggedClass):
             self.fetched_height += count
 
         self.refill_event.clear()
-
+        return True
 
 class ChainError(Exception):
     '''Raised on error processing blocks.'''

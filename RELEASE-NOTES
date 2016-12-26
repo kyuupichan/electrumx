@@ -1,3 +1,8 @@
+version 0.9.19
+--------------
+
+- move sleep outside semaphore (issue 88)
+
 version 0.9.18
 --------------
 
