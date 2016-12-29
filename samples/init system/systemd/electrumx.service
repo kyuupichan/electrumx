@@ -1,0 +1,11 @@
+[Unit]
+Description=Electrumx
+After=network.target
+
+[Service]
+EnvironmentFile=/etc/electrumx.conf
+ExecStart=/usr/local/bin/electrumx_server.py
+User=electrumx
+
+[Install]
+WantedBy=multi-user.target
