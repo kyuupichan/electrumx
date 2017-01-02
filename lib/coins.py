@@ -34,7 +34,6 @@ class Coin(object):
 
     REORG_LIMIT=200
     # Not sure if these are coin-specific
-    HEADER_LEN = 80
     RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
@@ -191,9 +190,24 @@ class Coin(object):
         return header[4:36]
 
     @classmethod
-    def read_block(cls, block):
-        '''Return a tuple (header, tx_hashes, txs) given a raw block.'''
-        header, rest = block[:cls.HEADER_LEN], block[cls.HEADER_LEN:]
+    def header_offset(cls, height):
+        '''Given a header height return its offset in the headers file.
+
+        If header sizes change at some point, this is the only code
+        that needs updating.'''
+        return height * 80
+
+    @classmethod
+    def header_len(cls, height):
+        '''Given a header height return its length.'''
+        return cls.header_offset(height + 1) - cls.header_offset(height)
+
+    @classmethod
+    def read_block(cls, block, height):
+        '''Return a tuple (header, tx_hashes, txs) given a raw block at
+        the given height.'''
+        hlen = cls.header_len(height)
+        header, rest = block[:hlen], block[hlen:]
         return (header, ) + Deserializer(rest).read_block()
 
     @classmethod

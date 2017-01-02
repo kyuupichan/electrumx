@@ -258,7 +258,7 @@ class DB(util.LoggedClass):
         assert len(hashes) // 32 == txs_done
 
         # Write the headers, tx counts, and tx hashes
-        offset = (fs_height + 1) * self.coin.HEADER_LEN
+        offset = self.coin.header_offset(fs_height + 1)
         self.headers_file.write(offset, b''.join(headers))
         offset = (fs_height + 1) * self.tx_counts.itemsize
         self.tx_counts_file.write(offset,
@@ -274,9 +274,9 @@ class DB(util.LoggedClass):
             raise self.DBError('{:,d} headers starting at {:,d} not on disk'
                                .format(count, start))
         if disk_count:
-            header_len = self.coin.HEADER_LEN
-            offset = start * header_len
-            return self.headers_file.read(offset, disk_count * header_len)
+            offset = self.coin.header_offset(start)
+            size = self.coin.header_offset(start + disk_count) - offset
+            return self.headers_file.read(offset, size)
         return b''
 
     def fs_tx_hash(self, tx_num):
@@ -288,14 +288,18 @@ class DB(util.LoggedClass):
             tx_hash = None
         else:
             tx_hash = self.hashes_file.read(tx_num * 32, 32)
-        return tx_hash, height
+        return tx_hash, tx_height
 
     def fs_block_hashes(self, height, count):
-        headers = self.read_headers(height, count)
-        # FIXME: move to coins.py
-        hlen = self.coin.HEADER_LEN
-        return [self.coin.header_hash(header)
-                for header in util.chunks(headers, hlen)]
+        headers_concat = self.read_headers(height, count)
+        offset = 0
+        headers = []
+        for n in range(count):
+            hlen = self.coin.header_len(height + n)
+            headers.append(headers_concat[offset:offset + hlen])
+            offset += hlen
+
+        return [self.coin.header_hash(header) for header in headers]
 
     @staticmethod
     def _resolve_limit(limit):

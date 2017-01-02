@@ -128,7 +128,7 @@ class Prefetcher(LoggedClass):
 
                 # Strip the unspendable genesis coinbase
                 if first == 0:
-                    blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
+                    blocks[0] = blocks[0][:self.coin.header_len(0)] + bytes(1)
 
                 # Update our recent average block size estimate
                 size = sum(len(block) for block in blocks)
@@ -503,7 +503,7 @@ class BlockProcessor(server.db.DB):
         self.tx_counts.append(prior_tx_count + len(txs))
 
     def advance_block(self, block, touched):
-        header, tx_hashes, txs = self.coin.read_block(block)
+        header, tx_hashes, txs = self.coin.read_block(block, self.height + 1)
         if self.tip != self.coin.header_prevhash(header):
             raise ChainReorg
 
@@ -562,13 +562,13 @@ class BlockProcessor(server.db.DB):
     def backup_blocks(self, blocks, touched):
         '''Backup the blocks and flush.
 
-        The blocks should be in order of decreasing height.
-        A flush is performed once the blocks are backed up.
+        The blocks should be in order of decreasing height, starting at.
+        self.height.  A flush is performed once the blocks are backed up.
         '''
         self.assert_flushed()
 
         for block in blocks:
-            header, tx_hashes, txs = self.coin.read_block(block)
+            header, tx_hashes, txs = self.coin.read_block(block, self.height)
             header_hash = self.coin.header_hash(header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} is not tip {} at height {:,d}'
