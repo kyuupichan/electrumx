@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -42,15 +42,15 @@ class IRC(LoggedClass):
                                   env.irc_nick if env.irc_nick else
                                   double_sha256(env.report_host.encode())
                                   [:5].hex())
-        self.clients.append( IrcClient(irc_address, self.nick,
-                                       env.report_host,
-                                       env.report_tcp_port,
-                                       env.report_ssl_port) )
+        self.clients.append(IrcClient(irc_address, self.nick,
+                                      env.report_host,
+                                      env.report_tcp_port,
+                                      env.report_ssl_port))
         if env.report_host_tor:
-            self.clients.append( IrcClient(irc_address, self.nick + '_tor',
-                                           env.report_host_tor,
-                                           env.report_tcp_port_tor,
-                                           env.report_ssl_port_tor) )
+            self.clients.append(IrcClient(irc_address, self.nick + '_tor',
+                                          env.report_host_tor,
+                                          env.report_tcp_port_tor,
+                                          env.report_ssl_port_tor))
 
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
@@ -76,9 +76,9 @@ class IRC(LoggedClass):
         irc_client.ServerConnection.buffer_class = \
             buffer.LenientDecodingLineBuffer
 
+        # Register handlers for events we're interested in
         reactor = irc_client.Reactor()
-        for event in ['welcome', 'join', 'quit', 'kick', 'whoreply',
-                      'namreply', 'disconnect']:
+        for event in 'welcome join quit kick whoreply disconnect'.split():
             reactor.add_global_handler(event, getattr(self, 'on_' + event))
 
         # Note: Multiple nicks in same channel will trigger duplicate events
@@ -117,9 +117,15 @@ class IRC(LoggedClass):
 
     def on_join(self, connection, event):
         '''Called when someone new connects to our channel, including us.'''
-        match = self.peer_regexp.match(event.source)
-        if match:
-            connection.who(match.group(1))
+        # /who the channel when we join.  We used to /who on each
+        # namreply event, but the IRC server would frequently kick us
+        # for flooding.  This requests only once including the tor case.
+        if event.source.startswith(self.nick + '!'):
+            connection.who(self.channel)
+        else:
+            match = self.peer_regexp.match(event.source)
+            if match:
+                connection.who(match.group(1))
 
     def on_quit(self, connection, event):
         '''Called when someone leaves our channel.'''
@@ -134,16 +140,6 @@ class IRC(LoggedClass):
         if match:
             self.peers.pop(match.group(1), None)
 
-    def on_namreply(self, connection, event):
-        '''Called repeatedly when we first connect to inform us of all users
-        in the channel.
-
-        The users are space-separated in the 2nd argument.
-        '''
-        for peer in event.arguments[2].split():
-            if peer.startswith(self.prefix):
-                connection.who(peer)
-
     def on_whoreply(self, connection, event):
         '''Called when a response to our who requests arrives.
 
@@ -152,14 +148,15 @@ class IRC(LoggedClass):
         '''
         try:
             nick = event.arguments[4]
-            line = event.arguments[6].split()
-            try:
-                ip_addr = socket.gethostbyname(line[1])
-            except socket.error:
-                # Could be .onion or IPv6.
-                ip_addr = line[1]
-            peer = self.Peer(ip_addr, line[1], line[2:])
-            self.peers[nick] = peer
+            if nick.startswith(self.prefix):
+                line = event.arguments[6].split()
+                try:
+                    ip_addr = socket.gethostbyname(line[1])
+                except socket.error:
+                    # Could be .onion or IPv6.
+                    ip_addr = line[1]
+                peer = self.Peer(ip_addr, line[1], line[2:])
+                self.peers[nick] = peer
         except (IndexError, UnicodeError):
             # UnicodeError comes from invalid domains (issue #68)
             pass

@@ -17,7 +17,8 @@ import traceback
 from functools import partial
 
 from server.env import Env
-from server.protocol import ServerManager
+from server.controller import Controller
+
 
 SUPPRESS_MESSAGES = [
     'Fatal read error on socket transport',
@@ -46,7 +47,7 @@ def main_loop():
                     'accept_connection2()' in repr(context.get('task'))):
                 loop.default_exception_handler(context)
 
-    server = ServerManager(Env())
+    server = Controller(Env())
     future = asyncio.ensure_future(server.main_loop())
 
     # Install signal handlers
