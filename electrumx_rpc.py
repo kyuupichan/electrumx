@@ -17,7 +17,7 @@ from functools import partial
 from os import environ
 
 from lib.jsonrpc import JSONRPC
-from server.protocol import ServerManager
+from server.controller import Controller
 
 
 class RPCClient(JSONRPC):
@@ -48,7 +48,7 @@ class RPCClient(JSONRPC):
 
     async def handle_response(self, result, error, method):
         if result and method in ('groups', 'sessions'):
-            for line in ServerManager.text_lines(method, result):
+            for line in Controller.text_lines(method, result):
                 print(line)
         else:
             value = {'error': error} if error else result
