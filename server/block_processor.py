@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -88,9 +88,8 @@ class Prefetcher(LoggedClass):
 
         while True:
             try:
-                with await self.semaphore:
-                    fetched = await self._prefetch_blocks(caught_up_event.is_set())
-                if not fetched:
+                # Sleep a while if there is nothing to prefetch
+                if not await self._prefetch_blocks(caught_up_event.is_set()):
                     await asyncio.sleep(5)
                 await self.refill_event.wait()
             except DaemonError as e:
@@ -106,39 +105,41 @@ class Prefetcher(LoggedClass):
         sleep for a period of time before returning.
         '''
         daemon_height = await self.daemon.height(mempool)
-        while self.cache_size < self.min_cache_size:
-            # Try and catch up all blocks but limit to room in cache.
-            # Constrain fetch count to between 0 and 2500 regardless.
-            cache_room = self.min_cache_size // self.ave_size
-            count = min(daemon_height - self.fetched_height, cache_room)
-            count = min(2500, max(count, 0))
-            if not count:
-                self.cache.put_nowait(([], 0))
-                self.caught_up = True
-                return False
+        with await self.semaphore:
+            while self.cache_size < self.min_cache_size:
+                # Try and catch up all blocks but limit to room in cache.
+                # Constrain fetch count to between 0 and 2500 regardless.
+                cache_room = self.min_cache_size // self.ave_size
+                count = min(daemon_height - self.fetched_height, cache_room)
+                count = min(2500, max(count, 0))
+                if not count:
+                    self.cache.put_nowait(([], 0))
+                    self.caught_up = True
+                    return False
 
-            first = self.fetched_height + 1
-            hex_hashes = await self.daemon.block_hex_hashes(first, count)
-            if self.caught_up:
-                self.logger.info('new block height {:,d} hash {}'
-                                 .format(first + count - 1, hex_hashes[-1]))
-            blocks = await self.daemon.raw_blocks(hex_hashes)
-            assert count == len(blocks)
+                first = self.fetched_height + 1
+                hex_hashes = await self.daemon.block_hex_hashes(first, count)
+                if self.caught_up:
+                    self.logger.info('new block height {:,d} hash {}'
+                                     .format(first + count-1, hex_hashes[-1]))
+                blocks = await self.daemon.raw_blocks(hex_hashes)
 
-            # Strip the unspendable genesis coinbase
-            if first == 0:
-                blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
+                assert count == len(blocks)
 
-            # Update our recent average block size estimate
-            size = sum(len(block) for block in blocks)
-            if count >= 10:
-                self.ave_size = size // count
-            else:
-                self.ave_size = (size + (10 - count) * self.ave_size) // 10
+                # Strip the unspendable genesis coinbase
+                if first == 0:
+                    blocks[0] = blocks[0][:self.coin.HEADER_LEN] + bytes(1)
 
-            self.cache.put_nowait((blocks, size))
-            self.cache_size += size
-            self.fetched_height += count
+                # Update our recent average block size estimate
+                size = sum(len(block) for block in blocks)
+                if count >= 10:
+                    self.ave_size = size // count
+                else:
+                    self.ave_size = (size + (10 - count) * self.ave_size) // 10
+
+                self.cache.put_nowait((blocks, size))
+                self.cache_size += size
+                self.fetched_height += count
 
         self.refill_event.clear()
         return True
