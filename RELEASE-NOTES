@@ -1,3 +1,10 @@
+version 0.9.20
+--------------
+
+- fix for IRC flood issue 93
+
+NOTE: I will soon move the RELEASE-NOTES into the README
+
 version 0.9.19
 --------------
 
