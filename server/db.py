@@ -47,11 +47,11 @@ class DB(LoggedClass):
         self.logger.info('switching current directory to {}'
                          .format(env.db_dir))
         os.chdir(env.db_dir)
-        self.logger.info('reorg limit is {:,d} blocks'
-                         .format(self.env.reorg_limit))
 
         self.db = None
         self.open_db(for_sync=False)
+        self.logger.info('reorg limit is {:,d} blocks'
+                         .format(self.env.reorg_limit))
 
         create = self.db_height == -1
         self.headers_file = self.open_file('headers', create)
@@ -88,14 +88,18 @@ class DB(LoggedClass):
             self.db.close()
 
         # Open DB and metadata files.  Record some of its state.
-        db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
-        self.db = open_db(db_name, self.env.db_engine, for_sync)
+        self.db = open_db('db', self.env.db_engine, for_sync)
         if self.db.is_new:
-            self.logger.info('created new {} database {}'
-                             .format(self.env.db_engine, db_name))
+            self.logger.info('created new {} database'
+                             .format(self.env.db_engine))
+            self.logger.info('creating metadata diretcory')
+            os.mkdir('meta')
+            with self.open_file('COIN', create=True) as f:
+                f.write('ElectrumX DB and metadata files for {} {}'
+                        .format(self.coin.NAME, self.coin.NET).encode())
         else:
-            log_reason('opened {} database {}'
-                       .format(self.env.db_engine, db_name), self.db.for_sync)
+            log_reason('opened {} database'.format(self.env.db_engine),
+                       self.db.for_sync)
 
         self.read_state()
         if self.first_sync == self.db.for_sync:
