@@ -51,7 +51,7 @@ class DB(LoggedClass):
                          .format(self.env.reorg_limit))
 
         self.db = None
-        self.reopen_db(True)
+        self.open_db(for_sync=False)
 
         create = self.db_height == -1
         self.headers_file = self.open_file('headers', create)
@@ -69,30 +69,36 @@ class DB(LoggedClass):
             assert self.db_tx_count == 0
         self.clean_db()
 
-    def reopen_db(self, first_sync):
+    def open_db(self, for_sync):
         '''Open the database.  If the database is already open, it is
-        closed (implicitly via GC) and re-opened.
+        closed and re-opened.
 
+        If for_sync is True, it is opened for sync (high number of open
+        file, etc.)
         Re-open to set the maximum number of open files appropriately.
         '''
-        if self.db:
-            self.logger.info('closing DB to re-open')
-            self.db.close()
+        def log_reason(message, is_for_sync):
+            reason = 'sync' if is_for_sync else 'serving'
+            self.logger.info('{} for {}'.format(message, reason))
 
-        max_open_files = 1024 if first_sync else 256
+        if self.db:
+            if self.db.for_sync == for_sync:
+                return
+            log_reason('closing DB to re-open', for_sync)
+            self.db.close()
 
         # Open DB and metadata files.  Record some of its state.
         db_name = '{}-{}'.format(self.coin.NAME, self.coin.NET)
-        self.db = open_db(db_name, self.env.db_engine, max_open_files)
+        self.db = open_db(db_name, self.env.db_engine, for_sync)
         if self.db.is_new:
             self.logger.info('created new {} database {}'
                              .format(self.env.db_engine, db_name))
         else:
-            self.logger.info('successfully opened {} database {} for sync: {}'
-                             .format(self.env.db_engine, db_name, first_sync))
-        self.read_state()
+            log_reason('opened {} database {}'
+                       .format(self.env.db_engine, db_name), self.db.for_sync)
 
-        if self.first_sync == first_sync:
+        self.read_state()
+        if self.first_sync == self.db.for_sync:
             self.logger.info('software version: {}'.format(VERSION))
             self.logger.info('DB version: {:d}'.format(self.db_version))
             self.logger.info('coin: {}'.format(self.coin.NAME))
@@ -104,7 +110,7 @@ class DB(LoggedClass):
                 self.logger.info('sync time so far: {}'
                                  .format(formatted_time(self.wall_time)))
         else:
-            self.reopen_db(self.first_sync)
+            self.open_db(self.first_sync)
 
     def read_state(self):
         if self.db.is_new:

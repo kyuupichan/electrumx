@@ -1,4 +1,4 @@
-# Copyright (c) 2016, the ElectrumX authors
+# Copyright (c) 2016-2017, the ElectrumX authors
 #
 # All rights reserved.
 #
@@ -31,7 +31,8 @@ class Storage(object):
 
     def __init__(self, name, for_sync):
         self.is_new = not os.path.exists(name)
-        self.open(name, create=self.is_new, for_sync=for_sync)
+        self.for_sync = for_sync or self.is_new
+        self.open(name, create=self.is_new)
 
     @classmethod
     def import_module(cls):
@@ -79,8 +80,8 @@ class LevelDB(Storage):
         import plyvel
         cls.module = plyvel
 
-    def open(self, name, create, for_sync):
-        mof = 1024 if for_sync else 256
+    def open(self, name, create):
+        mof = 1024 if self.for_sync else 256
         self.db = self.module.DB(name, create_if_missing=create,
                                  max_open_files=mof, compression=None)
         self.close = self.db.close
@@ -99,8 +100,8 @@ class RocksDB(Storage):
         import rocksdb
         cls.module = rocksdb
 
-    def open(self, name, create, for_sync):
-        mof = 1024 if for_sync else 256
+    def open(self, name, create):
+        mof = 1024 if self.for_sync else 256
         compression = "no"
         compression = getattr(self.module.CompressionType,
                               compression + "_compression")
@@ -172,7 +173,7 @@ class LMDB(Storage):
         import lmdb
         cls.module = lmdb
 
-    def open(self, name, create, for_sync):
+    def open(self, name, create):
         # I don't see anything equivalent to max_open_files for for_sync
         self.env = LMDB.module.Environment('.', subdir=True, create=create,
                                           max_dbs=32, map_size=5 * 10 ** 10)

@@ -259,7 +259,7 @@ class BlockProcessor(server.db.DB):
                                  .format(VERSION, self.height))
                 self.first_sync = False
             self.flush_state(self.db)
-            self.reopen_db(False)
+            self.open_db(for_sync=False)
             self.caught_up_event.set()
 
     async def handle_chain_reorg(self, touched, count=None):
