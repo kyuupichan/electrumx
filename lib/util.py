@@ -142,3 +142,57 @@ def increment_byte_string(bs):
         # This can only happen if all characters are 0xff
         bs = bytes([1]) + bs
     return bytes(bs)
+
+
+class LogicalFile(object):
+    '''A logical binary file split across several separate files on disk.'''
+
+    def __init__(self, prefix, digits, file_size):
+        digit_fmt = '{' + ':0{:d}d'.format(digits) + '}'
+        self.filename_fmt = prefix + digit_fmt
+        self.file_size = file_size
+
+    def read(self, start, size=-1):
+        '''Read up to size bytes from the virtual file, starting at offset
+        start, and return them.
+
+        If size is -1 all bytes are read.'''
+        parts = []
+        while size != 0:
+            try:
+                with self.open_file(start, False) as f:
+                    part = f.read(size)
+                if not part:
+                    break
+            except FileNotFoundError:
+                break
+            parts.append(part)
+            start += len(part)
+            if size > 0:
+                size -= len(part)
+        return b''.join(parts)
+
+    def write(self, start, b):
+        '''Write the bytes-like object, b, to the underlying virtual file.'''
+        while b:
+            size = min(len(b), self.file_size - (start % self.file_size))
+            with self.open_file(start, True) as f:
+                f.write(b if size == len(b) else b[:size])
+            b = b[size:]
+            start += size
+
+    def open_file(self, start, create):
+        '''Open the virtual file and seek to start.  Return a file handle.
+        Raise FileNotFoundError if the file does not exist and create
+        is False.
+        '''
+        file_num, offset = divmod(start, self.file_size)
+        filename = self.filename_fmt.format(file_num)
+        try:
+            f= open(filename, 'rb+')
+        except FileNotFoundError:
+            if not create:
+                raise
+            f = open(filename, 'wb+')
+        f.seek(offset)
+        return f
