@@ -65,11 +65,12 @@ These environment variables are optional:
 
 * **DB_ENGINE**
 
-  Database engine for the transaction database.  The default is
+  Database engine for the UTXO and history database.  The default is
   `leveldb`.  Supported alternatives are `rocksdb` and `lmdb`.  You
   will need to install the appropriate python package for your engine.
   The value is not case sensitive.  Note that the current way
-  ElectrumX uses LMDB gives poor performance .
+  ElectrumX uses LMDB results in poor performance.  I intend to improve
+  this.
 
 * **REORG_LIMIT**
 
@@ -96,8 +97,8 @@ These environment variables are optional:
 * **RPC_PORT**
 
   ElectrumX will listen on this port for local RPC connections.
-  ElectrumX listens for RPC connections unless this is explicity set
-  to blank.  It defaults appropriately for **COIN** and **NETWORK**
+  ElectrumX listens for RPC connections unless this is explicitly set
+  to blank.  The default is appropriate for **COIN** and **NETWORK**
   (e.g., 8000 for Bitcoin mainnet) if not set.
 
 * **DONATION_ADDRESS**
@@ -107,9 +108,9 @@ These environment variables are optional:
 
 * **BANNER_FILE**
 
-  The path to a banner file to serve to clients.  Relative file paths
-  must be relative to **DB_DIRECTORY**.  The banner file is re-read
-  for each new client.
+  The path to a banner file to serve to clients in Electrum's
+  "Console" tab.  Relative file paths must be relative to
+  **DB_DIRECTORY**.  The banner file is re-read for each new client.
 
   You can place several meta-variables in your banner file, which will be
   replaced before serving to a client.

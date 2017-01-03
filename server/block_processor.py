@@ -62,7 +62,7 @@ class Prefetcher(LoggedClass):
             else:
                 self.refill_event.set()
                 self.fetched_height = height
-                self.logger.info('reset to height'.format(height))
+                self.logger.info('reset to height {:,d}'.format(height))
 
     async def get_blocks(self):
         '''Return the next list of blocks from our prefetch cache.
