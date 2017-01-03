@@ -31,14 +31,17 @@ Handles JSON Electrum client connections over TCP or SSL.  One
 instance per client session.  Should be the only component concerned
 with the details of the Electrum wire protocol.
 
-Not started until the block processor has caught up with the daemon.
+Not started until the Block Processor has caught up with bitcoind.
 
 Daemon
 ------
 
 Encapsulates the RPC wire protcol with bitcoind for the whole server.
-Transparently handles temporary daemon errors, and fails over if
-necessary.
+Transparently handles temporary bitcoind connection errors, and fails
+over if necessary.
+
+Notifies the Mempool when the list of mempool transaction hashes is
+updated.
 
 
 Block Processor
@@ -49,7 +52,7 @@ transaction and undo information) and for handling block chain
 reorganisations.
 
 When caught up, processes new blocks as they are found, and flushes
-the updates to the database immediately.
+the updates to the Database immediately.
 
 When syncing uses caches for in-memory state updates since the prior
 flush.  Occasionally flushes state to the storage layer when caches
@@ -58,10 +61,10 @@ get large.
 Prefetcher
 ----------
 
-Cooperates with the block processor to asynchronously prefetch blocks
-from bitcoind.  Once it has caught up it additionally requests mempool
-transaction hashes from bitcoind.  Serves blocks to the block
-processor via a queue, and the mempool hashes to the Mempool object.
+Cooperates with the Block Processor to asynchronously prefetch blocks
+from bitcoind.  Once it has caught up it additionally asks the Daemon
+to refresh its view of bitcoind's mempool transaction hashes.  Serves
+blocks to the Block Processor via a queue.
 
 Mempool
 -------
@@ -70,14 +73,14 @@ Handles all the details of maintaining a representation of bitcoind's
 mempool state.  Obtains the list of current mempool transaction hashes
 from the Daemon when notified by the Prefetcher.
 
-Notifies the controller that addresses have been touched when the
+Notifies the Controller that addresses have been touched when the
 mempool refreshes (or implicitly when a new block is found).
 
 Database
 --------
 
-The database.  Flushed chain state is stored in the DB backend, such
-as leveldb, along with metadata on the host filesystem.
+The underlying data store, made up of the DB backend (such as
+`leveldb`) and the host filesystem.
 
 IRC
 ---
