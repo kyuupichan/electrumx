@@ -145,6 +145,11 @@ need to resync from Genesis, which is quite tolerable.
 ChangeLog
 =========
 
+Version 0.9.22
+--------------
+
+* documentation updates (ARCHITECTURE.rst, ENVIRONMENT.rst) only.
+
 Version 0.9.21
 --------------
 
