@@ -117,8 +117,9 @@ The following commands are available:
 
 * **log**
 
-  Toggles logging of the given session IDs.  Session IDs can be seen
-  in the logs or with the **sessions** RPC command.
+  Toggles logging of the given session IDs.  All incoming requests for
+  a logged session are written to the server log.  Session IDs can be
+  seen in the logs or with the **sessions** RPC command.
 
   .. code::
 
