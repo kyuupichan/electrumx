@@ -279,6 +279,10 @@ class BitcoinTestnet(Bitcoin):
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
     REORG_LIMIT = 2000
+    TX_COUNT = 12242438
+    TX_COUNT_HEIGHT = 1035428
+    TX_PER_BLOCK = 21
+    IRC_PREFIX = "ET_"
 
 
 class Litecoin(Coin):
