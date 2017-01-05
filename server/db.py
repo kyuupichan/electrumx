@@ -13,12 +13,12 @@ import ast
 import itertools
 import os
 from struct import pack, unpack
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections import namedtuple
 
 import lib.util as util
 from lib.hash import hash_to_str
-from server.storage import open_db
+from server.storage import db_class
 from server.version import VERSION
 
 
@@ -31,7 +31,7 @@ class DB(util.LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [4]
+    DB_VERSIONS = [5]
 
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
@@ -48,8 +48,13 @@ class DB(util.LoggedClass):
                          .format(env.db_dir))
         os.chdir(env.db_dir)
 
-        self.db = None
-        self.open_db(for_sync=False)
+        self.db_class = db_class(self.env.db_engine)
+        self.logger.info('using {} for DB backend'.format(self.env.db_engine))
+
+        self.utxo_db = None
+        self.open_dbs()
+        self.clean_db()
+
         self.logger.info('reorg limit is {:,d} blocks'
                          .format(self.env.reorg_limit))
 
@@ -67,67 +72,68 @@ class DB(util.LoggedClass):
             assert self.db_tx_count == self.tx_counts[-1]
         else:
             assert self.db_tx_count == 0
-        self.clean_db()
 
-    def open_db(self, for_sync):
-        '''Open the database.  If the database is already open, it is
-        closed and re-opened.
+    def open_dbs(self):
+        '''Open the databases.  If already open they are closed and re-opened.
 
-        If for_sync is True, it is opened for sync (high number of open
-        file, etc.)
-        Re-open to set the maximum number of open files appropriately.
+        When syncing we want to reserve a lot of open files for the
+        synchtonization.  When serving clients we want the open files for
+        serving network connections.
         '''
         def log_reason(message, is_for_sync):
             reason = 'sync' if is_for_sync else 'serving'
             self.logger.info('{} for {}'.format(message, reason))
 
-        if self.db:
-            if self.db.for_sync == for_sync:
-                return
-            log_reason('closing DB to re-open', for_sync)
-            self.db.close()
+        # Assume we're serving until we find out otherwise
+        for for_sync in [False, True]:
+            if self.utxo_db:
+                if self.utxo_db.for_sync == for_sync:
+                    return
+                log_reason('closing DB to re-open', for_sync)
+                self.utxo_db.close()
+                self.hist_db.close()
 
-        # Open DB and metadata files.  Record some of its state.
-        self.db = open_db('db', self.env.db_engine, for_sync)
-        if self.db.is_new:
-            self.logger.info('created new {} database'
-                             .format(self.env.db_engine))
-            self.logger.info('creating metadata diretcory')
-            os.mkdir('meta')
-            with self.open_file('COIN', create=True) as f:
-                f.write('ElectrumX DB and metadata files for {} {}'
-                        .format(self.coin.NAME, self.coin.NET).encode())
-        else:
-            log_reason('opened {} database'.format(self.env.db_engine),
-                       self.db.for_sync)
+            # Open DB and metadata files.  Record some of its state.
+            self.utxo_db = self.db_class('utxo', for_sync)
+            self.hist_db = self.db_class('hist', for_sync)
+            if self.utxo_db.is_new:
+                self.logger.info('created new database')
+                self.logger.info('creating metadata diretcory')
+                os.mkdir('meta')
+                with self.open_file('COIN', create=True) as f:
+                    f.write('ElectrumX databases and metadata for {} {}'
+                            .format(self.coin.NAME, self.coin.NET).encode())
+            else:
+                log_reason('opened DB', self.utxo_db.for_sync)
 
-        self.read_state()
-        if self.first_sync == self.db.for_sync:
-            self.logger.info('software version: {}'.format(VERSION))
-            self.logger.info('DB version: {:d}'.format(self.db_version))
-            self.logger.info('coin: {}'.format(self.coin.NAME))
-            self.logger.info('network: {}'.format(self.coin.NET))
-            self.logger.info('height: {:,d}'.format(self.db_height))
-            self.logger.info('tip: {}'.format(hash_to_str(self.db_tip)))
-            self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
-            if self.first_sync:
-                self.logger.info('sync time so far: {}'
-                                 .format(util.formatted_time(self.wall_time)))
-        else:
-            self.open_db(self.first_sync)
+            self.read_utxo_state()
+            if self.first_sync == self.utxo_db.for_sync:
+                break
 
-    def read_state(self):
-        if self.db.is_new:
+        self.read_history_state()
+
+        self.logger.info('software version: {}'.format(VERSION))
+        self.logger.info('DB version: {:d}'.format(self.db_version))
+        self.logger.info('coin: {}'.format(self.coin.NAME))
+        self.logger.info('network: {}'.format(self.coin.NET))
+        self.logger.info('height: {:,d}'.format(self.db_height))
+        self.logger.info('tip: {}'.format(hash_to_str(self.db_tip)))
+        self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
+        if self.first_sync:
+            self.logger.info('sync time so far: {}'
+                             .format(util.formatted_time(self.wall_time)))
+
+    def read_utxo_state(self):
+        if self.utxo_db.is_new:
             self.db_height = -1
             self.db_tx_count = 0
             self.db_tip = b'\0' * 32
             self.db_version = max(self.DB_VERSIONS)
-            self.flush_count = 0
             self.utxo_flush_count = 0
             self.wall_time = 0
             self.first_sync = True
         else:
-            state = self.db.get(b'state')
+            state = self.utxo_db.get(b'state')
             if state:
                 state = ast.literal_eval(state.decode())
             if not isinstance(state, dict):
@@ -144,22 +150,17 @@ class DB(util.LoggedClass):
             self.db_height = state['height']
             self.db_tx_count = state['tx_count']
             self.db_tip = state['tip']
-            self.flush_count = state['flush_count']
             self.utxo_flush_count = state['utxo_flush_count']
             self.wall_time = state['wall_time']
             self.first_sync = state['first_sync']
 
-        if self.flush_count < self.utxo_flush_count:
-            raise self.DBError('DB corrupt: flush_count < utxo_flush_count')
-
     def write_state(self, batch):
-        '''Write chain state to the batch.'''
+        '''Write (UTXO) state to the batch.'''
         state = {
             'genesis': self.coin.GENESIS_HASH,
             'height': self.db_height,
             'tx_count': self.db_tx_count,
             'tip': self.db_tip,
-            'flush_count': self.flush_count,
             'utxo_flush_count': self.utxo_flush_count,
             'wall_time': self.wall_time,
             'first_sync': self.first_sync,
@@ -174,48 +175,28 @@ class DB(util.LoggedClass):
         recent UTXO flush (only happens on unclean shutdown), and aged
         undo information.
         '''
+        if self.flush_count < self.utxo_flush_count:
+            raise self.DBError('DB corrupt: flush_count < utxo_flush_count')
         if self.flush_count > self.utxo_flush_count:
-            self.utxo_flush_count = self.flush_count
-            self.logger.info('DB shut down uncleanly.  Scanning for '
-                             'excess history flushes...')
-            history_keys = self.excess_history_keys()
-            self.logger.info('deleting {:,d} history entries'
-                             .format(len(history_keys)))
-        else:
-            history_keys = []
+            self.clear_excess_history(self.utxo_flush_count)
 
-        undo_keys = self.stale_undo_keys()
-        if undo_keys:
-            self.logger.info('deleting {:,d} stale undo entries'
-                             .format(len(undo_keys)))
-
-        with self.db.write_batch() as batch:
-            batch_delete = batch.delete
-            for key in history_keys:
-                batch_delete(key)
-            for key in undo_keys:
-                batch_delete(key)
-            self.write_state(batch)
-
-    def excess_history_keys(self):
-        prefix = b'H'
-        keys = []
-        for key, hist in self.db.iterator(prefix=prefix):
-            flush_id, = unpack('>H', key[-2:])
-            if flush_id > self.utxo_flush_count:
-                keys.append(key)
-        return keys
-
-    def stale_undo_keys(self):
+        # Remove stale undo information
         prefix = b'U'
         cutoff = self.db_height - self.env.reorg_limit
         keys = []
-        for key, hist in self.db.iterator(prefix=prefix):
+        for key, hist in self.utxo_db.iterator(prefix=prefix):
             height, = unpack('>I', key[-4:])
             if height > cutoff:
                 break
             keys.append(key)
-        return keys
+        if keys:
+            self.logger.info('deleting {:,d} stale undo entries'
+                             .format(len(keys)))
+
+            with self.utxo_db.write_batch() as batch:
+                for key in keys:
+                    batch.delete(key)
+                self.write_state(batch)
 
     def undo_key(self, height):
         '''DB key for undo information at the given height.'''
@@ -223,11 +204,11 @@ class DB(util.LoggedClass):
 
     def write_undo_info(self, height, undo_info):
         '''Write out undo information for the current height.'''
-        self.db.put(self.undo_key(height), undo_info)
+        self.utxo_db.put(self.undo_key(height), undo_info)
 
     def read_undo_info(self, height):
         '''Read undo information from a file for the current height.'''
-        return self.db.get(self.undo_key(height))
+        return self.utxo_db.get(self.undo_key(height))
 
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
@@ -308,24 +289,6 @@ class DB(util.LoggedClass):
         assert isinstance(limit, int) and limit >= 0
         return limit
 
-    def get_history(self, hashX, limit=1000):
-        '''Generator that returns an unpruned, sorted list of (tx_hash,
-        height) tuples of confirmed transactions that touched the address,
-        earliest in the blockchain first.  Includes both spending and
-        receiving transactions.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
-        '''
-        limit = self._resolve_limit(limit)
-        prefix = b'H' + hashX
-        for key, hist in self.db.iterator(prefix=prefix):
-            a = array.array('I')
-            a.frombytes(hist)
-            for tx_num in a:
-                if limit == 0:
-                    return
-                yield self.fs_tx_hash(tx_num)
-                limit -= 1
-
     def get_balance(self, hashX):
         '''Returns the confirmed balance of an address.'''
         return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
@@ -340,7 +303,7 @@ class DB(util.LoggedClass):
         # Key: b'u' + address_hashX + tx_idx + tx_num
         # Value: the UTXO value as a 64-bit unsigned integer
         prefix = b'u' + hashX
-        for db_key, db_value in self.db.iterator(prefix=prefix):
+        for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
             if limit == 0:
                 return
             limit -= 1
@@ -358,7 +321,7 @@ class DB(util.LoggedClass):
         prefix = b'h' + tx_hash[:4] + idx_packed
 
         # Find which entry, if any, the TX_HASH matches.
-        for db_key, hashX in self.db.iterator(prefix=prefix):
+        for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
             tx_num_packed = db_key[-4:]
             tx_num, = unpack('<I', tx_num_packed)
             hash, height = self.fs_tx_hash(tx_num)
@@ -383,9 +346,103 @@ class DB(util.LoggedClass):
         # Key: b'u' + address_hashX + tx_idx + tx_num
         # Value: the UTXO value as a 64-bit unsigned integer
         key = b'u' + hashX + idx_packed + tx_num_packed
-        db_value = self.db.get(key)
+        db_value = self.utxo_db.get(key)
         if not db_value:
             raise self.DBError('UTXO {} / {:,d} in one table only'
                                .format(hash_to_str(tx_hash), tx_idx))
         value, = unpack('<Q', db_value)
         return hashX, value
+
+    # -- History database
+
+    def clear_excess_history(self, flush_count):
+        self.logger.info('DB shut down uncleanly.  Scanning for '
+                         'excess history flushes...')
+
+        keys = []
+        for key, hist in self.hist_db.iterator(prefix=b''):
+            flush_id, = unpack('>H', key[-2:])
+            if flush_id > flush_count:
+                keys.append(key)
+
+        self.logger.info('deleting {:,d} history entries'.format(len(keys)))
+
+        self.flush_count = flush_count
+        with self.hist_db.write_batch() as batch:
+            for key in keys:
+                batch.delete(key)
+            self.write_history_state(batch)
+
+        self.logger.info('deleted excess history entries')
+
+    def write_history_state(self, batch):
+        state = {'flush_count': self.flush_count}
+        # History entries are not prefixed; the suffix \0\0 ensures we
+        # look similar to other entries and aren't interfered with
+        batch.put(b'state\0\0', repr(state).encode())
+
+    def read_history_state(self):
+        state = self.hist_db.get(b'state\0\0')
+        if state:
+            state = ast.literal_eval(state.decode())
+            if not isinstance(state, dict):
+                raise self.DBError('failed reading state from history DB')
+            self.flush_count = state['flush_count']
+        else:
+            self.flush_count = 0
+
+    def flush_history(self, history):
+        self.flush_count += 1
+        flush_id = pack('>H', self.flush_count)
+
+        with self.hist_db.write_batch() as batch:
+            for hashX in sorted(history):
+                key = hashX + flush_id
+                batch.put(key, history[hashX].tobytes())
+            self.write_history_state(batch)
+
+    def backup_history(self, hashXs):
+        # Not certain this is needed, but it doesn't hurt
+        self.flush_count += 1
+        nremoves = 0
+
+        with self.hist_db.write_batch() as batch:
+            for hashX in sorted(hashXs):
+                deletes = []
+                puts = {}
+                for key, hist in self.hist_db.iterator(prefix=hashX,
+                                                       reverse=True):
+                    a = array.array('I')
+                    a.frombytes(hist)
+                    # Remove all history entries >= self.tx_count
+                    idx = bisect_left(a, self.tx_count)
+                    nremoves += len(a) - idx
+                    if idx > 0:
+                        puts[key] = a[:idx].tobytes()
+                        break
+                    deletes.append(key)
+
+                for key in deletes:
+                    batch.delete(key)
+                for key, value in puts.items():
+                    batch.put(key, value)
+            self.write_history_state(batch)
+
+        return nremoves
+
+    def get_history(self, hashX, limit=1000):
+        '''Generator that returns an unpruned, sorted list of (tx_hash,
+        height) tuples of confirmed transactions that touched the address,
+        earliest in the blockchain first.  Includes both spending and
+        receiving transactions.  By default yields at most 1000 entries.
+        Set limit to None to get them all.
+        '''
+        limit = self._resolve_limit(limit)
+        for key, hist in self.hist_db.iterator(prefix=hashX):
+            a = array.array('I')
+            a.frombytes(hist)
+            for tx_num in a:
+                if limit == 0:
+                    return
+                yield self.fs_tx_hash(tx_num)
+                limit -= 1

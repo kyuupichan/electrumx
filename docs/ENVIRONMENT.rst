@@ -260,34 +260,29 @@ Cache
 -----
 
 If synchronizing from the Genesis block your performance might change
-by tweaking the following cache variables.  Cache size is only checked
-roughly every minute, so the caches can grow beyond the specified
-size.  Also the Python process is often quite a bit fatter than the
-combined cache size, because of Python overhead and also because
-leveldb consumes a lot of memory during UTXO flushing.  So I recommend
-you set the sum of these to nothing over half your available physical
-RAM:
+by tweaking the cache size.  Cache size is only checked roughly every
+minute, so the cache can grow beyond the specified size.  Moreover,
+the Python process is often quite a bit fatter than the cache size,
+because of Python overhead and also because leveldb consumes a lot of
+memory when flushing.  So I recommend you do not set this over 60% of
+your available physical RAM:
 
-* **HIST_MB**
+* **CACHE_MB**
 
-  The amount of history cache, in MB, to retain before flushing to
-  disk.  Default is 300; probably no benefit being much larger as
-  history is append-only and not searched.
+  The amount of cache, in MB, to use.  The default is 1,200.
 
-  I do not recommend setting this above 500.
+  A portion of the cache is reserved for unflushed history, which is
+  written out frequently.  The bulk is used to cache UTXOs.
 
-* **UTXO_MB**
+  Larger caches probably increase performance a little as there is
+  significant searching of the UTXO cache during indexing.  However, I
+  don't see much benefit in my tests pushing this too high, and in
+  fact performance begins to fall, probably because LevelDB already
+  caches, and also because of Python GC.
 
-  The amount of UTXO and history cache, in MB, to retain before
-  flushing to disk.  Default is 1000.  This may be too large for small
-  boxes or too small for machines with lots of RAM.  Larger caches
-  generally perform better as there is significant searching of the
-  UTXO cache during indexing.  However, I don't see much benefit in my
-  tests pushing this too high, and in fact performance begins to fall.
-  My machine has 24GB RAM; the slow down is probably because of
-  leveldb caching and Python GC effects.
-
-  I do not recommend setting this above 2000.
+  I do not recommend raising this above 2000.  If upgrading from prior
+  versions, a value of 90% of the sum of the old UTXO_MB and HIST_MB
+  variables is roughly equivalent.
 
 Debugging
 ---------
@@ -297,9 +292,12 @@ The following are for debugging purposes:
 * **FORCE_REORG**
 
   If set to a positive integer, it will simulate a reorg of the
-  blockchain for that number of blocks on startup.  Although it should
-  fail gracefully if set to a value greater than **REORG_LIMIT**, I do
-  not recommend it as I have not tried it and there is a chance your
-  DB might corrupt.
+  blockchain for that number of blocks on startup.  You must have
+  synced before using this, otherwise there will be no undo
+  information.
+
+  Although it should fail gracefully if set to a value greater than
+  **REORG_LIMIT**, I do not recommend it as I have not tried it and
+  there is a chance your DB might corrupt.
 
 .. _lib/coins.py: https://github.com/kyuupichan/electrumx/blob/master/lib/coins.py

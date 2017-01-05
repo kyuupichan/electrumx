@@ -15,15 +15,13 @@ from functools import partial
 
 from lib.util import subclasses, increment_byte_string
 
-
-def open_db(name, db_engine, for_sync):
-    '''Returns a database handle.'''
+def db_class(name):
+    '''Returns a DB engine class.'''
     for db_class in subclasses(Storage):
-        if db_class.__name__.lower() == db_engine.lower():
+        if db_class.__name__.lower() == name.lower():
             db_class.import_module()
-            return db_class(name, for_sync)
-
-    raise RuntimeError('unrecognised DB engine "{}"'.format(db_engine))
+            return db_class
+    raise RuntimeError('unrecognised DB engine "{}"'.format(name))
 
 
 class Storage(object):
@@ -81,7 +79,7 @@ class LevelDB(Storage):
         cls.module = plyvel
 
     def open(self, name, create):
-        mof = 1024 if self.for_sync else 256
+        mof = 512 if self.for_sync else 128
         self.db = self.module.DB(name, create_if_missing=create,
                                  max_open_files=mof, compression=None)
         self.close = self.db.close
@@ -101,7 +99,7 @@ class RocksDB(Storage):
         cls.module = rocksdb
 
     def open(self, name, create):
-        mof = 1024 if self.for_sync else 256
+        mof = 512 if self.for_sync else 128
         compression = "no"
         compression = getattr(self.module.CompressionType,
                               compression + "_compression")

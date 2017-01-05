@@ -20,23 +20,23 @@ from server.db import DB
 from lib.hash import hash_to_str
 
 
-def count_entries(db):
+def count_entries(hist_db, utxo_db):
     utxos = 0
-    for key in db.iterator(prefix=b'u', include_value=False):
+    for key in utxo_db.iterator(prefix=b'u', include_value=False):
         utxos += 1
     print("UTXO count:", utxos)
 
     hashX = 0
-    for key in db.iterator(prefix=b'h', include_value=False):
+    for key in utxo_db.iterator(prefix=b'h', include_value=False):
         hashX += 1
     print("HashX count:", hashX)
 
     hist = 0
     hist_len = 0
-    for key, value in db.iterator(prefix=b'H'):
+    for key, value in hist_db.iterator(prefix=b'H'):
         hist += 1
         hist_len += len(value) // 4
-    print("History rows {:,d} entries {:,d}", hist, hist_len)
+    print("History rows {:,d} entries {:,d}".format(hist, hist_len))
 
 
 def main():
@@ -44,7 +44,7 @@ def main():
     bp = DB(env)
     coin = env.coin
     if len(sys.argv) == 1:
-        count_entries(bp.db)
+        count_entries(bp.hist_db, bp.utxo_db)
         return
     argc = 1
     try:
