@@ -89,7 +89,7 @@ class MemPool(util.LoggedClass):
         unprocessed = {}
         unfetched = set()
         txs = self.txs
-        fetch_size = 400
+        fetch_size = 800
         process_some = self.async_process_some(unfetched, fetch_size // 2)
 
         await self.daemon.mempool_refresh_event.wait()

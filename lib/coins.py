@@ -278,6 +278,8 @@ class BitcoinTestnet(Bitcoin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+    GENESIS_HASH=(b'000000000933ea01ad0ee984209779ba'
+                  b'aec3ced90fa3f408719526f8d77f4943')
     REORG_LIMIT = 2000
     TX_COUNT = 12242438
     TX_COUNT_HEIGHT = 1035428
