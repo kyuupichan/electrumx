@@ -301,6 +301,8 @@ class BitcoinTestnetSegWit(BitcoinTestnet):
     differently than with earlier versions.  If you are using such a
     bitcoind on testnet, you must use this class as your "COIN".
     '''
+    NET = "testnet-segwit"
+
     @classmethod
     def deserializer(cls):
         return DeserializerSegWit

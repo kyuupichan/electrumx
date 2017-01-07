@@ -31,7 +31,7 @@ These environment variables are always required:
 
   The leading `http://` is optional, as is the trailing slash.  The
   `:port` part is also optional and will default to the standard RPC
-  port for **COIN** and **NETWORK** if omitted.
+  port for **COIN** and **NET** if omitted.
 
 
 For the `run` script
@@ -58,7 +58,7 @@ These environment variables are optional:
   Must be a *NAME* from one of the **Coin** classes in
   `lib/coins.py`_.  Defaults to `Bitcoin`.
 
-* **NETWORK**
+* **NET**
 
   Must be a *NET* from one of the **Coin** classes in `lib/coins.py`_.
   Defaults to `mainnet`.
@@ -77,7 +77,7 @@ These environment variables are optional:
   The maximum number of blocks to be able to handle in a chain
   reorganisation.  ElectrumX retains some fairly compact undo
   information for this many blocks in levelDB.  The default is a
-  function of **COIN** and **NETWORK**; for Bitcoin mainnet it is 200.
+  function of **COIN** and **NET**; for Bitcoin mainnet it is 200.
 
 * **HOST**
 
@@ -98,7 +98,7 @@ These environment variables are optional:
 
   ElectrumX will listen on this port for local RPC connections.
   ElectrumX listens for RPC connections unless this is explicitly set
-  to blank.  The default is appropriate for **COIN** and **NETWORK**
+  to blank.  The default is appropriate for **COIN** and **NET**
   (e.g., 8000 for Bitcoin mainnet) if not set.
 
 * **DONATION_ADDRESS**
@@ -223,7 +223,7 @@ connectivity on IRC:
 
   The nick to use when connecting to IRC.  The default is a hash of
   **REPORT_HOST**.  Either way a prefix will be prepended depending on
-  **COIN** and **NETWORK**.
+  **COIN** and **NET**.
 
 * **REPORT_HOST**
 
