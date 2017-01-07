@@ -145,6 +145,12 @@ need to resync from Genesis, which is quite tolerable.
 ChangeLog
 =========
 
+Version 0.9.23
+--------------
+
+* Includes what should be a fix for issue `#94#` - stale references to
+  old sessions.  This would effectively memory and network handles.
+
 Version 0.9.22
 --------------
 
@@ -312,4 +318,5 @@ Version 0.9.0
 .. _#88: https://github.com/kyuupichan/electrumx/issues/88
 .. _#89: https://github.com/kyuupichan/electrumx/issues/89
 .. _#93: https://github.com/kyuupichan/electrumx/issues/93
+.. _#94: https://github.com/kyuupichan/electrumx/issues/94
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
