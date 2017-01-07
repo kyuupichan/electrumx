@@ -142,13 +142,19 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.1
+--------------
+
+* Includes what should be a fix for issue `#94#` - stale references to
+  old sessions.  This would effectively memory and network handles.
+
 Version 0.10.0
 --------------
 
-Major rewrite of DB layer as per issue `#72`_.  UTXOs and history are
-now indexed by the hash of the pay to script, making the index
-independent of the address scheme.  The history and UTXO DBs are also
-now separate.
+* Major rewrite of DB layer as per issue `#72`_.  UTXOs and history
+  are now indexed by the hash of the pay to script, making the index
+  independent of the address scheme.
+* The history and UTXO DBs are also now separate.
 
 Together these changes reduce the size of the DB by approximately 15%
 and the time taken to sync from genesis by about 20%.
@@ -329,4 +335,5 @@ Version 0.9.0
 .. _#88: https://github.com/kyuupichan/electrumx/issues/88
 .. _#89: https://github.com/kyuupichan/electrumx/issues/89
 .. _#93: https://github.com/kyuupichan/electrumx/issues/93
+.. _#94: https://github.com/kyuupichan/electrumx/issues/94
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
