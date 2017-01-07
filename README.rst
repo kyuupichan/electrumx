@@ -167,6 +167,12 @@ variables to use roughly the same amount of memory.
 For now this code should be considered experimental; if you want
 stability please stick with the 0.9 series.
 
+Version 0.9.23
+--------------
+
+* Backport of the fix for issue `#94#` - stale references to old
+  sessions.  This would effectively memory and network handles.
+
 Version 0.9.22
 --------------
 
