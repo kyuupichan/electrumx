@@ -115,8 +115,6 @@ Roadmap Pre-1.0
 ===============
 
 - minor code cleanups.
-- there will be a DB format change to index the DB in a way purely
-  dependent on the script and not on address prefix
 - support bitcoin testnet with Satoshi bitcoind 0.13.1
 - implement simple protocol to discover peers without resorting to IRC.
   This may slip to post 1.0
@@ -137,13 +135,31 @@ Roadmap Post-1.0
 Database Format
 ===============
 
-The database and metadata format of ElectrumX is very likely to change
-prior to 1.0 release.  Existing DBs will not be unusable and you will
-need to resync from Genesis, which is quite tolerable.
+The database format of ElectrumX is unlikely to change from the 0.10.0
+version prior to the release of 1.0.
 
 
 ChangeLog
 =========
+
+Version 0.10.0
+--------------
+
+Major rewrite of DB layer as per issue `#72`_.  UTXOs and history are
+now indexed by the hash of the pay to script, making the index
+independent of the address scheme.  The history and UTXO DBs are also
+now separate.
+
+Together these changes reduce the size of the DB by approximately 15%
+and the time taken to sync from genesis by about 20%.
+
+Note the **UTXO_MB** and **HIST_MB** environment variables have been
+removed and replaced with the single environment variable
+**CACHE_MB**.  I suggest you set this to 90% of the sum of the old
+variables to use roughly the same amount of memory.
+
+For now this code should be considered experimental; if you want
+stability please stick with the 0.9 series.
 
 Version 0.9.22
 --------------
@@ -308,6 +324,7 @@ Version 0.9.0
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 
+.. _#72: https://github.com/kyuupichan/electrumx/issues/72
 .. _#75: https://github.com/kyuupichan/electrumx/issues/75
 .. _#88: https://github.com/kyuupichan/electrumx/issues/88
 .. _#89: https://github.com/kyuupichan/electrumx/issues/89
