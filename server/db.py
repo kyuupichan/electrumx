@@ -142,7 +142,11 @@ class DB(util.LoggedClass):
                 raise self.DBError('your DB version is {} but this software '
                                    'only handles versions {}'
                                    .format(self.db_version, self.DB_VERSIONS))
-            if state['genesis'] != self.coin.GENESIS_HASH:
+            # backwards compat
+            genesis_hash = state['genesis']
+            if isinstance(genesis_hash, bytes):
+                genesis_hash = genesis_hash.decode()
+            if genesis_hash != self.coin.GENESIS_HASH:
                 raise self.DBError('DB genesis hash {} does not match coin {}'
                                    .format(state['genesis_hash'],
                                            self.coin.GENESIS_HASH))

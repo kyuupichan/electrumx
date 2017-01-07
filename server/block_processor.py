@@ -125,9 +125,11 @@ class Prefetcher(LoggedClass):
 
                 assert count == len(blocks)
 
-                # Strip the unspendable genesis coinbase
+                # Special handling for genesis block
                 if first == 0:
-                    blocks[0] = blocks[0][:self.coin.header_len(0)] + bytes(1)
+                    blocks[0] = self.coin.genesis_block(blocks[0])
+                    self.logger.info('verified genesis block with hash {}'
+                                     .format(hex_hashes[0]))
 
                 # Update our recent average block size estimate
                 size = sum(len(block) for block in blocks)
