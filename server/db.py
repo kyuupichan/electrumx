@@ -10,7 +10,6 @@
 
 import array
 import ast
-import itertools
 import os
 from struct import pack, unpack
 from bisect import bisect_left, bisect_right
@@ -234,7 +233,7 @@ class DB(util.LoggedClass):
 
         assert len(self.tx_hashes) == blocks_done
         assert len(self.tx_counts) == new_height + 1
-        hashes = b''.join(itertools.chain(*block_tx_hashes))
+        hashes = b''.join(block_tx_hashes)
         assert len(hashes) % 32 == 0
         assert len(hashes) // 32 == txs_done
 

@@ -21,7 +21,7 @@ import sys
 
 from lib.hash import Base58, hash160, ripemd160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
-from lib.tx import Deserializer
+from lib.tx import Deserializer, DeserializerSegWit
 from lib.util import cachedproperty, subclasses
 
 
@@ -204,11 +204,14 @@ class Coin(object):
 
     @classmethod
     def read_block(cls, block, height):
-        '''Return a tuple (header, tx_hashes, txs) given a raw block at
-        the given height.'''
+        '''Returns a pair (header, tx_list) given a raw block and height.
+
+        tx_list is a list of (deserialized_tx, tx_hash) pairs.
+        '''
+        deserializer = cls.deserializer()
         hlen = cls.header_len(height)
         header, rest = block[:hlen], block[hlen:]
-        return (header, ) + Deserializer(rest).read_block()
+        return (header, deserializer(rest).read_block())
 
     @classmethod
     def decimal_value(cls, value):
@@ -233,6 +236,10 @@ class Coin(object):
             'bits': bits,
             'nonce': nonce,
         }
+
+    @classmethod
+    def deserializer(cls):
+        return Deserializer
 
 
 class Bitcoin(Coin):
@@ -269,6 +276,19 @@ class BitcoinTestnet(Bitcoin):
     TX_COUNT_HEIGHT = 1035428
     TX_PER_BLOCK = 21
     IRC_PREFIX = "ET_"
+
+
+class BitcoinTestnetSegWit(BitcoinTestnet):
+    '''Bitcoin Testnet for Core bitcoind >= 0.13.1.
+
+    Unfortunately 0.13.1 broke backwards compatibility of the RPC
+    interface's TX serialization, SegWit transactions serialize
+    differently than with earlier versions.  If you are using such a
+    bitcoind on testnet, you must use this class as your "COIN".
+    '''
+    @classmethod
+    def deserializer(cls):
+        return DeserializerSegWit
 
 
 class Litecoin(Coin):
