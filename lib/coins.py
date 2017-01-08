@@ -426,6 +426,7 @@ class DashTestnet(Dash):
     RPC_PORT = 19998
     IRC_PREFIX = "d_"
 
+
 class Argentum(Coin):
     NAME = "Argentum"
     SHORTNAME = "ARG"
@@ -442,7 +443,8 @@ class Argentum(Coin):
     TX_PER_BLOCK = 2000
     IRC_PREFIX = "A_"
     IRC_CHANNEL = "#electrum-arg"
-    RPC_PORT = 13580
+    RPC_PORT = 13581
+
 
 class ArgentumTestnet(Argentum):
    SHORTNAME = "XRG"
@@ -453,6 +455,7 @@ class ArgentumTestnet(Argentum):
    P2SH_VERBYTE = 0xc4
    WIF_BYTE = 0xef
    REORG_LIMIT = 2000
+
 
 class DigiByte(Coin):
     NAME = "DigiByte"
@@ -470,11 +473,10 @@ class DigiByte(Coin):
     TX_PER_BLOCK = 1000
     IRC_PREFIX = "DE_"
     IRC_CHANNEL = "#electrum-dgb"
-    RPC_PORT = 12024
+    RPC_PORT = 12022
 
 
 class DigiByteTestnet(DigiByte):
-    SHORTNAME = "DGB"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
@@ -485,5 +487,5 @@ class DigiByteTestnet(DigiByte):
                   'e2a444af34c447dbd0916fa3430a68c2')
     IRC_PREFIX = "DET_"
     IRC_CHANNEL = "#electrum-dgb"
-    RPC_PORT = 13024
+    RPC_PORT = 15022
     REORG_LIMIT = 2000

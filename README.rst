@@ -141,6 +141,11 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.3
+--------------
+
+* add Argentum and Digibyte support to coins.py (protonn)
+
 Version 0.10.2
 --------------
 
