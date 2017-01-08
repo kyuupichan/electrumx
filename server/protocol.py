@@ -14,7 +14,6 @@ import traceback
 
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 from lib.jsonrpc import JSONRPC
-from lib.tx import Deserializer
 from server.daemon import DaemonError
 from server.version import VERSION
 
@@ -427,7 +426,8 @@ class ElectrumX(Session):
             if not raw_tx:
                 return None
             raw_tx = bytes.fromhex(raw_tx)
-            tx = Deserializer(raw_tx).read_tx()
+            deserializer = self.coin.deserializer()
+            tx, tx_hash = deserializer(raw_tx).read_tx()
             if index >= len(tx.outputs):
                 return None
             return self.coin.address_from_script(tx.outputs[index].pk_script)

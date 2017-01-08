@@ -22,9 +22,9 @@ class Env(LoggedClass):
 
     def __init__(self):
         super().__init__()
-        self.obsolete(['UTXO_MB', 'HIST_MB'])
+        self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
         coin_name = self.default('COIN', 'Bitcoin')
-        network = self.default('NETWORK', 'mainnet')
+        network = self.default('NET', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.db_dir = self.required('DB_DIRECTORY')
         self.cache_MB = self.integer('CACHE_MB', 1200)

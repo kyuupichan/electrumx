@@ -125,9 +125,11 @@ class Prefetcher(LoggedClass):
 
                 assert count == len(blocks)
 
-                # Strip the unspendable genesis coinbase
+                # Special handling for genesis block
                 if first == 0:
-                    blocks[0] = blocks[0][:self.coin.header_len(0)] + bytes(1)
+                    blocks[0] = self.coin.genesis_block(blocks[0])
+                    self.logger.info('verified genesis block with hash {}'
+                                     .format(hex_hashes[0]))
 
                 # Update our recent average block size estimate
                 size = sum(len(block) for block in blocks)
@@ -444,7 +446,9 @@ class BlockProcessor(server.db.DB):
         utxo_cache_size = len(self.utxo_cache) * 205
         db_deletes_size = len(self.db_deletes) * 57
         hist_cache_size = len(self.history) * 180 + self.history_size * 4
-        tx_hash_size = (self.tx_count - self.fs_tx_count) * 74
+        # Roughly ntxs * 32 + nblocks * 42
+        tx_hash_size = ((self.tx_count - self.fs_tx_count) * 32
+                        + (self.height - self.fs_height) * 42)
         utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
         hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
@@ -458,28 +462,28 @@ class BlockProcessor(server.db.DB):
         if utxo_MB + hist_MB >= self.cache_MB or hist_MB >= self.cache_MB // 5:
             self.flush(utxo_MB >= self.cache_MB * 4 // 5)
 
-    def fs_advance_block(self, header, tx_hashes, txs):
+    def fs_advance_block(self, header, txs):
         '''Update unflushed FS state for a new block.'''
         prior_tx_count = self.tx_counts[-1] if self.tx_counts else 0
 
         # Cache the new header, tx hashes and cumulative tx count
         self.headers.append(header)
-        self.tx_hashes.append(tx_hashes)
+        self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
         self.tx_counts.append(prior_tx_count + len(txs))
 
     def advance_block(self, block, touched):
-        header, tx_hashes, txs = self.coin.read_block(block, self.height + 1)
+        header, txs = self.coin.read_block(block, self.height + 1)
         if self.tip != self.coin.header_prevhash(header):
             raise ChainReorg
 
-        self.fs_advance_block(header, tx_hashes, txs)
+        self.fs_advance_block(header, txs)
         self.tip = self.coin.header_hash(header)
         self.height += 1
-        undo_info = self.advance_txs(tx_hashes, txs, touched)
+        undo_info = self.advance_txs(txs, touched)
         if self.daemon.cached_height() - self.height <= self.env.reorg_limit:
             self.write_undo_info(self.height, b''.join(undo_info))
 
-    def advance_txs(self, tx_hashes, txs, touched):
+    def advance_txs(self, txs, touched):
         undo_info = []
 
         # Use local vars for speed in the loops
@@ -492,7 +496,7 @@ class BlockProcessor(server.db.DB):
         spend_utxo = self.spend_utxo
         undo_info_append = undo_info.append
 
-        for tx, tx_hash in zip(txs, tx_hashes):
+        for tx, tx_hash in txs:
             hashXs = set()
             add_hashX = hashXs.add
             tx_numb = s_pack('<I', tx_num)
@@ -533,14 +537,14 @@ class BlockProcessor(server.db.DB):
         self.assert_flushed()
 
         for block in blocks:
-            header, tx_hashes, txs = self.coin.read_block(block, self.height)
+            header, txs = self.coin.read_block(block, self.height)
             header_hash = self.coin.header_hash(header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} is not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
 
-            self.backup_txs(tx_hashes, txs, touched)
+            self.backup_txs(txs, touched)
             self.tip = self.coin.header_prevhash(header)
             assert self.height >= 0
             self.height -= 1
@@ -553,7 +557,7 @@ class BlockProcessor(server.db.DB):
         touched.discard(None)
         self.backup_flush(touched)
 
-    def backup_txs(self, tx_hashes, txs, touched):
+    def backup_txs(self, txs, touched):
         # Prevout values, in order down the block (coinbase first if present)
         # undo_info is in reverse block order
         undo_info = self.read_undo_info(self.height)
@@ -569,10 +573,7 @@ class BlockProcessor(server.db.DB):
         script_hashX = self.coin.hashX_from_script
         undo_entry_len = 12 + self.coin.HASHX_LEN
 
-        rtxs = reversed(txs)
-        rtx_hashes = reversed(tx_hashes)
-
-        for tx_hash, tx in zip(rtx_hashes, rtxs):
+        for tx, tx_hash in reversed(txs):
             for idx, txout in enumerate(tx.outputs):
                 # Spend the TX outputs.  Be careful with unspendable
                 # outputs - we didn't save those in the first place.

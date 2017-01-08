@@ -21,8 +21,8 @@ import sys
 
 from lib.hash import Base58, hash160, ripemd160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
-from lib.tx import Deserializer
-from lib.util import cachedproperty, subclasses
+from lib.tx import Deserializer, DeserializerSegWit
+import lib.util as util
 
 
 class CoinError(Exception):
@@ -46,7 +46,7 @@ class Coin(object):
         '''Return a coin class given name and network.
 
         Raise an exception if unrecognised.'''
-        for coin in subclasses(Coin):
+        for coin in util.subclasses(Coin):
             if (coin.NAME.lower() == name.lower()
                     and coin.NET.lower() == net.lower()):
                 return coin
@@ -71,6 +71,20 @@ class Coin(object):
         return [cls.sanitize_url(url) for url in urls.split(',')]
 
     @classmethod
+    def genesis_block(cls, block):
+        '''Check the Genesis block is the right one for this coin.
+
+        Return the block less its unspendable coinbase.
+        '''
+        header = block[:cls.header_len(0)]
+        header_hex_hash = hash_to_str(cls.header_hash(header))
+        if header_hex_hash != cls.GENESIS_HASH:
+            raise CoinError('genesis block has hash {} expected {}'
+                            .format(header_hex_hash, cls.GENESIS_HASH))
+
+        return header + bytes(1)
+
+    @classmethod
     def hashX_from_script(cls, script):
         '''Returns a hashX from a script.'''
         script = ScriptPubKey.hashX_script(script)
@@ -78,7 +92,7 @@ class Coin(object):
             return None
         return sha256(script).digest()[:cls.HASHX_LEN]
 
-    @cachedproperty
+    @util.cachedproperty
     def address_handlers(cls):
         return ScriptPubKey.PayToHandlers(
             address = cls.P2PKH_address_from_hash160,
@@ -204,11 +218,14 @@ class Coin(object):
 
     @classmethod
     def read_block(cls, block, height):
-        '''Return a tuple (header, tx_hashes, txs) given a raw block at
-        the given height.'''
+        '''Returns a pair (header, tx_list) given a raw block and height.
+
+        tx_list is a list of (deserialized_tx, tx_hash) pairs.
+        '''
+        deserializer = cls.deserializer()
         hlen = cls.header_len(height)
         header, rest = block[:hlen], block[hlen:]
-        return (header, ) + Deserializer(rest).read_block()
+        return (header, deserializer(rest).read_block())
 
     @classmethod
     def decimal_value(cls, value):
@@ -234,6 +251,10 @@ class Coin(object):
             'nonce': nonce,
         }
 
+    @classmethod
+    def deserializer(cls):
+        return Deserializer
+
 
 class Bitcoin(Coin):
     NAME = "Bitcoin"
@@ -244,8 +265,8 @@ class Bitcoin(Coin):
     P2PKH_VERBYTE = 0x00
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0x80
-    GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
-                  b'4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_HASH=('000000000019d6689c085ae165831e93'
+                  '4ff763ae46a2a6c172b3f1b60a8ce26f')
     TX_COUNT = 156335304
     TX_COUNT_HEIGHT = 429972
     TX_PER_BLOCK = 1800
@@ -262,13 +283,29 @@ class BitcoinTestnet(Bitcoin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
-    GENESIS_HASH=(b'000000000933ea01ad0ee984209779ba'
-                  b'aec3ced90fa3f408719526f8d77f4943')
+    GENESIS_HASH=('000000000933ea01ad0ee984209779ba'
+                  'aec3ced90fa3f408719526f8d77f4943')
     REORG_LIMIT = 2000
     TX_COUNT = 12242438
     TX_COUNT_HEIGHT = 1035428
     TX_PER_BLOCK = 21
     IRC_PREFIX = "ET_"
+    RPC_PORT = 18332
+
+
+class BitcoinTestnetSegWit(BitcoinTestnet):
+    '''Bitcoin Testnet for Core bitcoind >= 0.13.1.
+
+    Unfortunately 0.13.1 broke backwards compatibility of the RPC
+    interface's TX serialization, SegWit transactions serialize
+    differently than with earlier versions.  If you are using such a
+    bitcoind on testnet, you must use this class as your "COIN".
+    '''
+    NET = "testnet-segwit"
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerSegWit
 
 
 class Litecoin(Coin):
@@ -280,8 +317,8 @@ class Litecoin(Coin):
     P2PKH_VERBYTE = 0x30
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0xb0
-    GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
-                  b'4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_HASH=('000000000019d6689c085ae165831e93'
+                  '4ff763ae46a2a6c172b3f1b60a8ce26f')
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10
@@ -355,8 +392,8 @@ class Dash(Coin):
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("02fe52cc")
     XPRV_VERBYTES = bytes.fromhex("02fe52f8")
-    GENESIS_HASH = (b'00000ffd590b1485b3caadc19b22e637'
-                    b'9c733355108f107a430458cdf3407ab6')
+    GENESIS_HASH = ('00000ffd590b1485b3caadc19b22e637'
+                    '9c733355108f107a430458cdf3407ab6')
     P2PKH_VERBYTE = 0x4c
     P2SH_VERBYTE = 0x10
     WIF_BYTE = 0xcc
@@ -378,8 +415,8 @@ class DashTestnet(Dash):
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("3a805837")
     XPRV_VERBYTES = bytes.fromhex("3a8061a0")
-    GENESIS_HASH = (b'00000bafbc94add76cb75e2ec9289483'
-                    b'7288a481e5c005f6563d91623bf8bc2c')
+    GENESIS_HASH = ('00000bafbc94add76cb75e2ec9289483'
+                    '7288a481e5c005f6563d91623bf8bc2c')
     P2PKH_VERBYTE = 0x8c
     P2SH_VERBYTE = 0x13
     WIF_BYTE = 0xef

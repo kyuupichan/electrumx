@@ -13,7 +13,6 @@ import time
 from collections import defaultdict
 
 from lib.hash import hash_to_str, hex_str_to_hash
-from lib.tx import Deserializer
 import lib.util as util
 from server.daemon import DaemonError
 
@@ -200,6 +199,7 @@ class MemPool(util.LoggedClass):
         not depend on the result remaining the same are fine.
         '''
         script_hashX = self.coin.hashX_from_script
+        deserializer = self.coin.deserializer()
         db_utxo_lookup = self.db.db_utxo_lookup
         txs = self.txs
 
@@ -207,7 +207,7 @@ class MemPool(util.LoggedClass):
         for tx_hash, raw_tx in raw_tx_map.items():
             if not tx_hash in txs:
                 continue
-            tx = Deserializer(raw_tx).read_tx()
+            tx, _tx_hash = deserializer(raw_tx).read_tx()
 
             # Convert the tx outputs into (hashX, value) pairs
             txout_pairs = [(script_hashX(txout.pk_script), txout.value)
@@ -271,6 +271,7 @@ class MemPool(util.LoggedClass):
         if not hashX in self.hashXs:
             return []
 
+        deserializer = self.coin.deserializer()
         hex_hashes = self.hashXs[hashX]
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         result = []
@@ -281,7 +282,7 @@ class MemPool(util.LoggedClass):
             txin_pairs, txout_pairs = item
             tx_fee = (sum(v for hashX, v in txin_pairs)
                       - sum(v for hashX, v in txout_pairs))
-            tx = Deserializer(raw_tx).read_tx()
+            tx, tx_hash = deserializer(raw_tx).read_tx()
             unconfirmed = any(txin.prev_hash in self.txs for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result

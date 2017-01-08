@@ -115,7 +115,6 @@ Roadmap Pre-1.0
 ===============
 
 - minor code cleanups.
-- support bitcoin testnet with Satoshi bitcoind 0.13.1
 - implement simple protocol to discover peers without resorting to IRC.
   This may slip to post 1.0
 
@@ -142,6 +141,24 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.2
+--------------
+
+* Note the **NETWORK** environment variable was renamed **NET** to
+  bring it into line with lib/coins.py.
+* The genesis hash is now compared with the genesis hash expected by
+  **COIN** and **NET**.  This sanity check was not done previously, so
+  you could easily be syncing to a network daemon different to what
+  you thought.
+* SegWit-compatible testnet support for bitcoin core versions 0.13.1
+  or higher.  Resolves issue `#92#`.  Testnet worked with prior
+  versions of ElectrumX as long as you used an older bitcoind too,
+  such as 0.13.0 or Bitcoin Unlimited.
+
+  **Note**: for testnet, you need to set *NET** to *testnet-segwit* if
+  using recent RPC incompatible core bitcoinds, or *testnet* if using
+  older RPC compatible bitcoinds.
+
 Version 0.10.1
 --------------
 
@@ -166,6 +183,12 @@ variables to use roughly the same amount of memory.
 
 For now this code should be considered experimental; if you want
 stability please stick with the 0.9 series.
+
+Version 0.9.23
+--------------
+
+* Backport of the fix for issue `#94#` - stale references to old
+  sessions.  This would effectively memory and network handles.
 
 Version 0.9.22
 --------------
@@ -334,6 +357,7 @@ Version 0.9.0
 .. _#75: https://github.com/kyuupichan/electrumx/issues/75
 .. _#88: https://github.com/kyuupichan/electrumx/issues/88
 .. _#89: https://github.com/kyuupichan/electrumx/issues/89
+.. _#92: https://github.com/kyuupichan/electrumx/issues/92
 .. _#93: https://github.com/kyuupichan/electrumx/issues/93
 .. _#94: https://github.com/kyuupichan/electrumx/issues/94
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
