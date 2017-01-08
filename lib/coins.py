@@ -425,3 +425,65 @@ class DashTestnet(Dash):
     TX_PER_BLOCK = 1
     RPC_PORT = 19998
     IRC_PREFIX = "d_"
+
+class Argentum(Coin):
+    NAME = "Argentum"
+    SHORTNAME = "ARG"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = 0x17
+    P2SH_VERBYTE = 0x05
+    WIF_BYTE = 0x97
+    GENESIS_HASH=(b'88c667bc63167685e4e4da058fffdfe8'
+                  b'e007e5abffd6855de52ad59df7bb0bb2')
+    TX_COUNT = 2263089
+    TX_COUNT_HEIGHT = 2050260
+    TX_PER_BLOCK = 2000
+    IRC_PREFIX = "A_"
+    IRC_CHANNEL = "#electrum-arg"
+    RPC_PORT = 13580
+
+class ArgentumTestnet(Argentum):
+   SHORTNAME = "XRG"
+   NET = "testnet"
+   XPUB_VERBYTES = bytes.fromhex("043587cf")
+   XPRV_VERBYTES = bytes.fromhex("04358394")
+   P2PKH_VERBYTE = 0x6f
+   P2SH_VERBYTE = 0xc4
+   WIF_BYTE = 0xef
+   REORG_LIMIT = 2000
+
+class DigiByte(Coin):
+    NAME = "DigiByte"
+    SHORTNAME = "DGB"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = 0x1E
+    P2SH_VERBYTE = 0x05
+    WIF_BYTE = 0x80
+    GENESIS_HASH=(b'7497ea1b465eb39f1c8f507bc877078f'
+                  b'e016d6fcb6dfad3a64c98dcc6e1e8496')
+    TX_COUNT = 1046018
+    TX_COUNT_HEIGHT = 1435000
+    TX_PER_BLOCK = 1000
+    IRC_PREFIX = "DE_"
+    IRC_CHANNEL = "#electrum-dgb"
+    RPC_PORT = 12024
+
+
+class DigiByteTestnet(DigiByte):
+    SHORTNAME = "DGB"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = 0x6f
+    P2SH_VERBYTE = 0xc4
+    WIF_BYTE = 0xef
+    GENESIS_HASH=(b'b5dca8039e300198e5fe7cd23bdd1728'
+                  b'e2a444af34c447dbd0916fa3430a68c2')
+    IRC_PREFIX = "DET_"
+    IRC_CHANNEL = "#electrum-dgb"
+    RPC_PORT = 13024
+    REORG_LIMIT = 2000
