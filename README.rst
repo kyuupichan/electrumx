@@ -144,16 +144,20 @@ ChangeLog
 Version 0.10.2
 --------------
 
-* SegWit-compatible testnet support for bitcoin core versions >=
-  0.13.1.  Resolves issue `#92#`.  Testnet worked with prior versions
-  as long as you used a different daemon, such as 0.13.0 or Bitcoin
-  Unlimited.
 * Note the **NETWORK** environment variable was renamed **NET** to
   bring it into line with lib/coins.py.
 * The genesis hash is now compared with the genesis hash expected by
   **COIN** and **NET**.  This sanity check was not done previously, so
   you could easily be syncing to a network daemon different to what
   you thought.
+* SegWit-compatible testnet support for bitcoin core versions 0.13.1
+  or higher.  Resolves issue `#92#`.  Testnet worked with prior
+  versions of ElectrumX as long as you used an older bitcoind too,
+  such as 0.13.0 or Bitcoin Unlimited.
+
+  **Note**: for testnet, you need to set *NET** to *testnet-segwit* if
+  using recent RPC incompatible core bitcoinds, or *testnet* if using
+  older RPC compatible bitcoinds.
 
 Version 0.10.1
 --------------
