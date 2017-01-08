@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -120,13 +120,13 @@ class Daemon(util.LoggedClass):
 
         The result will be an array of the same length as params_iterable.
         If replace_errs is true, any item with an error is returned as None,
-        othewise an exception is raised.'''
+        otherwise an exception is raised.'''
         def processor(result):
             errs = [item['error'] for item in result if item['error']]
-            if not errs or replace_errs:
-                return [item['result'] for item in result]
             if any(err.get('code') == self.WARMING_UP for err in errs):
                 raise self.DaemonWarmingUpError
+            if not errs or replace_errs:
+                return [item['result'] for item in result]
             raise DaemonError(errs)
 
         payload = [{'method': method, 'params': p} for p in params_iterable]
