@@ -442,7 +442,7 @@ class Argentum(Coin):
     TX_PER_BLOCK = 2000
     IRC_PREFIX = "A_"
     IRC_CHANNEL = "#electrum-arg"
-    RPC_PORT = 13580
+    RPC_PORT = 13581
 
 class ArgentumTestnet(Argentum):
    SHORTNAME = "XRG"
@@ -452,6 +452,7 @@ class ArgentumTestnet(Argentum):
    P2PKH_VERBYTE = 0x6f
    P2SH_VERBYTE = 0xc4
    WIF_BYTE = 0xef
+   RPC_PORT = 40556
    REORG_LIMIT = 2000
 
 class DigiByte(Coin):
@@ -470,7 +471,7 @@ class DigiByte(Coin):
     TX_PER_BLOCK = 1000
     IRC_PREFIX = "DE_"
     IRC_CHANNEL = "#electrum-dgb"
-    RPC_PORT = 12024
+    RPC_PORT = 14022
 
 
 class DigiByteTestnet(DigiByte):
@@ -485,5 +486,5 @@ class DigiByteTestnet(DigiByte):
                   'e2a444af34c447dbd0916fa3430a68c2')
     IRC_PREFIX = "DET_"
     IRC_CHANNEL = "#electrum-dgb"
-    RPC_PORT = 13024
+    RPC_PORT = 15022
     REORG_LIMIT = 2000
