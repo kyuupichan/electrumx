@@ -496,7 +496,7 @@ class LocalRPC(Session):
 
     def __init__(self, *args):
         super().__init__(*args)
-        cmds = 'disconnect getinfo groups log peers sessions'.split()
+        cmds = 'disconnect getinfo groups log peers reorg sessions'.split()
         self.handlers = {cmd: getattr(self.manager, 'rpc_{}'.format(cmd))
                          for cmd in cmds}
         self.client = 'RPC'

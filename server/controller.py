@@ -49,7 +49,7 @@ class Controller(util.LoggedClass):
         self.loop = asyncio.get_event_loop()
         self.start = time.time()
         self.bp = BlockProcessor(env)
-        self.mempool = MemPool(self.bp.daemon, env.coin, self.bp)
+        self.mempool = MemPool(self.bp)
         self.irc = IRC(env)
         self.env = env
         self.servers = {}
@@ -172,8 +172,8 @@ class Controller(util.LoggedClass):
             self.futures.append(asyncio.ensure_future(coro))
 
         # shutdown() assumes bp.main_loop() is first
-        add_future(self.bp.main_loop(self.mempool.touched))
-        add_future(self.bp.prefetcher.main_loop(self.bp.caught_up_event))
+        add_future(self.bp.main_loop())
+        add_future(self.bp.prefetcher.main_loop())
         add_future(self.irc.start(self.bp.caught_up_event))
         add_future(self.start_servers(self.bp.caught_up_event))
         add_future(self.mempool.main_loop())
@@ -187,8 +187,8 @@ class Controller(util.LoggedClass):
                 await future  # Note: future is not one of self.futures
             except asyncio.CancelledError:
                 break
+
         await self.shutdown()
-        await asyncio.sleep(1)
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
@@ -309,6 +309,7 @@ class Controller(util.LoggedClass):
     async def shutdown(self):
         '''Call to shutdown everything.  Returns when done.'''
         self.state = self.SHUTTING_DOWN
+        self.bp.on_shutdown()
         self.close_servers(list(self.servers.keys()))
         # Don't cancel the block processor main loop - let it close itself
         for future in self.futures[1:]:
@@ -559,3 +560,11 @@ class Controller(util.LoggedClass):
 
     async def rpc_peers(self, params):
         return self.irc.peers
+
+    async def rpc_reorg(self, params):
+        '''Force a reorg of the given number of blocks, 3 by default.'''
+        count = 3
+        if params:
+            count = JSONRPC.params_to_non_negative_integer(params)
+        if not self.bp.force_chain_reorg(count):
+            raise JSONRPC.RPCError('still catching up with daemon')

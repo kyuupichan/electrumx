@@ -142,3 +142,8 @@ The following commands are available:
   Returns a list of peer electrum servers.  This command takes no arguments.
 
   Currently this is data gleaned from an IRC session.
+
+* **reorg**
+
+  Force a block chain reorg.  This command takes an optional
+  argument - the number of blocks to reorg - that defaults to 3.

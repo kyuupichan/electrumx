@@ -31,12 +31,12 @@ class MemPool(util.LoggedClass):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, daemon, coin, db):
+    def __init__(self, bp):
         super().__init__()
-        self.daemon = daemon
-        self.coin = coin
-        self.db = db
-        self.touched = set()
+        self.daemon = bp.daemon
+        self.coin = bp.coin
+        self.db = bp
+        self.touched = bp.touched
         self.touched_event = asyncio.Event()
         self.prioritized = set()
         self.stop = False
