@@ -76,7 +76,7 @@ class Coin(object):
 
         Return the block less its unspendable coinbase.
         '''
-        header = block[:cls.header_len(0)]
+        header = cls.block_header(block, 0)
         header_hex_hash = hash_to_str(cls.header_hash(header))
         if header_hex_hash != cls.GENESIS_HASH:
             raise CoinError('genesis block has hash {} expected {}'
@@ -217,15 +217,16 @@ class Coin(object):
         return cls.header_offset(height + 1) - cls.header_offset(height)
 
     @classmethod
-    def read_block(cls, block, height):
-        '''Returns a pair (header, tx_list) given a raw block and height.
+    def block_header(cls, block, height):
+        '''Returns the block header given a block and its height.'''
+        return block[:cls.header_len(height)]
 
-        tx_list is a list of (deserialized_tx, tx_hash) pairs.
-        '''
+    @classmethod
+    def block_txs(cls, block, height):
+        '''Returns a list of (deserialized_tx, tx_hash) pairs given a
+        block and its height.'''
         deserializer = cls.deserializer()
-        hlen = cls.header_len(height)
-        header, rest = block[:hlen], block[hlen:]
-        return (header, deserializer(rest).read_block())
+        return deserializer(block[cls.header_len(height):]).read_block()
 
     @classmethod
     def decimal_value(cls, value):

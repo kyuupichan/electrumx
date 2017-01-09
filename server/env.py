@@ -67,8 +67,6 @@ class Env(LoggedClass):
                                                 if self.report_ssl_port else
                                                 self.ssl_port)
         self.report_host_tor = self.default('REPORT_HOST_TOR', None)
-        # Debugging
-        self.force_reorg = self.integer('FORCE_REORG', 0)
 
     def default(self, envvar, default):
         return environ.get(envvar, default)

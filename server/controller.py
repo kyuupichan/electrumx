@@ -20,7 +20,7 @@ from lib.jsonrpc import JSONRPC, RequestBase
 import lib.util as util
 from server.block_processor import BlockProcessor
 from server.irc import IRC
-from server.protocol import LocalRPC, ElectrumX
+from server.session import LocalRPC, ElectrumX
 from server.mempool import MemPool
 
 

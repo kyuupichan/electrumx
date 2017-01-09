@@ -284,20 +284,4 @@ your available physical RAM:
   versions, a value of 90% of the sum of the old UTXO_MB and HIST_MB
   variables is roughly equivalent.
 
-Debugging
----------
-
-The following are for debugging purposes:
-
-* **FORCE_REORG**
-
-  If set to a positive integer, it will simulate a reorg of the
-  blockchain for that number of blocks on startup.  You must have
-  synced before using this, otherwise there will be no undo
-  information.
-
-  Although it should fail gracefully if set to a value greater than
-  **REORG_LIMIT**, I do not recommend it as I have not tried it and
-  there is a chance your DB might corrupt.
-
 .. _lib/coins.py: https://github.com/kyuupichan/electrumx/blob/master/lib/coins.py
