@@ -6,11 +6,10 @@
 ===============================================
 ElectrumX - Reimplementation of electrum-server
 ===============================================
-::
 
-  Licence: MIT
-  Author: Neil Booth
-  Language: Python (>=3.5)
+  :Licence: MIT
+  :Language: Python (>= 3.5)
+  :Author: Neil Booth
 
 Getting Started
 ===============
@@ -151,8 +150,8 @@ Version 0.10.3
 Version 0.10.2
 --------------
 
-* Note the **NETWORK** environment variable was renamed **NET** to
-  bring it into line with lib/coins.py.
+* The **NETWORK** environment variable was renamed **NET** to bring it
+  into line with lib/coins.py.
 * The genesis hash is now compared with the genesis hash expected by
   **COIN** and **NET**.  This sanity check was not done previously, so
   you could easily be syncing to a network daemon different to what
@@ -162,9 +161,11 @@ Version 0.10.2
   versions of ElectrumX as long as you used an older bitcoind too,
   such as 0.13.0 or Bitcoin Unlimited.
 
-  **Note**: for testnet, you need to set *NET** to *testnet-segwit* if
-  using recent RPC incompatible core bitcoinds, or *testnet* if using
-  older RPC compatible bitcoinds.
+  **Note**: for testnet, you need to set **NET** to *testnet-segwit*
+  if using a recent Core bitcoind that broke RPC compatibility, or
+  *testnet* if using a bitcoind that maintains RPC compatibility.
+  Changing **NET** for Bitcoin testnet can be done dynamically; it is
+  not necessary to resync from scratch.
 
 Version 0.10.1
 --------------

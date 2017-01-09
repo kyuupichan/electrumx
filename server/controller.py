@@ -8,6 +8,7 @@
 import asyncio
 import json
 import os
+import _socket
 import ssl
 import time
 from bisect import bisect_left
@@ -218,6 +219,7 @@ class Controller(util.LoggedClass):
         if self.env.rpc_port is not None:
             await self.start_server('RPC', 'localhost', self.env.rpc_port)
         await caught_up.wait()
+        _socket.setdefaulttimeout(5)
         self.logger.info('max session count: {:,d}'.format(self.max_sessions))
         self.logger.info('session timeout: {:,d} seconds'
                          .format(self.env.session_timeout))
