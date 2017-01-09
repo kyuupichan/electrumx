@@ -163,6 +163,7 @@ class BlockProcessor(server.db.DB):
         # Caches of unflushed items.
         self.headers = []
         self.tx_hashes = []
+        self.undo_infos = []
         self.history = defaultdict(partial(array.array, 'I'))
         self.history_size = 0
 
@@ -338,6 +339,7 @@ class BlockProcessor(server.db.DB):
         '''Asserts state is fully flushed.'''
         assert self.tx_count == self.fs_tx_count == self.db_tx_count
         assert self.height == self.fs_height == self.db_height
+        assert not self.undo_infos
         assert not self.history
         assert not self.utxo_cache
         assert not self.db_deletes
@@ -484,14 +486,16 @@ class BlockProcessor(server.db.DB):
         It is already verified they correctly connect onto our tip.
         '''
         block_txs = self.coin.block_txs
-        daemon_height = self.daemon.cached_height()
+        min_height = self.min_undo_height(self.daemon.cached_height())
+        height = self.height
 
         for block in blocks:
-            self.height += 1
-            undo_info = self.advance_txs(block_txs(block, self.height))
-            if daemon_height - self.height <= self.env.reorg_limit:
-                self.write_undo_info(self.height, b''.join(undo_info))
+            height += 1
+            undo_info = self.advance_txs(block_txs(block, height))
+            if height >= min_height:
+                self.undo_infos.append((undo_info, height))
 
+        self.height = height
         self.headers.extend(headers)
         self.tip = self.coin.header_hash(headers[-1])
 
@@ -724,11 +728,13 @@ class BlockProcessor(server.db.DB):
         delete_count = len(self.db_deletes) // 2
         utxo_cache_len = len(self.utxo_cache)
 
+        # Spends
         batch_delete = batch.delete
         for key in sorted(self.db_deletes):
             batch_delete(key)
         self.db_deletes = []
 
+        # New UTXOs
         batch_put = batch.put
         for cache_key, cache_value in self.utxo_cache.items():
             # suffix = tx_idx + tx_num
@@ -736,6 +742,11 @@ class BlockProcessor(server.db.DB):
             suffix =  cache_key[-2:] + cache_value[-12:-8]
             batch_put(b'h' + cache_key[:4] + suffix, hashX)
             batch_put(b'u' + hashX + suffix, cache_value[-8:])
+        self.utxo_cache = {}
+
+        # New undo information
+        self.flush_undo_infos(batch_put, self.undo_infos)
+        self.undo_infos = []
 
         if self.utxo_db.for_sync:
             self.logger.info('flushed {:,d} blocks with {:,d} txs, {:,d} UTXO '
@@ -745,7 +756,6 @@ class BlockProcessor(server.db.DB):
                                      utxo_cache_len, delete_count,
                                      time.time() - flush_start))
 
-        self.utxo_cache = {}
         self.utxo_flush_count = self.flush_count
         self.db_tx_count = self.tx_count
         self.db_height = self.height

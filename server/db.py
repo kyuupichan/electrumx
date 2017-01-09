@@ -182,36 +182,7 @@ class DB(util.LoggedClass):
             raise self.DBError('DB corrupt: flush_count < utxo_flush_count')
         if self.flush_count > self.utxo_flush_count:
             self.clear_excess_history(self.utxo_flush_count)
-
-        # Remove stale undo information
-        prefix = b'U'
-        cutoff = self.db_height - self.env.reorg_limit
-        keys = []
-        for key, hist in self.utxo_db.iterator(prefix=prefix):
-            height, = unpack('>I', key[-4:])
-            if height > cutoff:
-                break
-            keys.append(key)
-        if keys:
-            self.logger.info('deleting {:,d} stale undo entries'
-                             .format(len(keys)))
-
-            with self.utxo_db.write_batch() as batch:
-                for key in keys:
-                    batch.delete(key)
-                self.write_state(batch)
-
-    def undo_key(self, height):
-        '''DB key for undo information at the given height.'''
-        return b'U' + pack('>I', height)
-
-    def write_undo_info(self, height, undo_info):
-        '''Write out undo information for the current height.'''
-        self.utxo_db.put(self.undo_key(height), undo_info)
-
-    def read_undo_info(self, height):
-        '''Read undo information from a file for the current height.'''
-        return self.utxo_db.get(self.undo_key(height))
+        self.clear_excess_undo_info()
 
     def open_file(self, filename, create=False):
         '''Open the file name.  Return its handle.'''
@@ -355,6 +326,43 @@ class DB(util.LoggedClass):
                                .format(hash_to_str(tx_hash), tx_idx))
         value, = unpack('<Q', db_value)
         return hashX, value
+
+    # -- Undo information
+
+    def min_undo_height(self, max_height):
+        '''Returns a height from which we should store undo info.'''
+        return max_height - self.env.reorg_limit + 1
+
+    def undo_key(self, height):
+        '''DB key for undo information at the given height.'''
+        return b'U' + pack('>I', height)
+
+    def read_undo_info(self, height):
+        '''Read undo information from a file for the current height.'''
+        return self.utxo_db.get(self.undo_key(height))
+
+    def flush_undo_infos(self, batch_put, undo_infos):
+        '''undo_infos is a list of (undo_info, height) pairs.'''
+        for undo_info, height in undo_infos:
+            batch_put(self.undo_key(height), b''.join(undo_info))
+
+    def clear_excess_undo_info(self):
+        '''Clear excess undo info.  Only most recent N are kept.'''
+        prefix = b'U'
+        min_height = self.min_undo_height(self.db_height)
+        keys = []
+        for key, hist in self.utxo_db.iterator(prefix=prefix):
+            height, = unpack('>I', key[-4:])
+            if height >= min_height:
+                break
+            keys.append(key)
+
+        if keys:
+            with self.utxo_db.write_batch() as batch:
+                for key in keys:
+                    batch.delete(key)
+            self.logger.info('deleted {:,d} stale undo entries'
+                             .format(len(keys)))
 
     # -- History database
 
