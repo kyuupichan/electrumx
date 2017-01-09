@@ -1,12 +1,13 @@
+=============
 Prerequisites
 =============
 
-ElectrumX should run on any flavour of unix.  I have run it
+**ElectrumX** should run on any flavour of unix.  I have run it
 successfully on MaxOSX and DragonFlyBSD.  It won't run out-of-the-box
 on Windows, but the changes required to make it do so should be
-small - patches welcome.
+small - pull requests are welcome.
 
-+ Python3:  ElectrumX uses asyncio.  Python version >=3.5 is required.
++ Python3:  ElectrumX uses asyncio.  Python version >= 3.5 is **required**.
 + plyvel:   Python interface to LevelDB.  I am using plyvel-0.9.
 + pylru:    Python LRU cache package.  I'm using 1.0.9.
 + aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
@@ -18,30 +19,30 @@ small - patches welcome.
 + x11_hash: Python X11 Hash package. Only required if you use ElectrumX
             with Dash Mainnet or Testnet.  Version 1.4 tested.
 
-While not requirements for running ElectrumX, it is intended to be run
-with supervisor software such as Daniel Bernstein's daemontools,
-Gerald Pape's runit package or systemd.  These make administration of secure
-unix servers very easy, and I strongly recommend you install one of these
-and familiarise yourself with them.  The instructions below and sample
-run scripts assume daemontools; adapting to runit should be trivial
-for someone used to either.
+While not a requirement for running ElectrumX, it is intended to be
+run with supervisor software such as Daniel Bernstein's
+`daemontools`_, Gerald Pape's `runit`_ package or `systemd`.  These
+make administration of secure unix servers very easy, and I strongly
+recommend you install one of these and familiarise yourself with them.
+The instructions below and sample run scripts assume `daemontools`;
+adapting to `runit` should be trivial for someone used to either.
 
 When building the database form the genesis block, ElectrumX has to
-flush large quantities of data to disk and to leveldb.  You will have
-a much nicer experience if the database directory is on an SSD than on
-an HDD.  Currently to around height 439,800 of the Bitcoin blockchain
-the final size of the leveldb database, and other ElectrumX file
-metadata comes to just over 18GB.  Leveldb needs a bit more for brief
-periods, and the block chain is only getting longer, so I would
-recommend having at least 30-40GB free space.
+flush large quantities of data to disk and its DB.  You will have a
+better experience if the database directory is on an SSD than on an
+HDD.  Currently to around height 447,100 of the Bitcoin blockchain the
+final size of the leveldb database, and other ElectrumX file metadata
+comes to just over 18.7GB (17.5 GiB).  LevelDB needs a bit more for
+brief periods, and the block chain is only getting longer, so I would
+recommend having at least 30-40GB of free space before starting.
 
 Database Engine
 ===============
 
 You can choose from RocksDB, LevelDB or LMDB to store transaction
 information on disk. Currently, the fastest seems to be RocksDB with
-LevelDB being about 10% slower. LMDB is slowest but that is because it
-is not yet efficiently abstracted.
+LevelDB being a few percent slower. LMDB is slowest but that is
+because the code does not currently suit the LMDB design.
 
 You will need to install one of:
 
@@ -59,14 +60,14 @@ Check out the code from Github::
     git clone https://github.com/kyuupichan/electrumx.git
     cd electrumx
 
-You can install with setup.py, or run the code from the source tree or
-a copy of it.
+You can install with `setup.py` or run the code from the source tree
+or a copy of it.
 
 You should create a standard user account to run the server under;
 your own is probably adequate unless paranoid.  The paranoid might
 also want to create another user account for the daemontools logging
 process.  The sample scripts and these instructions assume it is all
-under one account which I have called 'electrumx'.
+under one account which I have called *electrumx*.
 
 Next create a directory where the database will be stored and make it
 writeable by the electrumx account.  I recommend this directory live
@@ -75,42 +76,43 @@ on an SSD::
     mkdir /path/to/db_directory
     chown electrumx /path/to/db_directory
 
+
 Process limits
 --------------
 
-You should ensure the ElectrumX process has a large open file limit.
+You must ensure the ElectrumX process has a large open file limit.
 During sync it should not need more than about 1,024 open files.  When
 serving it will use approximately 256 for LevelDB plus the number of
 incoming connections.  It is not unusual to have 1,000 to 2,000
 connections being served, so I suggest you set your open files limit
 to at least 2,500.
 
-Note that setting the limit in your shell does NOT affect ElectrumX
+Note that setting the limit in your shell does *NOT* affect ElectrumX
 unless you are invoking ElectrumX directly from your shell.  If you
-are using systemd, you need to set it in the .service file (see
-samples/systemd/electrumx.service in the ElectrumX source).
+are using `systemd`, you need to set it in the `.service` file (see
+`samples/systemd/electrumx.service`_).
 
 
 Using daemontools
 -----------------
 
 Next create a daemontools service directory; this only holds symlinks
-(see daemontools documentation).  The 'svscan' program will ensure the
-servers in the directory are running by launching a 'supervise'
+(see daemontools documentation).  The `svscan` program will ensure the
+servers in the directory are running by launching a `supervise`
 supervisor for the server and another for its logging process.  You
-can run 'svscan' under the electrumx account if that is the only one
+can run `svscan` under the *electrumx* account if that is the only one
 involved (server and logger) otherwise it will need to run as root so
 that the user can be switched to electrumx.
 
-Assuming this directory is called service, you would do one of::
+Assuming this directory is called `service`, you would do one of::
 
     mkdir /service       # If running svscan as root
     mkdir ~/service      # As electrumx if running svscan as that a/c
 
-Next create a directory to hold the scripts that the 'supervise'
-process spawned by 'svscan' will run - this directory must be readable
-by the 'svscan' process.  Suppose this directory is called scripts, you
-might do::
+Next create a directory to hold the scripts that the `supervise`
+process spawned by `svscan` will run - this directory must be readable
+by the `svscan` process.  Suppose this directory is called *scripts*,
+you might do::
 
     mkdir -p ~/scripts/electrumx
 
@@ -122,7 +124,7 @@ This copies 3 things: the top level server run script, a log/ directory
 with the logger run script, an env/ directory.
 
 You need to configure the environment variables under env/ to your
-setup, as explained in docs/ENV-NOTES.  ElectrumX server currently
+setup, as explained in `ENVIRONMENT.rst`_.  ElectrumX server currently
 takes no command line arguments; all of its configuration is taken
 from its environment which is set up according to env/ directory (see
 'envdir' man page).  Finally you need to change the log/run script to
@@ -159,7 +161,7 @@ The sample unit file assumes that the repository is located at
 change the unit file accordingly.
 
 You need to set a few configuration variables in :code:`/etc/electrumx.conf`,
-see `docs/ENV-NOTES` for the list of required variables.
+see `ENVIRONMENT.rst`_ for the list of required variables.
 
 Now you can start ElectrumX using :code:`systemctl`::
 
@@ -169,51 +171,54 @@ You can use :code:`journalctl` to check the log output::
 
     journalctl -u electrumx -f
 
-Once configured, you may want to start ElectrumX at boot::
+Once configured you may want to start ElectrumX at boot::
 
     systemctl enable electrumx
 
-systemd is aggressive in shutting down processes.  ElectrumX can need
-several minutes to flush cached data to disk during sync.  You should
-set TimeoutStopSec to at least 10 mins in your .service file.
+**Warning**: systemd is aggressive in forcibly shutting down
+processes.  Depending on your hardware, ElectrumX can need several
+minutes to flush cached data to disk during initial sync.  You should
+set TimeoutStopSec to *at least* 10 mins in your `.service` file.
 
 
 Sync Progress
 =============
 
-Speed indexing the blockchain depends on your hardware of course.  As
-Python is single-threaded most of the time only 1 core is kept busy.
-ElectrumX uses Python's asyncio to prefill a cache of future blocks
-asynchronously; this keeps the CPU busy processing the chain and not
-waiting for blocks to be delivered.  I therefore doubt there will be
-much boost in performance if the daemon is on the same host: indeed it
-may even be beneficial to have the daemon on a separate machine so the
-machine doing the indexing is focussing on the one task and not the
-wider network.
+Time taken to index the blockchain depends on your hardware of course.
+As Python is single-threaded most of the time only 1 core is kept
+busy.  ElectrumX uses Python's `asyncio` to prefill a cache of future
+blocks asynchronously to keep the CPU busy processing the chain
+without pausing.
 
-The HIST_MB and CACHE_MB environment variables control cache sizes
-before they spill to disk; see the ENV-NOTES file under docs/.
+Consequently there will probably be only a minor boost in performance
+if the daemon is on the same host.  It may even be beneficial to have
+the daemon on a *separate* machine so the machine doing the indexing
+has its caches and disk I/O tuned to that task only.
+
+The **CACHE_MB** environment variable controls the total cache size
+ElectrumX uses; see `ENVIRONMENT.rst`_ for caveats.
 
 Here is my experience with the current codebase, to given heights and
-rough wall-time::
+rough wall-time.  The period from heights 363,000 to 378,000 is the
+most sluggish::
 
-                 Machine A     Machine B    DB + Metadata
-  181,000                       7m 09s       0.4 GiB
-  255,000                       1h 02m       2.7 GiB
-  289,000                       1h 46m       3.3 GiB
-  317,000                       2h 33m
-  351,000                       3h 58m
-  377,000                       6h 06m       6.5 GiB
-  403,400                       8h 51m
-  436,196                      14h 03m      17.3 GiB
+                 Machine A     Machine B
+  181,000          25m 00s      5m 30s
+  283,500                       1h 00m
+  321,800                       1h 40m
+  357,000          12h 32m      2h 41m
+  386,000          21h 56m      4h 25m
+  414,200       1d              6h 30m
+  447,168                       9h 47m
 
-Machine A: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU, 8GB
-RAM and a DragonFlyBSD HAMMER fileystem on an SSD.  It requests blocks
-over the LAN from a bitcoind on machine B.
+*Machine A*: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU,
+8GB RAM and a DragonFlyBSD UFS fileystem on an SSD.  It requests
+blocks over the LAN from a bitcoind on machine B.  **DB_CACHE** the
+default of 1,200.  LevelDB.
 
-Machine B: a late 2012 iMac running El-Capitan 10.11.6, 2.9GHz
-quad-core Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on
-the same machine.  HIST_MB of 350, UTXO_MB of 1,600.  LevelDB.
+*Machine B*: a late 2012 iMac running Sierra 10.12.2, 2.9GHz quad-core
+Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on the same
+machine.  **DB_CACHE** set to 1,800.  LevelDB.
 
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
@@ -223,26 +228,22 @@ Terminating ElectrumX
 =====================
 
 The preferred way to terminate the server process is to send it the
-TERM signal.  For a daemontools supervised process this is best done
-by bringing it down like so::
+INT or TERM signals.  For a daemontools supervised process this is best
+done by bringing it down like so::
 
     svc -d ~/service/electrumx
 
-If processing the blockchain the server will start the process of
-flushing to disk.  Once that is complete the server will exit.  Be
-patient as disk flushing can take many minutes.
+ElectrumX will note receipt of the signals in the logs, and ensure the
+block chain index is flushed to disk before terminating.  You should
+be patient as flushing data to disk can take many minutes.
 
-ElectrumX flushes to leveldb using its transaction functionality.  The
-plyvel documentation claims this is atomic.  I have written ElectrumX
-with the intent that, to the extent this atomicity guarantee holds,
-the database should not get corrupted even if the ElectrumX process if
-forcibly killed or there is loss of power.  The worst case is losing
-unflushed in-memory blockchain processing and having to restart from
-the state as of the prior successfully completed UTXO flush.
-
-If you do have any database corruption as a result of terminating the
-process (without modifying the code) I would be interested in the
-details.
+ElectrumX uses the transaction functionality, with fsync enabled, of
+the databases.  I have written it with the intent that, to the extent
+the atomicity guarantees are upheld by the DB software, the operating
+system, and the hardware, the database should not get corrupted even
+if the ElectrumX process if forcibly killed or there is loss of power.
+The worst case should be having to restart indexing from the most
+recent UTXO flush.
 
 Once the process has terminated, you can start it up again with::
 
@@ -252,9 +253,9 @@ You can see the status of a running service with::
 
     svstat ~/service/electrumx
 
-Of course, svscan can handle multiple services simultaneously from the
-same service directory, such as a testnet or altcoin server.  See the
-man pages of these various commands for more information.
+`svscan` can of course handle multiple services simultaneously from
+the same service directory, such as a testnet or altcoin server.  See
+the man pages of these various commands for more information.
 
 
 Understanding the Logs
@@ -266,38 +267,55 @@ You can see the logs usefully like so::
 
 Here is typical log output on startup::
 
-  2016-10-14 20:22:10.747808500 Launching ElectrumX server...
-  2016-10-14 20:22:13.032415500 INFO:root:ElectrumX server starting
-  2016-10-14 20:22:13.032633500 INFO:root:switching current directory to /Users/neil/server-btc
-  2016-10-14 20:22:13.038495500 INFO:DB:created new database Bitcoin-mainnet
-  2016-10-14 20:22:13.038892500 INFO:DB:Bitcoin/mainnet height: -1 tx count: 0 flush count: 0 utxo flush count: 0 sync time: 0d 00h 00m 00s
-  2016-10-14 20:22:13.038935500 INFO:DB:flushing all after cache reaches 2,000 MB
-  2016-10-14 20:22:13.038978500 INFO:DB:flushing history cache at 400 MB
-  2016-10-14 20:22:13.039076500 INFO:BlockCache:using RPC URL http://user:password@192.168.0.2:8332/
-  2016-10-14 20:22:13.039796500 INFO:BlockCache:catching up, block cache limit 10MB...
-  2016-10-14 20:22:14.092192500 INFO:DB:cache stats at height 0  daemon height: 434,293
-  2016-10-14 20:22:14.092243500 INFO:DB:  entries: UTXO: 1  DB: 0  hist count: 1  hist size: 1
-  2016-10-14 20:22:14.092288500 INFO:DB:  size: 0MB  (UTXOs 0MB hist 0MB)
-  2016-10-14 20:22:32.302394500 INFO:UTXO:duplicate tx hash d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599
-  2016-10-14 20:22:32.310441500 INFO:UTXO:duplicate tx hash e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468
-  2016-10-14 20:23:14.094855500 INFO:DB:cache stats at height 125,278  daemon height: 434,293
-  2016-10-14 20:23:14.095026500 INFO:DB:  entries: UTXO: 191,155  DB: 0  hist count: 543,455  hist size: 1,394,187
-  2016-10-14 20:23:14.095028500 INFO:DB:  size: 172MB  (UTXOs 44MB hist 128MB)
+  INFO:BlockProcessor:switching current directory to /crucial/server-good
+  INFO:BlockProcessor:using leveldb for DB backend
+  INFO:BlockProcessor:created new database
+  INFO:BlockProcessor:creating metadata diretcory
+  INFO:BlockProcessor:software version: ElectrumX 0.10.2
+  INFO:BlockProcessor:DB version: 5
+  INFO:BlockProcessor:coin: Bitcoin
+  INFO:BlockProcessor:network: mainnet
+  INFO:BlockProcessor:height: -1
+  INFO:BlockProcessor:tip: 0000000000000000000000000000000000000000000000000000000000000000
+  INFO:BlockProcessor:tx count: 0
+  INFO:BlockProcessor:sync time so far: 0d 00h 00m 00s
+  INFO:BlockProcessor:reorg limit is 200 blocks
+  INFO:Daemon:daemon at 192.168.0.2:8332/
+  INFO:BlockProcessor:flushing DB cache at 1,200 MB
+  INFO:Controller:RPC server listening on localhost:8000
+  INFO:Prefetcher:catching up to daemon height 447,187...
+  INFO:Prefetcher:verified genesis block with hash 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
+  INFO:BlockProcessor:our height: 9 daemon: 447,187 UTXOs 0MB hist 0MB
+  INFO:BlockProcessor:our height: 52,509 daemon: 447,187 UTXOs 9MB hist 14MB
+  INFO:BlockProcessor:our height: 85,009 daemon: 447,187 UTXOs 12MB hist 31MB
+  INFO:BlockProcessor:our height: 102,384 daemon: 447,187 UTXOs 15MB hist 47MB
+  [...]
+  INFO:BlockProcessor:our height: 133,375 daemon: 447,187 UTXOs 80MB hist 222MB
+  INFO:BlockProcessor:our height: 134,692 daemon: 447,187 UTXOs 96MB hist 250MB
+  INFO:BlockProcessor:flushed to FS in 0.7s
+  INFO:BlockProcessor:flushed history in 16.3s for 1,124,512 addrs
+  INFO:BlockProcessor:flush #1 took 18.7s.  Height 134,692 txs: 941,963
+  INFO:BlockProcessor:tx/sec since genesis: 2,399, since last flush: 2,400
+  INFO:BlockProcessor:sync time: 0d 00h 06m 32s  ETA: 1d 13h 03m 42s
 
-Under normal operation these cache stats repeat roughly every minute.
-Flushes can take many minutes and look like this::
+Under normal operation these cache stats repeat once or twice a
+minute.  UTXO flushes can take several minutes and look like this::
 
-  2016-10-14 21:30:29.085479500 INFO:DB:flushing UTXOs: 22,910,848 txs and 254,753 blocks
-  2016-10-14 21:32:05.383413500 INFO:UTXO:UTXO cache adds: 55,647,862 spends: 48,751,219
-  2016-10-14 21:32:05.383460500 INFO:UTXO:UTXO DB adds: 6,875,315 spends: 0. Collisions: hash168: 268 UTXO: 0
-  2016-10-14 21:32:07.056008500 INFO:DB:6,982,386 history entries in 1,708,991 addrs
-  2016-10-14 21:32:08.169468500 INFO:DB:committing transaction...
-  2016-10-14 21:33:17.644296500 INFO:DB:flush #11 to height 254,752 took 168s
-  2016-10-14 21:33:17.644357500 INFO:DB:txs: 22,910,848  tx/sec since genesis: 5,372, since last flush: 3,447
-  2016-10-14 21:33:17.644536500 INFO:DB:sync time: 0d 01h 11m 04s  ETA: 0d 11h 22m 42s
+  INFO:BlockProcessor:our height: 378,745 daemon: 447,332 UTXOs 1,013MB hist 184MB
+  INFO:BlockProcessor:our height: 378,787 daemon: 447,332 UTXOs 1,014MB hist 194MB
+  INFO:BlockProcessor:flushed to FS in 0.3s
+  INFO:BlockProcessor:flushed history in 13.4s for 934,933 addrs
+  INFO:BlockProcessor:flushed 6,403 blocks with 5,879,440 txs, 2,920,524 UTXO adds, 3,646,572 spends in 93.1s, committing...
+  INFO:BlockProcessor:flush #120 took 226.4s.  Height 378,787 txs: 87,695,588
+  INFO:BlockProcessor:tx/sec since genesis: 1,280, since last flush: 359
+  INFO:BlockProcessor:sync time: 0d 19h 01m 06s  ETA: 3d 21h 17m 52s
+  INFO:BlockProcessor:our height: 378,812 daemon: 447,334 UTXOs 10MB hist 10MB
 
-After flush-to-disk you may see an aiohttp error; this is the daemon
-timing out the connection while the disk flush was in progress.  This
-is harmless.
+The ETA shown is just a rough guide and in the short term can be quite
+volatile.  It tends to be a little optimistic at first; once you get
+to height 280,000 is should be fairly accurate.
 
-The ETA is just a guide and can be quite volatile around flushes.
+.. _`ENVIRONMENT.rst`: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
+.. _`samples/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/samples/systemd/electrumx.service
+.. _`daemontools`: http://cr.yp.to/daemontools.html
+.. _`runit`: http://smarden.org/runit/index.html
