@@ -144,6 +144,8 @@ ChangeLog
 Version 0.10.3
 --------------
 
+* Add an RPC call to force a reorg at run-time, issue `#103`_
+* Make flushes and reorgs async, issue `#102`_
 * add Argentum and Digibyte support to coins.py (protonn)
 
 Version 0.10.2
@@ -156,7 +158,7 @@ Version 0.10.2
   you could easily be syncing to a network daemon different to what
   you thought.
 * SegWit-compatible testnet support for bitcoin core versions 0.13.1
-  or higher.  Resolves issue `#92#`.  Testnet worked with prior
+  or higher.  Resolves issue `#92`_.  Testnet worked with prior
   versions of ElectrumX as long as you used an older bitcoind too,
   such as 0.13.0 or Bitcoin Unlimited.
 
@@ -167,7 +169,7 @@ Version 0.10.2
 Version 0.10.1
 --------------
 
-* Includes what should be a fix for issue `#94#` - stale references to
+* Includes what should be a fix for issue `#94`_ - stale references to
   old sessions.  This would effectively memory and network handles.
 
 Version 0.10.0
@@ -229,129 +231,6 @@ Version 0.9.17
   case of a kernel panic (issue `#75`_)
 * replace $DONATION_ADDRESS in banner file
 
-Version 0.9.16
---------------
-
-* logging improvements, including throttling of abusive logs
-* permit large RPC requests (issue 85)
-
-Version 0.9.15
---------------
-
-* fix crash on reorg, issue #84
-
-Version 0.9.14
---------------
-
-* don't start processing mempool until block processor has caught up.
-  Print server settings when servers start, not at startup.
-
-Version 0.9.13
---------------
-
-* fix to reduce verbosity of logging of deprioritised sessions.  Sessions
-  are deprioritised if they are using high bandwidth, or if they are part
-  of a group using high bandwidth.  Previously each delayed request scheduling
-  would be logged, now only changes in the delay (up or down) are logged.
-
-Version 0.9.12
---------------
-
-* enchancements to RPC and logging.  getinfo output has changed, a couple
-  of fields renamed.
-  issue 77: add PID to getinfo
-  issue 78: start RPC immediately, don't wait for catch-up
-  issue 79: show IPv6 address-port combinations properly in []
-  issue 80: show DB and daemon heights in getinfo
-
-Version 0.9.11
---------------
-
-* rework the fetch-and-process blocks loop.  This regains some of the
-  sync efficiency we lost during 0.8.x and that was poorly hacked
-  around earlier in 0.9.x.  Continuing to investigate where the rest
-  went.
-* logging of block processing times fixes #58
-* moved the peer column to the end of the sessions RPC so that IPv6 addrs
-  don't mess up the formatting
-
-Version 0.9.10
---------------
-
-* logging improvements
-* fixed issue #76 (RPCError namespace)
-
-Version 0.9.9
--------------
-
-* prioritize mempool processing of sent txs.  Closes issue 73.
-* mempool tx processing needs to handle DBError exceptions.  Fixes issue 74.
-
-Version 0.9.8
--------------
-
-* cleanup up mempool handling, notify of addresses only once when a new block
-  comes in.  Fixes issue 70.
-
-Version 0.9.7
--------------
-
-* history and UTXO requests are now processed by the executor, i.e.,
-  properly asynchronously.  This was the last of the potential latency
-  bottlenecks.
-
-Version 0.9.6
--------------
-
-* fix it properly this time
-
-Version 0.9.5
--------------
-
-* fix issue introduced in 0.9.4 with paused connections
-
-Version 0.9.4
--------------
-
-* new env var MAX_SESSIONS, see docs/ENV-NOTES.  The default limit is
-  1,000 sessions so raise this if you want to be able to take more.
-* a couple of minor bug fixes relating to paused connections
-* removed RPC calls numsessions and numpeers.  They're not very interesting
-  and all that and more is in getinfo.
-
-Version 0.9.3
--------------
-
-* unconfirmed flag indicating whether mempool txs have unconfirmed inputs
-  was inverted
-
-Version 0.9.2
--------------
-
-* fix mempool busy waiting
-
-Version 0.9.1
--------------
-
-* fix another couple of issues introduced in 0.9.0
-
-Version 0.9.0a
---------------
-
-* fix typo in 0.9.0
-
-Version 0.9.0
--------------
-
-* complete rewrite of mempool code to have minimal latency and fix a
-  couple of minor bugs.  When a new block is found, ideally this
-  should be communicated to clients who addresses are affected with a
-  single notification.  Previously this would happen with two
-  notifications: one because the TX got in the block, and one because
-  that TX was no longer in the mempool.  Fundamentally this a race
-  condition that cannot be eliminated but its occurrence should be
-  minimized.
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
@@ -365,4 +244,6 @@ Version 0.9.0
 .. _#92: https://github.com/kyuupichan/electrumx/issues/92
 .. _#93: https://github.com/kyuupichan/electrumx/issues/93
 .. _#94: https://github.com/kyuupichan/electrumx/issues/94
+.. _#102: https://github.com/kyuupichan/electrumx/issues/102
+.. _#103: https://github.com/kyuupichan/electrumx/issues/103
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
