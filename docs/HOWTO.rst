@@ -7,17 +7,23 @@ successfully on MaxOSX and DragonFlyBSD.  It won't run out-of-the-box
 on Windows, but the changes required to make it do so should be
 small - pull requests are welcome.
 
-+ Python3:  ElectrumX uses asyncio.  Python version >= 3.5 is **required**.
-+ plyvel:   Python interface to LevelDB.  I am using plyvel-0.9.
-+ pylru:    Python LRU cache package.  I'm using 1.0.9.
-+ aiohttp:  Python library for asynchronous HTTP.  ElectrumX uses it for
-            communication with the daemon.  Version >= 1.0 required; I am
-            using 1.0.5.
-+ irc:      Python IRC package.  Only required if you enable IRC; ElectrumX
-            will happily serve clients that try to connect directly.
-            I use 15.0.4 but older versions likely are fine.
-+ x11_hash: Python X11 Hash package. Only required if you use ElectrumX
-            with Dash Mainnet or Testnet.  Version 1.4 tested.
+================ ========================
+Package          Notes
+================ ========================
+Python3          ElectrumX uses asyncio.  Python version >= 3.5 is **required**.
+`aiohttp`_       Python library for asynchronous HTTP.  Version >=
+                 1.0 required; I am using 1.0.5.
+`pylru`_         Python LRU cache package.  I'm using 1.0.9.
+DB Engine        I use `plyvel`_ 0.9, a Python interface to LevelDB.
+                 A database engine package is required but others
+                 are supported (see **Database Engine** below).
+`IRC`_           Python IRC package.  Only required if you enable
+                 IRC; ElectrumX will happily serve clients that
+                 try to connect directly.  I use 15.0.4 but
+                 older versions likely are fine.
+`x11_hash`_      Only required for DASH.  Python X11 Hash package.  Only
+                 required if for Dash.  Version 1.4 tested.
+================ ========================
 
 While not a requirement for running ElectrumX, it is intended to be
 run with supervisor software such as Daniel Bernstein's
@@ -41,8 +47,8 @@ Database Engine
 
 You can choose from RocksDB, LevelDB or LMDB to store transaction
 information on disk. Currently, the fastest seems to be RocksDB with
-LevelDB being a few percent slower. LMDB is slowest but that is
-because the code does not currently suit the LMDB design.
+LevelDB being slightly slower. LMDB is slowest but that is because the
+code needs reworking to be better usable with LMDB.
 
 You will need to install one of:
 
@@ -208,7 +214,7 @@ most sluggish::
   321,800                       1h 40m
   357,000          12h 32m      2h 41m
   386,000          21h 56m      4h 25m
-  414,200       1d              6h 30m
+  414,200       1d 12h 29m      6h 30m
   447,168                       9h 47m
 
 *Machine A*: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU,
@@ -308,7 +314,7 @@ minute.  UTXO flushes can take several minutes and look like this::
   INFO:BlockProcessor:flushed 6,403 blocks with 5,879,440 txs, 2,920,524 UTXO adds, 3,646,572 spends in 93.1s, committing...
   INFO:BlockProcessor:flush #120 took 226.4s.  Height 378,787 txs: 87,695,588
   INFO:BlockProcessor:tx/sec since genesis: 1,280, since last flush: 359
-  INFO:BlockProcessor:sync time: 0d 19h 01m 06s  ETA: 3d 21h 17m 52s
+  INFO:BlockProcessor:sync t ime: 0d 19h 01m 06s  ETA: 3d 21h 17m 52s
   INFO:BlockProcessor:our height: 378,812 daemon: 447,334 UTXOs 10MB hist 10MB
 
 The ETA shown is just a rough guide and in the short term can be quite
@@ -319,3 +325,7 @@ to height 280,000 is should be fairly accurate.
 .. _`samples/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/samples/systemd/electrumx.service
 .. _`daemontools`: http://cr.yp.to/daemontools.html
 .. _`runit`: http://smarden.org/runit/index.html
+.. _`aiohttp`: https://pypi.python.org/pypi/aiohttp
+.. _`pylru`: https://pypi.python.org/pypi/pylru
+.. _`IRC`: https://pypi.python.org/pypi/irc
+.. _`x11_hash`: https://pypi.python.org/pypi/x11_hash
