@@ -8,11 +8,21 @@
 '''Class for handling JSON RPC 2.0 connections, server or client.'''
 
 import asyncio
+import inspect
 import json
 import numbers
 import time
+import traceback
 
 from lib.util import LoggedClass
+
+
+class RPCError(Exception):
+    '''RPC handlers raise this error.'''
+    def __init__(self, msg, code=-1, **kw_args):
+        super().__init__(**kw_args)
+        self.msg = msg
+        self.code = code
 
 
 class RequestBase(object):
@@ -20,6 +30,7 @@ class RequestBase(object):
 
     def __init__(self, remaining):
         self.remaining = remaining
+
 
 class SingleRequest(RequestBase):
     '''An object that represents a single request.'''
@@ -62,7 +73,8 @@ class BatchRequest(RequestBase):
                 self.parts.append(part)
 
         total_len = sum(len(part) + 2 for part in self.parts)
-        session.check_oversized_request(total_len)
+        if session.is_oversized_request(total_len):
+            raise RPCError('request too large', JSONRPC.INVALID_REQUEST)
 
         if not self.remaining:
             if self.parts:
@@ -83,33 +95,30 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     Derived classes may want to override connection_made() and
     connection_lost() but should be sure to call the implementation in
-    this base class first.  They will also want to implement some or
-    all of the asynchronous functions handle_notification(),
-    handle_response() and handle_request().
+    this base class first.  They may also want to implement the asynchronous
+    function handle_response() which by default does nothing.
 
-    handle_request() returns the result to pass over the network, and
-    must raise an RPCError if there is an error.
-    handle_notification() and handle_response() should not return
-    anything or raise any exceptions.  All three functions have
-    default "ignore" implementations supplied by this class.
+    The functions request_handler() and notification_handler() are
+    passed an RPC method name, and should return an asynchronous
+    function to call to handle it.  The functions' docstrings are used
+    for help, and the arguments are what can be used as JSONRPC 2.0
+    named arguments (and thus become part of the external interface).
+    If the method is unknown return None.
+
+    Request handlers should return a Python object to return to the
+    caller, or raise an RPCError on error.  Notification handlers
+    should not return a value or raise any exceptions.
     '''
 
     # See http://www.jsonrpc.org/specification
     PARSE_ERROR = -32700
     INVALID_REQUEST = -32600
     METHOD_NOT_FOUND = -32601
-    INVALID_PARAMS = -32602
+    INVALID_ARGS = -32602
     INTERNAL_ERROR = -32603
 
     ID_TYPES = (type(None), str, numbers.Number)
     NEXT_SESSION_ID = 0
-
-    class RPCError(Exception):
-        '''RPC handlers raise this error.'''
-        def __init__(self, msg, code=-1, **kw_args):
-            super().__init__(**kw_args)
-            self.msg = msg
-            self.code = code
 
     @classmethod
     def request_payload(cls, method, id_, params=None):
@@ -120,8 +129,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     @classmethod
     def response_payload(cls, result, id_):
-        # We should not respond to notifications
-        assert id_ is not None
         return {'jsonrpc': '2.0', 'result': result, 'id': id_}
 
     @classmethod
@@ -134,8 +141,28 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         return {'jsonrpc': '2.0', 'error': error, 'id': id_}
 
     @classmethod
+    def check_payload_id(cls, payload):
+        '''Extract and return the ID from the payload.
+
+        Raises an RPCError if it is missing or invalid.'''
+        if not 'id' in payload:
+            raise RPCError('missing id', JSONRPC.INVALID_REQUEST)
+
+        id_ = payload['id']
+        if not isinstance(id_, JSONRPC.ID_TYPES):
+            raise RPCError('invalid id: {}'.format(id_),
+                           JSONRPC.INVALID_REQUEST)
+        return id_
+
+    @classmethod
     def payload_id(cls, payload):
-        return payload.get('id') if isinstance(payload, dict) else None
+        '''Extract and return the ID from the payload.
+
+        Returns None if it is missing or invalid.'''
+        try:
+            return cls.check_payload_id(payload)
+        except RPCError:
+            return None
 
     def __init__(self):
         super().__init__()
@@ -157,6 +184,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         self.send_count = 0
         self.send_size = 0
         self.error_count = 0
+        self.close_after_send = False
         self.peer_info = None
         # Sends longer than max_send are prevented, instead returning
         # an oversized request error to other end of the network
@@ -260,20 +288,20 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
             message = message.decode()
         except UnicodeDecodeError as e:
             msg = 'cannot decode binary bytes: {}'.format(e)
-            self.send_json_error(msg, self.PARSE_ERROR, close=True)
+            self.send_json_error(msg, JSONRPC.PARSE_ERROR)
             return
 
         try:
             message = json.loads(message)
         except json.JSONDecodeError as e:
             msg = 'cannot decode JSON: {}'.format(e)
-            self.send_json_error(msg, self.PARSE_ERROR, close=True)
+            self.send_json_error(msg, JSONRPC.PARSE_ERROR)
             return
 
         if isinstance(message, list):
-            # Batches must have at least one request.
+            # Batches must have at least one object.
             if not message:
-                self.send_json_error('empty batch', self.INVALID_REQUEST)
+                self.send_json_error('empty batch', JSONRPC.INVALID_REQUEST)
                 return
             request = BatchRequest(message)
         else:
@@ -284,34 +312,42 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         if self.log_me:
             self.log_info('queued {}'.format(message))
 
+    def send_json_error(self, message, code, id_=None):
+        '''Send a JSON error.'''
+        self._send_bytes(self.json_error_bytes(message, code, id_))
+
     def encode_payload(self, payload):
+        assert isinstance(payload, dict)
+
         try:
             binary = json.dumps(payload).encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.log_error(msg)
-            return self.send_json_error(msg, self.INTERNAL_ERROR,
-                                        self.payload_id(payload))
+            binary = self.json_error_bytes(msg, JSONRPC.INTERNAL_ERROR,
+                                           payload.get('id'))
 
-        self.check_oversized_request(len(binary))
+        if self.is_oversized_request(len(binary)):
+            binary = self.json_error_bytes('request too large',
+                                           JSONRPC.INVALID_REQUEST,
+                                           payload.get('id'))
         self.send_count += 1
         self.send_size += len(binary)
         self.using_bandwidth(len(binary))
         return binary
 
-    def _send_bytes(self, binary, close=False):
+    def is_oversized_request(self, total_len):
+        return total_len > max(1000, self.max_send)
+
+    def _send_bytes(self, binary):
         '''Send JSON text over the transport.  Close it if close is True.'''
         # Confirmed this happens, sometimes a lot
         if self.transport.is_closing():
             return
         self.transport.write(binary)
         self.transport.write(b'\n')
-        if close or self.error_count > 10:
+        if self.close_after_send:
             self.close_connection()
-
-    def send_json_error(self, message, code, id_=None, close=False):
-        '''Send a JSON error and close the connection by default.'''
-        self._send_bytes(self.json_error_bytes(message, code, id_), close)
 
     def encode_and_send_payload(self, payload):
         '''Encode the payload and send it.'''
@@ -330,124 +366,134 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         return self.encode_payload(self.response_payload(result, id_))
 
     def json_error_bytes(self, message, code, id_=None):
-        '''Return the bytes of a JSON error.'''
+        '''Return the bytes of a JSON error.
+
+        Flag the connection to close on a fatal error or too many errors.'''
         self.error_count += 1
+        if (code in (JSONRPC.PARSE_ERROR, JSONRPC.INVALID_REQUEST)
+                or self.error_count > 10):
+            self.close_after_send = True
         return self.encode_payload(self.error_payload(message, code, id_))
 
     async def process_single_payload(self, payload):
-        '''Return the binary JSON result of a single JSON request, response or
-        notification.
+        '''Handle a single JSON request, notification or response.
 
-        The result is empty if nothing is to be sent.
-        '''
-
+        If it is a request, return the binary response, oterhwise None.'''
         if not isinstance(payload, dict):
             return self.json_error_bytes('request must be a dict',
-                                         self.INVALID_REQUEST)
+                                         JSONRPC.INVALID_REQUEST)
 
+        # Requests and notifications must have a method.
+        # Notifications are distinguished by having no 'id'.
+        if 'method' in payload:
+            if 'id' in payload:
+                return await self.process_single_request(payload)
+            else:
+                await self.process_single_notification(payload)
+        else:
+            await self.process_single_response(payload)
+
+        return None
+
+    async def process_single_request(self, payload):
+        '''Handle a single JSON request and return the binary response.'''
         try:
-            if not 'id' in payload:
-                return await self.process_json_notification(payload)
-
-            id_ = payload['id']
-            if not isinstance(id_, self.ID_TYPES):
-                return self.json_error_bytes('invalid id: {}'.format(id_),
-                                             self.INVALID_REQUEST)
-
-            if 'method' in payload:
-                return await self.process_json_request(payload)
-
-            return await self.process_json_response(payload)
-        except self.RPCError as e:
+            result = await self.handle_payload(payload, self.request_handler)
+            return self.json_response_bytes(result, payload['id'])
+        except RPCError as e:
             return self.json_error_bytes(e.msg, e.code,
                                          self.payload_id(payload))
+        except Exception:
+            self.log_error(traceback.format_exc())
+            return self.json_error_bytes('internal error processing request',
+                                         JSONRPC.INTERNAL_ERROR,
+                                         self.payload_id(payload))
 
-    @classmethod
-    def method_and_params(cls, payload):
+    async def process_single_notification(self, payload):
+        '''Handle a single JSON notification.'''
+        try:
+            await self.handle_payload(payload, self.notification_handler)
+        except RPCError:
+            pass
+        except Exception:
+            self.log_error(traceback.format_exc())
+
+    async def process_single_response(self, payload):
+        '''Handle a single JSON response.'''
+        try:
+            id_ = self.check_payload_id(payload)
+            # Only one of result and error should exist
+            if 'error' in payload:
+                error = payload['error']
+                if (not 'result' in payload and isinstance(error, dict)
+                        and 'code' in error and 'message' in error):
+                    await self.handle_response(None, error, id_)
+            elif 'result' in payload:
+                await self.handle_response(payload['result'], None, id_)
+        except RPCError:
+            pass
+        except Exception:
+            self.log_error(traceback.format_exc())
+
+    async def handle_payload(self, payload, get_handler):
+        '''Handle a request or notification payload given the handlers.'''
+        # An argument is the value passed to a function parameter...
+        args = payload.get('params', [])
         method = payload.get('method')
-        params = payload.get('params', [])
 
         if not isinstance(method, str):
-            raise cls.RPCError('invalid method: {}'.format(method),
-                               cls.INVALID_REQUEST)
+            raise RPCError("invalid method: '{}'".format(method),
+                           JSONRPC.INVALID_REQUEST)
 
-        if not isinstance(params, list):
-            raise cls.RPCError('params should be an array',
-                               cls.INVALID_REQUEST)
+        handler = get_handler(method)
+        if not handler:
+            raise RPCError("unknown method: '{}'".format(method),
+                           JSONRPC.METHOD_NOT_FOUND)
 
-        return method, params
+        if not isinstance(args, (list, dict)):
+            raise RPCError('arguments should be an array or a dict',
+                           JSONRPC.INVALID_REQUEST)
 
-    async def process_json_notification(self, payload):
-        try:
-            method, params = self.method_and_params(payload)
-        except self.RPCError:
-            pass
+        params = inspect.signature(handler).parameters
+        names = list(params)
+        min_args = sum(p.default is p.empty for p in params.values())
+
+        if len(args) < min_args:
+            raise RPCError('too few arguments: expected {:d} got {:d}'
+                           .format(min_args, len(args)), JSONRPC.INVALID_ARGS)
+
+        if len(args) > len(params):
+            raise RPCError('too many arguments: expected {:d} got {:d}'
+                           .format(len(params), len(args)),
+                           JSONRPC.INVALID_ARGS)
+
+        if isinstance(args, list):
+            kw_args = {name: arg for name, arg in zip(names, args)}
         else:
-            await self.handle_notification(method, params)
-        return b''
+            kw_args = args
+            bad_names = ['<{}>'.format(name) for name in args
+                         if name not in names]
+            if bad_names:
+                raise RPCError('invalid parameter names: {}'
+                               .format(', '.join(bad_names)))
 
-    async def process_json_request(self, payload):
-        method, params = self.method_and_params(payload)
-        result = await self.handle_request(method, params)
-        return self.json_response_bytes(result, payload['id'])
-
-    async def process_json_response(self, payload):
-        # Only one of result and error should exist; we go with 'error'
-        # if both are supplied.
-        if 'error' in payload:
-            await self.handle_response(None, payload['error'], payload['id'])
-        elif 'result' in payload:
-            await self.handle_response(payload['result'], None, payload['id'])
-        return b''
-
-    def check_oversized_request(self, total_len):
-        if total_len > max(1000, self.max_send):
-            raise self.RPCError('request too large', self.INVALID_REQUEST)
-
-    def raise_unknown_method(self, method):
-        '''Respond to a request with an unknown method.'''
-        raise self.RPCError("unknown method: '{}'".format(method),
-                            self.METHOD_NOT_FOUND)
-
-    # Common parameter verification routines
-    @classmethod
-    def param_to_non_negative_integer(cls, param):
-        '''Return param if it is or can be converted to a non-negative
-        integer, otherwise raise an RPCError.'''
-        try:
-            param = int(param)
-            if param >= 0:
-                return param
-        except ValueError:
-            pass
-
-        raise cls.RPCError('param {} should be a non-negative integer'
-                           .format(param))
-
-    @classmethod
-    def params_to_non_negative_integer(cls, params):
-        if len(params) == 1:
-            return cls.param_to_non_negative_integer(params[0])
-        raise cls.RPCError('params {} should contain one non-negative integer'
-                            .format(params))
-
-    @classmethod
-    def require_empty_params(cls, params):
-        if params:
-            raise cls.RPCError('params {} should be empty'.format(params))
-
+        return await handler(**kw_args)
 
     # --- derived classes are intended to override these functions
     def enqueue_request(self, request):
         '''Enqueue a request for later asynchronous processing.'''
         raise NotImplementedError
 
-    async def handle_notification(self, method, params):
-        '''Handle a notification.'''
+    async def handle_response(self, result, error, id_):
+        '''Handle a JSON response.
 
-    async def handle_request(self, method, params):
-        '''Handle a request.'''
+        Should not raise an exception.  Return values are ignored.
+        '''
+
+    def notification_handler(self, method):
+        '''Return the async handler for the given notification method.'''
         return None
 
-    async def handle_response(self, result, error, id_):
-        '''Handle a response.'''
+    def request_handler(self, method):
+        '''Return the async handler for the given request method.'''
+        return None

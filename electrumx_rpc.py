@@ -33,6 +33,8 @@ class RPCClient(JSONRPC):
     async def send_and_wait(self, method, params, timeout=None):
         # Raise incoming buffer size - presumably connection is trusted
         self.max_buffer_size = 5000000
+        if params:
+            params = [params]
         payload = self.request_payload(method, id_=method, params=params)
         self.encode_and_send_payload(payload)
 
