@@ -6,6 +6,7 @@
 # and warranty status of this software.
 
 import asyncio
+import codecs
 import json
 import os
 import _socket
@@ -17,12 +18,14 @@ from functools import partial
 
 import pylru
 
-from lib.jsonrpc import JSONRPC, RequestBase
+from lib.jsonrpc import JSONRPC, RPCError, RequestBase
+from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
 from server.irc import IRC
 from server.session import LocalRPC, ElectrumX
 from server.mempool import MemPool
+from server.version import VERSION
 
 
 class Controller(util.LoggedClass):
@@ -49,7 +52,9 @@ class Controller(util.LoggedClass):
         super().__init__()
         self.loop = asyncio.get_event_loop()
         self.start = time.time()
+        self.coin = env.coin
         self.bp = BlockProcessor(env)
+        self.daemon = self.bp.daemon
         self.mempool = MemPool(self.bp)
         self.irc = IRC(env)
         self.env = env
@@ -70,10 +75,27 @@ class Controller(util.LoggedClass):
         self.queue = asyncio.PriorityQueue()
         self.delayed_sessions = []
         self.next_queue_id = 0
-        self.height = 0
+        self.cache_height = 0
         self.futures = []
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
+        # Set up the RPC request handlers
+        cmds = 'disconnect getinfo groups log peers reorg sessions'.split()
+        self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
+        # Set up the ElectrumX request handlers
+        rpcs = [
+            ('blockchain',
+             'address.get_balance address.get_history address.get_mempool '
+             'address.get_proof address.listunspent '
+             'block.get_header block.get_chunk estimatefee relayfee '
+             'transaction.get transaction.get_merkle utxo.get_address'),
+            ('server',
+             'banner donation_address peers.subscribe version'),
+        ]
+        self.electrumx_handlers = {'.'.join([prefix, suffix]):
+                                   getattr(self, suffix.replace('.', '_'))
+                                   for prefix, suffixes in rpcs
+                                   for suffix in suffixes.split()}
 
     async def mempool_transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -168,7 +190,7 @@ class Controller(util.LoggedClass):
                 await session.serve_requests()
 
     async def main_loop(self):
-        '''Server manager main loop.'''
+        '''Controller main loop.'''
         def add_future(coro):
             self.futures.append(asyncio.ensure_future(coro))
 
@@ -261,8 +283,8 @@ class Controller(util.LoggedClass):
             hc = self.history_cache
             for hashX in set(hc).intersection(touched):
                 del hc[hashX]
-            if self.bp.db_height != self.height:
-                self.height = self.bp.db_height
+            if self.bp.db_height != self.cache_height:
+                self.cache_height = self.bp.db_height
                 self.header_cache.clear()
 
             for session in self.sessions:
@@ -282,31 +304,13 @@ class Controller(util.LoggedClass):
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
         if not 0 <= height <= self.bp.db_height:
-            raise JSONRPC.RPCError('height {:,d} out of range'.format(height))
+            raise RPCError('height {:,d} out of range'.format(height))
         if height in self.header_cache:
             return self.header_cache[height]
         header = self.bp.read_headers(height, 1)
-        header = self.env.coin.electrum_header(header, height)
+        header = self.coin.electrum_header(header, height)
         self.header_cache[height] = header
         return header
-
-    async def async_get_history(self, hashX):
-        '''Get history asynchronously to reduce latency.'''
-        if hashX in self.history_cache:
-            return self.history_cache[hashX]
-
-        def job():
-            # History DoS limit.  Each element of history is about 99
-            # bytes when encoded as JSON.  This limits resource usage
-            # on bloated history requests, and uses a smaller divisor
-            # so large requests are logged before refusing them.
-            limit = self.env.max_send // 97
-            return list(self.bp.get_history(hashX, limit=limit))
-
-        loop = asyncio.get_event_loop()
-        history = await loop.run_in_executor(None, job)
-        self.history_cache[hashX] = history
-        return history
 
     async def shutdown(self):
         '''Call to shutdown everything.  Returns when done.'''
@@ -402,15 +406,6 @@ class Controller(util.LoggedClass):
                 self.sessions[session] = new_gid
             self.groups[new_gid] = sessions
 
-    def new_subscription(self):
-        if self.subscription_count >= self.max_subs:
-            raise JSONRPC.RPCError('server subscription limit {:,d} reached'
-                                   .format(self.max_subs))
-        self.subscription_count += 1
-
-    def irc_peers(self):
-        return self.irc.peers
-
     def session_count(self):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
@@ -418,7 +413,7 @@ class Controller(util.LoggedClass):
     def server_summary(self):
         '''A one-line summary of server state.'''
         return {
-            'daemon_height': self.bp.daemon.cached_height(),
+            'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'errors': sum(s.error_count for s in self.sessions),
@@ -524,49 +519,360 @@ class Controller(util.LoggedClass):
                  now - session.start)
                 for session in sessions]
 
-    def lookup_session(self, param):
+    def lookup_session(self, session_id):
         try:
-            id_ = int(param)
+            session_id = int(session_id)
         except:
             pass
         else:
             for session in self.sessions:
-                if session.id_ == id_:
+                if session.id_ == session_id:
                     return session
         return None
 
-    def for_each_session(self, params, operation):
+    def for_each_session(self, session_ids, operation):
+        if not isinstance(session_ids, list):
+            raise RPCError('expected a list of session IDs')
+
         result = []
-        for param in params:
-            session = self.lookup_session(param)
+        for session_id in session_ids:
+            session = self.lookup_session(session_id)
             if session:
                 result.append(operation(session))
             else:
-                result.append('unknown session: {}'.format(param))
+                result.append('unknown session: {}'.format(session_id))
         return result
 
-    async def rpc_disconnect(self, params):
-        return self.for_each_session(params, self.close_session)
+    # Local RPC command handlers
 
-    async def rpc_log(self, params):
-        return self.for_each_session(params, self.toggle_logging)
+    async def rpc_disconnect(self, session_ids):
+        '''Disconnect sesssions.
 
-    async def rpc_getinfo(self, params):
+        session_ids: array of session IDs
+        '''
+        return self.for_each_session(session_ids, self.close_session)
+
+    async def rpc_log(self, session_ids):
+        '''Toggle logging of sesssions.
+
+        session_ids: array of session IDs
+        '''
+        return self.for_each_session(session_ids, self.toggle_logging)
+
+    async def rpc_getinfo(self):
+        '''Return summary information about the server process.'''
         return self.server_summary()
 
-    async def rpc_groups(self, params):
+    async def rpc_groups(self):
+        '''Return statistics about the session groups.'''
         return self.group_data()
 
-    async def rpc_sessions(self, params):
+    async def rpc_sessions(self):
+        '''Return statistics about connected sessions.'''
         return self.session_data(for_log=False)
 
-    async def rpc_peers(self, params):
+    async def rpc_peers(self):
+        '''Return a list of server peers, currently taken from IRC.'''
         return self.irc.peers
 
-    async def rpc_reorg(self, params):
-        '''Force a reorg of the given number of blocks, 3 by default.'''
-        count = 3
-        if params:
-            count = JSONRPC.params_to_non_negative_integer(params)
+    async def rpc_reorg(self, count=3):
+        '''Force a reorg of the given number of blocks.
+
+        count: number of blocks to reorg (default 3)
+        '''
+        count = self.non_negative_integer(count)
         if not self.bp.force_chain_reorg(count):
-            raise JSONRPC.RPCError('still catching up with daemon')
+            raise RPCError('still catching up with daemon')
+        return 'scheduled a reorg of {:,d} blocks'.format(count)
+
+    # Helpers for RPC "blockchain" command handlers
+
+    def address_to_hashX(self, address):
+        if isinstance(address, str):
+            try:
+                return self.coin.address_to_hashX(address)
+            except:
+                pass
+        raise RPCError('{} is not a valid address'.format(address))
+
+    def to_tx_hash(self, value):
+        '''Raise an RPCError if the value is not a valid transaction
+        hash.'''
+        if isinstance(value, str) and len(value) == 64:
+            try:
+                bytes.fromhex(value)
+                return value
+            except ValueError:
+                pass
+        raise RPCError('{} should be a transaction hash'.format(value))
+
+    def non_negative_integer(self, value):
+        '''Return param value it is or can be converted to a non-negative
+        integer, otherwise raise an RPCError.'''
+        try:
+            value = int(value)
+            if value >= 0:
+                return value
+        except ValueError:
+            pass
+        raise RPCError('{} should be a non-negative integer'.format(value))
+
+    async def daemon_request(self, method, *args):
+        '''Catch a DaemonError and convert it to an RPCError.'''
+        try:
+            return await getattr(self.daemon, method)(*args)
+        except DaemonError as e:
+            raise RPCError('daemon error: {}'.format(e))
+
+    async def new_subscription(self, address):
+        if self.subscription_count >= self.max_subs:
+            raise RPCError('server subscription limit {:,d} reached'
+                           .format(self.max_subs))
+        self.subscription_count += 1
+        hashX = self.address_to_hashX(address)
+        status = await self.address_status(hashX)
+        return hashX, status
+
+    async def tx_merkle(self, tx_hash, height):
+        '''tx_hash is a hex string.'''
+        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
+        block = await self.daemon_request('deserialised_block', hex_hashes[0])
+        tx_hashes = block['tx']
+        try:
+            pos = tx_hashes.index(tx_hash)
+        except ValueError:
+            raise RPCError('tx hash {} not in block {} at height {:,d}'
+                           .format(tx_hash, hex_hashes[0], height))
+
+        idx = pos
+        hashes = [hex_str_to_hash(txh) for txh in tx_hashes]
+        merkle_branch = []
+        while len(hashes) > 1:
+            if len(hashes) & 1:
+                hashes.append(hashes[-1])
+            idx = idx - 1 if (idx & 1) else idx + 1
+            merkle_branch.append(hash_to_str(hashes[idx]))
+            idx //= 2
+            hashes = [double_sha256(hashes[n] + hashes[n + 1])
+                      for n in range(0, len(hashes), 2)]
+
+        return {"block_height": height, "merkle": merkle_branch, "pos": pos}
+
+    async def get_balance(self, hashX):
+        utxos = await self.get_utxos(hashX)
+        confirmed = sum(utxo.value for utxo in utxos)
+        unconfirmed = self.mempool_value(hashX)
+        return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
+
+    async def unconfirmed_history(self, hashX):
+        # Note unconfirmed history is unordered in electrum-server
+        # Height is -1 if unconfirmed txins, otherwise 0
+        mempool = await self.mempool_transactions(hashX)
+        return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
+                for tx_hash, fee, unconfirmed in mempool]
+
+    async def get_history(self, hashX):
+        '''Get history asynchronously to reduce latency.'''
+        if hashX in self.history_cache:
+            return self.history_cache[hashX]
+
+        def job():
+            # History DoS limit.  Each element of history is about 99
+            # bytes when encoded as JSON.  This limits resource usage
+            # on bloated history requests, and uses a smaller divisor
+            # so large requests are logged before refusing them.
+            limit = self.env.max_send // 97
+            return list(self.bp.get_history(hashX, limit=limit))
+
+        loop = asyncio.get_event_loop()
+        history = await loop.run_in_executor(None, job)
+        self.history_cache[hashX] = history
+        return history
+
+    async def confirmed_and_unconfirmed_history(self, hashX):
+        # Note history is ordered but unconfirmed is unordered in e-s
+        history = await self.get_history(hashX)
+        conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
+                for tx_hash, height in history]
+        return conf + await self.unconfirmed_history(hashX)
+
+    async def address_status(self, hashX):
+        '''Returns status as 32 bytes.'''
+        # Note history is ordered and mempool unordered in electrum-server
+        # For mempool, height is -1 if unconfirmed txins, otherwise 0
+        history = await self.get_history(hashX)
+        mempool = await self.mempool_transactions(hashX)
+
+        status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
+                         for tx_hash, height in history)
+        status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
+                          for hex_hash, tx_fee, unconfirmed in mempool)
+        if status:
+            return sha256(status.encode()).hex()
+        return None
+
+    async def get_utxos(self, hashX):
+        '''Get UTXOs asynchronously to reduce latency.'''
+        def job():
+            return list(self.bp.get_utxos(hashX, limit=None))
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, job)
+
+    def get_chunk(self, index):
+        '''Return header chunk as hex.  Index is a non-negative integer.'''
+        chunk_size = self.coin.CHUNK_SIZE
+        next_height = self.bp.db_height + 1
+        start_height = min(index * chunk_size, next_height)
+        count = min(next_height - start_height, chunk_size)
+        return self.bp.read_headers(start_height, count).hex()
+
+    # Client RPC "blockchain" command handlers
+
+    async def address_get_balance(self, address):
+        '''Return the confirmed and unconfirmed balance of an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.get_balance(hashX)
+
+    async def address_get_history(self, address):
+        '''Return the confirmed and unconfirmed history of an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.confirmed_and_unconfirmed_history(hashX)
+
+    async def address_get_mempool(self, address):
+        '''Return the mempool transactions touching an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.unconfirmed_history(hashX)
+
+    async def address_get_proof(self, address):
+        '''Return the UTXO proof of an address.'''
+        hashX = self.address_to_hashX(address)
+        raise RPCError('address.get_proof is not yet implemented')
+
+    async def address_listunspent(self, address):
+        '''Return the list of UTXOs of an address.'''
+        hashX = self.address_to_hashX(address)
+        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in sorted(await self.get_utxos(hashX))]
+
+    async def block_get_chunk(self, index):
+        '''Return a chunk of block headers.
+
+        index: the chunk index'''
+        index = self.non_negative_integer(index)
+        return self.get_chunk(index)
+
+    async def block_get_header(self, height):
+        '''The deserialized header at a given height.
+
+        height: the header's height'''
+        height = self.non_negative_integer(height)
+        return self.electrum_header(height)
+
+    async def estimatefee(self, number):
+        '''The estimated transaction fee per kilobyte to be paid for a
+        transaction to be included within a certain number of blocks.
+
+        number: the number of blocks
+        '''
+        number = self.non_negative_integer(number)
+        return await self.daemon_request('estimatefee', [number])
+
+    async def relayfee(self):
+        '''The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool.'''
+        return await self.daemon_request('relayfee')
+
+    async def transaction_get(self, tx_hash, height=None):
+        '''Return the serialized raw transaction given its hash
+
+        tx_hash: the transaction hash as a hexadecimal string
+        height: ignored, do not use
+        '''
+        # For some reason Electrum passes a height.  We don't require
+        # it in anticipation it might be dropped in the future.
+        tx_hash = self.to_tx_hash(tx_hash)
+        return await self.daemon_request('getrawtransaction', tx_hash)
+
+    async def transaction_get_merkle(self, tx_hash, height):
+        '''Return the markle tree to a confirmed transaction given its hash
+        and height.
+
+        tx_hash: the transaction hash as a hexadecimal string
+        height: the height of the block it is in
+        '''
+        tx_hash = self.to_tx_hash(tx_hash)
+        height = self.non_negative_integer(height)
+        return await self.tx_merkle(tx_hash, height)
+
+    async def utxo_get_address(self, tx_hash, index):
+        '''Returns the address sent to in a UTXO, or null if the UTXO
+        cannot be found.
+
+        tx_hash: the transaction hash of the UTXO
+        index: the index of the UTXO in the transaction'''
+        # Used only for electrum client command-line requests.  We no
+        # longer index by address, so need to request the raw
+        # transaction.  So it works for any TXO not just UTXOs.
+        tx_hash = self.to_tx_hash(tx_hash)
+        index = self.non_negative_integer(index)
+        raw_tx = await self.daemon_request('getrawtransaction', tx_hash)
+        if not raw_tx:
+            return None
+        raw_tx = bytes.fromhex(raw_tx)
+        deserializer = self.coin.deserializer()
+        tx, tx_hash = deserializer(raw_tx).read_tx()
+        if index >= len(tx.outputs):
+            return None
+        return self.coin.address_from_script(tx.outputs[index].pk_script)
+
+    # Client RPC "server" command handlers
+
+    async def banner(self):
+        '''Return the server banner text.'''
+        banner = 'Welcome to Electrum!'
+        if self.env.banner_file:
+            try:
+                with codecs.open(self.env.banner_file, 'r', 'utf-8') as f:
+                    banner = f.read()
+            except Exception as e:
+                self.log_error('reading banner file {}: {}'
+                               .format(self.env.banner_file, e))
+            else:
+                network_info = await self.daemon_request('getnetworkinfo')
+                version = network_info['version']
+                major, minor = divmod(version, 1000000)
+                minor, revision = divmod(minor, 10000)
+                revision //= 100
+                version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
+                for pair in [
+                    ('$VERSION', VERSION),
+                    ('$DAEMON_VERSION', version),
+                    ('$DAEMON_SUBVERSION', network_info['subversion']),
+                    ('$DONATION_ADDRESS', self.env.donation_address),
+                ]:
+                    banner = banner.replace(*pair)
+
+        return banner
+
+    async def donation_address(self):
+        '''Return the donation address as a string, empty if there is none.'''
+        return self.env.donation_address
+
+    async def peers_subscribe(self):
+        '''Returns the server peers as a list of (ip, host, ports) tuples.
+
+        Despite the name this is not currently treated as a subscription.'''
+        return list(self.irc.peers.values())
+
+    async def version(self, client_name=None, protocol_version=None):
+        '''Returns the server version as a string.
+
+        client_name: a string identifying the client
+        protocol_version: the protocol version spoken by the client
+        '''
+        if client_name:
+            self.client = str(client_name)[:15]
+        if protocol_version is not None:
+            self.protocol_version = protocol_version
+        return VERSION
