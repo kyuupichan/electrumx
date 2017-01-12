@@ -140,6 +140,14 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.4
+--------------
+
+* Named argument handling as per JSON RPC 2.0 (issue `#99`_).  This
+  takes argument names from the Python RPC handlers, and paves the way
+  for creating help output automatically from the handler docstrings
+* Write reorg undo info with the UTXO flushes (issue `#101`_)
+
 Version 0.10.3
 --------------
 
@@ -245,6 +253,8 @@ Version 0.9.17
 .. _#92: https://github.com/kyuupichan/electrumx/issues/92
 .. _#93: https://github.com/kyuupichan/electrumx/issues/93
 .. _#94: https://github.com/kyuupichan/electrumx/issues/94
+.. _#99: https://github.com/kyuupichan/electrumx/issues/99
+.. _#101: https://github.com/kyuupichan/electrumx/issues/101
 .. _#102: https://github.com/kyuupichan/electrumx/issues/102
 .. _#103: https://github.com/kyuupichan/electrumx/issues/103
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
