@@ -234,8 +234,9 @@ Terminating ElectrumX
 =====================
 
 The preferred way to terminate the server process is to send it the
-INT or TERM signals.  For a daemontools supervised process this is best
-done by bringing it down like so::
+**stop** RPC command, or alternatively on Unix the INT or TERM
+signals.  For a daemontools supervised process this can be done by
+bringing it down like so::
 
     svc -d ~/service/electrumx
 

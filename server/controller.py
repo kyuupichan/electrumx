@@ -9,7 +9,6 @@ import asyncio
 import codecs
 import json
 import os
-import _socket
 import ssl
 import time
 from bisect import bisect_left
@@ -50,6 +49,8 @@ class Controller(util.LoggedClass):
 
     def __init__(self, env):
         super().__init__()
+        # Set this event to cleanly shutdown
+        self.shutdown_event = asyncio.Event()
         self.loop = asyncio.get_event_loop()
         self.start = time.time()
         self.coin = env.coin
@@ -76,11 +77,11 @@ class Controller(util.LoggedClass):
         self.delayed_sessions = []
         self.next_queue_id = 0
         self.cache_height = 0
-        self.futures = []
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
         # Set up the RPC request handlers
-        cmds = 'disconnect getinfo groups log peers reorg sessions'.split()
+        cmds = ('disconnect getinfo groups log peers reorg sessions stop'
+                .split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
         # Set up the ElectrumX request handlers
         rpcs = [
@@ -189,37 +190,75 @@ class Controller(util.LoggedClass):
             if session in self.sessions:
                 await session.serve_requests()
 
+    def initiate_shutdown(self):
+        '''Call this function to start the shutdown process.'''
+        self.shutdown_event.set()
+
     async def main_loop(self):
         '''Controller main loop.'''
         def add_future(coro):
-            self.futures.append(asyncio.ensure_future(coro))
+            futures.append(asyncio.ensure_future(coro))
 
-        # shutdown() assumes bp.main_loop() is first
-        add_future(self.bp.main_loop())
+        async def await_bp_catchup():
+            '''Wait for the block processor to catch up.
+
+            When it has, start the servers and connect to IRC.
+            '''
+            await self.bp.caught_up_event.wait()
+            self.logger.info('block processor has caught up')
+            add_future(self.irc.start())
+            add_future(self.start_servers())
+            add_future(self.mempool.main_loop())
+            add_future(self.enqueue_delayed_sessions())
+            add_future(self.notify())
+            for n in range(4):
+                add_future(self.serve_requests())
+
+        bp_future = asyncio.ensure_future(self.bp.main_loop())
+        futures = []
         add_future(self.bp.prefetcher.main_loop())
-        add_future(self.irc.start(self.bp.caught_up_event))
-        add_future(self.start_servers(self.bp.caught_up_event))
-        add_future(self.mempool.main_loop())
-        add_future(self.enqueue_delayed_sessions())
-        add_future(self.notify())
-        for n in range(4):
-            add_future(self.serve_requests())
+        add_future(await_bp_catchup())
 
-        for future in asyncio.as_completed(self.futures):
-            try:
-                await future  # Note: future is not one of self.futures
-            except asyncio.CancelledError:
-                break
+        # Perform a clean shutdown when this event is signalled.
+        await self.shutdown_event.wait()
+        self.logger.info('shutting down gracefully')
+        self.state = self.SHUTTING_DOWN
 
-        await self.shutdown()
+        # First tell the block processor to shut down, it may need to
+        # perform a lengthy flush.  Then shut down the rest.
+        self.bp.on_shutdown()
+        self.close_servers(list(self.servers.keys()))
+        for future in futures:
+            future.cancel()
+
+        # Now wait for the cleanup to complete
+        await self.close_sessions()
+        if not bp_future.done():
+            self.logger.info('waiting for block processor')
+            await bp_future
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
+        self.logger.info('closing down {} listening servers'
+                         .format(', '.join(kinds)))
         for kind in kinds:
             server = self.servers.pop(kind, None)
             if server:
                 server.close()
-                # Don't bother awaiting the close - we're not async
+
+    async def close_sessions(self, secs=30):
+        if not self.sessions:
+            return
+        self.logger.info('waiting up to {:d} seconds for socket cleanup'
+                         .format(secs))
+        for session in self.sessions:
+            self.close_session(session)
+        limit = time.time() + secs
+        while self.sessions and time.time() < limit:
+            self.clear_stale_sessions(grace=secs//2)
+            await asyncio.sleep(2)
+            self.logger.info('{:,d} sessions remaining'
+                             .format(len(self.sessions)))
 
     async def start_server(self, kind, *args, **kw_args):
         protocol_class = LocalRPC if kind == 'RPC' else ElectrumX
@@ -236,12 +275,10 @@ class Controller(util.LoggedClass):
             self.logger.info('{} server listening on {}:{:d}'
                              .format(kind, host, port))
 
-    async def start_servers(self, caught_up):
+    async def start_servers(self):
         '''Start RPC, TCP and SSL servers once caught up.'''
         if self.env.rpc_port is not None:
             await self.start_server('RPC', 'localhost', self.env.rpc_port)
-        await caught_up.wait()
-        _socket.setdefaulttimeout(5)
         self.logger.info('max session count: {:,d}'.format(self.max_sessions))
         self.logger.info('session timeout: {:,d} seconds'
                          .format(self.env.session_timeout))
@@ -311,31 +348,6 @@ class Controller(util.LoggedClass):
         header = self.coin.electrum_header(header, height)
         self.header_cache[height] = header
         return header
-
-    async def shutdown(self):
-        '''Call to shutdown everything.  Returns when done.'''
-        self.state = self.SHUTTING_DOWN
-        self.bp.on_shutdown()
-        self.close_servers(list(self.servers.keys()))
-        # Don't cancel the block processor main loop - let it close itself
-        for future in self.futures[1:]:
-            future.cancel()
-        if self.sessions:
-            await self.close_sessions()
-        await self.futures[0]
-
-    async def close_sessions(self, secs=30):
-        self.logger.info('cleanly closing client sessions, please wait...')
-        for session in self.sessions:
-            self.close_session(session)
-        self.logger.info('listening sockets closed, waiting up to '
-                         '{:d} seconds for socket cleanup'.format(secs))
-        limit = time.time() + secs
-        while self.sessions and time.time() < limit:
-            self.clear_stale_sessions(grace=secs//2)
-            await asyncio.sleep(2)
-            self.logger.info('{:,d} sessions remaining'
-                             .format(len(self.sessions)))
 
     def add_session(self, session):
         now = time.time()
@@ -558,6 +570,11 @@ class Controller(util.LoggedClass):
         session_ids: array of session IDs
         '''
         return self.for_each_session(session_ids, self.toggle_logging)
+
+    async def rpc_stop(self):
+        '''Shut down the server cleanly.'''
+        self.initiate_shutdown()
+        return 'stopping'
 
     async def rpc_getinfo(self):
         '''Return summary information about the server process.'''

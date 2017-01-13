@@ -193,6 +193,7 @@ class BlockProcessor(server.db.DB):
         '''Called by the controller to shut processing down.'''
         async def do_nothing():
             pass
+        self.logger.info('preparing clean shutdown')
         self.stop = True
         self.add_task(do_nothing) # Ensure something is on the queue
 
