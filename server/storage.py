@@ -77,8 +77,9 @@ class LevelDB(Storage):
 
     def open(self, name, create):
         mof = 512 if self.for_sync else 128
+        # Use snappy compression (the default)
         self.db = self.module.DB(name, create_if_missing=create,
-                                 max_open_files=mof, compression=None)
+                                 max_open_files=mof)
         self.close = self.db.close
         self.get = self.db.get
         self.put = self.db.put
@@ -97,11 +98,8 @@ class RocksDB(Storage):
 
     def open(self, name, create):
         mof = 512 if self.for_sync else 128
-        compression = "no"
-        compression = getattr(self.module.CompressionType,
-                              compression + "_compression")
+        # Use snappy compression (the default)
         options = self.module.Options(create_if_missing=create,
-                                      compression=compression,
                                       use_fsync=True,
                                       target_file_size_base=33554432,
                                       max_open_files=mof)
