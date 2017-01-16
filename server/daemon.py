@@ -70,10 +70,13 @@ class Daemon(util.LoggedClass):
                 async with self.workqueue_semaphore:
                     url = self.urls[self.url_index]
                     async with aiohttp.post(url, data=data) as resp:
-                        result = processor(await resp.json())
-                        if self.prior_msg:
-                            self.logger.info('connection restored')
-                        return result
+                        if resp.status == 200:
+                            if self.prior_msg:
+                                self.logger.info('connection restored')
+                            result = processor(await resp.json())
+                            return result
+                log_error('HTTP error code {:d}: {}'
+                          .format(resp.status, resp.reason))
             except asyncio.TimeoutError:
                 log_error('timeout error.', skip_once=True)
             except aiohttp.ClientHttpProcessingError:

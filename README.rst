@@ -137,10 +137,17 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.6
+--------------
+
+* fix for rest of second part of issue `#100`_
+* check HTTP error codes from bitcoind and log appropriately
+* don't error opening a new DB that has nothing written yet
+
 Version 0.10.5
 --------------
 
-* fix for second part of issue `#100`_ where the ElectrumX was not
+* fix for some of second part of issue `#100`_ where the ElectrumX was not
   killable if bitcoind was unavailable
 
 

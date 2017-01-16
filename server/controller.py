@@ -13,6 +13,7 @@ import ssl
 import time
 from bisect import bisect_left
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import pylru
@@ -53,6 +54,8 @@ class Controller(util.LoggedClass):
         # Set this event to cleanly shutdown
         self.shutdown_event = asyncio.Event()
         self.loop = asyncio.get_event_loop()
+        self.executor = ThreadPoolExecutor()
+        self.loop.set_default_executor(self.executor)
         self.start = time.time()
         self.coin = env.coin
         self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
@@ -215,8 +218,8 @@ class Controller(util.LoggedClass):
             for n in range(4):
                 add_future(self.serve_requests())
 
-        bp_future = asyncio.ensure_future(self.bp.main_loop())
         futures = []
+        add_future(self.bp.main_loop())
         add_future(self.bp.prefetcher.main_loop())
         add_future(await_bp_catchup())
 
@@ -225,35 +228,36 @@ class Controller(util.LoggedClass):
         self.logger.info('shutting down gracefully')
         self.state = self.SHUTTING_DOWN
 
-        # First tell the block processor to shut down, it may need to
-        # perform a lengthy flush.  Then shut down the rest.
-        self.bp.on_shutdown()
+        # Close servers and sessions
         self.close_servers(list(self.servers.keys()))
+        for session in self.sessions:
+            self.close_session(session)
+
+        # Cancel the futures
         for future in futures:
             future.cancel()
 
-        # Now wait for the cleanup to complete
-        await self.close_sessions()
-        if not bp_future.done():
-            self.logger.info('waiting for block processor')
-            await bp_future
+        await asyncio.wait(futures)
+
+        # Wait for the executor to finish anything it's doing
+        self.executor.shutdown()
+        self.bp.shutdown()
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
-        self.logger.info('closing down {} listening servers'
-                         .format(', '.join(kinds)))
+        if kinds:
+            self.logger.info('closing down {} listening servers'
+                             .format(', '.join(kinds)))
         for kind in kinds:
             server = self.servers.pop(kind, None)
             if server:
                 server.close()
 
-    async def close_sessions(self, secs=30):
+    async def wait_for_sessions(self, secs=30):
         if not self.sessions:
             return
         self.logger.info('waiting up to {:d} seconds for socket cleanup'
                          .format(secs))
-        for session in self.sessions:
-            self.close_session(session)
         limit = time.time() + secs
         while self.sessions and time.time() < limit:
             self.clear_stale_sessions(grace=secs//2)
