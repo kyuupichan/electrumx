@@ -137,6 +137,15 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.7
+--------------
+
+* remove LMDB
+* turn on snappy compression for LevelDB and RocksDB; gives smaller DBs and
+  faster sync
+* fix and speed up RocksDB iterator slightly
+* expect JSON with bitcoind HTTP status code 500
+
 Version 0.10.6
 --------------
 

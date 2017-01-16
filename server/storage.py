@@ -5,10 +5,7 @@
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
-'''Backend database abstraction.
-
-The abstraction needs to be improved to not heavily penalise LMDB.
-'''
+'''Backend database abstraction.'''
 
 import os
 from functools import partial
@@ -80,8 +77,9 @@ class LevelDB(Storage):
 
     def open(self, name, create):
         mof = 512 if self.for_sync else 128
+        # Use snappy compression (the default)
         self.db = self.module.DB(name, create_if_missing=create,
-                                 max_open_files=mof, compression=None)
+                                 max_open_files=mof)
         self.close = self.db.close
         self.get = self.db.get
         self.put = self.db.put
@@ -100,11 +98,8 @@ class RocksDB(Storage):
 
     def open(self, name, create):
         mof = 512 if self.for_sync else 128
-        compression = "no"
-        compression = getattr(self.module.CompressionType,
-                              compression + "_compression")
+        # Use snappy compression (the default)
         options = self.module.Options(create_if_missing=create,
-                                      compression=compression,
                                       use_fsync=True,
                                       target_file_size_base=33554432,
                                       max_open_files=mof)
@@ -118,111 +113,53 @@ class RocksDB(Storage):
         import gc
         gc.collect()
 
-    class WriteBatch(object):
-        def __init__(self, db):
-            self.batch = RocksDB.module.WriteBatch()
-            self.db = db
-
-        def __enter__(self):
-            return self.batch
-
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            if not exc_val:
-                self.db.write(self.batch)
-
     def write_batch(self):
-        return RocksDB.WriteBatch(self.db)
-
-    class Iterator(object):
-        def __init__(self, db, prefix, reverse):
-            self.it = db.iteritems()
-            self.reverse = reverse
-            self.prefix = prefix
-            # Whether we are at the first item
-            self.first = True
-
-        def __iter__(self):
-            prefix = self.prefix
-            if self.reverse:
-                prefix = increment_byte_string(prefix)
-                self.it = reversed(self.it)
-            self.it.seek(prefix)
-            return self
-
-        def __next__(self):
-            k, v = self.it.__next__()
-            if self.first and self.reverse and not k.startswith(self.prefix):
-                k, v = self.it.__next__()
-            self.first = False
-            if not k.startswith(self.prefix):
-                # We're already ahead of the prefix
-                raise StopIteration
-            return k, v
+        return RocksDBWriteBatch(self.db)
 
     def iterator(self, prefix=b'', reverse=False):
-        return RocksDB.Iterator(self.db, prefix, reverse)
+        return RocksDBIterator(self.db, prefix, reverse)
 
 
-class LMDB(Storage):
-    '''RocksDB database engine.'''
+class RocksDBWriteBatch(object):
+    '''A write batch for RocksDB.'''
 
-    @classmethod
-    def import_module(cls):
-        import lmdb
-        cls.module = lmdb
+    def __init__(self, db):
+        self.batch = RocksDB.module.WriteBatch()
+        self.db = db
 
-    def open(self, name, create):
-        # I don't see anything equivalent to max_open_files for for_sync
-        self.env = LMDB.module.Environment('.', subdir=True, create=create,
-                                          max_dbs=32, map_size=5 * 10 ** 10)
-        self.db = self.env.open_db(create=create)
+    def __enter__(self):
+        return self.batch
 
-    def close(self):
-        self.env.close()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not exc_val:
+            self.db.write(self.batch)
 
-    def get(self, key):
-        with self.env.begin(db=self.db) as tx:
-            return tx.get(key)
 
-    def put(self, key, value):
-        with self.env.begin(db=self.db, write=True) as tx:
-            tx.put(key, value)
+class RocksDBIterator(object):
+    '''An iterator for RocksDB.'''
 
-    def write_batch(self):
-        return self.env.begin(db=self.db, write=True)
+    def __init__(self, db, prefix, reverse):
+        self.prefix = prefix
+        if reverse:
+            self.iterator = reversed(db.iteritems())
+            nxt_prefix = util.increment_byte_string(prefix)
+            if nxt_prefix:
+                self.iterator.seek(nxt_prefix)
+                try:
+                    next(self.iterator)
+                except StopIteration:
+                    self.iterator.seek(nxt_prefix)
+            else:
+                self.iterator.seek_to_last()
+        else:
+            self.iterator = db.iteritems()
+            self.iterator.seek(prefix)
 
-    def iterator(self, prefix=b'', reverse=False):
-        return LMDB.Iterator(self.db, self.env, prefix, reverse)
+    def __iter__(self):
+        return self
 
-    class Iterator:
-        def __init__(self, db, env, prefix, reverse):
-            self.transaction = env.begin(db=db)
-            self.transaction.__enter__()
-            self.db = db
-            self.prefix = prefix
-            self.reverse = reverse
-            self._stop = False
-
-        def __iter__(self):
-            self.iterator = LMDB.module.Cursor(self.db, self.transaction)
-            prefix = self.prefix
-            if self.reverse:
-                # Go to the first value after the prefix
-                prefix = increment_byte_string(prefix)
-            self.iterator.set_range(prefix)
-            if not self.iterator.key().startswith(self.prefix) and self.reverse:
-                # Go back to the first item starting with the prefix
-                self.iterator.prev()
-            return self
-
-        def __next__(self):
-            k, v = self.iterator.item()
-            if not k.startswith(self.prefix) or self._stop:
-                # We're already ahead of the prefix
-                self.transaction.__exit__()
-                raise StopIteration
-            next = self.iterator.next \
-                if not self.reverse else self.iterator.prev
-            # Stop after the next value if we're at the end of the DB
-            self._stop = not next()
-            return k, v
+    def __next__(self):
+        k, v = next(self.iterator)
+        if not k.startswith(self.prefix):
+            raise StopIteration
+        return k, v
