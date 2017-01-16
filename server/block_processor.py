@@ -151,7 +151,6 @@ class BlockProcessor(server.db.DB):
 
         self.caught_up_event = asyncio.Event()
         self.task_queue = asyncio.Queue()
-        self.stop = False
 
         # Meta
         self.cache_MB = env.cache_MB
@@ -189,26 +188,19 @@ class BlockProcessor(server.db.DB):
         '''Called by the prefetcher when it first catches up.'''
         self.add_task(self.first_caught_up)
 
-    def on_shutdown(self):
-        '''Called by the controller to shut processing down.'''
-        async def do_nothing():
-            pass
-        self.logger.info('preparing clean shutdown')
-        self.stop = True
-        # Ensure something is on the queue so main_loop notices self.stop
-        self.add_task(do_nothing)
-
     async def main_loop(self):
         '''Main loop for block processing.'''
         await self.prefetcher.reset_height()
 
-        while not self.stop:
+        while True:
             task = await self.task_queue.get()
             await task()
 
-        self.logger.info('flushing state to DB for a clean shutdown...')
-        await self.executor(self.flush, True)
-        self.logger.info('shutdown complete')
+    def shutdown(self):
+        if self.height != self.db_height:
+            self.logger.info('flushing state to DB for a clean shutdown...')
+            self.flush(True)
+            self.logger.info('shutdown complete')
 
     async def executor(self, func, *args, **kwargs):
         '''Run func taking args in the executor.'''

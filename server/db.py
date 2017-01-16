@@ -123,7 +123,8 @@ class DB(util.LoggedClass):
                              .format(util.formatted_time(self.wall_time)))
 
     def read_utxo_state(self):
-        if self.utxo_db.is_new:
+        state = self.utxo_db.get(b'state')
+        if not state:
             self.db_height = -1
             self.db_tx_count = 0
             self.db_tip = b'\0' * 32
@@ -132,9 +133,7 @@ class DB(util.LoggedClass):
             self.wall_time = 0
             self.first_sync = True
         else:
-            state = self.utxo_db.get(b'state')
-            if state:
-                state = ast.literal_eval(state.decode())
+            state = ast.literal_eval(state.decode())
             if not isinstance(state, dict):
                 raise self.DBError('failed reading state from DB')
             self.db_version = state['db_version']
