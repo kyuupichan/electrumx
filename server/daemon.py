@@ -70,7 +70,10 @@ class Daemon(util.LoggedClass):
                 async with self.workqueue_semaphore:
                     url = self.urls[self.url_index]
                     async with aiohttp.post(url, data=data) as resp:
-                        if resp.status == 200:
+                        # If bitcoind can't find a tx, for some reason
+                        # it returns 500 but fills out the JSON.
+                        # Should still return 200 IMO.
+                        if resp.status in (200, 500):
                             if self.prior_msg:
                                 self.logger.info('connection restored')
                             result = processor(await resp.json())
