@@ -36,8 +36,9 @@ def main_loop():
 
     def on_signal(signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
-        logging.warning('received {} signal, shutting down'.format(signame))
-        future.cancel()
+        logging.warning('received {} signal, initiating shutdown'
+                        .format(signame))
+        controller.initiate_shutdown()
 
     def on_exception(loop, context):
         '''Suppress spurious messages it appears we cannot control.'''
@@ -47,8 +48,8 @@ def main_loop():
                     'accept_connection2()' in repr(context.get('task'))):
                 loop.default_exception_handler(context)
 
-    server = Controller(Env())
-    future = asyncio.ensure_future(server.main_loop())
+    controller = Controller(Env())
+    future = asyncio.ensure_future(controller.main_loop())
 
     # Install signal handlers
     for signame in ('SIGINT', 'SIGTERM'):

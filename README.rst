@@ -124,9 +124,6 @@ Roadmap Post-1.0
 - Python 3.6, which has several performance improvements relevant to
   ElectrumX
 - UTXO root logic and implementation
-- improve DB abstraction so LMDB is not penalized
-- investigate effects of cache defaults and DB configuration defaults
-  on sync time and simplify / optimize the default config accordingly
 - potentially move some functionality to C or C++
 
 
@@ -139,6 +136,13 @@ version prior to the release of 1.0.
 
 ChangeLog
 =========
+
+Version 0.10.5
+--------------
+
+* fix for second part of issue `#100`_ where the ElectrumX was not
+  killable if bitcoind was unavailable
+
 
 Version 0.10.4
 --------------
@@ -254,6 +258,7 @@ Version 0.9.17
 .. _#93: https://github.com/kyuupichan/electrumx/issues/93
 .. _#94: https://github.com/kyuupichan/electrumx/issues/94
 .. _#99: https://github.com/kyuupichan/electrumx/issues/99
+.. _#100: https://github.com/kyuupichan/electrumx/issues/100
 .. _#101: https://github.com/kyuupichan/electrumx/issues/101
 .. _#102: https://github.com/kyuupichan/electrumx/issues/102
 .. _#103: https://github.com/kyuupichan/electrumx/issues/103

@@ -15,7 +15,7 @@ import time
 from collections import defaultdict
 from functools import partial
 
-from server.daemon import Daemon, DaemonError
+from server.daemon import DaemonError
 from server.version import VERSION
 from lib.hash import hash_to_str
 from lib.util import chunks, formatted_time, LoggedClass
@@ -138,8 +138,9 @@ class BlockProcessor(server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env):
+    def __init__(self, env, daemon):
         super().__init__(env)
+        self.daemon = daemon
 
         # These are our state as we move ahead of DB state
         self.fs_height = self.db_height
@@ -148,7 +149,6 @@ class BlockProcessor(server.db.DB):
         self.tip = self.db_tip
         self.tx_count = self.db_tx_count
 
-        self.daemon = Daemon(self.coin.daemon_urls(env.daemon_url))
         self.caught_up_event = asyncio.Event()
         self.task_queue = asyncio.Queue()
         self.stop = False
@@ -193,8 +193,10 @@ class BlockProcessor(server.db.DB):
         '''Called by the controller to shut processing down.'''
         async def do_nothing():
             pass
+        self.logger.info('preparing clean shutdown')
         self.stop = True
-        self.add_task(do_nothing) # Ensure something is on the queue
+        # Ensure something is on the queue so main_loop notices self.stop
+        self.add_task(do_nothing)
 
     async def main_loop(self):
         '''Main loop for block processing.'''

@@ -55,9 +55,8 @@ class IRC(LoggedClass):
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
         self.peers = {}
 
-    async def start(self, caught_up):
-        '''Start IRC connections once caught up if enabled in environment.'''
-        await caught_up.wait()
+    async def start(self):
+        '''Start IRC connections if enabled in environment.'''
         try:
             if self.env.irc:
                 await self.join()

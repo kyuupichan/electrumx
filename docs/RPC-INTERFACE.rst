@@ -2,13 +2,25 @@ The ElectrumX RPC Interface
 ===========================
 
 You can query the status of a running server, and affect its behaviour
-using the RPC interface.
+by sending JSON RPC commands to the LocalRPC port it is listening on.
+This is best done using the electrumx_rpc.py script provided.
 
 The general form of invocation is:
 
-    ``electrumx_rpc.py <command> [arg1 [arg2...]``
+    ``electrumx_rpc.py [-p PORT] <command> [arg1 [arg2...]``
+
+The port to send the commands to can be specified on the command line,
+otherwise it is taken from the environment variable **RPC_PORT**, or
+8000 is used if that is not set.
 
 The following commands are available:
+
+* **stop**
+
+  Flush all cached data to disk and shut down the server cleanly, as
+  if sending the KILL signal.  Be patient - during initial sync
+  flushing all cached data to disk can take several minutes.  This
+  command takes no arguments.
 
 * **getinfo**
 
