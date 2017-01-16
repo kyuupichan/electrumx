@@ -128,20 +128,13 @@ def int_to_bytes(value):
 
 
 def increment_byte_string(bs):
-    bs = bytearray(bs)
-    incremented = False
-    for i in reversed(range(len(bs))):
-        if bs[i] < 0xff:
-            # This is easy
-            bs[i] += 1
-            incremented = True
-            break
-        # Otherwise we need to look at the previous character
-        bs[i] = 0
-    if not incremented:
-        # This can only happen if all characters are 0xff
-        bs = bytes([1]) + bs
-    return bytes(bs)
+    '''Return the lexicographically next byte string of the same length.
+
+    Return None if there is none (when the input is all 0xff bytes).'''
+    for n in range(1, len(bs) + 1):
+        if bs[-n] != 0xff:
+            return bs[:-n] + bytes([bs[-n] + 1]) + bytes(n - 1)
+    return None
 
 
 class LogicalFile(object):
