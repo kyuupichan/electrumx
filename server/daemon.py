@@ -10,6 +10,7 @@ daemon.'''
 
 import asyncio
 import json
+import traceback
 
 import aiohttp
 
@@ -82,11 +83,14 @@ class Daemon(util.LoggedClass):
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
             except self.DaemonWarmingUpError:
-                log_error('still starting up checking blocks.')
+                log_error('starting up checking blocks.')
             except (asyncio.CancelledError, DaemonError):
                 raise
             except Exception as e:
+                self.log_error(traceback.format_exc())
+                self.log_error('response was: {}'.format(resp))
                 log_error('request gave unexpected error: {}.'.format(e))
+
             if secs >= max_secs and len(self.urls) > 1:
                 self.url_index = (self.url_index + 1) % len(self.urls)
                 logged_url = self.logged_url(self.urls[self.url_index])

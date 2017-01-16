@@ -21,6 +21,7 @@ from lib.jsonrpc import JSONRPC, RPCError, RequestBase
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
+from server.daemon import Daemon
 from server.irc import IRC
 from server.session import LocalRPC, ElectrumX
 from server.mempool import MemPool
@@ -54,8 +55,8 @@ class Controller(util.LoggedClass):
         self.loop = asyncio.get_event_loop()
         self.start = time.time()
         self.coin = env.coin
-        self.bp = BlockProcessor(env)
-        self.daemon = self.bp.daemon
+        self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
+        self.bp = BlockProcessor(env, self.daemon)
         self.mempool = MemPool(self.bp)
         self.irc = IRC(env)
         self.env = env
