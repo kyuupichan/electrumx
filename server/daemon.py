@@ -89,10 +89,8 @@ class Daemon(util.LoggedClass):
                 log_error('starting up checking blocks.')
             except (asyncio.CancelledError, DaemonError):
                 raise
-            except Exception as e:
+            except Exception:
                 self.log_error(traceback.format_exc())
-                self.log_error('response was: {}'.format(resp))
-                log_error('request gave unexpected error: {}.'.format(e))
 
             if secs >= max_secs and len(self.urls) > 1:
                 self.url_index = (self.url_index + 1) % len(self.urls)
