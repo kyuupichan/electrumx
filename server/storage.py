@@ -5,10 +5,7 @@
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
-'''Backend database abstraction.
-
-The abstraction needs to be improved to not heavily penalise LMDB.
-'''
+'''Backend database abstraction.'''
 
 import os
 from functools import partial
@@ -161,68 +158,3 @@ class RocksDB(Storage):
 
     def iterator(self, prefix=b'', reverse=False):
         return RocksDB.Iterator(self.db, prefix, reverse)
-
-
-class LMDB(Storage):
-    '''RocksDB database engine.'''
-
-    @classmethod
-    def import_module(cls):
-        import lmdb
-        cls.module = lmdb
-
-    def open(self, name, create):
-        # I don't see anything equivalent to max_open_files for for_sync
-        self.env = LMDB.module.Environment('.', subdir=True, create=create,
-                                          max_dbs=32, map_size=5 * 10 ** 10)
-        self.db = self.env.open_db(create=create)
-
-    def close(self):
-        self.env.close()
-
-    def get(self, key):
-        with self.env.begin(db=self.db) as tx:
-            return tx.get(key)
-
-    def put(self, key, value):
-        with self.env.begin(db=self.db, write=True) as tx:
-            tx.put(key, value)
-
-    def write_batch(self):
-        return self.env.begin(db=self.db, write=True)
-
-    def iterator(self, prefix=b'', reverse=False):
-        return LMDB.Iterator(self.db, self.env, prefix, reverse)
-
-    class Iterator:
-        def __init__(self, db, env, prefix, reverse):
-            self.transaction = env.begin(db=db)
-            self.transaction.__enter__()
-            self.db = db
-            self.prefix = prefix
-            self.reverse = reverse
-            self._stop = False
-
-        def __iter__(self):
-            self.iterator = LMDB.module.Cursor(self.db, self.transaction)
-            prefix = self.prefix
-            if self.reverse:
-                # Go to the first value after the prefix
-                prefix = increment_byte_string(prefix)
-            self.iterator.set_range(prefix)
-            if not self.iterator.key().startswith(self.prefix) and self.reverse:
-                # Go back to the first item starting with the prefix
-                self.iterator.prev()
-            return self
-
-        def __next__(self):
-            k, v = self.iterator.item()
-            if not k.startswith(self.prefix) or self._stop:
-                # We're already ahead of the prefix
-                self.transaction.__exit__()
-                raise StopIteration
-            next = self.iterator.next \
-                if not self.reverse else self.iterator.prev
-            # Stop after the next value if we're at the end of the DB
-            self._stop = not next()
-            return k, v

@@ -66,11 +66,9 @@ These environment variables are optional:
 * **DB_ENGINE**
 
   Database engine for the UTXO and history database.  The default is
-  `leveldb`.  Supported alternatives are `rocksdb` and `lmdb`.  You
-  will need to install the appropriate python package for your engine.
-  The value is not case sensitive.  Note that the current way
-  ElectrumX uses LMDB results in poor performance.  I intend to improve
-  this.
+  `leveldb`.  The other alternative is `rocksdb`.  You will need to
+  install the appropriate python package for your engine.  The value
+  is not case sensitive.
 
 * **REORG_LIMIT**
 

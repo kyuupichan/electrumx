@@ -12,7 +12,6 @@ python:
 # command to install dependencies
 install:
   - pip install aiohttp
-  - pip install lmdb
   - pip install plyvel
   - pip install pyrocksdb
   - pip install pytest-cov
