@@ -45,16 +45,15 @@ recommend having at least 30-40GB of free space before starting.
 Database Engine
 ===============
 
-You can choose from RocksDB, LevelDB or LMDB to store transaction
-information on disk. Currently, the fastest seems to be RocksDB with
-LevelDB being slightly slower. LMDB is slowest but that is because the
-code needs reworking to be better usable with LMDB.
+You can choose from LevelDB and RocksDB to store transaction
+information on disk.  The time taken and DB size is not significantly
+different.  We tried to support LMDB but its history write performance
+was much worse.
 
 You will need to install one of:
 
 + `plyvel <https://plyvel.readthedocs.io/en/latest/installation.html>`_ for LevelDB
 + `pyrocksdb <http://pyrocksdb.readthedocs.io/en/v0.4/installation.html>`_ for RocksDB
-+ `lmdb <https://lmdb.readthedocs.io/en/release/#installation-unix>`_ for LMDB
 
 Running
 =======

@@ -124,9 +124,6 @@ Roadmap Post-1.0
 - Python 3.6, which has several performance improvements relevant to
   ElectrumX
 - UTXO root logic and implementation
-- improve DB abstraction so LMDB is not penalized
-- investigate effects of cache defaults and DB configuration defaults
-  on sync time and simplify / optimize the default config accordingly
 - potentially move some functionality to C or C++
 
 
