@@ -10,11 +10,11 @@
 import os
 from functools import partial
 
-from lib.util import subclasses, increment_byte_string
+import lib.util as util
 
 def db_class(name):
     '''Returns a DB engine class.'''
-    for db_class in subclasses(Storage):
+    for db_class in util.subclasses(Storage):
         if db_class.__name__.lower() == name.lower():
             db_class.import_module()
             return db_class
