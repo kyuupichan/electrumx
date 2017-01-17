@@ -56,4 +56,4 @@ def test_chunks():
 def test_increment_byte_string():
     assert util.increment_byte_string(b'1') == b'2'
     assert util.increment_byte_string(b'\x01\x01') == b'\x01\x02'
-    assert util.increment_byte_string(b'\xff\xff') == b'\x01\x00\x00'
+    assert util.increment_byte_string(b'\xff\xff') == None
