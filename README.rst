@@ -137,6 +137,12 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.8
+--------------
+
+* fix import for reverse iterator for RocksDB
+* fix tests
+
 Version 0.10.7
 --------------
 
