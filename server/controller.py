@@ -95,7 +95,7 @@ class Controller(util.LoggedClass):
              'block.get_header block.get_chunk estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
             ('server',
-             'banner donation_address peers.subscribe version'),
+             'banner donation_address peers.subscribe'),
         ]
         self.electrumx_handlers = {'.'.join([prefix, suffix]):
                                    getattr(self, suffix.replace('.', '_'))
@@ -886,15 +886,3 @@ class Controller(util.LoggedClass):
 
         Despite the name this is not currently treated as a subscription.'''
         return list(self.irc.peers.values())
-
-    async def version(self, client_name=None, protocol_version=None):
-        '''Returns the server version as a string.
-
-        client_name: a string identifying the client
-        protocol_version: the protocol version spoken by the client
-        '''
-        if client_name:
-            self.client = str(client_name)[:15]
-        if protocol_version is not None:
-            self.protocol_version = protocol_version
-        return VERSION
