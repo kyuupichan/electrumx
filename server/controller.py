@@ -225,7 +225,13 @@ class Controller(util.LoggedClass):
 
         # Perform a clean shutdown when this event is signalled.
         await self.shutdown_event.wait()
-        self.logger.info('shutting down gracefully')
+
+        self.logger.info('shutting down')
+        await self.shutdown(futures)
+        self.logger.info('shutdown complete')
+
+    async def shutdown(self, futures):
+        '''Perform the shutdown sequence.'''
         self.state = self.SHUTTING_DOWN
 
         # Close servers and sessions
@@ -237,11 +243,12 @@ class Controller(util.LoggedClass):
         for future in futures:
             future.cancel()
 
-        await asyncio.wait(futures)
+        # Wait for all futures to finish
+        while any(not future.done() for future in futures):
+            await asyncio.sleep(1)
 
-        # Wait for the executor to finish anything it's doing
-        self.executor.shutdown()
-        self.bp.shutdown()
+        # Finally shut down the block processor and executor
+        self.bp.shutdown(self.executor)
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
@@ -252,18 +259,6 @@ class Controller(util.LoggedClass):
             server = self.servers.pop(kind, None)
             if server:
                 server.close()
-
-    async def wait_for_sessions(self, secs=30):
-        if not self.sessions:
-            return
-        self.logger.info('waiting up to {:d} seconds for socket cleanup'
-                         .format(secs))
-        limit = time.time() + secs
-        while self.sessions and time.time() < limit:
-            self.clear_stale_sessions(grace=secs//2)
-            await asyncio.sleep(2)
-            self.logger.info('{:,d} sessions remaining'
-                             .format(len(self.sessions)))
 
     async def start_server(self, kind, *args, **kw_args):
         protocol_class = LocalRPC if kind == 'RPC' else ElectrumX
