@@ -13,6 +13,7 @@ import traceback
 
 from lib.jsonrpc import JSONRPC, RPCError
 from server.daemon import DaemonError
+from server.version import VERSION
 
 
 class Session(JSONRPC):
@@ -123,6 +124,7 @@ class ElectrumX(Session):
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
+            'server.version': self.version,
         }
 
     def sub_count(self):
@@ -190,6 +192,18 @@ class ElectrumX(Session):
         hashX, status = await self.controller.new_subscription(address)
         self.hashX_subs[hashX] = address
         return status
+
+    async def version(self, client_name=None, protocol_version=None):
+        '''Returns the server version as a string.
+
+        client_name: a string identifying the client
+        protocol_version: the protocol version spoken by the client
+        '''
+        if client_name:
+            self.client = str(client_name)[:15]
+        if protocol_version is not None:
+            self.protocol_version = protocol_version
+        return VERSION
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.

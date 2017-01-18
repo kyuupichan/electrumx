@@ -196,11 +196,14 @@ class BlockProcessor(server.db.DB):
             task = await self.task_queue.get()
             await task()
 
-    def shutdown(self):
+    def shutdown(self, executor):
+        '''Shutdown cleanly and flush to disk.'''
+        # First stut down the executor; it may be processing a block.
+        # Then we can flush anything remaining to disk.
+        executor.shutdown()
         if self.height != self.db_height:
             self.logger.info('flushing state to DB for a clean shutdown...')
             self.flush(True)
-            self.logger.info('shutdown complete')
 
     async def executor(self, func, *args, **kwargs):
         '''Run func taking args in the executor.'''
