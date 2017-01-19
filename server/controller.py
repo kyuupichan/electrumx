@@ -73,7 +73,8 @@ class Controller(util.LoggedClass):
         self.max_sessions = env.max_sessions
         self.low_watermark = self.max_sessions * 19 // 20
         self.max_subs = env.max_subs
-        self.subscription_count = 0
+        # Cache some idea of room to avoid recounting on each subscription
+        self.subs_room = 0
         self.next_stale_check = 0
         self.history_cache = pylru.lrucache(256)
         self.header_cache = pylru.lrucache(8)
@@ -374,7 +375,6 @@ class Controller(util.LoggedClass):
             gid = self.sessions.pop(session)
             assert gid in self.groups
             self.groups[gid].remove(session)
-            self.subscription_count -= session.sub_count()
 
     def close_session(self, session):
         '''Close the session's transport and cancel its future.'''
@@ -436,9 +436,12 @@ class Controller(util.LoggedClass):
             'peers': len(self.irc.peers),
             'requests': sum(s.requests_remaining() for s in self.sessions),
             'sessions': self.session_count(),
-            'subs': self.subscription_count,
+            'subs': self.sub_count(),
             'txs_sent': self.txs_sent,
         }
+
+    def sub_count(self):
+        return sum(s.sub_count() for s in self.sessions)
 
     @staticmethod
     def text_lines(method, data):
@@ -642,10 +645,12 @@ class Controller(util.LoggedClass):
             raise RPCError('daemon error: {}'.format(e))
 
     async def new_subscription(self, address):
-        if self.subscription_count >= self.max_subs:
-            raise RPCError('server subscription limit {:,d} reached'
-                           .format(self.max_subs))
-        self.subscription_count += 1
+        if self.subs_room <= 0:
+            self.subs_room = self.max_subs - self.sub_count()
+            if self.subs_room <= 0:
+                raise RPCError('server subscription limit {:,d} reached'
+                               .format(self.max_subs))
+        self.subs_room -= 1
         hashX = self.address_to_hashX(address)
         status = await self.address_status(hashX)
         return hashX, status
