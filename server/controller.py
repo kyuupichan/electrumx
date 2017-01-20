@@ -18,14 +18,14 @@ from functools import partial
 
 import pylru
 
-from lib.jsonrpc import JSONRPC, RPCError, RequestBase
+from lib.jsonrpc import JSONRPC, RPCError
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
 from server.daemon import Daemon, DaemonError
-from server.session import LocalRPC, ElectrumX
-from server.peers import PeerManager
 from server.mempool import MemPool
+from server.peers import PeerManager
+from server.session import LocalRPC, ElectrumX
 from server.version import VERSION
 
 
@@ -39,16 +39,6 @@ class Controller(util.LoggedClass):
     BANDS = 5
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    class NotificationRequest(RequestBase):
-        def __init__(self, height, touched):
-            super().__init__(1)
-            self.height = height
-            self.touched = touched
-
-        async def process(self, session):
-            self.remaining = 0
-            await session.notify(self.height, self.touched)
-
     def __init__(self, env):
         super().__init__()
         # Set this event to cleanly shutdown
@@ -56,7 +46,7 @@ class Controller(util.LoggedClass):
         self.loop = asyncio.get_event_loop()
         self.executor = ThreadPoolExecutor()
         self.loop.set_default_executor(self.executor)
-        self.start = time.time()
+        self.start_time = time.time()
         self.coin = env.coin
         self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
         self.bp = BlockProcessor(env, self.daemon)
@@ -141,9 +131,9 @@ class Controller(util.LoggedClass):
         if isinstance(session, LocalRPC):
             return 0
         gid = self.sessions[session]
-        group_bandwidth = sum(s.bandwidth_used for s in self.groups[gid])
-        return 1 + (bisect_left(self.bands, session.bandwidth_used)
-                    + bisect_left(self.bands, group_bandwidth)) // 2
+        group_bw = sum(session.bw_used for session in self.groups[gid])
+        return 1 + (bisect_left(self.bands, session.bw_used)
+                    + bisect_left(self.bands, group_bw)) // 2
 
     def is_deprioritized(self, session):
         return self.session_priority(session) > self.BANDS
@@ -165,6 +155,15 @@ class Controller(util.LoggedClass):
             if (len(self.sessions) <= self.low_watermark
                     and self.state == self.PAUSED):
                 await self.start_external_servers()
+
+            # Periodically log sessions
+            if self.env.log_sessions and time.time() > self.next_log_sessions:
+                if self.next_log_sessions:
+                    data = self.session_data(for_log=True)
+                    for line in Controller.sessions_text_lines(data):
+                        self.logger.info(line)
+                    self.logger.info(json.dumps(self.server_summary()))
+                self.next_log_sessions = time.time() + self.env.log_sessions
 
             await asyncio.sleep(1)
 
@@ -195,7 +194,10 @@ class Controller(util.LoggedClass):
         while True:
             priority_, id_, session = await self.queue.get()
             if session in self.sessions:
-                await session.serve_requests()
+                await session.process_pending_items()
+                # Re-enqueue the session if stuff is left
+                if session.items:
+                    self.enqueue_session(session)
 
     def initiate_shutdown(self):
         '''Call this function to start the shutdown process.'''
@@ -265,8 +267,8 @@ class Controller(util.LoggedClass):
 
     async def start_server(self, kind, *args, **kw_args):
         protocol_class = LocalRPC if kind == 'RPC' else ElectrumX
-        protocol = partial(protocol_class, self, self.bp, self.env, kind)
-        server = self.loop.create_server(protocol, *args, **kw_args)
+        protocol_factory = partial(protocol_class, self, kind)
+        server = self.loop.create_server(protocol_factory, *args, **kw_args)
 
         host, port = args[:2]
         try:
@@ -329,17 +331,7 @@ class Controller(util.LoggedClass):
 
             for session in self.sessions:
                 if isinstance(session, ElectrumX):
-                    request = self.NotificationRequest(self.bp.db_height,
-                                                       touched)
-                    session.enqueue_request(request)
-            # Periodically log sessions
-            if self.env.log_sessions and time.time() > self.next_log_sessions:
-                if self.next_log_sessions:
-                    data = self.session_data(for_log=True)
-                    for line in Controller.sessions_text_lines(data):
-                        self.logger.info(line)
-                    self.logger.info(json.dumps(self.server_summary()))
-                self.next_log_sessions = time.time() + self.env.log_sessions
+                    await session.notify(self.bp.db_height, touched)
 
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
@@ -357,7 +349,7 @@ class Controller(util.LoggedClass):
         if now > self.next_stale_check:
             self.next_stale_check = now + 300
             self.clear_stale_sessions()
-        gid = int(session.start - self.start) // 900
+        gid = int(session.start_time - self.start_time) // 900
         self.groups[gid].append(session)
         self.sessions[session] = gid
         session.log_info('{} {}, {:,d} total'
@@ -381,12 +373,12 @@ class Controller(util.LoggedClass):
     def close_session(self, session):
         '''Close the session's transport and cancel its future.'''
         session.close_connection()
-        return 'disconnected {:d}'.format(session.id_)
+        return 'disconnected {:d}'.format(session.session_id)
 
     def toggle_logging(self, session):
         '''Toggle logging of the session.'''
         session.log_me = not session.log_me
-        return 'log {:d}: {}'.format(session.id_, session.log_me)
+        return 'log {:d}: {}'.format(session.session_id, session.log_me)
 
     def clear_stale_sessions(self, grace=15):
         '''Cut off sessions that haven't done anything for 10 minutes.  Force
@@ -400,17 +392,17 @@ class Controller(util.LoggedClass):
         stale = []
         for session in self.sessions:
             if session.is_closing():
-                if session.stop <= shutdown_cutoff:
-                    session.transport.abort()
+                if session.close_time <= shutdown_cutoff:
+                    session.abort()
             elif session.last_recv < stale_cutoff:
                 self.close_session(session)
-                stale.append(session.id_)
+                stale.append(session.session_id)
         if stale:
             self.logger.info('closing stale connections {}'.format(stale))
 
         # Consolidate small groups
         gids = [gid for gid, l in self.groups.items() if len(l) <= 4
-                and sum(session.bandwidth_used for session in l) < 10000]
+                and sum(session.bw_used for session in l) < 10000]
         if len(gids) > 1:
             sessions = sum([self.groups[gid] for gid in gids], [])
             new_gid = max(gids)
@@ -436,7 +428,7 @@ class Controller(util.LoggedClass):
             'paused': sum(s.pause for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peers.count(),
-            'requests': sum(s.requests_remaining() for s in self.sessions),
+            'requests': sum(s.count_pending_items() for s in self.sessions),
             'sessions': self.session_count(),
             'subs': self.sub_count(),
             'txs_sent': self.txs_sent,
@@ -444,13 +436,6 @@ class Controller(util.LoggedClass):
 
     def sub_count(self):
         return sum(s.sub_count() for s in self.sessions)
-
-    @staticmethod
-    def text_lines(method, data):
-        if method == 'sessions':
-            return Controller.sessions_text_lines(data)
-        else:
-            return Controller.groups_text_lines(data)
 
     @staticmethod
     def groups_text_lines(data):
@@ -482,8 +467,8 @@ class Controller(util.LoggedClass):
             sessions = self.groups[gid]
             result.append([gid,
                            len(sessions),
-                           sum(s.bandwidth_used for s in sessions),
-                           sum(s.requests_remaining() for s in sessions),
+                           sum(s.bw_used for s in sessions),
+                           sum(s.count_pending_items() for s in sessions),
                            sum(s.txs_sent for s in sessions),
                            sum(s.sub_count() for s in sessions),
                            sum(s.recv_count for s in sessions),
@@ -523,17 +508,17 @@ class Controller(util.LoggedClass):
     def session_data(self, for_log):
         '''Returned to the RPC 'sessions' call.'''
         now = time.time()
-        sessions = sorted(self.sessions, key=lambda s: s.start)
-        return [(session.id_,
+        sessions = sorted(self.sessions, key=lambda s: s.start_time)
+        return [(session.session_id,
                  session.flags(),
                  session.peername(for_log=for_log),
                  session.client,
-                 session.requests_remaining(),
+                 session.count_pending_items(),
                  session.txs_sent,
                  session.sub_count(),
                  session.recv_count, session.recv_size,
                  session.send_count, session.send_size,
-                 now - session.start)
+                 now - session.start_time)
                 for session in sessions]
 
     def lookup_session(self, session_id):
@@ -543,7 +528,7 @@ class Controller(util.LoggedClass):
             pass
         else:
             for session in self.sessions:
-                if session.id_ == session_id:
+                if session.session_id == session_id:
                     return session
         return None
 
@@ -562,42 +547,42 @@ class Controller(util.LoggedClass):
 
     # Local RPC command handlers
 
-    async def rpc_disconnect(self, session_ids):
+    def rpc_disconnect(self, session_ids):
         '''Disconnect sesssions.
 
         session_ids: array of session IDs
         '''
         return self.for_each_session(session_ids, self.close_session)
 
-    async def rpc_log(self, session_ids):
+    def rpc_log(self, session_ids):
         '''Toggle logging of sesssions.
 
         session_ids: array of session IDs
         '''
         return self.for_each_session(session_ids, self.toggle_logging)
 
-    async def rpc_stop(self):
+    def rpc_stop(self):
         '''Shut down the server cleanly.'''
         self.initiate_shutdown()
         return 'stopping'
 
-    async def rpc_getinfo(self):
+    def rpc_getinfo(self):
         '''Return summary information about the server process.'''
         return self.server_summary()
 
-    async def rpc_groups(self):
+    def rpc_groups(self):
         '''Return statistics about the session groups.'''
         return self.group_data()
 
-    async def rpc_sessions(self):
+    def rpc_sessions(self):
         '''Return statistics about connected sessions.'''
         return self.session_data(for_log=False)
 
-    async def rpc_peers(self):
+    def rpc_peers(self):
         '''Return a list of server peers, currently taken from IRC.'''
         return self.peers.peer_list()
 
-    async def rpc_reorg(self, count=3):
+    def rpc_reorg(self, count=3):
         '''Force a reorg of the given number of blocks.
 
         count: number of blocks to reorg (default 3)
@@ -779,14 +764,14 @@ class Controller(util.LoggedClass):
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in sorted(await self.get_utxos(hashX))]
 
-    async def block_get_chunk(self, index):
+    def block_get_chunk(self, index):
         '''Return a chunk of block headers.
 
         index: the chunk index'''
         index = self.non_negative_integer(index)
         return self.get_chunk(index)
 
-    async def block_get_header(self, height):
+    def block_get_header(self, height):
         '''The deserialized header at a given height.
 
         height: the header's height'''
@@ -879,6 +864,6 @@ class Controller(util.LoggedClass):
 
         return banner
 
-    async def donation_address(self):
+    def donation_address(self):
         '''Return the donation address as a string, empty if there is none.'''
         return self.env.donation_address

@@ -205,7 +205,8 @@ below are low and encourage you to raise them.
   An integer number of seconds defaulting to 600.  Sessions with no
   activity for longer than this are disconnected.  Properly
   functioning Electrum clients by default will send pings roughly
-  every 60 seconds.
+  every 60 seconds, and servers doing peer discovery roughly every 300
+  seconds.
 
 IRC
 ---

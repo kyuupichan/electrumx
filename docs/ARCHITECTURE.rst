@@ -36,7 +36,7 @@ Not started until the Block Processor has caught up with bitcoind.
 Daemon
 ------
 
-Encapsulates the RPC wire protcol with bitcoind for the whole server.
+Encapsulates the RPC wire protocol with bitcoind for the whole server.
 Transparently handles temporary bitcoind connection errors, and fails
 over if necessary.
 
