@@ -13,6 +13,7 @@ import json
 import numbers
 import time
 import traceback
+from functools import partial
 
 from lib.util import LoggedClass
 
@@ -121,7 +122,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     NEXT_SESSION_ID = 0
 
     @classmethod
-    def request_payload(cls, method, id_, params=None):
+    def request_payload(cls, id_, method, params=None):
         payload = {'jsonrpc': '2.0', 'id': id_, 'method': method}
         if params:
             payload['params'] = params
@@ -130,10 +131,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     @classmethod
     def response_payload(cls, result, id_):
         return {'jsonrpc': '2.0', 'result': result, 'id': id_}
-
-    @classmethod
-    def notification_payload(cls, method, params=None):
-        return cls.request_payload(method, None, params)
 
     @classmethod
     def error_payload(cls, message, code, id_=None):
@@ -166,6 +163,7 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
 
     def __init__(self):
         super().__init__()
+        self.send_notification = partial(self.send_request, None)
         self.start = time.time()
         self.stop = 0
         self.last_recv = self.start
@@ -316,6 +314,18 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
         '''Send a JSON error.'''
         self._send_bytes(self.json_error_bytes(message, code, id_))
 
+    def send_request(self, id_, method, params=None):
+        '''Send a request.  If id_ is None it is a notification.'''
+        self.encode_and_send_payload(self.request_payload(id_, method, params))
+
+    def send_notifications(self, mp_iterable):
+        '''Send an iterable of (method, params) notification pairs.
+
+        A 1-tuple is also valid in which case there are no params.'''
+        # TODO: maybe send batches if remote side supports it
+        for pair in mp_iterable:
+            self.send_notification(*pair)
+
     def encode_payload(self, payload):
         assert isinstance(payload, dict)
 
@@ -352,10 +362,6 @@ class JSONRPC(asyncio.Protocol, LoggedClass):
     def encode_and_send_payload(self, payload):
         '''Encode the payload and send it.'''
         self._send_bytes(self.encode_payload(payload))
-
-    def json_notification_bytes(self, method, params):
-        '''Return the bytes of a json notification.'''
-        return self.encode_payload(self.notification_payload(method, params))
 
     def json_request_bytes(self, method, id_, params=None):
         '''Return the bytes of a JSON request.'''

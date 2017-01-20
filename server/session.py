@@ -135,32 +135,29 @@ class ElectrumX(Session):
 
         Cache is a shared cache for this update.
         '''
+        controller = self.controller
+        pairs = []
+
         if height != self.notified_height:
             self.notified_height = height
             if self.subscribe_headers:
-                payload = self.notification_payload(
-                    'blockchain.headers.subscribe',
-                    (self.controller.electrum_header(height), ),
-                )
-                self.encode_and_send_payload(payload)
+                args = (controller.electrum_header(height), )
+                pairs.append(('blockchain.headers.subscribe', args))
 
             if self.subscribe_height:
-                payload = self.notification_payload(
-                    'blockchain.numblocks.subscribe',
-                    (height, ),
-                )
-                self.encode_and_send_payload(payload)
+                pairs.append(('blockchain.numblocks.subscribe', (height, )))
 
         matches = touched.intersection(self.hashX_subs)
         for hashX in matches:
             address = self.hashX_subs[hashX]
-            status = await self.controller.address_status(hashX)
-            payload = self.notification_payload(
-                'blockchain.address.subscribe', (address, status))
-            self.encode_and_send_payload(payload)
+            status = await controller.address_status(hashX)
+            pairs.append(('blockchain.address.subscribe', (address, status)))
 
+        self.send_notifications(pairs)
         if matches:
-            self.log_info('notified of {:,d} addresses'.format(len(matches)))
+            es = '' if len(matches) == 1 else 'es'
+            self.log_info('notified of {:,d} address{}'
+                          .format(len(matches), es))
 
     def height(self):
         '''Return the current flushed database height.'''
