@@ -137,6 +137,14 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.10
+---------------
+
+* move peer management from irc.py to peers.py.  This is preparataion
+  for peer discovery without IRC.
+* misc cleanups
+* fix Litecoin genesis hash (petrkr)
+
 Version 0.10.9
 --------------
 
