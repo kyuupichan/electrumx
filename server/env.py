@@ -66,7 +66,7 @@ class Env(LoggedClass):
                                                 self.report_ssl_port
                                                 if self.report_ssl_port else
                                                 self.ssl_port)
-        self.report_host_tor = self.default('REPORT_HOST_TOR', None)
+        self.report_host_tor = self.default('REPORT_HOST_TOR', '')
 
     def default(self, envvar, default):
         return environ.get(envvar, default)

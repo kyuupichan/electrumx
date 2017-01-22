@@ -35,8 +35,7 @@ class RPCClient(JSONRPC):
         self.max_buffer_size = 5000000
         if params:
             params = [params]
-        payload = self.request_payload(method, id_=method, params=params)
-        self.encode_and_send_payload(payload)
+        self.send_request(method, method, params)
 
         future = asyncio.ensure_future(self.queue.get())
         for f in asyncio.as_completed([future], timeout=timeout):
@@ -80,6 +79,7 @@ def main():
     except OSError:
         print('error connecting - is ElectrumX catching up or not running?')
     finally:
+        loop.stop()
         loop.close()
 
 

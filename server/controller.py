@@ -23,8 +23,8 @@ from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
 from server.daemon import Daemon, DaemonError
-from server.irc import IRC
 from server.session import LocalRPC, ElectrumX
+from server.peers import PeerManager
 from server.mempool import MemPool
 from server.version import VERSION
 
@@ -61,7 +61,7 @@ class Controller(util.LoggedClass):
         self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
         self.bp = BlockProcessor(env, self.daemon)
         self.mempool = MemPool(self.bp)
-        self.irc = IRC(env)
+        self.peers = PeerManager(env)
         self.env = env
         self.servers = {}
         # Map of session to the key of its list in self.groups
@@ -73,7 +73,8 @@ class Controller(util.LoggedClass):
         self.max_sessions = env.max_sessions
         self.low_watermark = self.max_sessions * 19 // 20
         self.max_subs = env.max_subs
-        self.subscription_count = 0
+        # Cache some idea of room to avoid recounting on each subscription
+        self.subs_room = 0
         self.next_stale_check = 0
         self.history_cache = pylru.lrucache(256)
         self.header_cache = pylru.lrucache(8)
@@ -95,12 +96,14 @@ class Controller(util.LoggedClass):
              'block.get_header block.get_chunk estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
             ('server',
-             'banner donation_address peers.subscribe'),
+             'banner donation_address'),
         ]
-        self.electrumx_handlers = {'.'.join([prefix, suffix]):
-                                   getattr(self, suffix.replace('.', '_'))
-                                   for prefix, suffixes in rpcs
-                                   for suffix in suffixes.split()}
+        handlers = {'.'.join([prefix, suffix]):
+                    getattr(self, suffix.replace('.', '_'))
+                    for prefix, suffixes in rpcs
+                    for suffix in suffixes.split()}
+        handlers['server.peers.subscribe'] = self.peers.subscribe
+        self.electrumx_handlers = handlers
 
     async def mempool_transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -206,11 +209,11 @@ class Controller(util.LoggedClass):
         async def await_bp_catchup():
             '''Wait for the block processor to catch up.
 
-            When it has, start the servers and connect to IRC.
+            Then start the servers and the peer manager.
             '''
             await self.bp.caught_up_event.wait()
             self.logger.info('block processor has caught up')
-            add_future(self.irc.start())
+            add_future(self.peers.main_loop())
             add_future(self.start_servers())
             add_future(self.mempool.main_loop())
             add_future(self.enqueue_delayed_sessions())
@@ -374,7 +377,6 @@ class Controller(util.LoggedClass):
             gid = self.sessions.pop(session)
             assert gid in self.groups
             self.groups[gid].remove(session)
-            self.subscription_count -= session.sub_count()
 
     def close_session(self, session):
         '''Close the session's transport and cancel its future.'''
@@ -433,12 +435,15 @@ class Controller(util.LoggedClass):
             'logged': len([s for s in self.sessions if s.log_me]),
             'paused': sum(s.pause for s in self.sessions),
             'pid': os.getpid(),
-            'peers': len(self.irc.peers),
+            'peers': self.peers.count(),
             'requests': sum(s.requests_remaining() for s in self.sessions),
             'sessions': self.session_count(),
-            'subs': self.subscription_count,
+            'subs': self.sub_count(),
             'txs_sent': self.txs_sent,
         }
+
+    def sub_count(self):
+        return sum(s.sub_count() for s in self.sessions)
 
     @staticmethod
     def text_lines(method, data):
@@ -590,7 +595,7 @@ class Controller(util.LoggedClass):
 
     async def rpc_peers(self):
         '''Return a list of server peers, currently taken from IRC.'''
-        return self.irc.peers
+        return self.peers.peer_list()
 
     async def rpc_reorg(self, count=3):
         '''Force a reorg of the given number of blocks.
@@ -642,10 +647,12 @@ class Controller(util.LoggedClass):
             raise RPCError('daemon error: {}'.format(e))
 
     async def new_subscription(self, address):
-        if self.subscription_count >= self.max_subs:
-            raise RPCError('server subscription limit {:,d} reached'
-                           .format(self.max_subs))
-        self.subscription_count += 1
+        if self.subs_room <= 0:
+            self.subs_room = self.max_subs - self.sub_count()
+            if self.subs_room <= 0:
+                raise RPCError('server subscription limit {:,d} reached'
+                               .format(self.max_subs))
+        self.subs_room -= 1
         hashX = self.address_to_hashX(address)
         status = await self.address_status(hashX)
         return hashX, status
@@ -875,9 +882,3 @@ class Controller(util.LoggedClass):
     async def donation_address(self):
         '''Return the donation address as a string, empty if there is none.'''
         return self.env.donation_address
-
-    async def peers_subscribe(self):
-        '''Returns the server peers as a list of (ip, host, ports) tuples.
-
-        Despite the name this is not currently treated as a subscription.'''
-        return list(self.irc.peers.values())
