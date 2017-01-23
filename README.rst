@@ -135,6 +135,11 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.12
+---------------
+
+* fixed a bug in 0.10.11 where a dict changed whilst iterating it
+
 Version 0.10.11
 ---------------
 
