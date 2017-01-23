@@ -329,9 +329,10 @@ class Controller(util.LoggedClass):
                 self.cache_height = self.bp.db_height
                 self.header_cache.clear()
 
-            for session in self.sessions:
-                if isinstance(session, ElectrumX):
-                    await session.notify(self.bp.db_height, touched)
+            # Make a copy; self.sessions can change whilst await-ing
+            sessions = [s for s in self.sessions if isinstance(s, ElectrumX)]
+            for session in sessions:
+                await session.notify(self.bp.db_height, touched)
 
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
