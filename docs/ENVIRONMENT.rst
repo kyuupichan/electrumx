@@ -205,7 +205,8 @@ below are low and encourage you to raise them.
   An integer number of seconds defaulting to 600.  Sessions with no
   activity for longer than this are disconnected.  Properly
   functioning Electrum clients by default will send pings roughly
-  every 60 seconds.
+  every 60 seconds, and servers doing peer discovery roughly every 300
+  seconds.
 
 IRC
 ---
@@ -239,8 +240,9 @@ connectivity on IRC:
 
 * **REPORT_HOST_TOR**
 
-  The tor .onion address to advertise.  If set, an additional
-  connection to IRC happens with '_tor" appended to **IRC_NICK**.
+  The tor address to advertise; must end with `.onion`.  If set, an
+  additional connection to IRC happens with '_tor' appended to
+  **IRC_NICK**.
 
 * **REPORT_TCP_PORT_TOR**
 

@@ -115,8 +115,6 @@ Roadmap Pre-1.0
 
 - minor code cleanups.
 - implement simple protocol to discover peers without resorting to IRC.
-  This may slip to post 1.0
-
 
 Roadmap Post-1.0
 ================
@@ -136,6 +134,33 @@ version prior to the release of 1.0.
 
 ChangeLog
 =========
+
+Version 0.10.11
+---------------
+
+* rewrite of JSON RPC layer to improve usability for clients.
+  Includes support of JSON RPC v1, v2 and a compat layer that tries to
+  detect the peer's version.
+
+Version 0.10.10
+---------------
+
+* move peer management from irc.py to peers.py.  This is preparataion
+  for peer discovery without IRC.
+* misc cleanups
+* fix Litecoin genesis hash (petrkr)
+
+Version 0.10.9
+--------------
+
+* restore client to sessions output
+* cleanup shutdown process; hopefully this resolves the log spew for good
+
+Version 0.10.8
+--------------
+
+* fix import for reverse iterator for RocksDB
+* fix tests
 
 Version 0.10.7
 --------------
@@ -220,46 +245,6 @@ variables to use roughly the same amount of memory.
 For now this code should be considered experimental; if you want
 stability please stick with the 0.9 series.
 
-Version 0.9.23
---------------
-
-* Backport of the fix for issue `#94#` - stale references to old
-  sessions.  This would effectively memory and network handles.
-
-Version 0.9.22
---------------
-
-* documentation updates (ARCHITECTURE.rst, ENVIRONMENT.rst) only.
-
-Version 0.9.21
---------------
-
-* moved RELEASE-NOTES into this README
-* document the RPC interface in docs/RPC-INTERFACE.rst
-* clean up open DB handling, issue `#89`_
-
-Version 0.9.20
---------------
-
-* fix for IRC flood issue `#93`_
-
-Version 0.9.19
---------------
-
-* move sleep outside semaphore (issue `#88`_)
-
-Version 0.9.18
---------------
-
-* last release of 2016.  Just a couple of minor tweaks to logging.
-
-Version 0.9.17
---------------
-
-* have all the DBs use fsync on write; hopefully means DB won't corrupt in
-  case of a kernel panic (issue `#75`_)
-* replace $DONATION_ADDRESS in banner file
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
@@ -267,11 +252,7 @@ Version 0.9.17
 
 
 .. _#72: https://github.com/kyuupichan/electrumx/issues/72
-.. _#75: https://github.com/kyuupichan/electrumx/issues/75
-.. _#88: https://github.com/kyuupichan/electrumx/issues/88
-.. _#89: https://github.com/kyuupichan/electrumx/issues/89
 .. _#92: https://github.com/kyuupichan/electrumx/issues/92
-.. _#93: https://github.com/kyuupichan/electrumx/issues/93
 .. _#94: https://github.com/kyuupichan/electrumx/issues/94
 .. _#99: https://github.com/kyuupichan/electrumx/issues/99
 .. _#100: https://github.com/kyuupichan/electrumx/issues/100

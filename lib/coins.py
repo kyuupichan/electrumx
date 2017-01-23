@@ -318,8 +318,8 @@ class Litecoin(Coin):
     P2PKH_VERBYTE = 0x30
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0xb0
-    GENESIS_HASH=('000000000019d6689c085ae165831e93'
-                  '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_HASH=('12a765e31ffd4059bada1e25190f6e98'
+                  'c99d9714d334efa41a195a7e7e04bfe2')
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10

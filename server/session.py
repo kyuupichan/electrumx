@@ -9,38 +9,61 @@
 
 
 import asyncio
+import time
 import traceback
+from functools import partial
 
-from lib.jsonrpc import JSONRPC, RPCError
+from lib.jsonrpc import JSONSession, RPCError
 from server.daemon import DaemonError
+from server.version import VERSION
 
 
-class Session(JSONRPC):
-    '''Base class of ElectrumX JSON session protocols.
+class SessionBase(JSONSession):
+    '''Base class of ElectrumX JSON sessions.
 
     Each session runs its tasks in asynchronous parallelism with other
-    sessions.  To prevent some sessions blocking others, potentially
-    long-running requests should yield.
+    sessions.
     '''
 
-    def __init__(self, controller, bp, env, kind):
+    def __init__(self, controller, kind):
         super().__init__()
+        self.kind = kind  # 'RPC', 'TCP' etc.
         self.controller = controller
-        self.bp = bp
-        self.env = env
-        self.daemon = bp.daemon
-        self.kind = kind
+        self.bp = controller.bp
+        self.env = controller.env
+        self.daemon = self.bp.daemon
         self.client = 'unknown'
-        self.anon_logs = env.anon_logs
-        self.max_send = env.max_send
-        self.bandwidth_limit = env.bandwidth_limit
+        self.anon_logs = self.env.anon_logs
         self.last_delay = 0
         self.txs_sent = 0
         self.requests = []
+        self.start_time = time.time()
+        self.close_time = 0
+        self.bw_time = self.start_time
+        self.bw_interval = 3600
+        self.bw_used = 0
 
-    def is_closing(self):
-        '''True if this session is closing.'''
-        return self.transport and self.transport.is_closing()
+    def have_pending_items(self):
+        '''Called each time the pending item queue goes from empty to having
+        one item.'''
+        self.controller.enqueue_session(self)
+
+    def close_connection(self):
+        '''Call this to close the connection.'''
+        self.close_time = time.time()
+        super().close_connection()
+
+    def peername(self, *, for_log=True):
+        '''Return the peer name of this connection.'''
+        peer_info = self.peer_info()
+        if not peer_info:
+            return 'unknown'
+        if for_log and self.anon_logs:
+            return 'xx.xx.xx.xx:xx'
+        if ':' in peer_info[0]:
+            return '[{}]:{}'.format(peer_info[0], peer_info[1])
+        else:
+            return '{}:{}'.format(peer_info[0], peer_info[1])
 
     def flags(self):
         '''Status flags.'''
@@ -52,42 +75,6 @@ class Session(JSONRPC):
         status += str(self.controller.session_priority(self))
         return status
 
-    def requests_remaining(self):
-        return sum(request.remaining for request in self.requests)
-
-    def enqueue_request(self, request):
-        '''Add a request to the session's list.'''
-        self.requests.append(request)
-        if len(self.requests) == 1:
-            self.controller.enqueue_session(self)
-
-    async def serve_requests(self):
-        '''Serve requests in batches.'''
-        total = 0
-        errs = []
-        # Process 8 items at a time
-        for request in self.requests:
-            try:
-                initial = request.remaining
-                await request.process(self)
-                total += initial - request.remaining
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                # Should probably be considered a bug and fixed
-                self.log_error('error handling request {}'.format(request))
-                traceback.print_exc()
-                errs.append(request)
-            await asyncio.sleep(0)
-            if total >= 8:
-                break
-
-        # Remove completed requests and re-enqueue ourself if any remain.
-        self.requests = [req for req in self.requests
-                         if req.remaining and not req in errs]
-        if self.requests:
-            self.controller.enqueue_session(self)
-
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
@@ -95,27 +82,32 @@ class Session(JSONRPC):
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
-        super().connection_lost(exc)
-        if (self.pause or self.controller.is_deprioritized(self)
-                 or self.send_size >= 1024*1024 or self.error_count):
-            self.log_info('disconnected.  Sent {:,d} bytes in {:,d} messages '
-                          '{:,d} errors'
-                          .format(self.send_size, self.send_count,
-                                  self.error_count))
+        msg = ''
+        if self.pause:
+            msg += ' whilst paused'
+        if self.controller.is_deprioritized(self):
+            msg += ' whilst deprioritized'
+        if self.send_size >= 1024*1024:
+            msg += ('.  Sent {:,d} bytes in {:,d} messages'
+                    .format(self.send_size, self.send_count))
+        if msg:
+            msg = 'disconnected' + msg
+            self.log_info(msg)
         self.controller.remove_session(self)
 
     def sub_count(self):
         return 0
 
 
-class ElectrumX(Session):
+class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.subscribe_headers = False
         self.subscribe_height = False
         self.notified_height = None
+        self.max_send = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.electrumx_handlers = {
@@ -123,6 +115,7 @@ class ElectrumX(Session):
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
+            'server.version': self.server_version,
         }
 
     def sub_count(self):
@@ -133,32 +126,29 @@ class ElectrumX(Session):
 
         Cache is a shared cache for this update.
         '''
+        controller = self.controller
+        pairs = []
+
         if height != self.notified_height:
             self.notified_height = height
             if self.subscribe_headers:
-                payload = self.notification_payload(
-                    'blockchain.headers.subscribe',
-                    (self.controller.electrum_header(height), ),
-                )
-                self.encode_and_send_payload(payload)
+                args = (controller.electrum_header(height), )
+                pairs.append(('blockchain.headers.subscribe', args))
 
             if self.subscribe_height:
-                payload = self.notification_payload(
-                    'blockchain.numblocks.subscribe',
-                    (height, ),
-                )
-                self.encode_and_send_payload(payload)
+                pairs.append(('blockchain.numblocks.subscribe', (height, )))
 
         matches = touched.intersection(self.hashX_subs)
         for hashX in matches:
             address = self.hashX_subs[hashX]
-            status = await self.controller.address_status(hashX)
-            payload = self.notification_payload(
-                'blockchain.address.subscribe', (address, status))
-            self.encode_and_send_payload(payload)
+            status = await controller.address_status(hashX)
+            pairs.append(('blockchain.address.subscribe', (address, status)))
 
+        self.send_notifications(pairs)
         if matches:
-            self.log_info('notified of {:,d} addresses'.format(len(matches)))
+            es = '' if len(matches) == 1 else 'es'
+            self.log_info('notified of {:,d} address{}'
+                          .format(len(matches), es))
 
     def height(self):
         '''Return the current flushed database height.'''
@@ -168,12 +158,12 @@ class ElectrumX(Session):
         '''Used as response to a headers subscription request.'''
         return self.controller.electrum_header(self.height())
 
-    async def headers_subscribe(self):
+    def headers_subscribe(self):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
         return self.current_electrum_header()
 
-    async def numblocks_subscribe(self):
+    def numblocks_subscribe(self):
         '''Subscribe to get height of new blocks.'''
         self.subscribe_height = True
         return self.height()
@@ -190,6 +180,18 @@ class ElectrumX(Session):
         hashX, status = await self.controller.new_subscription(address)
         self.hashX_subs[hashX] = address
         return status
+
+    def server_version(self, client_name=None, protocol_version=None):
+        '''Returns the server version as a string.
+
+        client_name: a string identifying the client
+        protocol_version: the protocol version spoken by the client
+        '''
+        if client_name:
+            self.client = str(client_name)[:15]
+        if protocol_version is not None:
+            self.protocol_version = protocol_version
+        return VERSION
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -230,13 +232,13 @@ class ElectrumX(Session):
         return handler
 
 
-class LocalRPC(Session):
-    '''A local TCP RPC server for querying status.'''
+class LocalRPC(SessionBase):
+    '''A local TCP RPC server session.'''
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.client = 'RPC'
-        self.max_send = 5000000
+        self.max_send = 0
 
     def request_handler(self, method):
         '''Return the async handler for the given request method.'''
