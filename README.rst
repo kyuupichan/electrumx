@@ -115,8 +115,6 @@ Roadmap Pre-1.0
 
 - minor code cleanups.
 - implement simple protocol to discover peers without resorting to IRC.
-  This may slip to post 1.0
-
 
 Roadmap Post-1.0
 ================
@@ -136,6 +134,13 @@ version prior to the release of 1.0.
 
 ChangeLog
 =========
+
+Version 0.10.11
+---------------
+
+* rewrite of JSON RPC layer to improve usability for clients.
+  Includes support of JSON RPC v1, v2 and a compat layer that tries to
+  detect the peer's version.
 
 Version 0.10.10
 ---------------
