@@ -132,7 +132,7 @@ class PeerManager(util.LoggedClass):
     def peer_list(self):
         return self.irc_peers
 
-    async def subscribe(self):
+    def subscribe(self):
         '''Returns the server peers as a list of (ip, host, details) tuples.
 
         Despite the name this is not currently treated as a subscription.'''
