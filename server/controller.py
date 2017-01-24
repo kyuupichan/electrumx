@@ -12,6 +12,7 @@ import os
 import ssl
 import time
 import traceback
+import warnings
 from bisect import bisect_left
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -247,6 +248,11 @@ class Controller(util.LoggedClass):
         await self.shutdown_event.wait()
         self.logger.info('shutting down')
         await self.shutdown()
+        # Avoid log spew on shutdown for partially opened SSL sockets
+        try:
+            del asyncio.sslproto._SSLProtocolTransport.__del__
+        except Exception:
+            pass
         self.logger.info('shutdown complete')
 
     def initiate_shutdown(self):
@@ -543,7 +549,7 @@ class Controller(util.LoggedClass):
     def lookup_session(self, session_id):
         try:
             session_id = int(session_id)
-        except:
+        except Exception:
             pass
         else:
             for session in self.sessions:
@@ -617,7 +623,7 @@ class Controller(util.LoggedClass):
         if isinstance(address, str):
             try:
                 return self.coin.address_to_hashX(address)
-            except:
+            except Exception:
                 pass
         raise RPCError('{} is not a valid address'.format(address))
 
