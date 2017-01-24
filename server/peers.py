@@ -7,6 +7,8 @@
 
 '''Peer management.'''
 
+import asyncio
+import itertools
 import socket
 from collections import namedtuple
 
@@ -32,20 +34,27 @@ class PeerManager(util.LoggedClass):
         self.env = env
         self.controller = controller
         self.irc = IRC(env, self)
-        self.identities = []
+        self.pruning = None
+        self._identities = []
         # Keyed by nick
         self.irc_peers = {}
+        self.updated_nicks = set()
 
         # We can have a Tor identity inaddition to a normal one
-        self.identities.append(NetIdentity(env.report_host,
-                                           env.report_tcp_port,
-                                           env.report_ssl_port,
-                                           ''))
+        self._identities.append(self.identity(env.report_host,
+                                              env.report_tcp_port,
+                                              env.report_ssl_port,
+                                              ''))
         if env.report_host_tor.endswith('.onion'):
-            self.identities.append(NetIdentity(env.report_host_tor,
-                                               env.report_tcp_port_tor,
-                                               env.report_ssl_port_tor,
-                                               '_tor'))
+            self._identities.append(self.identity(env.report_host_tor,
+                                                  env.report_tcp_port_tor,
+                                                  env.report_ssl_port_tor,
+                                                  '_tor'))
+
+    @classmethod
+    def identity(self, host, tcp_port, ssl_port, suffix):
+        '''Returns a NetIdentity object.  Unpublished ports are None.'''
+        return NetIdentity(host, tcp_port or None, ssl_port or None, suffix)
 
     @classmethod
     def real_name(cls, identity):
@@ -62,18 +71,28 @@ class PeerManager(util.LoggedClass):
         ssl = port_text('s', identity.ssl_port)
         return '{} v{}{}{}'.format(identity.host, cls.VERSION, tcp, ssl)
 
-    def start_irc(self):
-        '''Start up the IRC connections if enabled.'''
+    def identities(self):
+        '''Return a list of network identities of this server.'''
+        return self._identities
+
+    async def refresh_peer_subs(self):
+        for n in itertools.count():
+            await asyncio.sleep(60)
+            updates = [self.irc_peers[nick] for nick in self.updated_nicks
+                       if nick in self.irc_peers]
+            if updates:
+                self.controller.notify_peers(updates)
+            self.updated_nicks.clear()
+
+    async def main_loop(self):
+        '''Not a loop for now...'''
+        self.controller.ensure_future(self.refresh_peer_subs())
         if self.env.irc:
             name_pairs = [(self.real_name(identity), identity.nick_suffix)
-                          for identity in self.identities]
+                          for identity in self._identities]
             self.controller.ensure_future(self.irc.start(name_pairs))
         else:
             self.logger.info('IRC is disabled')
-
-    async def main_loop(self):
-        '''Main loop.  No loop for now.'''
-        self.start_irc()
 
     def dns_lookup_peer(self, nick, hostname, details):
         try:
@@ -83,6 +102,7 @@ class PeerManager(util.LoggedClass):
             except socket.error:
                 pass  # IPv6?
             ip_addr = ip_addr or hostname
+            self.updated_nicks.add(nick)
             self.irc_peers[nick] = IRCPeer(ip_addr, hostname, details)
             self.logger.info('new IRC peer {} at {} ({})'
                              .format(nick, hostname, details))
@@ -102,11 +122,9 @@ class PeerManager(util.LoggedClass):
     def count(self):
         return len(self.irc_peers)
 
-    def peer_list(self):
+    def peer_dict(self):
         return self.irc_peers
 
-    def subscribe(self):
-        '''Returns the server peers as a list of (ip, host, details) tuples.
-
-        Despite the name this is not currently treated as a subscription.'''
+    def peer_list(self):
+        '''Returns the server peers as a list of (ip, host, details) tuples.'''
         return list(self.irc_peers.values())

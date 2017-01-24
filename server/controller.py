@@ -91,12 +91,10 @@ class Controller(util.LoggedClass):
             ('server',
              'banner donation_address'),
         ]
-        handlers = {'.'.join([prefix, suffix]):
-                    getattr(self, suffix.replace('.', '_'))
-                    for prefix, suffixes in rpcs
-                    for suffix in suffixes.split()}
-        handlers['server.peers.subscribe'] = self.peers.subscribe
-        self.electrumx_handlers = handlers
+        self.electrumx_handlers = {'.'.join([prefix, suffix]):
+                                   getattr(self, suffix.replace('.', '_'))
+                                   for prefix, suffixes in rpcs
+                                   for suffix in suffixes.split()}
 
     async def mempool_transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -358,6 +356,11 @@ class Controller(util.LoggedClass):
             for session in sessions:
                 await session.notify(self.bp.db_height, touched)
 
+    def notify_peers(self, updates):
+        '''Notify of peer updates.'''
+        for session in self.sessions:
+            session.notify_peers(updates)
+
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
         if not 0 <= height <= self.bp.db_height:
@@ -605,7 +608,7 @@ class Controller(util.LoggedClass):
 
     def rpc_peers(self):
         '''Return a list of server peers, currently taken from IRC.'''
-        return self.peers.peer_list()
+        return self.peers.peer_dict()
 
     def rpc_reorg(self, count=3):
         '''Force a reorg of the given number of blocks.

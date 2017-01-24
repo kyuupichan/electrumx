@@ -7,7 +7,6 @@
 
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
-
 import time
 import traceback
 from functools import partial
@@ -105,6 +104,7 @@ class ElectrumX(SessionBase):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
         self.subscribe_height = False
+        self.subscribe_peers = False
         self.notified_height = None
         self.max_send = self.env.max_send
         self.max_subs = self.env.max_session_subs
@@ -114,6 +114,8 @@ class ElectrumX(SessionBase):
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
+            'server.features': self.server_features,
+            'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
         }
 
@@ -167,6 +169,23 @@ class ElectrumX(SessionBase):
         self.subscribe_height = True
         return self.height()
 
+    def peers_subscribe(self, incremental=False):
+        '''Returns the server peers as a list of (ip, host, details) tuples.
+
+        If incremental is False there is no subscription.  If True the
+        remote side will receive notifications of new or modified
+        peers (peers that disappeared are not notified).
+        '''
+        self.subscribe_peers = incremental
+        return self.controller.peers.peer_list()
+
+    def notify_peers(self, updates):
+        '''Notify of peer updates.  Updates are sent as a list in the same
+        format as the subscription reply, as the first parameter.
+        '''
+        if self.subscribe_peers:
+            self.send_notification('server.peers.subscribe', [updates])
+
     async def address_subscribe(self, address):
         '''Subscribe to an address.
 
@@ -179,6 +198,20 @@ class ElectrumX(SessionBase):
         hashX, status = await self.controller.new_subscription(address)
         self.hashX_subs[hashX] = address
         return status
+
+    def server_features(self):
+        '''Returns a dictionary of server features.'''
+        peers = self.controller.peers
+        hosts = {identity.host: {
+            'tcp_port': identity.tcp_port,
+            'ssl_port': identity.ssl_port,
+            'pruning': peers.pruning,
+            'version': peers.VERSION,
+        } for identity in self.controller.peers.identities()}
+
+        return {
+            'hosts': hosts,
+        }
 
     def server_version(self, client_name=None, protocol_version=None):
         '''Returns the server version as a string.
