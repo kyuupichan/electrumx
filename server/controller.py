@@ -11,6 +11,7 @@ import json
 import os
 import ssl
 import time
+import traceback
 from bisect import bisect_left
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -49,9 +50,9 @@ class Controller(util.LoggedClass):
         self.start_time = time.time()
         self.coin = env.coin
         self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
-        self.bp = BlockProcessor(env, self.daemon)
-        self.mempool = MemPool(self.bp)
-        self.peers = PeerManager(env)
+        self.bp = BlockProcessor(env, self, self.daemon)
+        self.mempool = MemPool(self.bp, self)
+        self.peers = PeerManager(env, self)
         self.env = env
         self.servers = {}
         # Map of session to the key of its list in self.groups
@@ -63,6 +64,7 @@ class Controller(util.LoggedClass):
         self.max_sessions = env.max_sessions
         self.low_watermark = self.max_sessions * 19 // 20
         self.max_subs = env.max_subs
+        self.futures = set()
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
         self.next_stale_check = 0
@@ -199,43 +201,59 @@ class Controller(util.LoggedClass):
                 if session.items:
                     self.enqueue_session(session)
 
+    async def run_in_executor(self, func, *args):
+        '''Wait whilst running func in the executor.'''
+        return await self.loop.run_in_executor(None, func, *args)
+
+    def schedule_executor(self, func, *args):
+        '''Schedule running func in the executor, return a task.'''
+        return self.ensure_future(self.run_in_executor(func, *args))
+
+    def ensure_future(self, coro):
+        '''Schedule the coro to be run.'''
+        future = asyncio.ensure_future(coro)
+        future.add_done_callback(self.on_future_done)
+        self.futures.add(future)
+        return future
+
+    def on_future_done(self, future):
+        '''Collect the result of a future after removing it from our set.'''
+        self.futures.remove(future)
+        try:
+            future.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self.log_error(traceback.format_exc())
+
+    async def wait_for_bp_catchup(self):
+        '''Called when the block processor catches up.'''
+        await self.bp.caught_up_event.wait()
+        self.logger.info('block processor has caught up')
+        self.ensure_future(self.peers.main_loop())
+        self.ensure_future(self.start_servers())
+        self.ensure_future(self.mempool.main_loop())
+        self.ensure_future(self.enqueue_delayed_sessions())
+        self.ensure_future(self.notify())
+        for n in range(4):
+            self.ensure_future(self.serve_requests())
+
+    async def main_loop(self):
+        '''Controller main loop.'''
+        self.ensure_future(self.bp.main_loop())
+        self.ensure_future(self.wait_for_bp_catchup())
+
+        # Shut down cleanly after waiting for shutdown to be signalled
+        await self.shutdown_event.wait()
+        self.logger.info('shutting down')
+        await self.shutdown()
+        self.logger.info('shutdown complete')
+
     def initiate_shutdown(self):
         '''Call this function to start the shutdown process.'''
         self.shutdown_event.set()
 
-    async def main_loop(self):
-        '''Controller main loop.'''
-        def add_future(coro):
-            futures.append(asyncio.ensure_future(coro))
-
-        async def await_bp_catchup():
-            '''Wait for the block processor to catch up.
-
-            Then start the servers and the peer manager.
-            '''
-            await self.bp.caught_up_event.wait()
-            self.logger.info('block processor has caught up')
-            add_future(self.peers.main_loop())
-            add_future(self.start_servers())
-            add_future(self.mempool.main_loop())
-            add_future(self.enqueue_delayed_sessions())
-            add_future(self.notify())
-            for n in range(4):
-                add_future(self.serve_requests())
-
-        futures = []
-        add_future(self.bp.main_loop())
-        add_future(self.bp.prefetcher.main_loop())
-        add_future(await_bp_catchup())
-
-        # Perform a clean shutdown when this event is signalled.
-        await self.shutdown_event.wait()
-
-        self.logger.info('shutting down')
-        await self.shutdown(futures)
-        self.logger.info('shutdown complete')
-
-    async def shutdown(self, futures):
+    async def shutdown(self):
         '''Perform the shutdown sequence.'''
         self.state = self.SHUTTING_DOWN
 
@@ -244,13 +262,13 @@ class Controller(util.LoggedClass):
         for session in self.sessions:
             self.close_session(session)
 
-        # Cancel the futures
-        for future in futures:
+        # Cancel pending futures
+        for future in self.futures:
             future.cancel()
 
         # Wait for all futures to finish
-        while any(not future.done() for future in futures):
-            await asyncio.sleep(1)
+        while not all (future.done() for future in self.futures):
+            await asyncio.sleep(0.1)
 
         # Finally shut down the block processor and executor
         self.bp.shutdown(self.executor)
@@ -694,8 +712,7 @@ class Controller(util.LoggedClass):
             limit = self.env.max_send // 97
             return list(self.bp.get_history(hashX, limit=limit))
 
-        loop = asyncio.get_event_loop()
-        history = await loop.run_in_executor(None, job)
+        history = await self.run_in_executor(job)
         self.history_cache[hashX] = history
         return history
 
@@ -725,8 +742,8 @@ class Controller(util.LoggedClass):
         '''Get UTXOs asynchronously to reduce latency.'''
         def job():
             return list(self.bp.get_utxos(hashX, limit=None))
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, job)
+
+        return await self.run_in_executor(job)
 
     def get_chunk(self, index):
         '''Return header chunk as hex.  Index is a non-negative integer.'''

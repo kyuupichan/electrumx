@@ -138,9 +138,10 @@ class BlockProcessor(server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, daemon):
+    def __init__(self, env, controller, daemon):
         super().__init__(env)
         self.daemon = daemon
+        self.controller = controller
 
         # These are our state as we move ahead of DB state
         self.fs_height = self.db_height
@@ -190,6 +191,7 @@ class BlockProcessor(server.db.DB):
 
     async def main_loop(self):
         '''Main loop for block processing.'''
+        self.controller.ensure_future(self.prefetcher.main_loop())
         await self.prefetcher.reset_height()
 
         while True:
@@ -205,16 +207,11 @@ class BlockProcessor(server.db.DB):
             self.logger.info('flushing state to DB for a clean shutdown...')
             self.flush(True)
 
-    async def executor(self, func, *args, **kwargs):
-        '''Run func taking args in the executor.'''
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, partial(func, *args, **kwargs))
-
     async def first_caught_up(self):
         '''Called when first caught up to daemon after starting.'''
         # Flush everything with updated first_sync->False state.
         self.first_sync = False
-        await self.executor(self.flush, True)
+        await self.controller.run_in_executor(self.flush, True)
         if self.utxo_db.for_sync:
             self.logger.info('{} synced to height {:,d}'
                              .format(VERSION, self.height))
@@ -240,7 +237,8 @@ class BlockProcessor(server.db.DB):
 
         if hprevs == chain:
             start = time.time()
-            await self.executor(self.advance_blocks, blocks, headers)
+            await self.controller.run_in_executor(self.advance_blocks,
+                                                  blocks, headers)
             if not self.first_sync:
                 s = '' if len(blocks) == 1 else 's'
                 self.logger.info('processed {:,d} block{} in {:.1f}s'
@@ -277,14 +275,14 @@ class BlockProcessor(server.db.DB):
             self.logger.info('chain reorg detected')
         else:
             self.logger.info('faking a reorg of {:,d} blocks'.format(count))
-        await self.executor(self.flush, True)
+        await self.controller.run_in_executor(self.flush, True)
 
         hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             blocks = await self.daemon.raw_blocks(hex_hashes)
-            await self.executor(self.backup_blocks, blocks)
+            await self.controller.run_in_executor(self.backup_blocks, blocks)
         await self.prefetcher.reset_height()
 
     async def reorg_hashes(self, count):
