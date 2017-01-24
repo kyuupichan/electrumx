@@ -83,7 +83,7 @@ class Env(LoggedClass):
             return default
         try:
             return int(value)
-        except:
+        except Exception:
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
 
