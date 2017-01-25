@@ -135,6 +135,14 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.13
+---------------
+
+* worked around asyncio issue to suppress the annoying log spew on shutdown
+  that makes it look like a bomb hit
+* implement peer subscriptions as real subscriptions with incremental updates
+* misc cleanups
+
 Version 0.10.12
 ---------------
 

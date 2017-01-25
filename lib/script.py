@@ -209,7 +209,7 @@ class Script(object):
                     n += dlen
 
                 ops.append(op)
-        except:
+        except Exception:
             # Truncated script; e.g. tx_hash
             # ebc9fa1196a59e192352d76c0f6e73167046b9d37b8302b6bb6968dfd279b767
             raise ScriptError('truncated script')

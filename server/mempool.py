@@ -31,9 +31,10 @@ class MemPool(util.LoggedClass):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, bp):
+    def __init__(self, bp, controller):
         super().__init__()
         self.daemon = bp.daemon
+        self.controller = controller
         self.coin = bp.coin
         self.db = bp
         self.touched = bp.touched
@@ -139,7 +140,6 @@ class MemPool(util.LoggedClass):
                 break
 
     def async_process_some(self, unfetched, limit):
-        loop = asyncio.get_event_loop()
         pending = []
         txs = self.txs
 
@@ -162,9 +162,8 @@ class MemPool(util.LoggedClass):
                 deferred = pending
                 pending = []
 
-            def job():
-                return self.process_raw_txs(raw_txs, deferred)
-            result, deferred = await loop.run_in_executor(None, job)
+            result, deferred = await self.controller.run_in_executor \
+                (self.process_raw_txs, raw_txs, deferred)
 
             pending.extend(deferred)
             hashXs = self.hashXs

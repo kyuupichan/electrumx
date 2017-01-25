@@ -89,7 +89,7 @@ These environment variables are optional:
 * **SSL_PORT**
 
   If set ElectrumX will serve SSL clients on **HOST**:**SSL_PORT**.
-  If set SSL_CERTFILE and SSL_KEYFILE must be defined and be
+  If set then SSL_CERTFILE and SSL_KEYFILE must be defined and be
   filesystem paths to those SSL files.
 
 * **RPC_PORT**

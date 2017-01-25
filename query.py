@@ -50,7 +50,7 @@ def main():
     try:
         limit = int(sys.argv[argc])
         argc += 1
-    except:
+    except Exception:
         limit = 10
     for addr in sys.argv[argc:]:
         print('Address: ', addr)
