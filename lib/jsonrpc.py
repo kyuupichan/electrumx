@@ -607,7 +607,7 @@ class JSONSessionBase(util.LoggedClass):
         A 1-tuple is also valid in which case there are no params.'''
         if self.version.HAS_BATCHES:
             parts = [self.notification_bytes(*pair) for pair in mp_iterable]
-            self.send_binary(batch_bytes(parts))
+            self.send_binary(self.version.batch_bytes(parts))
         else:
             for pair in mp_iterable:
                 self.send_notification(*pair)
