@@ -324,12 +324,15 @@ class JSONSessionBase(util.LoggedClass):
         Flag the connection to close on a fatal error or too many errors.'''
         version = self.version
         self.error_count += 1
-        if code in (version.PARSE_ERROR, version.INVALID_REQUEST):
-            self.log_info(message)
-            self.close_after_send = True
-        elif self.error_count >= 10:
-            self.log_info('too many errors, last: {}'.format(message))
-            self.close_after_send = True
+        if not self.close_after_send:
+            fatal_log = None
+            if code in (version.PARSE_ERROR, version.INVALID_REQUEST):
+                fatal_log = message
+            elif self.error_count >= 10:
+                fatal_log = 'too many errors, last: {}'.format(message)
+            if fatal_log:
+                self.log_info(fatal_log)
+                self.close_after_send = True
         return self.encode_payload(self.version.error_payload
                                    (message, code, id_))
 
