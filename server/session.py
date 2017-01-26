@@ -7,12 +7,13 @@
 
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
+import codecs
 import time
 from functools import partial
 
 from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2
 from server.daemon import DaemonError
-from server.version import VERSION
+import server.version as version
 
 
 class SessionBase(JSONSession):
@@ -32,6 +33,7 @@ class SessionBase(JSONSession):
         self.env = controller.env
         self.daemon = self.bp.daemon
         self.client = 'unknown'
+        self.protocol_version = '1.0'
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
         self.txs_sent = 0
@@ -42,6 +44,7 @@ class SessionBase(JSONSession):
         self.bw_time = self.start_time
         self.bw_interval = 3600
         self.bw_used = 0
+        self.peer_added = False
 
     def have_pending_items(self):
         '''Called each time the pending item queue goes from empty to having
@@ -74,6 +77,7 @@ class SessionBase(JSONSession):
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
+        super().connection_lost(exc)
         msg = ''
         if self.pause:
             msg += ' whilst paused'
@@ -116,6 +120,8 @@ class ElectrumX(SessionBase):
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
+            'server.add_peer': self.add_peer,
+            'server.banner': self.banner,
             'server.features': self.server_features,
             'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
@@ -171,9 +177,19 @@ class ElectrumX(SessionBase):
         self.subscribe_height = True
         return self.height()
 
+    def add_peer(self, features):
+        '''Add a peer.'''
+        if self.peer_added:
+            return False
+        peer_mgr = self.controller.peer_mgr
+        peer_info = self.peer_info()
+        source = peer_info[0] if peer_info else 'unknown'
+        self.peer_added = peer_mgr.on_add_peer(features, source)
+        return self.peer_added
+
     def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
-        return self.controller.peer_mgr.on_peers_subscribe()
+        return self.controller.peer_mgr.on_peers_subscribe(self.is_tor())
 
     async def address_subscribe(self, address):
         '''Subscribe to an address.
@@ -190,18 +206,50 @@ class ElectrumX(SessionBase):
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
-        peer_mgr = self.controller.peer_mgr
-        hosts = {identity.host: {
-            'tcp_port': identity.tcp_port,
-            'ssl_port': identity.ssl_port,
-        } for identity in peer_mgr.identities()}
+        return self.controller.peer_mgr.myself.features
 
-        return {
-            'hosts': hosts,
-            'pruning': peer_mgr.pruning,
-            'protocol_version': peer_mgr.PROTOCOL_VERSION,
-            'server_version': VERSION,
-        }
+    def is_tor(self):
+        '''Try to detect if the connection is to a tor hidden service we are
+        running.'''
+        tor_proxy = self.controller.peer_mgr.tor_proxy
+        peer_info = self.peer_info()
+        return peer_info and peer_info[0] == tor_proxy.ip_addr
+
+    async def replaced_banner(self, banner):
+        network_info = await self.controller.daemon_request('getnetworkinfo')
+        ni_version = network_info['version']
+        major, minor = divmod(ni_version, 1000000)
+        minor, revision = divmod(minor, 10000)
+        revision //= 100
+        daemon_version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
+        for pair in [
+                ('$VERSION', version.VERSION),
+                ('$DAEMON_VERSION', daemon_version),
+                ('$DAEMON_SUBVERSION', network_info['subversion']),
+                ('$DONATION_ADDRESS', self.env.donation_address),
+        ]:
+            banner = banner.replace(*pair)
+        return banner
+
+    async def banner(self):
+        '''Return the server banner text.'''
+        banner = 'Welcome to Electrum!'
+
+        if self.is_tor():
+            banner_file = self.env.tor_banner_file
+        else:
+            banner_file = self.env.banner_file
+        if banner_file:
+            try:
+                with codecs.open(banner_file, 'r', 'utf-8') as f:
+                    banner = f.read()
+            except Exception as e:
+                self.log_error('reading banner file {}: {}'
+                               .format(banner_file, e))
+            else:
+                banner = await self.replaced_banner(banner)
+
+        return banner
 
     def server_version(self, client_name=None, protocol_version=None):
         '''Returns the server version as a string.
@@ -213,7 +261,7 @@ class ElectrumX(SessionBase):
             self.client = str(client_name)[:17]
         if protocol_version is not None:
             self.protocol_version = protocol_version
-        return VERSION
+        return version.VERSION
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.

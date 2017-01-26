@@ -6,7 +6,6 @@
 # and warranty status of this software.
 
 import asyncio
-import codecs
 import json
 import os
 import ssl
@@ -20,7 +19,7 @@ from functools import partial
 
 import pylru
 
-from lib.jsonrpc import JSONRPC, RPCError
+from lib.jsonrpc import JSONRPC, JSONSessionBase, RPCError
 from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
@@ -28,7 +27,6 @@ from server.daemon import Daemon, DaemonError
 from server.mempool import MemPool
 from server.peers import PeerManager
 from server.session import LocalRPC, ElectrumX
-from server.version import VERSION
 
 
 class Controller(util.LoggedClass):
@@ -88,8 +86,7 @@ class Controller(util.LoggedClass):
              'address.get_proof address.listunspent '
              'block.get_header block.get_chunk estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
-            ('server',
-             'banner donation_address'),
+            ('server', 'donation_address'),
         ]
         self.electrumx_handlers = {'.'.join([prefix, suffix]):
                                    getattr(self, suffix.replace('.', '_'))
@@ -218,15 +215,21 @@ class Controller(util.LoggedClass):
     def on_future_done(self, future):
         '''Collect the result of a future after removing it from our set.'''
         callback = self.futures.pop(future)
-        if callback:
-            callback(future)
-        else:
-            try:
+        try:
+            if callback:
+                callback(future)
+            else:
                 future.result()
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                self.log_error(traceback.format_exc())
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self.log_error(traceback.format_exc())
+
+    async def check_request_timeouts(self):
+        '''Regularly check pending JSON requests for timeouts.'''
+        while True:
+            await asyncio.sleep(30)
+            JSONSessionBase.timeout_check()
 
     async def wait_for_bp_catchup(self):
         '''Called when the block processor catches up.'''
@@ -234,6 +237,7 @@ class Controller(util.LoggedClass):
         self.logger.info('block processor has caught up')
         self.ensure_future(self.peer_mgr.main_loop())
         self.ensure_future(self.start_servers())
+        self.ensure_future(self.check_request_timeouts())
         self.ensure_future(self.mempool.main_loop())
         self.ensure_future(self.enqueue_delayed_sessions())
         self.ensure_future(self.notify())
@@ -242,6 +246,8 @@ class Controller(util.LoggedClass):
 
     async def main_loop(self):
         '''Controller main loop.'''
+        if self.env.rpc_port is not None:
+            await self.start_server('RPC', 'localhost', self.env.rpc_port)
         self.ensure_future(self.bp.main_loop())
         self.ensure_future(self.wait_for_bp_catchup())
 
@@ -268,6 +274,9 @@ class Controller(util.LoggedClass):
         self.close_servers(list(self.servers.keys()))
         for session in self.sessions:
             self.close_session(session)
+
+        # This might resolve "future never awaited" log
+        await asyncio.sleep(0)
 
         # Cancel pending futures
         for future in self.futures:
@@ -306,9 +315,7 @@ class Controller(util.LoggedClass):
                              .format(kind, host, port))
 
     async def start_servers(self):
-        '''Start RPC, TCP and SSL servers once caught up.'''
-        if self.env.rpc_port is not None:
-            await self.start_server('RPC', 'localhost', self.env.rpc_port)
+        '''Start TCP and SSL servers.'''
         self.logger.info('max session count: {:,d}'.format(self.max_sessions))
         self.logger.info('session timeout: {:,d} seconds'
                          .format(self.env.session_timeout))
@@ -459,7 +466,7 @@ class Controller(util.LoggedClass):
             'logged': len([s for s in self.sessions if s.log_me]),
             'paused': sum(s.pause for s in self.sessions),
             'pid': os.getpid(),
-            'peers': self.peer_mgr.count(),
+            'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
             'sessions': self.session_count(),
             'subs': self.sub_count(),
@@ -510,6 +517,38 @@ class Controller(util.LoggedClass):
                            sum(s.send_size for s in sessions),
                            ])
         return result
+
+    @staticmethod
+    def peers_text_lines(data):
+        '''A generator returning lines for a list of peers.
+
+        data is the return value of rpc_peers().'''
+        def time_fmt(t):
+            if not t:
+                return 'Never'
+            return util.formatted_time(now - t)
+
+        now = time.time()
+        fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>3} '
+               '{:>3} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
+        yield fmt.format('Host', 'Status', 'TCP', 'SSL', 'Server', 'Min',
+                         'Max', 'Pruning', 'Last Conn', 'Last Try',
+                         'Tries', 'Source', 'IP Address')
+        for item in data:
+            features = item['features']
+            yield fmt.format(item['host'][:30],
+                             item['status'],
+                             features['tcp_port'] or '',
+                             features['ssl_port'] or '',
+                             features['server_version'] or 'unknown',
+                             features['protocol_min'],
+                             features['protocol_max'],
+                             features['pruning'] or '',
+                             time_fmt(item['last_connect']),
+                             time_fmt(item['last_try']),
+                             item['try_count'],
+                             item['source'][:20],
+                             item['ip_addr'] or '')
 
     @staticmethod
     def sessions_text_lines(data):
@@ -871,33 +910,6 @@ class Controller(util.LoggedClass):
         return self.coin.address_from_script(tx.outputs[index].pk_script)
 
     # Client RPC "server" command handlers
-
-    async def banner(self):
-        '''Return the server banner text.'''
-        banner = 'Welcome to Electrum!'
-        if self.env.banner_file:
-            try:
-                with codecs.open(self.env.banner_file, 'r', 'utf-8') as f:
-                    banner = f.read()
-            except Exception as e:
-                self.log_error('reading banner file {}: {}'
-                               .format(self.env.banner_file, e))
-            else:
-                network_info = await self.daemon_request('getnetworkinfo')
-                version = network_info['version']
-                major, minor = divmod(version, 1000000)
-                minor, revision = divmod(minor, 10000)
-                revision //= 100
-                version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
-                for pair in [
-                    ('$VERSION', VERSION),
-                    ('$DAEMON_VERSION', version),
-                    ('$DAEMON_SUBVERSION', network_info['subversion']),
-                    ('$DONATION_ADDRESS', self.env.donation_address),
-                ]:
-                    banner = banner.replace(*pair)
-
-        return banner
 
     def donation_address(self):
         '''Return the donation address as a string, empty if there is none.'''

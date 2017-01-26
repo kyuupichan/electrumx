@@ -2,8 +2,26 @@
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# The MIT License (MIT)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 '''Classes for acting as a peer over a transport and speaking the JSON
 RPC versions 1.0 and 2.0.
@@ -41,8 +59,34 @@ class JSONRPC(object):
     INVALID_ARGS = -32602
     INTERNAL_ERROR = -32603
 
+    # Codes for this library
+    INVALID_RESPONSE = -100
+    ERROR_CODE_UNAVAILABLE = -101
+    REQUEST_TIMEOUT = -102
+
     ID_TYPES = (type(None), str, numbers.Number)
     HAS_BATCHES = False
+
+    @classmethod
+    def canonical_error(cls, error):
+        '''Convert an error to a JSON RPC 2.0 error.
+
+        Handlers then only have a single form of error to deal with.
+        '''
+        if isinstance(error, int):
+            error = {'code': error}
+        elif isinstance(error, str):
+            error = {'message': error}
+        elif not isinstance(error, dict):
+            error = {'data': error}
+        error['code'] = error.get('code', JSONRPC.ERROR_CODE_UNAVAILABLE)
+        error['message'] = error.get('message', 'error message unavailable')
+        return error
+
+    @classmethod
+    def timeout_error(cls):
+        return {'message': 'request timed out',
+                'code': JSONRPC.REQUEST_TIMEOUT}
 
 
 class JSONRPCv1(JSONRPC):
@@ -71,23 +115,23 @@ class JSONRPCv1(JSONRPC):
 
     @classmethod
     def handle_response(cls, handler, payload):
-        '''JSON v1 response handler.  Both 'error' and 'response'
+        '''JSON v1 response handler.  Both 'error' and 'result'
         should exist with exactly one being None.
+
+        Unfortunately many 1.0 clients behave like 2.0, and just send
+        one or the other.
         '''
-        try:
-            result = payload['result']
-            error = payload['error']
-        except KeyError:
-            pass
+        error = payload.get('error')
+        if error is None:
+            handler(payload.get('result'), None)
         else:
-            if (result is None) != (error is None):
-                handler(result, error)
+            handler(None, cls.canonical_error(error))
 
     @classmethod
     def is_request(cls, payload):
         '''Returns True if the payload (which has a method) is a request.
         False means it is a notification.'''
-        return payload.get('id') != None
+        return payload.get('id') is not None
 
 
 class JSONRPCv2(JSONRPC):
@@ -124,17 +168,17 @@ class JSONRPCv2(JSONRPC):
 
     @classmethod
     def handle_response(cls, handler, payload):
-        '''JSON v2 response handler.  Exactly one of 'error' and 'response'
+        '''JSON v2 response handler.  Exactly one of 'error' and 'result'
         must exist.  Errors must have 'code' and 'message' members.
         '''
-        if ('error' in payload) != ('result' in payload):
-            if 'result' in payload:
-                handler(payload['result'], None)
-            else:
-                error = payload['error']
-                if (isinstance(error, dict) and 'code' in error
-                       and 'message' in error):
-                    handler(None, error)
+        if 'error' in payload:
+            handler(None, cls.canonical_error(payload['error']))
+        elif 'result' in payload:
+            handler(payload['result'], None)
+        else:
+            error = {'message': 'no error or result returned',
+                     'code': JSONRPC.INVALID_RESPONSE}
+            handler(None, cls.canonical_error(error))
 
     @classmethod
     def batch_size(cls, parts):
@@ -213,14 +257,48 @@ class JSONSessionBase(util.LoggedClass):
     responses.  Incoming messages are queued.  When the queue goes
     from empty
     '''
-
-    NEXT_SESSION_ID = 0
+    _next_session_id = 0
+    _pending_reqs = {}
 
     @classmethod
     def next_session_id(cls):
-        session_id = cls.NEXT_SESSION_ID
-        cls.NEXT_SESSION_ID += 1
+        '''Return the next unique session ID.'''
+        session_id = cls._next_session_id
+        cls._next_session_id += 1
         return session_id
+
+    def _pending_request_keys(self):
+        '''Return a generator of pending request keys for this session.'''
+        return [key for key in self._pending_reqs if key[0] is self]
+
+    def has_pending_requests(self):
+        '''Return True if this session has pending requests.'''
+        return bool(self._pending_request_keys())
+
+    def pop_response_handler(self, msg_id):
+        '''Return the response handler for the given message ID.'''
+        return self._pending_reqs.pop((self, msg_id), (None, None))[0]
+
+    def timeout_session(self):
+        '''Trigger timeouts for all of the session's pending requests.'''
+        self._timeout_requests(self._pending_request_keys())
+
+    @classmethod
+    def timeout_check(cls):
+        '''Trigger timeouts where necessary for all pending requests.'''
+        now = time.time()
+        keys = [key for key, value in cls._pending_reqs.items()
+                if value[1] < now]
+        cls._timeout_requests(keys)
+
+    @classmethod
+    def _timeout_requests(cls, keys):
+        '''Trigger timeouts for the given lookup keys.'''
+        values = [cls._pending_reqs.pop(key) for key in keys]
+        handlers = [handler for handler, timeout in values]
+        timeout_error = JSONRPC.timeout_error()
+        for handler in handlers:
+            handler(None, timeout_error)
 
     def __init__(self, version=JSONRPCCompat):
         super().__init__()
@@ -245,7 +323,6 @@ class JSONSessionBase(util.LoggedClass):
         self.batch_results = []
         # Handling of outgoing requests
         self.next_request_id = 0
-        self.pending_responses = {}
         # If buffered incoming data exceeds this the connection is closed
         self.max_buffer_size = 1000000
         self.max_send = 50000
@@ -296,7 +373,7 @@ class JSONSessionBase(util.LoggedClass):
         '''Extract and return the ID from the payload.
 
         Raises an RPCError if it is missing or invalid.'''
-        if not 'id' in payload:
+        if 'id' not in payload:
             raise RPCError('missing id', JSONRPC.INVALID_REQUEST)
 
         id_ = payload['id']
@@ -473,7 +550,7 @@ class JSONSessionBase(util.LoggedClass):
         '''Handle a single JSON response.'''
         try:
             id_ = self.check_payload_id(payload)
-            handler = self.pending_responses.pop(id_, None)
+            handler = self.pop_response_handler(id_)
             if handler:
                 self.version.handle_response(handler, payload)
             else:
@@ -593,14 +670,18 @@ class JSONSessionBase(util.LoggedClass):
         '''Send a JSON error.'''
         self.send_binary(self.error_bytes(message, code, id_))
 
-    def send_request(self, handler, method, params=None):
+    def send_request(self, handler, method, params=None, timeout=30):
         '''Sends a request and arranges for handler to be called with the
         response when it comes in.
+
+        A call to request_timeout_check() will result in pending
+        responses that have been waiting more than timeout seconds to
+        call the handler with a REQUEST_TIMEOUT error.
         '''
         id_ = self.next_request_id
         self.next_request_id += 1
         self.send_binary(self.request_bytes(id_, method, params))
-        self.pending_responses[id_] = handler
+        self._pending_reqs[(self, id_)] = (handler, time.time() + timeout)
 
     def send_notification(self, method, params=None):
         '''Send a notification.'''
@@ -679,7 +760,9 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
 
     def peer_info(self):
         '''Returns information about the peer.'''
-        return self.transport.get_extra_info('peername')
+        if self.transport:
+            return self.transport.get_extra_info('peername')
+        return None
 
     def abort(self):
         '''Cut the connection abruptly.'''
@@ -690,6 +773,10 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
         transport.set_write_buffer_limits(high=self.write_buffer_high)
         self.transport = transport
         super().connection_made()
+
+    def connection_lost(self, exc):
+        '''Trigger timeouts of all pending requests.'''
+        self.timeout_session()
 
     def is_closing(self):
         '''True if the underlying transport is closing.'''

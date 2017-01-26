@@ -723,8 +723,8 @@ Get a list of features and services supported by the server.
 
   * **pruning**
 
-    The history pruning limit of the server.  If the server does not
-    prune return *null*.
+    The history pruning limit of the server as an integer.  If the
+    server does not prune return *null*.
 
 **Example Response**
 

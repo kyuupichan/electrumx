@@ -2,19 +2,37 @@
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
+# The MIT License (MIT)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # and warranty status of this software.
 
 '''Miscellaneous utility classes and functions.'''
 
 
 import array
-import asyncio
 import inspect
+from ipaddress import ip_address
 import logging
 import sys
 from collections import Container, Mapping
-
 
 class LoggedClass(object):
 
@@ -202,3 +220,21 @@ def open_file(filename, create=False):
         if create:
             return open(filename, 'wb+')
         raise
+
+def open_truncate(filename):
+    '''Open the file name.  Return its handle.'''
+    return open(filename, 'wb+')
+
+
+def address_string(address):
+    '''Return an address as a correctly formatted string.'''
+    fmt = '{}:{:d}'
+    host, port = address
+    try:
+        host = ip_address(host)
+    except ValueError:
+        pass
+    else:
+        if host.version == 6:
+            fmt = '[{}]:{:d}'
+    return fmt.format(host, port)

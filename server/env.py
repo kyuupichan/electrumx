@@ -44,8 +44,14 @@ class Env(LoggedClass):
         self.rpc_port = self.integer('RPC_PORT', 8000)
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
+        self.tor_banner_file = self.default('TOR_BANNER_FILE',
+                                            self.banner_file)
         self.anon_logs = self.default('ANON_LOGS', False)
         self.log_sessions = self.integer('LOG_SESSIONS', 3600)
+        # Tor proxy
+        # Python 3.5.3 - revert back to localhost?
+        self.tor_proxy_host = self.default('TOR_PROXY_HOST', '127.0.0.1')
+        self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
@@ -60,31 +66,33 @@ class Env(LoggedClass):
         self.irc = self.default('IRC', False)
         self.irc_nick = self.default('IRC_NICK', None)
 
-        self.identity = NetIdentity(
+        # Identities
+        main_identity = NetIdentity(
             self.default('REPORT_HOST', self.host),
             self.integer('REPORT_TCP_PORT', self.tcp_port) or None,
             self.integer('REPORT_SSL_PORT', self.ssl_port) or None,
             ''
         )
-        self.tor_identity = NetIdentity(
-            self.default('REPORT_HOST_TOR', ''), # must be a string
-            self.integer('REPORT_TCP_PORT_TOR',
-                         self.identity.tcp_port
-                         if self.identity.tcp_port else
-                         self.tcp_port) or None,
-            self.integer('REPORT_SSL_PORT_TOR',
-                         self.identity.ssl_port
-                         if self.identity.ssl_port else
-                         self.ssl_port) or None,
-            '_tor'
-        )
+        if not main_identity.host.strip():
+            raise self.Error('IRC host is empty')
+        if main_identity.tcp_port == main_identity.ssl_port:
+            raise self.Error('IRC TCP and SSL ports are the same')
 
-        if self.irc:
-            if not self.identity.host.strip():
-                raise self.Error('IRC host is empty')
-            if self.identity.tcp_port == self.identity.ssl_port:
-                raise self.Error('IRC TCP and SSL ports are the same')
-
+        self.identities = [main_identity]
+        tor_host = self.default('REPORT_HOST_TOR', '')
+        if tor_host.endswith('.onion'):
+            self.identities.append(NetIdentity(
+                tor_host,
+                self.integer('REPORT_TCP_PORT_TOR',
+                             main_identity.tcp_port
+                             if main_identity.tcp_port else
+                             self.tcp_port) or None,
+                self.integer('REPORT_SSL_PORT_TOR',
+                             main_identity.ssl_port
+                             if main_identity.ssl_port else
+                             self.ssl_port) or None,
+                '_tor',
+            ))
 
     def default(self, envvar, default):
         return environ.get(envvar, default)

@@ -160,8 +160,8 @@ Unknown keys should be silently ignored.
 * **protocol_min**
 
   Strings that are the minimum and maximum Electrum protcol versions
-  this server speaks.  Should be the same as what would suffix the
-  letter **v** in the IRC real name.  Example: "1.1".
+  this server speaks.  The maximum value should be the same as what
+  would suffix the letter **v** in the IRC real name.  Example: "1.1".
 
 * **pruning**
 

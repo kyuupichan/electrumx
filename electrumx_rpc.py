@@ -40,12 +40,9 @@ class RPCClient(JSONSession):
         self.send_request(handler, method, params)
 
     def handle_response(self, method, result, error):
-        if method in ('groups', 'sessions') and not error:
-            if method == 'groups':
-                lines = Controller.groups_text_lines(result)
-            else:
-                lines = Controller.sessions_text_lines(result)
-            for line in lines:
+        if method in ('groups', 'peers', 'sessions') and not error:
+            lines_func = getattr(Controller, '{}_text_lines'.format(method))
+            for line in lines_func(result):
                 print(line)
         elif error:
             print('error: {} (code {:d})'

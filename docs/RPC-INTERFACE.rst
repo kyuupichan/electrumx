@@ -62,10 +62,10 @@ The following commands are available:
   Sessions are put into groups, primarily as an anti-DoS measure.
   Initially all connections made within a period of time are put in
   the same group.  High bandwidth usage by a member of a group
-  deprioritizes itself, and all members of its group to a lesser
+  deprioritizes that session, and all members of its group to a lesser
   extent.  Low-priority sessions have their requests served after
   higher priority sessions.  ElectrumX will start delaying responses
-  to a sessions if it becomes sufficiently deprioritized.
+  to a session if it becomes sufficiently deprioritized.
 
 * **sessions**
 
@@ -125,7 +125,7 @@ The following commands are available:
 
   ElectrumX initiates the socket close process for the passed
   sessions.  Whilst most connections close quickly, it can take
-  several minutes for Python to close some SSL connections down.
+  several minutes for Python to shut some SSL connections down.
 
 * **log**
 
@@ -153,22 +153,25 @@ The following commands are available:
 
   Returns a list of peer electrum servers.  This command takes no arguments.
 
-  Currently this is data gleaned from an IRC session.
+  Currently peer data is obtained via a peer discovery protocol; it
+  used to be taken from IRC.
 
 * **daemon_url**
 
-  This command takes an option argument that is interpreted
-  identically to the **DAEMON_URL** environment variable.  If default
-  value of the argument is the **DAEMON_URL** environment variable.
+  This command takes an optional argument that is interpreted
+  identically to the **DAEMON_URL** environment variable.  If omitted,
+  the default argument value is the process's **DAEMON_URL**
+  environment variable.
 
-  The command replaces the daemon's URL at run-time, and rotates to the
-  first in the list.
+  This command replaces the daemon's URL at run-time, and also
+  forecefully rotates to the first URL in the list.
 
-  For example, in case ElectrumX has rotated to a secondary daemon and
-  you want to revert to the first after fixing the issue, call this
-  command without an argument.
+  For example, in case ElectrumX has previously failed over to a
+  secondary daemon and you want to revert to the primary having
+  resolved the connectivity issue, invoking this command without an
+  argument will have that effect.
 
 * **reorg**
 
   Force a block chain reorg.  This command takes an optional
-  argument - the number of blocks to reorg - that defaults to 3.
+  argument - the number of blocks to reorg - which defaults to 3.

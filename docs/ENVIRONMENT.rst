@@ -122,6 +122,11 @@ These environment variables are optional:
   + **$DONATION_ADDRESS** is replaced with the address from the
     **DONATION_ADDRESS** environment variable.
 
+* **TOR_BANNER_FILE**
+
+  As for **BANNER_FILE** (which is also the default) but shown to
+  incoming connections believed to be to your Tor hidden service.
+
 * **ANON_LOGS**
 
   Set to anything non-empty to replace IP addresses in logs with
@@ -207,6 +212,33 @@ raise them.
   functioning Electrum clients by default will send pings roughly
   every 60 seconds.
 
+TOR
+---
+
+In response to the `server.peers.subscribe` RPC call, ElectrumX will
+only return peer servers that is has recently connected to and
+verified basic functionality.
+
+If you are not running a Tor proxy ElectrumX will be unable to connect
+to onion server peers, in which case rather than returning no onion
+peers it will fall back to a hard-coded list.
+
+To give incoming clients a full range of onion servers you will need
+to be running a Tor proxy for ElectrumX to use.
+
+* **TOR_PROXY_HOST**
+
+  The host where the Tor proxy is running.  Defaults to *127.0.0.1*.
+  If you use a hostname here rather than an IP address, you must have
+  Python version >= 3.5.3, Python 3.5.2 will **not** work.
+
+* **TOR_PROXY_PORT**
+
+  The port on which the Tor proxy is running.  If not set, ElectrumX
+  will autodetect any proxy running on the usual ports 9050 (Tor),
+  9150 (Tor browser bundle) and 1080 (socks).
+
+
 IRC
 ---
 
@@ -254,6 +286,11 @@ connectivity on IRC:
   The SSL port to advertise for Tor.  Defaults to **REPORT_SSL_PORT**,
   unless it is '0', otherwise **SSL_PORT**.  '0' disables publishing
   the port.
+
+  **NOTE**: Certificate-Authority signed certificates don't work over
+  Tor, so you should set **REPORT_SSL_PORT_TOR** to 0 if yours is not
+  self-signed.
+
 
 Cache
 -----
