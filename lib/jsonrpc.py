@@ -452,6 +452,8 @@ class JSONSessionBase(util.LoggedClass):
             return self.response_bytes(result, payload['id'])
         except RPCError as e:
             return self.error_bytes(e.msg, e.code, self.payload_id(payload))
+        except asyncio.CancelledError:
+            raise
         except Exception:
             self.log_error(traceback.format_exc())
             return self.error_bytes('internal error processing request',
@@ -701,3 +703,15 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
     def send_bytes(self, binary):
         '''Send JSON text over the transport.'''
         self.transport.writelines((binary, b'\n'))
+
+    def peer_addr(self, anon=True):
+        '''Return the peer address and port.'''
+        peer_info = self.peer_info()
+        if not peer_info:
+            return 'unknown'
+        if anon:
+            return 'xx.xx.xx.xx:xx'
+        if ':' in peer_info[0]:
+            return '[{}]:{}'.format(peer_info[0], peer_info[1])
+        else:
+            return '{}:{}'.format(peer_info[0], peer_info[1])

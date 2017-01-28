@@ -181,11 +181,16 @@ class LogicalFile(object):
         '''
         file_num, offset = divmod(start, self.file_size)
         filename = self.filename_fmt.format(file_num)
-        try:
-            f= open(filename, 'rb+')
-        except FileNotFoundError:
-            if not create:
-                raise
-            f = open(filename, 'wb+')
+        f = open_file(filename, create)
         f.seek(offset)
         return f
+
+
+def open_file(filename, create=False):
+    '''Open the file name.  Return its handle.'''
+    try:
+        return open(filename, 'rb+')
+    except FileNotFoundError:
+        if create:
+            return open(filename, 'wb+')
+        raise

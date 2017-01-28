@@ -8,7 +8,6 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import time
-import traceback
 from functools import partial
 
 from lib.jsonrpc import JSONSession, RPCError
@@ -52,16 +51,8 @@ class SessionBase(JSONSession):
         super().close_connection()
 
     def peername(self, *, for_log=True):
-        '''Return the peer name of this connection.'''
-        peer_info = self.peer_info()
-        if not peer_info:
-            return 'unknown'
-        if for_log and self.anon_logs:
-            return 'xx.xx.xx.xx:xx'
-        if ':' in peer_info[0]:
-            return '[{}]:{}'.format(peer_info[0], peer_info[1])
-        else:
-            return '{}:{}'.format(peer_info[0], peer_info[1])
+        '''Return the peer address and port.'''
+        return self.peer_addr(anon=for_log and self.anon_logs)
 
     def flags(self):
         '''Status flags.'''
@@ -104,7 +95,6 @@ class ElectrumX(SessionBase):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
         self.subscribe_height = False
-        self.subscribe_peers = False
         self.notified_height = None
         self.max_send = self.env.max_send
         self.max_subs = self.env.max_session_subs
@@ -169,22 +159,9 @@ class ElectrumX(SessionBase):
         self.subscribe_height = True
         return self.height()
 
-    def peers_subscribe(self, incremental=False):
-        '''Returns the server peers as a list of (ip, host, details) tuples.
-
-        If incremental is False there is no subscription.  If True the
-        remote side will receive notifications of new or modified
-        peers (peers that disappeared are not notified).
-        '''
-        self.subscribe_peers = incremental
-        return self.controller.peers.peer_list()
-
-    def notify_peers(self, updates):
-        '''Notify of peer updates.  Updates are sent as a list in the same
-        format as the subscription reply, as the first parameter.
-        '''
-        if self.subscribe_peers:
-            self.send_notification('server.peers.subscribe', [updates])
+    def peers_subscribe(self):
+        '''Return the server peers as a list of (ip, host, details) tuples.'''
+        return self.controller.peer_mgr.on_peers_subscribe()
 
     async def address_subscribe(self, address):
         '''Subscribe to an address.
@@ -201,16 +178,17 @@ class ElectrumX(SessionBase):
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
-        peers = self.controller.peers
+        peer_mgr = self.controller.peer_mgr
         hosts = {identity.host: {
             'tcp_port': identity.tcp_port,
             'ssl_port': identity.ssl_port,
-            'pruning': peers.pruning,
-            'version': peers.VERSION,
-        } for identity in self.controller.peers.identities()}
+        } for identity in peer_mgr.identities()}
 
         return {
             'hosts': hosts,
+            'pruning': peer_mgr.pruning,
+            'protocol_version': peer_mgr.PROTOCOL_VERSION,
+            'server_version': VERSION,
         }
 
     def server_version(self, client_name=None, protocol_version=None):
@@ -220,7 +198,7 @@ class ElectrumX(SessionBase):
         protocol_version: the protocol version spoken by the client
         '''
         if client_name:
-            self.client = str(client_name)[:15]
+            self.client = str(client_name)[:17]
         if protocol_version is not None:
             self.protocol_version = protocol_version
         return VERSION

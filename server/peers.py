@@ -8,7 +8,6 @@
 '''Peer management.'''
 
 import asyncio
-import itertools
 import socket
 from collections import namedtuple
 
@@ -16,7 +15,6 @@ import lib.util as util
 from server.irc import IRC
 
 
-NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 IRCPeer = namedtuple('IRCPeer', 'ip_addr host details')
 
 
@@ -26,8 +24,7 @@ class PeerManager(util.LoggedClass):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
-    VERSION = '1.0'
-    DEFAULT_PORTS = {'t': 50001, 's': 50002}
+    PROTOCOL_VERSION = '1.0'
 
     def __init__(self, env, controller):
         super().__init__()
@@ -38,59 +35,44 @@ class PeerManager(util.LoggedClass):
         self._identities = []
         # Keyed by nick
         self.irc_peers = {}
-        self.updated_nicks = set()
+        self._identities.append(env.identity)
+        if env.tor_identity.host.endswith('.onion'):
+            self._identities.append(env.tor_identity)
 
-        # We can have a Tor identity inaddition to a normal one
-        self._identities.append(self.identity(env.report_host,
-                                              env.report_tcp_port,
-                                              env.report_ssl_port,
-                                              ''))
-        if env.report_host_tor.endswith('.onion'):
-            self._identities.append(self.identity(env.report_host_tor,
-                                                  env.report_tcp_port_tor,
-                                                  env.report_ssl_port_tor,
-                                                  '_tor'))
-
-    @classmethod
-    def identity(self, host, tcp_port, ssl_port, suffix):
-        '''Returns a NetIdentity object.  Unpublished ports are None.'''
-        return NetIdentity(host, tcp_port or None, ssl_port or None, suffix)
-
-    @classmethod
-    def real_name(cls, identity):
+    def real_name(self, host, protocol_version, tcp_port, ssl_port):
         '''Real name as used on IRC.'''
-        def port_text(letter, port):
-            if not port:
-                return ''
-            if port == cls.DEFAULT_PORTS.get(letter):
-                return ' ' + letter
-            else:
-                return ' ' + letter + str(port)
+        default_ports = self.env.coin.PEER_DEFAULT_PORTS
 
-        tcp = port_text('t', identity.tcp_port)
-        ssl = port_text('s', identity.ssl_port)
-        return '{} v{}{}{}'.format(identity.host, cls.VERSION, tcp, ssl)
+        def port_text(letter, port):
+            if port == default_ports.get(letter):
+                return letter
+            else:
+                return letter + str(port)
+
+        parts = [host, 'v' + protocol_version]
+        for letter, port in (('s', ssl_port), ('t', tcp_port)):
+            if port:
+                parts.append(port_text(letter, port))
+        return ' '.join(parts)
+
+    def irc_name_pairs(self):
+        return [(self.real_name(identity.host, self.PROTOCOL_VERSION,
+                                identity.tcp_port, identity.ssl_port),
+                 identity.nick_suffix)
+                for identity in self._identities]
 
     def identities(self):
         '''Return a list of network identities of this server.'''
         return self._identities
 
-    async def refresh_peer_subs(self):
-        for n in itertools.count():
-            await asyncio.sleep(60)
-            updates = [self.irc_peers[nick] for nick in self.updated_nicks
-                       if nick in self.irc_peers]
-            if updates:
-                self.controller.notify_peers(updates)
-            self.updated_nicks.clear()
+    def ensure_future(self, coro, callback=None):
+        '''Schedule the coro to be run.'''
+        return self.controller.ensure_future(coro, callback=callback)
 
     async def main_loop(self):
         '''Not a loop for now...'''
-        self.controller.ensure_future(self.refresh_peer_subs())
         if self.env.irc:
-            name_pairs = [(self.real_name(identity), identity.nick_suffix)
-                          for identity in self._identities]
-            self.controller.ensure_future(self.irc.start(name_pairs))
+            self.ensure_future(self.irc.start(self.irc_name_pairs()))
         else:
             self.logger.info('IRC is disabled')
 
@@ -102,7 +84,6 @@ class PeerManager(util.LoggedClass):
             except socket.error:
                 pass  # IPv6?
             ip_addr = ip_addr or hostname
-            self.updated_nicks.add(nick)
             self.irc_peers[nick] = IRCPeer(ip_addr, hostname, details)
             self.logger.info('new IRC peer {} at {} ({})'
                              .format(nick, hostname, details))
@@ -122,9 +103,9 @@ class PeerManager(util.LoggedClass):
     def count(self):
         return len(self.irc_peers)
 
-    def peer_dict(self):
+    def rpc_data(self):
         return self.irc_peers
 
-    def peer_list(self):
+    def on_peers_subscribe(self):
         '''Returns the server peers as a list of (ip, host, details) tuples.'''
         return list(self.irc_peers.values())

@@ -53,7 +53,7 @@ class Controller(util.LoggedClass):
         self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
         self.bp = BlockProcessor(env, self, self.daemon)
         self.mempool = MemPool(self.bp, self)
-        self.peers = PeerManager(env, self)
+        self.peer_mgr = PeerManager(env, self)
         self.env = env
         self.servers = {}
         # Map of session to the key of its list in self.groups
@@ -65,7 +65,7 @@ class Controller(util.LoggedClass):
         self.max_sessions = env.max_sessions
         self.low_watermark = self.max_sessions * 19 // 20
         self.max_subs = env.max_subs
-        self.futures = set()
+        self.futures = {}
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
         self.next_stale_check = 0
@@ -163,7 +163,7 @@ class Controller(util.LoggedClass):
                     data = self.session_data(for_log=True)
                     for line in Controller.sessions_text_lines(data):
                         self.logger.info(line)
-                    self.logger.info(json.dumps(self.server_summary()))
+                    self.logger.info(json.dumps(self.getinfo()))
                 self.next_log_sessions = time.time() + self.env.log_sessions
 
             await asyncio.sleep(1)
@@ -208,28 +208,31 @@ class Controller(util.LoggedClass):
         '''Schedule running func in the executor, return a task.'''
         return self.ensure_future(self.run_in_executor(func, *args))
 
-    def ensure_future(self, coro):
+    def ensure_future(self, coro, callback=None):
         '''Schedule the coro to be run.'''
         future = asyncio.ensure_future(coro)
         future.add_done_callback(self.on_future_done)
-        self.futures.add(future)
+        self.futures[future] = callback
         return future
 
     def on_future_done(self, future):
         '''Collect the result of a future after removing it from our set.'''
-        self.futures.remove(future)
-        try:
-            future.result()
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            self.log_error(traceback.format_exc())
+        callback = self.futures.pop(future)
+        if callback:
+            callback(future)
+        else:
+            try:
+                future.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                self.log_error(traceback.format_exc())
 
     async def wait_for_bp_catchup(self):
         '''Called when the block processor catches up.'''
         await self.bp.caught_up_event.wait()
         self.logger.info('block processor has caught up')
-        self.ensure_future(self.peers.main_loop())
+        self.ensure_future(self.peer_mgr.main_loop())
         self.ensure_future(self.start_servers())
         self.ensure_future(self.mempool.main_loop())
         self.ensure_future(self.enqueue_delayed_sessions())
@@ -444,7 +447,7 @@ class Controller(util.LoggedClass):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
-    def server_summary(self):
+    def getinfo(self):
         '''A one-line summary of server state.'''
         return {
             'daemon_height': self.daemon.cached_height(),
@@ -455,7 +458,7 @@ class Controller(util.LoggedClass):
             'logged': len([s for s in self.sessions if s.log_me]),
             'paused': sum(s.pause for s in self.sessions),
             'pid': os.getpid(),
-            'peers': self.peers.count(),
+            'peers': self.peer_mgr.count(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
             'sessions': self.session_count(),
             'subs': self.sub_count(),
@@ -517,7 +520,7 @@ class Controller(util.LoggedClass):
             return ('{:3d}:{:02d}:{:02d}'
                     .format(t // 3600, (t % 3600) // 60, t % 60))
 
-        fmt = ('{:<6} {:<5} {:>15} {:>5} {:>5} '
+        fmt = ('{:<6} {:<5} {:>17} {:>5} {:>5} '
                '{:>7} {:>7} {:>7} {:>7} {:>7} {:>9} {:>21}')
         yield fmt.format('ID', 'Flags', 'Client', 'Reqs', 'Txs', 'Subs',
                          'Recv', 'Recv KB', 'Sent', 'Sent KB', 'Time', 'Peer')
@@ -596,19 +599,19 @@ class Controller(util.LoggedClass):
 
     def rpc_getinfo(self):
         '''Return summary information about the server process.'''
-        return self.server_summary()
+        return self.getinfo()
 
     def rpc_groups(self):
         '''Return statistics about the session groups.'''
         return self.group_data()
 
+    def rpc_peers(self):
+        '''Return a list of data about server peers.'''
+        return self.peer_mgr.rpc_data()
+
     def rpc_sessions(self):
         '''Return statistics about connected sessions.'''
         return self.session_data(for_log=False)
-
-    def rpc_peers(self):
-        '''Return a list of server peers, currently taken from IRC.'''
-        return self.peers.peer_dict()
 
     def rpc_reorg(self, count=3):
         '''Force a reorg of the given number of blocks.

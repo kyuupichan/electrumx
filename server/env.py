@@ -8,10 +8,14 @@
 '''Class for handling environment configuration and defaults.'''
 
 
+from collections import namedtuple
 from os import environ
 
 from lib.coins import Coin
 from lib.util import LoggedClass
+
+
+NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
 class Env(LoggedClass):
@@ -55,18 +59,24 @@ class Env(LoggedClass):
         # IRC
         self.irc = self.default('IRC', False)
         self.irc_nick = self.default('IRC_NICK', None)
-        self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
-        self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
-        self.report_host = self.default('REPORT_HOST', self.host)
-        self.report_tcp_port_tor = self.integer('REPORT_TCP_PORT_TOR',
-                                                self.report_tcp_port
-                                                if self.report_tcp_port else
-                                                self.tcp_port)
-        self.report_ssl_port_tor = self.integer('REPORT_SSL_PORT_TOR',
-                                                self.report_ssl_port
-                                                if self.report_ssl_port else
-                                                self.ssl_port)
-        self.report_host_tor = self.default('REPORT_HOST_TOR', '')
+        self.identity = NetIdentity(
+            self.default('REPORT_HOST', self.host),
+            self.integer('REPORT_TCP_PORT', self.tcp_port) or None,
+            self.integer('REPORT_SSL_PORT', self.ssl_port) or None,
+            ''
+        )
+        self.tor_identity = NetIdentity(
+            self.default('REPORT_HOST_TOR', ''), # must be a string
+            self.integer('REPORT_TCP_PORT_TOR',
+                         self.identity.tcp_port
+                         if self.identity.tcp_port else
+                         self.tcp_port) or None,
+            self.integer('REPORT_SSL_PORT_TOR',
+                         self.identity.ssl_port
+                         if self.identity.ssl_port else
+                         self.ssl_port) or None,
+            '_tor'
+        )
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
