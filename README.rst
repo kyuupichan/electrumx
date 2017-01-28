@@ -135,6 +135,12 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.14
+---------------
+
+* misc cleanups and code changes to prepare for peer discovery in 0.11.0
+* add `docs/PEER_DISCOVERY.rst`_
+
 Version 0.10.13
 ---------------
 
@@ -273,3 +279,4 @@ stability please stick with the 0.9 series.
 .. _#102: https://github.com/kyuupichan/electrumx/issues/102
 .. _#103: https://github.com/kyuupichan/electrumx/issues/103
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
+.. docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst

@@ -13,7 +13,7 @@ Peer Database
 
 A persistent store of peers with at least the following information
 about a peer so that state persists across server restarts.  This
-information is required for a response to the *server.peers.subscribe*
+information is required for a response to the **server.peers.subscribe**
 RPC call:
 
 * host name
@@ -42,8 +42,8 @@ to 10 servers that have shown commitment to reliable service.
 In ElectrumX this is a per-coin property in `lib/coins.py`.
 
 
-Response to "server.peers.subscribe" RPC call
----------------------------------------------
+Response to server.peers.subscribe RPC call
+-------------------------------------------
 
 This RPC call is used by Electrum clients to get a list of peer
 servers, in preference to a hard-coded list of peer servers in the
@@ -83,8 +83,8 @@ available.  It tries to reconnect to each peer once every 24 hours and
 drops peers if two weeks have passed since a successful connection.
 
 
-"server.features" RPC call
---------------------------
+server.features RPC call
+------------------------
 
 This is a new RPC call that a server can use to advertise what
 services and features it offers.  It is intended for use by Electrum
@@ -123,7 +123,7 @@ Currently ElectrumX understands and returns the following keys:
 * **server_version**
 
   A string that identifies the server software.  Should be the same as
-  the response to 'server.version' RPC call.  Defaults to "unknown".
+  the response to **server.version** RPC call.
 
 * **protocol_version**
 
@@ -137,15 +137,15 @@ Currently ElectrumX understands and returns the following keys:
   'p' in the IRC real name.
 
 
-"server.add_peer" RPC call
---------------------------
+server.add_peer RPC call
+------------------------
 
 This call is intended for a new server to get itself in the connected
 set.
 
 It takes a single parameter (named **features** if JSON RPCv2 named
 parameters are being used) which contains the same information as the
-*server.features* RPC call would return.
+**server.features** RPC call would return.
 
 A server receiving a **server.add_peer** call should not replace
 existing information about the host(s) given, but instead schedule a
