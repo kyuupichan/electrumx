@@ -324,12 +324,15 @@ class JSONSessionBase(util.LoggedClass):
         Flag the connection to close on a fatal error or too many errors.'''
         version = self.version
         self.error_count += 1
-        if code in (version.PARSE_ERROR, version.INVALID_REQUEST):
-            self.log_info(message)
-            self.close_after_send = True
-        elif self.error_count >= 10:
-            self.log_info('too many errors, last: {}'.format(message))
-            self.close_after_send = True
+        if not self.close_after_send:
+            fatal_log = None
+            if code in (version.PARSE_ERROR, version.INVALID_REQUEST):
+                fatal_log = message
+            elif self.error_count >= 10:
+                fatal_log = 'too many errors, last: {}'.format(message)
+            if fatal_log:
+                self.log_info(fatal_log)
+                self.close_after_send = True
         return self.encode_payload(self.version.error_payload
                                    (message, code, id_))
 
@@ -449,6 +452,8 @@ class JSONSessionBase(util.LoggedClass):
             return self.response_bytes(result, payload['id'])
         except RPCError as e:
             return self.error_bytes(e.msg, e.code, self.payload_id(payload))
+        except asyncio.CancelledError:
+            raise
         except Exception:
             self.log_error(traceback.format_exc())
             return self.error_bytes('internal error processing request',
@@ -698,3 +703,15 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
     def send_bytes(self, binary):
         '''Send JSON text over the transport.'''
         self.transport.writelines((binary, b'\n'))
+
+    def peer_addr(self, anon=True):
+        '''Return the peer address and port.'''
+        peer_info = self.peer_info()
+        if not peer_info:
+            return 'unknown'
+        if anon:
+            return 'xx.xx.xx.xx:xx'
+        if ':' in peer_info[0]:
+            return '[{}]:{}'.format(peer_info[0], peer_info[1])
+        else:
+            return '{}:{}'.format(peer_info[0], peer_info[1])

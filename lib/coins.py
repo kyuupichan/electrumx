@@ -40,6 +40,9 @@ class Coin(object):
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
     HASHX_LEN = 11
+    # Peer discovery
+    PEER_DEFAULT_PORTS = {'t':'50001', 's':'50002'}
+    PEERS = []
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -274,6 +277,21 @@ class Bitcoin(Coin):
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332
+    PEERS = [
+        '4cii7ryno5j3axe4.onion t'
+        'btc.smsys.me s995',
+        'ca6ulp2j2mpsft3y.onion s t',
+        'electrum.be s t',
+        'electrum.trouth.net s t',
+        'electrum.vom-stausee.de s t',
+        'electrum3.hachre.de s t',
+        'Electrum.hsmiths.com s t',
+        'erbium1.sytes.net s t',
+        'h.1209k.com s t',
+        'helicarrier.bauerj.eu s t',
+        'ozahtqwp25chjdjd.onion s t',
+        'us11.einfachmalnettsein.de s t',
+    ]
 
 
 class BitcoinTestnet(Bitcoin):
@@ -292,7 +310,14 @@ class BitcoinTestnet(Bitcoin):
     TX_PER_BLOCK = 21
     IRC_PREFIX = "ET_"
     RPC_PORT = 18332
-
+    PEER_DEFAULT_PORTS = {'t':'51001', 's':'51002'}
+    PEERS = [
+        'electrum.akinbo.org s t',
+        'he36kyperp3kbuxu.onion s t',
+        'electrum-btc-testnet.petrkr.net s t',
+        'h.hsmiths.com t53011 s53012',
+        'testnet.not.fyi s t',
+    ]
 
 class BitcoinTestnetSegWit(BitcoinTestnet):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.

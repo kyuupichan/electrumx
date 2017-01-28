@@ -99,7 +99,7 @@ class DB(util.LoggedClass):
                 self.logger.info('created new database')
                 self.logger.info('creating metadata diretcory')
                 os.mkdir('meta')
-                with self.open_file('COIN', create=True) as f:
+                with util.open_file('COIN', create=True) as f:
                     f.write('ElectrumX databases and metadata for {} {}'
                             .format(self.coin.NAME, self.coin.NET).encode())
             else:
@@ -182,15 +182,6 @@ class DB(util.LoggedClass):
         if self.flush_count > self.utxo_flush_count:
             self.clear_excess_history(self.utxo_flush_count)
         self.clear_excess_undo_info()
-
-    def open_file(self, filename, create=False):
-        '''Open the file name.  Return its handle.'''
-        try:
-            return open(filename, 'rb+')
-        except FileNotFoundError:
-            if create:
-                return open(filename, 'wb+')
-            raise
 
     def fs_update(self, fs_height, headers, block_tx_hashes):
         '''Write headers, the tx_count array and block tx hashes to disk.
