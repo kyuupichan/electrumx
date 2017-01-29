@@ -64,9 +64,9 @@ current clients and servers continue to operate as expected.
 Protocol versions are denoted by [major_number, minor_number] pairs,
 for example protocol version 1.15 is [1, 15] as a pair.
 
-A party to a connection speak all protocol versions in a range, say
-from `protocol_min` to `protocol_max`.  This min and max may be the
-same.  When a connection is made, both client and server must
+A party to a connection will speak all protocol versions in a range,
+say from `protocol_min` to `protocol_max`.  This min and max may be
+the same.  When a connection is made, both client and server must
 initially assume the protocol to use is their own `protocol_min`.
 
 The client should send a `server.version` RPC call as early as
@@ -290,7 +290,7 @@ Subscribe to a bitcoin address.
        that is the same, but where *height* is `-1` if the transaction
        has at least one unconfirmed input, and `0` if all inputs are
        confirmed.  The *status* is the **sha256** hash of this string
-       expressed in hexadecimal.
+       expressed as a hexadecimal string.
 
 
 blockchain.block.get_header
@@ -316,7 +316,7 @@ Return the *deserialized header* [2]_ of the block at the given height.
             'merkle_root':  <hexadecimal string>,
             'timestamp': <integer>,
             'bits': <integer>,
-            'nonce': <integer>,
+            'nonce': <integer>
         }
 
 
@@ -366,6 +366,7 @@ be confirmed within a certain number of blocks.
 **Example Response**
 
 ::
+
   0.00101079
 
 
@@ -424,9 +425,11 @@ to the daemon's memory pool.
 **Example Responses**
 
 ::
+
    1e-05
 
 ::
+
    0.0
 
 blockchain.transaction.broadcast
