@@ -97,7 +97,7 @@ class DB(util.LoggedClass):
             self.hist_db = self.db_class('hist', for_sync)
             if self.utxo_db.is_new:
                 self.logger.info('created new database')
-                self.logger.info('creating metadata diretcory')
+                self.logger.info('creating metadata directory')
                 os.mkdir('meta')
                 with util.open_file('COIN', create=True) as f:
                     f.write('ElectrumX databases and metadata for {} {}'
