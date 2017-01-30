@@ -30,18 +30,22 @@ class Daemon(util.LoggedClass):
 
     def __init__(self, urls):
         super().__init__()
-        if not urls:
-            raise DaemonError('no daemon URLs provided')
-        for url in urls:
-            self.logger.info('daemon at {}'.format(self.logged_url(url)))
-        self.urls = urls
-        self.url_index = 0
+        self.set_urls(urls)
         self._height = None
         self._mempool_hashes = set()
         self.mempool_refresh_event = asyncio.Event()
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
+
+    def set_urls(self, urls):
+        '''Set the URLS to the given list, and switch to the first one.'''
+        if not urls:
+            raise DaemonError('no daemon URLs provided')
+        for url in urls:
+            self.logger.info('daemon at {}'.format(self.logged_url(url)))
+        self.urls = urls
+        self.url_index = 0
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.

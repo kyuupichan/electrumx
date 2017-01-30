@@ -78,8 +78,8 @@ class Controller(util.LoggedClass):
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
         # Set up the RPC request handlers
-        cmds = ('disconnect getinfo groups log peers reorg sessions stop'
-                .split())
+        cmds = ('daemon_url disconnect getinfo groups log peers reorg '
+                'sessions stop'.split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
         # Set up the ElectrumX request handlers
         rpcs = [
@@ -591,6 +591,15 @@ class Controller(util.LoggedClass):
         session_ids: array of session IDs
         '''
         return self.for_each_session(session_ids, self.toggle_logging)
+
+    def rpc_daemon_url(self, daemon_url=None):
+        '''Replace the daemon URL.'''
+        daemon_url = daemon_url or self.env.daemon_url
+        try:
+            self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
+        except Exception as e:
+            raise RPCError('an error occured: {}'.format(e))
+        return 'set daemon URL to {}'.format(daemon_url)
 
     def rpc_stop(self):
         '''Shut down the server cleanly.'''

@@ -155,6 +155,19 @@ The following commands are available:
 
   Currently this is data gleaned from an IRC session.
 
+* **daemon_url**
+
+  This command takes an option argument that is interpreted
+  identically to the **DAEMON_URL** environment variable.  If default
+  value of the argument is the **DAEMON_URL** environment variable.
+
+  The command replaces the daemon's URL at run-time, and rotates to the
+  first in the list.
+
+  For example, in case ElectrumX has rotated to a secondary daemon and
+  you want to revert to the first after fixing the issue, call this
+  command without an argument.
+
 * **reorg**
 
   Force a block chain reorg.  This command takes an optional
