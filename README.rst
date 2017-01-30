@@ -138,6 +138,16 @@ ChangeLog
 Version 0.10.14
 ---------------
 
+* Force JSONRPCv2 for backwards compat with Coinomi wallets that don't
+  speak JSON RPCv1 properly.  This will only be forced for a few
+  months to give Coinomi users a chance to upgrade.
+* Basic sanity check on IRC reported settings (closes `#110`_)
+* Add an RPC interface to set **DAEMON_URL** at run-time and switch back
+  to the primary daemon (closes `#111`_)
+
+Version 0.10.14
+---------------
+
 * misc cleanups and code changes to prepare for peer discovery in 0.11.0
 * add `docs/PEER_DISCOVERY.rst`_
 
@@ -278,5 +288,7 @@ stability please stick with the 0.9 series.
 .. _#101: https://github.com/kyuupichan/electrumx/issues/101
 .. _#102: https://github.com/kyuupichan/electrumx/issues/102
 .. _#103: https://github.com/kyuupichan/electrumx/issues/103
+.. _#110: https://github.com/kyuupichan/electrumx/issues/110
+.. _#111: https://github.com/kyuupichan/electrumx/issues/111
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
