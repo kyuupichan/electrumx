@@ -10,7 +10,7 @@
 import time
 from functools import partial
 
-from lib.jsonrpc import JSONSession, RPCError
+from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2
 from server.daemon import DaemonError
 from server.version import VERSION
 
@@ -23,7 +23,9 @@ class SessionBase(JSONSession):
     '''
 
     def __init__(self, controller, kind):
-        super().__init__()
+        # Force v2 as a temporary hack for old Coinomi wallets
+        # Remove in April 2017
+        super().__init__(version=JSONRPCv2)
         self.kind = kind  # 'RPC', 'TCP' etc.
         self.controller = controller
         self.bp = controller.bp
