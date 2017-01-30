@@ -61,7 +61,7 @@ class JSONRPCv1(JSONRPC):
     @classmethod
     def response_payload(cls, result, id_):
         '''JSON v1 response payload.  error is present and None.'''
-        return {'id': id_, 'result': result, 'error': None}
+        return {'id': id_, 'result': result}
 
     @classmethod
     def error_payload(cls, message, code, id_):
