@@ -16,42 +16,60 @@ import json
 from functools import partial
 from os import environ
 
-from lib.jsonrpc import JSONRPC
-from server.protocol import ServerManager
+from lib.jsonrpc import JSONSession, JSONRPCv2
+from server.controller import Controller
 
 
-class RPCClient(JSONRPC):
+class RPCClient(JSONSession):
 
     def __init__(self):
-        super().__init__()
-        self.queue = asyncio.Queue()
+        super().__init__(version=JSONRPCv2)
+        self.max_send = 0
+        self.max_buffer_size = 5*10**6
+        self.event = asyncio.Event()
 
-    def enqueue_request(self, request):
-        self.queue.put_nowait(request)
+    def have_pending_items(self):
+        self.event.set()
 
-    async def send_and_wait(self, method, params, timeout=None):
-        # Raise incoming buffer size - presumably connection is trusted
-        self.max_buffer_size = 5000000
-        payload = self.request_payload(method, id_=method, params=params)
-        self.encode_and_send_payload(payload)
+    async def wait_for_response(self):
+        await self.event.wait()
+        await self.process_pending_items()
 
-        future = asyncio.ensure_future(self.queue.get())
-        for f in asyncio.as_completed([future], timeout=timeout):
-            try:
-                request = await f
-            except asyncio.TimeoutError:
-                future.cancel()
-                print('request timed out after {}s'.format(timeout))
+    def send_rpc_request(self, method, params):
+        handler = partial(self.handle_response, method)
+        self.send_request(handler, method, params)
+
+    def handle_response(self, method, result, error):
+        if method in ('groups', 'sessions') and not error:
+            if method == 'groups':
+                lines = Controller.groups_text_lines(result)
             else:
-                await request.process(1)
-
-    async def handle_response(self, result, error, method):
-        if result and method in ('groups', 'sessions'):
-            for line in ServerManager.text_lines(method, result):
+                lines = Controller.sessions_text_lines(result)
+            for line in lines:
                 print(line)
+        elif error:
+            print('error: {} (code {:d})'
+                  .format(error['message'], error['code']))
         else:
-            value = {'error': error} if error else result
-            print(json.dumps(value, indent=4, sort_keys=True))
+            print(json.dumps(result, indent=4, sort_keys=True))
+
+
+def rpc_send_and_wait(port, method, params, timeout=15):
+    loop = asyncio.get_event_loop()
+    coro = loop.create_connection(RPCClient, 'localhost', port)
+    try:
+        transport, rpc_client = loop.run_until_complete(coro)
+        rpc_client.send_rpc_request(method, params)
+        try:
+            coro = rpc_client.wait_for_response()
+            loop.run_until_complete(asyncio.wait_for(coro, timeout))
+        except asyncio.TimeoutError:
+            print('request timed out after {}s'.format(timeout))
+    except OSError:
+        print('cannot connect - is ElectrumX catching up, not running, or '
+              'is {:d} the wrong RPC port?'.format(port))
+    finally:
+        loop.close()
 
 
 def main():
@@ -65,19 +83,17 @@ def main():
                         help='params to send')
     args = parser.parse_args()
 
-    if args.port is None:
-        args.port = int(environ.get('RPC_PORT', 8000))
+    port = args.port
+    if port is None:
+        port = int(environ.get('RPC_PORT', 8000))
 
-    loop = asyncio.get_event_loop()
-    coro = loop.create_connection(RPCClient, 'localhost', args.port)
-    try:
-        transport, protocol = loop.run_until_complete(coro)
-        coro = protocol.send_and_wait(args.command[0], args.param, timeout=15)
-        loop.run_until_complete(coro)
-    except OSError:
-        print('error connecting - is ElectrumX catching up or not running?')
-    finally:
-        loop.close()
+    # Get the RPC request.
+    method = args.command[0]
+    params = args.param
+    if method in ('log', 'disconnect'):
+        params = [params]
+
+    rpc_send_and_wait(port, method, params)
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -10,6 +10,7 @@ daemon.'''
 
 import asyncio
 import json
+import traceback
 
 import aiohttp
 
@@ -29,16 +30,22 @@ class Daemon(util.LoggedClass):
 
     def __init__(self, urls):
         super().__init__()
+        self.set_urls(urls)
+        self._height = None
+        self._mempool_hashes = set()
+        self.mempool_refresh_event = asyncio.Event()
+        # Limit concurrent RPC calls to this number.
+        # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
+        self.workqueue_semaphore = asyncio.Semaphore(value=10)
+
+    def set_urls(self, urls):
+        '''Set the URLS to the given list, and switch to the first one.'''
         if not urls:
             raise DaemonError('no daemon URLs provided')
         for url in urls:
             self.logger.info('daemon at {}'.format(self.logged_url(url)))
         self.urls = urls
         self.url_index = 0
-        self._height = None
-        # Limit concurrent RPC calls to this number.
-        # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
-        self.workqueue_semaphore = asyncio.Semaphore(value=10)
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -67,10 +74,16 @@ class Daemon(util.LoggedClass):
                 async with self.workqueue_semaphore:
                     url = self.urls[self.url_index]
                     async with aiohttp.post(url, data=data) as resp:
-                        result = processor(await resp.json())
-                        if self.prior_msg:
-                            self.logger.info('connection restored')
-                        return result
+                        # If bitcoind can't find a tx, for some reason
+                        # it returns 500 but fills out the JSON.
+                        # Should still return 200 IMO.
+                        if resp.status in (200, 500):
+                            if self.prior_msg:
+                                self.logger.info('connection restored')
+                            result = processor(await resp.json())
+                            return result
+                log_error('HTTP error code {:d}: {}'
+                          .format(resp.status, resp.reason))
             except asyncio.TimeoutError:
                 log_error('timeout error.', skip_once=True)
             except aiohttp.ClientHttpProcessingError:
@@ -80,11 +93,12 @@ class Daemon(util.LoggedClass):
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
             except self.DaemonWarmingUpError:
-                log_error('still starting up checking blocks.')
+                log_error('starting up checking blocks.')
             except (asyncio.CancelledError, DaemonError):
                 raise
-            except Exception as e:
-                log_error('request gave unexpected error: {}.'.format(e))
+            except Exception:
+                self.log_error(traceback.format_exc())
+
             if secs >= max_secs and len(self.urls) > 1:
                 self.url_index = (self.url_index + 1) % len(self.urls)
                 logged_url = self.logged_url(self.urls[self.url_index])
@@ -118,13 +132,13 @@ class Daemon(util.LoggedClass):
 
         The result will be an array of the same length as params_iterable.
         If replace_errs is true, any item with an error is returned as None,
-        othewise an exception is raised.'''
+        otherwise an exception is raised.'''
         def processor(result):
             errs = [item['error'] for item in result if item['error']]
-            if not errs or replace_errs:
-                return [item['result'] for item in result]
             if any(err.get('code') == self.WARMING_UP for err in errs):
                 raise self.DaemonWarmingUpError
+            if not errs or replace_errs:
+                return [item['result'] for item in result]
             raise DaemonError(errs)
 
         payload = [{'method': method, 'params': p} for p in params_iterable]
@@ -149,7 +163,7 @@ class Daemon(util.LoggedClass):
         return [bytes.fromhex(block) for block in blocks]
 
     async def mempool_hashes(self):
-        '''Return the hashes of the txs in the daemon's mempool.'''
+        '''Update our record of the daemon's mempool hashes.'''
         return await self._send_single('getrawmempool')
 
     async def estimatefee(self, params):
@@ -184,10 +198,17 @@ class Daemon(util.LoggedClass):
         '''Broadcast a transaction to the network.'''
         return await self._send_single('sendrawtransaction', params)
 
-    async def height(self):
+    async def height(self, mempool=False):
         '''Query the daemon for its current height.'''
         self._height = await self._send_single('getblockcount')
+        if mempool:
+            self._mempool_hashes = set(await self.mempool_hashes())
+            self.mempool_refresh_event.set()
         return self._height
+
+    def cached_mempool_hashes(self):
+        '''Return the cached mempool hashes.'''
+        return self._mempool_hashes
 
     def cached_height(self):
         '''Return the cached daemon height.

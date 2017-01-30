@@ -2,7 +2,7 @@ import gc
 import pytest
 import os
 
-from server.storage import Storage, open_db
+from server.storage import Storage, db_class
 from lib.util import subclasses
 
 # Find out which db engines to test
@@ -21,7 +21,7 @@ for c in subclasses(Storage):
 def db(tmpdir, request):
     cwd = os.getcwd()
     os.chdir(str(tmpdir))
-    db = open_db("db", request.param, False)
+    db = db_class(request.param)("db", False)
     yield db
     os.chdir(cwd)
     # Make sure all the locks and handles are closed
@@ -72,5 +72,5 @@ def test_iterator_reverse(db):
 def test_close(db):
     db.put(b"a", b"b")
     db.close()
-    db = open_db("db", db.__class__.__name__, False)
+    db = db_class(db.__class__.__name__)("db", False)
     assert db.get(b"a") == b"b"

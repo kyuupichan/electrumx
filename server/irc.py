@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -12,7 +12,6 @@ Only calling start() requires the IRC Python module.
 
 import asyncio
 import re
-import socket
 
 from collections import namedtuple
 
@@ -22,53 +21,26 @@ from lib.util import LoggedClass
 
 class IRC(LoggedClass):
 
-    Peer = namedtuple('Peer', 'ip_addr host ports')
-
     class DisconnectedError(Exception):
         pass
 
-    def __init__(self, env):
+    def __init__(self, env, peer_mgr):
         super().__init__()
-        self.env = env
+        self.coin = env.coin
+        self.peer_mgr = peer_mgr
 
         # If this isn't something a peer or client expects
         # then you won't appear in the client's network dialog box
-        irc_address = (env.coin.IRC_SERVER, env.coin.IRC_PORT)
         self.channel = env.coin.IRC_CHANNEL
         self.prefix = env.coin.IRC_PREFIX
-
-        self.clients = []
         self.nick = '{}{}'.format(self.prefix,
                                   env.irc_nick if env.irc_nick else
-                                  double_sha256(env.report_host.encode())
+                                  double_sha256(env.identity.host.encode())
                                   [:5].hex())
-        self.clients.append( IrcClient(irc_address, self.nick,
-                                       env.report_host,
-                                       env.report_tcp_port,
-                                       env.report_ssl_port) )
-        if env.report_host_tor:
-            self.clients.append( IrcClient(irc_address, self.nick + '_tor',
-                                           env.report_host_tor,
-                                           env.report_tcp_port_tor,
-                                           env.report_ssl_port_tor) )
-
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
-        self.peers = {}
 
-    async def start(self, caught_up):
-        '''Start IRC connections once caught up if enabled in environment.'''
-        await caught_up.wait()
-        try:
-            if self.env.irc:
-                await self.join()
-            else:
-                self.logger.info('IRC is disabled')
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            self.logger.error(str(e))
-
-    async def join(self):
+    async def start(self, name_pairs):
+        '''Start IRC connections if enabled in environment.'''
         import irc.client as irc_client
         from jaraco.stream import buffer
 
@@ -76,23 +48,20 @@ class IRC(LoggedClass):
         irc_client.ServerConnection.buffer_class = \
             buffer.LenientDecodingLineBuffer
 
+        # Register handlers for events we're interested in
         reactor = irc_client.Reactor()
-        for event in ['welcome', 'join', 'quit', 'kick', 'whoreply',
-                      'namreply', 'disconnect']:
+        for event in 'welcome join quit whoreply disconnect'.split():
             reactor.add_global_handler(event, getattr(self, 'on_' + event))
 
         # Note: Multiple nicks in same channel will trigger duplicate events
-        for client in self.clients:
-            client.connection = reactor.server()
+        clients = [IrcClient(self.coin, real_name, self.nick + suffix,
+                             reactor.server())
+                   for (real_name, suffix) in name_pairs]
 
         while True:
             try:
-                for client in self.clients:
-                    self.logger.info('Joining IRC in {} as "{}" with '
-                                     'real name "{}"'
-                                     .format(self.channel, client.nick,
-                                             client.realname))
-                    client.connect()
+                for client in clients:
+                    client.connect(self)
                 while True:
                     reactor.process_once()
                     await asyncio.sleep(2)
@@ -117,32 +86,21 @@ class IRC(LoggedClass):
 
     def on_join(self, connection, event):
         '''Called when someone new connects to our channel, including us.'''
-        match = self.peer_regexp.match(event.source)
-        if match:
-            connection.who(match.group(1))
+        # /who the channel when we join.  We used to /who on each
+        # namreply event, but the IRC server would frequently kick us
+        # for flooding.  This requests only once including the tor case.
+        if event.source.startswith(self.nick + '!'):
+            connection.who(self.channel)
+        else:
+            match = self.peer_regexp.match(event.source)
+            if match:
+                connection.who(match.group(1))
 
     def on_quit(self, connection, event):
         '''Called when someone leaves our channel.'''
         match = self.peer_regexp.match(event.source)
         if match:
-            self.peers.pop(match.group(1), None)
-
-    def on_kick(self, connection, event):
-        '''Called when someone is kicked from our channel.'''
-        self.log_event(event)
-        match = self.peer_regexp.match(event.arguments[0])
-        if match:
-            self.peers.pop(match.group(1), None)
-
-    def on_namreply(self, connection, event):
-        '''Called repeatedly when we first connect to inform us of all users
-        in the channel.
-
-        The users are space-separated in the 2nd argument.
-        '''
-        for peer in event.arguments[2].split():
-            if peer.startswith(self.prefix):
-                connection.who(peer)
+            self.peer_mgr.remove_irc_peer(match.group(1))
 
     def on_whoreply(self, connection, event):
         '''Called when a response to our who requests arrives.
@@ -150,49 +108,25 @@ class IRC(LoggedClass):
         The nick is the 4th argument, and real name is in the 6th
         argument preceeded by '0 ' for some reason.
         '''
-        try:
-            nick = event.arguments[4]
+        nick = event.arguments[4]
+        if nick.startswith(self.prefix):
             line = event.arguments[6].split()
-            try:
-                ip_addr = socket.gethostbyname(line[1])
-            except socket.error:
-                # Could be .onion or IPv6.
-                ip_addr = line[1]
-            peer = self.Peer(ip_addr, line[1], line[2:])
-            self.peers[nick] = peer
-        except (IndexError, UnicodeError):
-            # UnicodeError comes from invalid domains (issue #68)
-            pass
+            hostname, details = line[1], line[2:]
+            self.peer_mgr.add_irc_peer(nick, hostname, details)
 
 
-class IrcClient(LoggedClass):
+class IrcClient(object):
 
-    VERSION = '1.0'
-    DEFAULT_PORTS = {'t': 50001, 's': 50002}
-
-    def __init__(self, irc_address, nick, host, tcp_port, ssl_port):
-        super().__init__()
-        self.irc_host, self.irc_port = irc_address
+    def __init__(self, coin, real_name, nick, server):
+        self.irc_host = coin.IRC_SERVER
+        self.irc_port = coin.IRC_PORT
         self.nick = nick
-        self.realname = self.create_realname(host, tcp_port, ssl_port)
-        self.connection = None
+        self.real_name = real_name
+        self.server = server
 
-    def connect(self, keepalive=60):
+    def connect(self, irc):
         '''Connect this client to its IRC server'''
-        self.connection.connect(self.irc_host, self.irc_port, self.nick,
-                                ircname=self.realname)
-        self.connection.set_keepalive(keepalive)
-
-    @classmethod
-    def create_realname(cls, host, tcp_port, ssl_port):
-        def port_text(letter, port):
-            if not port:
-                return ''
-            if port == cls.DEFAULT_PORTS.get(letter):
-                return ' ' + letter
-            else:
-                return ' ' + letter + str(port)
-
-        tcp = port_text('t', tcp_port)
-        ssl = port_text('s', ssl_port)
-        return '{} v{}{}{}'.format(host, cls.VERSION, tcp, ssl)
+        irc.logger.info('joining {} as "{}" with real name "{}"'
+                        .format(irc.channel, self.nick, self.real_name))
+        self.server.connect(self.irc_host, self.irc_port, self.nick,
+                            ircname=self.real_name)

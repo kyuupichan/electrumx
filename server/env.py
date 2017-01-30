@@ -8,10 +8,14 @@
 '''Class for handling environment configuration and defaults.'''
 
 
+from collections import namedtuple
 from os import environ
 
 from lib.coins import Coin
 from lib.util import LoggedClass
+
+
+NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
 class Env(LoggedClass):
@@ -22,12 +26,12 @@ class Env(LoggedClass):
 
     def __init__(self):
         super().__init__()
+        self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
         coin_name = self.default('COIN', 'Bitcoin')
-        network = self.default('NETWORK', 'mainnet')
+        network = self.default('NET', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.db_dir = self.required('DB_DIRECTORY')
-        self.utxo_MB = self.integer('UTXO_MB', 1000)
-        self.hist_MB = self.integer('HIST_MB', 300)
+        self.cache_MB = self.integer('CACHE_MB', 1200)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
         self.daemon_url = self.required('DAEMON_URL')
@@ -48,26 +52,39 @@ class Env(LoggedClass):
         # Server limits to help prevent DoS
         self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
+        self.max_sessions = self.integer('MAX_SESSIONS', 1000)
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         # IRC
         self.irc = self.default('IRC', False)
         self.irc_nick = self.default('IRC_NICK', None)
-        self.report_tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port)
-        self.report_ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port)
-        self.report_host = self.default('REPORT_HOST', self.host)
-        self.report_tcp_port_tor = self.integer('REPORT_TCP_PORT_TOR',
-                                                self.report_tcp_port
-                                                if self.report_tcp_port else
-                                                self.tcp_port)
-        self.report_ssl_port_tor = self.integer('REPORT_SSL_PORT_TOR',
-                                                self.report_ssl_port
-                                                if self.report_ssl_port else
-                                                self.ssl_port)
-        self.report_host_tor = self.default('REPORT_HOST_TOR', None)
-        # Debugging
-        self.force_reorg = self.integer('FORCE_REORG', 0)
+
+        self.identity = NetIdentity(
+            self.default('REPORT_HOST', self.host),
+            self.integer('REPORT_TCP_PORT', self.tcp_port) or None,
+            self.integer('REPORT_SSL_PORT', self.ssl_port) or None,
+            ''
+        )
+        self.tor_identity = NetIdentity(
+            self.default('REPORT_HOST_TOR', ''), # must be a string
+            self.integer('REPORT_TCP_PORT_TOR',
+                         self.identity.tcp_port
+                         if self.identity.tcp_port else
+                         self.tcp_port) or None,
+            self.integer('REPORT_SSL_PORT_TOR',
+                         self.identity.ssl_port
+                         if self.identity.ssl_port else
+                         self.ssl_port) or None,
+            '_tor'
+        )
+
+        if self.irc:
+            if not self.identity.host.strip():
+                raise self.Error('IRC host is empty')
+            if self.identity.tcp_port == self.identity.ssl_port:
+                raise self.Error('IRC TCP and SSL ports are the same')
+
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
@@ -84,6 +101,12 @@ class Env(LoggedClass):
             return default
         try:
             return int(value)
-        except:
+        except Exception:
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
+
+    def obsolete(self, envvars):
+        bad = [envvar for envvar in envvars if environ.get(envvar)]
+        if bad:
+            raise self.Error('remove obsolete environment variables {}'
+                             .format(bad))

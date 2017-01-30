@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -13,15 +13,16 @@ necessary for appropriate handling.
 
 from decimal import Decimal
 from functools import partial
+from hashlib import sha256
 import inspect
 import re
 import struct
 import sys
 
-from lib.hash import Base58, hash160, double_sha256, hash_to_str
-from lib.script import ScriptPubKey, Script
-from lib.tx import Deserializer
-from lib.util import cachedproperty, subclasses
+from lib.hash import Base58, hash160, ripemd160, double_sha256, hash_to_str
+from lib.script import ScriptPubKey
+from lib.tx import Deserializer, DeserializerSegWit
+import lib.util as util
 
 
 class CoinError(Exception):
@@ -33,20 +34,22 @@ class Coin(object):
 
     REORG_LIMIT=200
     # Not sure if these are coin-specific
-    HEADER_LEN = 80
     RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE=2016
-    STRANGE_VERBYTE = 0xff
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
+    HASHX_LEN = 11
+    # Peer discovery
+    PEER_DEFAULT_PORTS = {'t':'50001', 's':'50002'}
+    PEERS = []
 
     @classmethod
     def lookup_coin_class(cls, name, net):
         '''Return a coin class given name and network.
 
         Raise an exception if unrecognised.'''
-        for coin in subclasses(Coin):
+        for coin in util.subclasses(Coin):
             if (coin.NAME.lower() == name.lower()
                     and coin.NET.lower() == net.lower()):
                 return coin
@@ -70,20 +73,42 @@ class Coin(object):
     def daemon_urls(cls, urls):
         return [cls.sanitize_url(url) for url in urls.split(',')]
 
-    @cachedproperty
-    def hash168_handlers(cls):
+    @classmethod
+    def genesis_block(cls, block):
+        '''Check the Genesis block is the right one for this coin.
+
+        Return the block less its unspendable coinbase.
+        '''
+        header = cls.block_header(block, 0)
+        header_hex_hash = hash_to_str(cls.header_hash(header))
+        if header_hex_hash != cls.GENESIS_HASH:
+            raise CoinError('genesis block has hash {} expected {}'
+                            .format(header_hex_hash, cls.GENESIS_HASH))
+
+        return header + bytes(1)
+
+    @classmethod
+    def hashX_from_script(cls, script):
+        '''Returns a hashX from a script.'''
+        script = ScriptPubKey.hashX_script(script)
+        if script is None:
+            return None
+        return sha256(script).digest()[:cls.HASHX_LEN]
+
+    @util.cachedproperty
+    def address_handlers(cls):
         return ScriptPubKey.PayToHandlers(
-            address = cls.P2PKH_hash168_from_hash160,
-            script_hash = cls.P2SH_hash168_from_hash160,
-            pubkey = cls.P2PKH_hash168_from_pubkey,
-            unspendable = cls.hash168_from_unspendable,
-            strange = cls.hash168_from_strange,
+            address = cls.P2PKH_address_from_hash160,
+            script_hash = cls.P2SH_address_from_hash160,
+            pubkey = cls.P2PKH_address_from_pubkey,
+            unspendable = lambda : None,
+            strange = lambda script: None,
         )
 
     @classmethod
-    def hash168_from_script(cls):
-        '''Returns a function that is passed a script to return a hash168.'''
-        return partial(ScriptPubKey.pay_to, cls.hash168_handlers)
+    def address_from_script(cls, script):
+        '''Given a pk_script, return the adddress it pays to, or None.'''
+        return ScriptPubKey.pay_to(cls.address_handlers, script)
 
     @staticmethod
     def lookup_xverbytes(verbytes):
@@ -97,47 +122,15 @@ class Coin(object):
         raise CoinError('version bytes unrecognised')
 
     @classmethod
-    def address_to_hash168(cls, addr):
-        '''Return a 21-byte hash given an address.
-
-        This is the hash160 prefixed by the address version byte.
-        '''
-        result = Base58.decode_check(addr)
-        if len(result) != 21:
-            raise CoinError('invalid address: {}'.format(addr))
-        return result
-
-    @classmethod
-    def hash168_to_address(cls, hash168):
-        '''Return an address given a 21-byte hash.'''
-        return Base58.encode_check(hash168)
-
-    @classmethod
-    def hash168_from_unspendable(cls):
-        '''Return a hash168 for an unspendable script.'''
-        return None
-
-    @classmethod
-    def hash168_from_strange(cls, script):
-        '''Return a hash168 for a strange script.'''
-        return bytes([cls.STRANGE_VERBYTE]) + hash160(script)
-
-    @classmethod
-    def P2PKH_hash168_from_hash160(cls, hash160):
-        '''Return a hash168 if hash160 is 160 bits otherwise None.'''
-        if len(hash160) == 20:
-            return bytes([cls.P2PKH_VERBYTE]) + hash160
-        return None
-
-    @classmethod
-    def P2PKH_hash168_from_pubkey(cls, pubkey):
-        return cls.P2PKH_hash168_from_hash160(hash160(pubkey))
+    def address_to_hashX(cls, address):
+        '''Return a hashX given a coin address.'''
+        return cls.hashX_from_script(cls.pay_to_address_script(address))
 
     @classmethod
     def P2PKH_address_from_hash160(cls, hash160):
         '''Return a P2PKH address given a public key.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2PKH_hash168_from_hash160(hash160))
+        return Base58.encode_check(bytes([cls.P2PKH_VERBYTE]) + hash160)
 
     @classmethod
     def P2PKH_address_from_pubkey(cls, pubkey):
@@ -145,17 +138,10 @@ class Coin(object):
         return cls.P2PKH_address_from_hash160(hash160(pubkey))
 
     @classmethod
-    def P2SH_hash168_from_hash160(cls, hash160):
-        '''Return a hash168 if hash160 is 160 bits otherwise None.'''
-        if len(hash160) == 20:
-            return bytes([cls.P2SH_VERBYTE]) + hash160
-        return None
-
-    @classmethod
     def P2SH_address_from_hash160(cls, hash160):
         '''Return a coin address given a hash160.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2SH_hash168_from_hash160(hash160))
+        return Base58.encode_check(bytes([cls.P2SH_VERBYTE]) + hash160)
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
@@ -195,7 +181,7 @@ class Coin(object):
         if len(raw) == 21:
             verbyte, hash_bytes = raw[0], raw[1:]
 
-        if verbyte == cls.P2PKH_VERYBYTE:
+        if verbyte == cls.P2PKH_VERBYTE:
             return ScriptPubKey.P2PKH_script(hash_bytes)
         if verbyte == cls.P2SH_VERBYTE:
             return ScriptPubKey.P2SH_script(hash_bytes)
@@ -221,10 +207,29 @@ class Coin(object):
         return header[4:36]
 
     @classmethod
-    def read_block(cls, block):
-        '''Return a tuple (header, tx_hashes, txs) given a raw block.'''
-        header, rest = block[:cls.HEADER_LEN], block[cls.HEADER_LEN:]
-        return (header, ) + Deserializer(rest).read_block()
+    def header_offset(cls, height):
+        '''Given a header height return its offset in the headers file.
+
+        If header sizes change at some point, this is the only code
+        that needs updating.'''
+        return height * 80
+
+    @classmethod
+    def header_len(cls, height):
+        '''Given a header height return its length.'''
+        return cls.header_offset(height + 1) - cls.header_offset(height)
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Returns the block header given a block and its height.'''
+        return block[:cls.header_len(height)]
+
+    @classmethod
+    def block_txs(cls, block, height):
+        '''Returns a list of (deserialized_tx, tx_hash) pairs given a
+        block and its height.'''
+        deserializer = cls.deserializer()
+        return deserializer(block[cls.header_len(height):]).read_block()
 
     @classmethod
     def decimal_value(cls, value):
@@ -250,6 +255,10 @@ class Coin(object):
             'nonce': nonce,
         }
 
+    @classmethod
+    def deserializer(cls):
+        return Deserializer
+
 
 class Bitcoin(Coin):
     NAME = "Bitcoin"
@@ -260,14 +269,29 @@ class Bitcoin(Coin):
     P2PKH_VERBYTE = 0x00
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0x80
-    GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
-                  b'4ff763ae46a2a6c172b3f1b60a8ce26f')
-    TX_COUNT = 142791895
-    TX_COUNT_HEIGHT = 420976
-    TX_PER_BLOCK = 1600
+    GENESIS_HASH=('000000000019d6689c085ae165831e93'
+                  '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    TX_COUNT = 156335304
+    TX_COUNT_HEIGHT = 429972
+    TX_PER_BLOCK = 1800
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332
+    PEERS = [
+        '4cii7ryno5j3axe4.onion t'
+        'btc.smsys.me s995',
+        'ca6ulp2j2mpsft3y.onion s t',
+        'electrum.be s t',
+        'electrum.trouth.net s t',
+        'electrum.vom-stausee.de s t',
+        'electrum3.hachre.de s t',
+        'Electrum.hsmiths.com s t',
+        'erbium1.sytes.net s t',
+        'h.1209k.com s t',
+        'helicarrier.bauerj.eu s t',
+        'ozahtqwp25chjdjd.onion s t',
+        'us11.einfachmalnettsein.de s t',
+    ]
 
 
 class BitcoinTestnet(Bitcoin):
@@ -278,7 +302,36 @@ class BitcoinTestnet(Bitcoin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+    GENESIS_HASH=('000000000933ea01ad0ee984209779ba'
+                  'aec3ced90fa3f408719526f8d77f4943')
     REORG_LIMIT = 2000
+    TX_COUNT = 12242438
+    TX_COUNT_HEIGHT = 1035428
+    TX_PER_BLOCK = 21
+    IRC_PREFIX = "ET_"
+    RPC_PORT = 18332
+    PEER_DEFAULT_PORTS = {'t':'51001', 's':'51002'}
+    PEERS = [
+        'electrum.akinbo.org s t',
+        'he36kyperp3kbuxu.onion s t',
+        'electrum-btc-testnet.petrkr.net s t',
+        'h.hsmiths.com t53011 s53012',
+        'testnet.not.fyi s t',
+    ]
+
+class BitcoinTestnetSegWit(BitcoinTestnet):
+    '''Bitcoin Testnet for Core bitcoind >= 0.13.1.
+
+    Unfortunately 0.13.1 broke backwards compatibility of the RPC
+    interface's TX serialization, SegWit transactions serialize
+    differently than with earlier versions.  If you are using such a
+    bitcoind on testnet, you must use this class as your "COIN".
+    '''
+    NET = "testnet-segwit"
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerSegWit
 
 
 class Litecoin(Coin):
@@ -290,8 +343,8 @@ class Litecoin(Coin):
     P2PKH_VERBYTE = 0x30
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0xb0
-    GENESIS_HASH=(b'000000000019d6689c085ae165831e93'
-                  b'4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_HASH=('12a765e31ffd4059bada1e25190f6e98'
+                  'c99d9714d334efa41a195a7e7e04bfe2')
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10
@@ -365,8 +418,8 @@ class Dash(Coin):
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("02fe52cc")
     XPRV_VERBYTES = bytes.fromhex("02fe52f8")
-    GENESIS_HASH = (b'00000ffd590b1485b3caadc19b22e637'
-                    b'9c733355108f107a430458cdf3407ab6')
+    GENESIS_HASH = ('00000ffd590b1485b3caadc19b22e637'
+                    '9c733355108f107a430458cdf3407ab6')
     P2PKH_VERBYTE = 0x4c
     P2SH_VERBYTE = 0x10
     WIF_BYTE = 0xcc
@@ -388,8 +441,8 @@ class DashTestnet(Dash):
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("3a805837")
     XPRV_VERBYTES = bytes.fromhex("3a8061a0")
-    GENESIS_HASH = (b'00000bafbc94add76cb75e2ec9289483'
-                    b'7288a481e5c005f6563d91623bf8bc2c')
+    GENESIS_HASH = ('00000bafbc94add76cb75e2ec9289483'
+                    '7288a481e5c005f6563d91623bf8bc2c')
     P2PKH_VERBYTE = 0x8c
     P2SH_VERBYTE = 0x13
     WIF_BYTE = 0xef
@@ -398,3 +451,67 @@ class DashTestnet(Dash):
     TX_PER_BLOCK = 1
     RPC_PORT = 19998
     IRC_PREFIX = "d_"
+
+
+class Argentum(Coin):
+    NAME = "Argentum"
+    SHORTNAME = "ARG"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = 0x17
+    P2SH_VERBYTE = 0x05
+    WIF_BYTE = 0x97
+    GENESIS_HASH=('88c667bc63167685e4e4da058fffdfe8'
+                  'e007e5abffd6855de52ad59df7bb0bb2')
+    TX_COUNT = 2263089
+    TX_COUNT_HEIGHT = 2050260
+    TX_PER_BLOCK = 2000
+    IRC_PREFIX = "A_"
+    IRC_CHANNEL = "#electrum-arg"
+    RPC_PORT = 13581
+
+
+class ArgentumTestnet(Argentum):
+   SHORTNAME = "XRG"
+   NET = "testnet"
+   XPUB_VERBYTES = bytes.fromhex("043587cf")
+   XPRV_VERBYTES = bytes.fromhex("04358394")
+   P2PKH_VERBYTE = 0x6f
+   P2SH_VERBYTE = 0xc4
+   WIF_BYTE = 0xef
+   REORG_LIMIT = 2000
+
+
+class DigiByte(Coin):
+    NAME = "DigiByte"
+    SHORTNAME = "DGB"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = 0x1E
+    P2SH_VERBYTE = 0x05
+    WIF_BYTE = 0x80
+    GENESIS_HASH=('7497ea1b465eb39f1c8f507bc877078f'
+                  'e016d6fcb6dfad3a64c98dcc6e1e8496')
+    TX_COUNT = 1046018
+    TX_COUNT_HEIGHT = 1435000
+    TX_PER_BLOCK = 1000
+    IRC_PREFIX = "DE_"
+    IRC_CHANNEL = "#electrum-dgb"
+    RPC_PORT = 12022
+
+
+class DigiByteTestnet(DigiByte):
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = 0x6f
+    P2SH_VERBYTE = 0xc4
+    WIF_BYTE = 0xef
+    GENESIS_HASH=('b5dca8039e300198e5fe7cd23bdd1728'
+                  'e2a444af34c447dbd0916fa3430a68c2')
+    IRC_PREFIX = "DET_"
+    IRC_CHANNEL = "#electrum-dgb"
+    RPC_PORT = 15022
+    REORG_LIMIT = 2000

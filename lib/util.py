@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -9,6 +9,7 @@
 
 
 import array
+import asyncio
 import inspect
 import logging
 import sys
@@ -21,8 +22,17 @@ class LoggedClass(object):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.INFO)
         self.log_prefix = ''
+        self.throttled = 0
 
-    def log_info(self, msg):
+    def log_info(self, msg, throttle=False):
+        # Prevent annoying log messages by throttling them if there
+        # are too many in a short period
+        if throttle:
+            self.throttled += 1
+            if self.throttled > 3:
+                return
+            if self.throttled == 3:
+                msg += ' (throttling later logs)'
         self.logger.info(self.log_prefix + msg)
 
     def log_warning(self, msg):
@@ -118,17 +128,69 @@ def int_to_bytes(value):
 
 
 def increment_byte_string(bs):
-    bs = bytearray(bs)
-    incremented = False
-    for i in reversed(range(len(bs))):
-        if bs[i] < 0xff:
-            # This is easy
-            bs[i] += 1
-            incremented = True
-            break
-        # Otherwise we need to look at the previous character
-        bs[i] = 0
-    if not incremented:
-        # This can only happen if all characters are 0xff
-        bs = bytes([1]) + bs
-    return bytes(bs)
+    '''Return the lexicographically next byte string of the same length.
+
+    Return None if there is none (when the input is all 0xff bytes).'''
+    for n in range(1, len(bs) + 1):
+        if bs[-n] != 0xff:
+            return bs[:-n] + bytes([bs[-n] + 1]) + bytes(n - 1)
+    return None
+
+
+class LogicalFile(object):
+    '''A logical binary file split across several separate files on disk.'''
+
+    def __init__(self, prefix, digits, file_size):
+        digit_fmt = '{' + ':0{:d}d'.format(digits) + '}'
+        self.filename_fmt = prefix + digit_fmt
+        self.file_size = file_size
+
+    def read(self, start, size=-1):
+        '''Read up to size bytes from the virtual file, starting at offset
+        start, and return them.
+
+        If size is -1 all bytes are read.'''
+        parts = []
+        while size != 0:
+            try:
+                with self.open_file(start, False) as f:
+                    part = f.read(size)
+                if not part:
+                    break
+            except FileNotFoundError:
+                break
+            parts.append(part)
+            start += len(part)
+            if size > 0:
+                size -= len(part)
+        return b''.join(parts)
+
+    def write(self, start, b):
+        '''Write the bytes-like object, b, to the underlying virtual file.'''
+        while b:
+            size = min(len(b), self.file_size - (start % self.file_size))
+            with self.open_file(start, True) as f:
+                f.write(b if size == len(b) else b[:size])
+            b = b[size:]
+            start += size
+
+    def open_file(self, start, create):
+        '''Open the virtual file and seek to start.  Return a file handle.
+        Raise FileNotFoundError if the file does not exist and create
+        is False.
+        '''
+        file_num, offset = divmod(start, self.file_size)
+        filename = self.filename_fmt.format(file_num)
+        f = open_file(filename, create)
+        f.seek(offset)
+        return f
+
+
+def open_file(filename, create=False):
+    '''Open the file name.  Return its handle.'''
+    try:
+        return open(filename, 'rb+')
+    except FileNotFoundError:
+        if create:
+            return open(filename, 'wb+')
+        raise

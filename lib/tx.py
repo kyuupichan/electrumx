@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -72,28 +72,25 @@ class Deserializer(object):
         self.cursor = 0
 
     def read_tx(self):
+        '''Return a (Deserialized TX, TX_HASH) pair.
+
+        The hash needs to be reversed for human display; for efficiency
+        we process it in the natural serialized order.
+        '''
+        start = self.cursor
         return Tx(
             self._read_le_int32(),  # version
             self._read_inputs(),    # inputs
             self._read_outputs(),   # outputs
             self._read_le_uint32()  # locktime
-        )
+        ), double_sha256(self.binary[start:self.cursor])
 
     def read_block(self):
-        tx_hashes = []
-        txs = []
-        binary = self.binary
-        hash = double_sha256
+        '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
         read_tx = self.read_tx
-        append_hash = tx_hashes.append
-        for n in range(self._read_varint()):
-            start = self.cursor
-            txs.append(read_tx())
-            # Note this hash needs to be reversed for human display
-            # For efficiency we store it in the natural serialized order
-            append_hash(hash(binary[start:self.cursor]))
-        assert self.cursor == len(binary)
-        return tx_hashes, txs
+        txs = [read_tx() for n in range(self._read_varint())]
+        assert self.cursor == len(self.binary)
+        return txs
 
     def _read_inputs(self):
         read_input = self._read_input
@@ -161,3 +158,62 @@ class Deserializer(object):
         result, = unpack_from('<Q', self.binary, self.cursor)
         self.cursor += 8
         return result
+
+
+class TxSegWit(namedtuple("Tx", "version marker flag inputs outputs "
+                          "witness locktime")):
+    '''Class representing a SegWit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase
+
+
+class DeserializerSegWit(Deserializer):
+
+    # https://bitcoincore.org/en/segwit_wallet_dev/#transaction-serialization
+
+    def _read_byte(self):
+        cursor = self.cursor
+        self.cursor += 1
+        return self.binary[cursor]
+
+    def _read_witness(self, fields):
+        read_witness_field = self._read_witness_field
+        return [read_witness_field() for i in range(fields)]
+
+    def _read_witness_field(self):
+        read_varbytes = self._read_varbytes
+        return [read_varbytes() for i in range(self._read_varint())]
+
+    def read_tx(self):
+        '''Return a (Deserialized TX, TX_HASH) pair.
+
+        The hash needs to be reversed for human display; for efficiency
+        we process it in the natural serialized order.
+        '''
+        marker = self.binary[self.cursor + 4]
+        if marker:
+            return super().read_tx()
+
+        # Ugh, this is nasty.
+        start = self.cursor
+        version = self._read_le_int32()
+        orig_ser = self.binary[start:self.cursor]
+
+        marker = self._read_byte()
+        flag = self._read_byte()
+
+        start = self.cursor
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        orig_ser += self.binary[start:self.cursor]
+
+        witness = self._read_witness(len(inputs))
+
+        start = self.cursor
+        locktime = self._read_le_uint32()
+        orig_ser += self.binary[start:self.cursor]
+
+        return TxSegWit(version, marker, flag, inputs,
+                        outputs, witness, locktime), double_sha256(orig_ser)

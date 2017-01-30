@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2017, Neil Booth
 #
 # All rights reserved.
 #
@@ -12,6 +12,7 @@ import struct
 from collections import namedtuple
 
 from lib.enum import Enumeration
+from lib.hash import hash160
 
 
 class ScriptError(Exception):
@@ -81,6 +82,27 @@ class ScriptPubKey(object):
 
     PayToHandlers = namedtuple('PayToHandlers', 'address script_hash pubkey '
                                'unspendable strange')
+
+    @classmethod
+    def hashX_script(cls, script):
+        '''Return None if the script is provably unspendable.  Return a
+        pay-to-pubkey-hash script if it is pay-to-pubkey, otherwise
+        return script.
+        '''
+        if script:
+            op = script[0]
+            if op == OpCodes.OP_RETURN:
+                return None
+            if op <= OpCodes.OP_PUSHDATA4:
+                try:
+                    ops = Script.get_ops(script)
+                except ScriptError:
+                    pass
+                else:
+                    if _match_ops(ops, cls.TO_PUBKEY_OPS):
+                        pubkey = ops[0][1]
+                        script = ScriptPubKey.P2PKH_script(hash160(pubkey))
+        return script
 
     @classmethod
     def pay_to(cls, handlers, script):
@@ -187,7 +209,7 @@ class Script(object):
                     n += dlen
 
                 ops.append(op)
-        except:
+        except Exception:
             # Truncated script; e.g. tx_hash
             # ebc9fa1196a59e192352d76c0f6e73167046b9d37b8302b6bb6968dfd279b767
             raise ScriptError('truncated script')
