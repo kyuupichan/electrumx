@@ -610,7 +610,7 @@ class JSONSessionBase(util.LoggedClass):
         '''Send an iterable of (method, params) notification pairs.
 
         A 1-tuple is also valid in which case there are no params.'''
-        if self.version.HAS_BATCHES:
+        if False and self.version.HAS_BATCHES:
             parts = [self.notification_bytes(*pair) for pair in mp_iterable]
             self.send_binary(self.version.batch_bytes(parts))
         else:
