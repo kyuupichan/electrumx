@@ -135,7 +135,7 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
-Version 0.10.14
+Version 0.10.15
 ---------------
 
 * Force JSONRPCv2 for backwards compat with Coinomi wallets that don't
