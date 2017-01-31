@@ -453,6 +453,48 @@ class DashTestnet(Dash):
     IRC_PREFIX = "d_"
 
 
+class Britcoin(Coin):
+    NAME = "Britcoin"
+    SHORTNAME = "BRIT"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("02fe52cc") # check these
+    XPRV_VERBYTES = bytes.fromhex("02fe52f8") # check these
+    GENESIS_HASH = ('00000c2cafe160374ffe5b516a2d2c83'
+                    'd7d13cf4e910dee00dd4fc2f7fa9c7cf')
+    P2PKH_VERBYTE = 0x19
+    P2SH_VERBYTE = 0x55
+    WIF_BYTE = 0xcc # check this
+    TX_COUNT_HEIGHT = 569399
+    TX_COUNT = 2157510
+    TX_PER_BLOCK = 4
+    RPC_PORT = 9198
+    IRC_PREFIX = "B_"
+    IRC_CHANNEL = "#electrum-brit"
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x13_hash
+        return x13_hash.getPoWHash(header)
+
+class BritcoinTestnet(Britcoin):
+    SHORTNAME = "tBRIT"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("3a805837")
+    XPRV_VERBYTES = bytes.fromhex("3a8061a0")
+    GENESIS_HASH = ('000018950ec725ebb4e4537bbb501fb0'
+                    'b1774436c9e90dcea12b2ea42c717a99')
+    P2PKH_VERBYTE = 0x110
+    P2SH_VERBYTE = 0x111 # check these
+    WIF_BYTE = 0xef #check this
+    TX_COUNT_HEIGHT = 101619
+    TX_COUNT = 132681
+    TX_PER_BLOCK = 1
+    RPC_PORT = 19198
+    IRC_PREFIX = "b_"
+
+
+
 class Argentum(Coin):
     NAME = "Argentum"
     SHORTNAME = "ARG"
