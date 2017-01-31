@@ -135,6 +135,11 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.16
+---------------
+
+* disable batch notifications; unintentionally enabled in a prior version
+
 Version 0.10.15
 ---------------
 
