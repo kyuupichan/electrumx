@@ -450,6 +450,7 @@ class Controller(util.LoggedClass):
     def getinfo(self):
         '''A one-line summary of server state.'''
         return {
+            'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
@@ -599,7 +600,7 @@ class Controller(util.LoggedClass):
             self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
         except Exception as e:
             raise RPCError('an error occured: {}'.format(e))
-        return 'set daemon URL to {}'.format(daemon_url)
+        return 'now using daemon at {}'.format(self.daemon.logged_url())
 
     def rpc_stop(self):
         '''Shut down the server cleanly.'''
