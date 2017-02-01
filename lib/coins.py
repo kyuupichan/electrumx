@@ -43,6 +43,7 @@ class Coin(object):
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
+    TX_COUNT_HEIGHT = 0
 
     @classmethod
     def lookup_coin_class(cls, name, net):
