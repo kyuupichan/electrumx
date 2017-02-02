@@ -429,6 +429,14 @@ class Dash(Coin):
     RPC_PORT = 9998
     IRC_PREFIX = "D_"
     IRC_CHANNEL = "#electrum-dash"
+    PEERS = [
+        'electrum.dash.org s t'
+        'electrum.masternode.io s t',
+        'electrum-drk.club s t',
+        'dashcrypto.space s t',
+        'electrum.dash.siampm.com s t',
+        'wl4sfwq2hwxnodof.onion s t',
+    ]
 
     @classmethod
     def header_hash(cls, header):
@@ -451,6 +459,9 @@ class DashTestnet(Dash):
     TX_PER_BLOCK = 1
     RPC_PORT = 19998
     IRC_PREFIX = "d_"
+    PEERS = [
+        'electrum.dash.siampm.com s51002 t51001',
+    ]
 
 
 class Argentum(Coin):
