@@ -464,6 +464,7 @@ class Controller(util.LoggedClass):
             'sessions': self.session_count(),
             'subs': self.sub_count(),
             'txs_sent': self.txs_sent,
+            'uptime': util.formatted_time(time.time() - self.start_time),
         }
 
     def sub_count(self):
@@ -515,12 +516,6 @@ class Controller(util.LoggedClass):
         '''A generator returning lines for a list of sessions.
 
         data is the return value of rpc_sessions().'''
-
-        def time_fmt(t):
-            t = int(t)
-            return ('{:3d}:{:02d}:{:02d}'
-                    .format(t // 3600, (t % 3600) // 60, t % 60))
-
         fmt = ('{:<6} {:<5} {:>17} {:>5} {:>5} '
                '{:>7} {:>7} {:>7} {:>7} {:>7} {:>9} {:>21}')
         yield fmt.format('ID', 'Flags', 'Client', 'Reqs', 'Txs', 'Subs',
@@ -535,7 +530,7 @@ class Controller(util.LoggedClass):
                              '{:,d}'.format(recv_size // 1024),
                              '{:,d}'.format(send_count),
                              '{:,d}'.format(send_size // 1024),
-                             time_fmt(time), peer)
+                             util.formatted_time(time, sep=''), peer)
 
     def session_data(self, for_log):
         '''Returned to the RPC 'sessions' call.'''
