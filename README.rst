@@ -16,6 +16,34 @@ Getting Started
 
 See `docs/HOWTO.rst`_.
 
+Features
+========
+
+- Efficient, lightweight reimplementation of electrum-server
+- Efficient synchronization of bitcoin mainnet from Genesis.  Recent
+  hardware should synchronize in well under 24 hours.  The fastest
+  time to height 448k (mid January 2017) reported is under 4h 30m.  On
+  the same hardware JElectrum would take around 4 days and
+  electrum-server probably around 1 month.
+- The full Electrum protocol is implemented.  The only exception is
+  the blockchain.address.get_proof RPC call, which is not used by
+  Electrum GUI clients, and can only be invoked from the command line.
+- Various configurable means of controlling resource consumption and
+  handling denial of service attacks.  These include maximum
+  connection counts, subscription limits per-connection and across all
+  connections, maximum response size, per-session bandwidth limits,
+  and session timeouts.
+- Minimal resource usage once caught up and serving clients; tracking the
+  transaction mempool appears to be the most expensive part.
+- Fully asynchronous processing of new blocks, mempool updates, and
+  client requests.  Busy clients should not noticeably impede other
+  clients' requests and notifications, nor the processing of incoming
+  blocks and mempool updates.
+- Daemon failover.  More than one daemon can be specified, and
+  ElectrumX will failover round-robin style if the current one fails
+  for any reason.
+- Coin abstraction makes compatible altcoin and testnet support easy.
+
 Motivation
 ==========
 
@@ -44,34 +72,6 @@ Finally though no fan of most altcoins I wanted to write a codebase
 that could easily be reused for those alts that are reasonably
 compatible with Bitcoin.  Such an abstraction is also useful for
 testnets.
-
-Features
-========
-
-- The full Electrum protocol is implemented.  The only exception is
-  the blockchain.address.get_proof RPC call, which is not used by
-  Electrum GUI clients, and can only be invoked from the command line.
-- Efficient synchronization from Genesis.  Recent hardware should
-  synchronize in well under 24 hours, possibly much faster for recent
-  CPUs or if you have an SSD.  The fastest time to height 439k (mid
-  November 2016) reported is under 5 hours.  For comparison, JElectrum
-  would take around 4 days, and electrum-server probably around 1
-  month, on the same hardware.
-- Various configurable means of controlling resource consumption and
-  handling denial of service attacks.  These include maximum
-  connection counts, subscription limits per-connection and across all
-  connections, maximum response size, per-session bandwidth limits,
-  and session timeouts.
-- Minimal resource usage once caught up and serving clients; tracking the
-  transaction mempool appears to be the most expensive part.
-- Fully asynchronous processing of new blocks, mempool updates, and
-  client requests.  Busy clients should not noticeably impede other
-  clients' requests and notifications, nor the processing of incoming
-  blocks and mempool updates.
-- Daemon failover.  More than one daemon can be specified, and
-  ElectrumX will failover round-robin style if the current one fails
-  for any reason.
-- Coin abstraction makes compatible altcoin and testnet support easy.
 
 Implementation
 ==============
@@ -134,6 +134,14 @@ version prior to the release of 1.0.
 
 ChangeLog
 =========
+
+Version 0.10.17
+---------------
+
+Minor upgrade
+
+* added current daemon URL and uptime to getinfo RPC call
+* altcoin cleanups / fixes (erasmospunk)
 
 Version 0.10.16
 ---------------
