@@ -286,7 +286,7 @@ class Bitcoin(Coin):
         'electrum.trouth.net s t',
         'electrum.vom-stausee.de s t',
         'electrum3.hachre.de s t',
-        'Electrum.hsmiths.com s t',
+        'electrum.hsmiths.com s t',
         'erbium1.sytes.net s t',
         'h.1209k.com s t',
         'helicarrier.bauerj.eu s t',
@@ -316,7 +316,8 @@ class BitcoinTestnet(Bitcoin):
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
         'electrum-btc-testnet.petrkr.net s t',
-        'h.hsmiths.com t53011 s53012',
+        'testnet.hsmiths.com t53011 s53012',
+        'hsmithsxurybd7uh.onion t53011',
         'testnet.not.fyi s t',
     ]
 
