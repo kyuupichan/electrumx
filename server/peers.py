@@ -30,7 +30,8 @@ class PeerManager(util.LoggedClass):
         super().__init__()
         self.env = env
         self.controller = controller
-        self.irc = IRC(env, self)
+        if self.env.irc:
+            self.irc = IRC(env, self)
         self.pruning = None
         self._identities = []
         # Keyed by nick
@@ -71,7 +72,7 @@ class PeerManager(util.LoggedClass):
 
     async def main_loop(self):
         '''Not a loop for now...'''
-        if self.env.irc:
+        if self.irc:
             self.ensure_future(self.irc.start(self.irc_name_pairs()))
         else:
             self.logger.info('IRC is disabled')
