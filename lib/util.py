@@ -57,12 +57,20 @@ class cachedproperty(object):
         return value
 
 
-def formatted_time(t):
+def formatted_time(t, sep=' '):
     '''Return a number of seconds as a string in days, hours, mins and
-    secs.'''
+    maybe secs.'''
     t = int(t)
-    return '{:d}d {:02d}h {:02d}m {:02d}s'.format(
-        t // 86400, (t % 86400) // 3600, (t % 3600) // 60, t % 60)
+    fmts = (('{:d}d', 86400), ('{:02d}h', 3600), ('{:02d}m', 60))
+    parts = []
+    for fmt, n in fmts:
+        val = t // n
+        if parts or val:
+            parts.append(fmt.format(val))
+        t %= n
+    if len(parts) < 3:
+        parts.append('{:02d}s'.format(t))
+    return sep.join(parts)
 
 
 def deep_getsizeof(obj):

@@ -32,17 +32,18 @@ class CoinError(Exception):
 class Coin(object):
     '''Base class of coin hierarchy.'''
 
-    REORG_LIMIT=200
+    REORG_LIMIT = 200
     # Not sure if these are coin-specific
     RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
-    CHUNK_SIZE=2016
+    CHUNK_SIZE = 2016
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
     HASHX_LEN = 11
     # Peer discovery
-    PEER_DEFAULT_PORTS = {'t':'50001', 's':'50002'}
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
+    TX_COUNT_HEIGHT = 0
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -98,11 +99,11 @@ class Coin(object):
     @util.cachedproperty
     def address_handlers(cls):
         return ScriptPubKey.PayToHandlers(
-            address = cls.P2PKH_address_from_hash160,
-            script_hash = cls.P2SH_address_from_hash160,
-            pubkey = cls.P2PKH_address_from_pubkey,
-            unspendable = lambda : None,
-            strange = lambda script: None,
+            address=cls.P2PKH_address_from_hash160,
+            script_hash=cls.P2SH_address_from_hash160,
+            pubkey=cls.P2PKH_address_from_pubkey,
+            unspendable=lambda: None,
+            strange=lambda script: None,
         )
 
     @classmethod
@@ -269,8 +270,8 @@ class Bitcoin(Coin):
     P2PKH_VERBYTE = 0x00
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0x80
-    GENESIS_HASH=('000000000019d6689c085ae165831e93'
-                  '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_HASH = ('000000000019d6689c085ae165831e93'
+                    '4ff763ae46a2a6c172b3f1b60a8ce26f')
     TX_COUNT = 156335304
     TX_COUNT_HEIGHT = 429972
     TX_PER_BLOCK = 1800
@@ -302,15 +303,15 @@ class BitcoinTestnet(Bitcoin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
-    GENESIS_HASH=('000000000933ea01ad0ee984209779ba'
-                  'aec3ced90fa3f408719526f8d77f4943')
+    GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
+                    'aec3ced90fa3f408719526f8d77f4943')
     REORG_LIMIT = 2000
     TX_COUNT = 12242438
     TX_COUNT_HEIGHT = 1035428
     TX_PER_BLOCK = 21
     IRC_PREFIX = "ET_"
     RPC_PORT = 18332
-    PEER_DEFAULT_PORTS = {'t':'51001', 's':'51002'}
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     PEERS = [
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
@@ -318,6 +319,7 @@ class BitcoinTestnet(Bitcoin):
         'h.hsmiths.com t53011 s53012',
         'testnet.not.fyi s t',
     ]
+
 
 class BitcoinTestnetSegWit(BitcoinTestnet):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.
@@ -343,8 +345,8 @@ class Litecoin(Coin):
     P2PKH_VERBYTE = 0x30
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0xb0
-    GENESIS_HASH=('12a765e31ffd4059bada1e25190f6e98'
-                  'c99d9714d334efa41a195a7e7e04bfe2')
+    GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
+                    'c99d9714d334efa41a195a7e7e04bfe2')
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10
@@ -361,7 +363,8 @@ class LitecoinTestnet(Litecoin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
-    # Some details missing...
+    GENESIS_HASH = ('f5ae71e26c74beacc88382716aced69c'
+                    'ddf3dffff24f384e1808905e0188f68f')
 
 
 # Source: namecoin.org
@@ -374,9 +377,11 @@ class Namecoin(Coin):
     P2PKH_VERBYTE = 0x34
     P2SH_VERBYTE = 0x0d
     WIF_BYTE = 0xe4
+    GENESIS_HASH = ('000000000062b72c5e2ceb45fbc8587e'
+                    '807c155b0da735e6483dfba2f0a9c770')
 
 
-class NamecoinTestnet(Coin):
+class NamecoinTestnet(Namecoin):
     NAME = "Namecoin"
     SHORTNAME = "XNM"
     NET = "testnet"
@@ -385,6 +390,7 @@ class NamecoinTestnet(Coin):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
+    # TODO add GENESIS_HASH
 
 
 # For DOGE there is disagreement across sites like bip32.org and
@@ -398,9 +404,11 @@ class Dogecoin(Coin):
     P2PKH_VERBYTE = 0x1e
     P2SH_VERBYTE = 0x16
     WIF_BYTE = 0x9e
+    GENESIS_HASH = ('1a91e3dace36e2be3bf030a65679fe82'
+                    '1aa1d6ef92e7c9902eb318182c355691')
 
 
-class DogecoinTestnet(Coin):
+class DogecoinTestnet(Dogecoin):
     NAME = "Dogecoin"
     SHORTNAME = "XDT"
     NET = "testnet"
@@ -409,6 +417,8 @@ class DogecoinTestnet(Coin):
     P2PKH_VERBYTE = 0x71
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xf1
+    GENESIS_HASH = ('bb0a78264637406b6360aad926284d54'
+                    '4d7049f45189db5664f3c4d07350559e')
 
 
 # Source: https://github.com/dashpay/dash
@@ -436,6 +446,7 @@ class Dash(Coin):
         import x11_hash
         return x11_hash.getPoWHash(header)
 
+
 class DashTestnet(Dash):
     SHORTNAME = "tDASH"
     NET = "testnet"
@@ -462,8 +473,8 @@ class Argentum(Coin):
     P2PKH_VERBYTE = 0x17
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0x97
-    GENESIS_HASH=('88c667bc63167685e4e4da058fffdfe8'
-                  'e007e5abffd6855de52ad59df7bb0bb2')
+    GENESIS_HASH = ('88c667bc63167685e4e4da058fffdfe8'
+                    'e007e5abffd6855de52ad59df7bb0bb2')
     TX_COUNT = 2263089
     TX_COUNT_HEIGHT = 2050260
     TX_PER_BLOCK = 2000
@@ -473,14 +484,14 @@ class Argentum(Coin):
 
 
 class ArgentumTestnet(Argentum):
-   SHORTNAME = "XRG"
-   NET = "testnet"
-   XPUB_VERBYTES = bytes.fromhex("043587cf")
-   XPRV_VERBYTES = bytes.fromhex("04358394")
-   P2PKH_VERBYTE = 0x6f
-   P2SH_VERBYTE = 0xc4
-   WIF_BYTE = 0xef
-   REORG_LIMIT = 2000
+    SHORTNAME = "XRG"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = 0x6f
+    P2SH_VERBYTE = 0xc4
+    WIF_BYTE = 0xef
+    REORG_LIMIT = 2000
 
 
 class DigiByte(Coin):
@@ -492,8 +503,8 @@ class DigiByte(Coin):
     P2PKH_VERBYTE = 0x1E
     P2SH_VERBYTE = 0x05
     WIF_BYTE = 0x80
-    GENESIS_HASH=('7497ea1b465eb39f1c8f507bc877078f'
-                  'e016d6fcb6dfad3a64c98dcc6e1e8496')
+    GENESIS_HASH = ('7497ea1b465eb39f1c8f507bc877078f'
+                    'e016d6fcb6dfad3a64c98dcc6e1e8496')
     TX_COUNT = 1046018
     TX_COUNT_HEIGHT = 1435000
     TX_PER_BLOCK = 1000
@@ -509,8 +520,8 @@ class DigiByteTestnet(DigiByte):
     P2PKH_VERBYTE = 0x6f
     P2SH_VERBYTE = 0xc4
     WIF_BYTE = 0xef
-    GENESIS_HASH=('b5dca8039e300198e5fe7cd23bdd1728'
-                  'e2a444af34c447dbd0916fa3430a68c2')
+    GENESIS_HASH = ('b5dca8039e300198e5fe7cd23bdd1728'
+                    'e2a444af34c447dbd0916fa3430a68c2')
     IRC_PREFIX = "DET_"
     IRC_CHANNEL = "#electrum-dgb"
     RPC_PORT = 15022

@@ -42,10 +42,27 @@ class Daemon(util.LoggedClass):
         '''Set the URLS to the given list, and switch to the first one.'''
         if not urls:
             raise DaemonError('no daemon URLs provided')
-        for url in urls:
-            self.logger.info('daemon at {}'.format(self.logged_url(url)))
         self.urls = urls
         self.url_index = 0
+        for n, url in enumerate(urls):
+            self.logger.info('daemon #{:d} at {}{}'
+                             .format(n + 1, self.logged_url(url),
+                                     '' if n else ' (current)'))
+
+    def url(self):
+        '''Returns the current daemon URL.'''
+        return self.urls[self.url_index]
+
+    def failover(self):
+        '''Call to fail-over to the next daemon URL.
+
+        Returns False if there is only one, otherwise True.
+        '''
+        if len(self.urls) > 1:
+            self.url_index = (self.url_index + 1) % len(self.urls)
+            self.logger.info('failing over to {}'.format(self.logged_url()))
+            return True
+        return False
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -72,8 +89,7 @@ class Daemon(util.LoggedClass):
         while True:
             try:
                 async with self.workqueue_semaphore:
-                    url = self.urls[self.url_index]
-                    async with aiohttp.post(url, data=data) as resp:
+                    async with aiohttp.post(self.url(), data=data) as resp:
                         # If bitcoind can't find a tx, for some reason
                         # it returns 500 but fills out the JSON.
                         # Should still return 200 IMO.
@@ -99,17 +115,15 @@ class Daemon(util.LoggedClass):
             except Exception:
                 self.log_error(traceback.format_exc())
 
-            if secs >= max_secs and len(self.urls) > 1:
-                self.url_index = (self.url_index + 1) % len(self.urls)
-                logged_url = self.logged_url(self.urls[self.url_index])
-                self.logger.info('failing over to {}'.format(logged_url))
+            if secs >= max_secs and self.failover():
                 secs = 1
             else:
                 await asyncio.sleep(secs)
                 secs = min(max_secs, secs * 2)
 
-    def logged_url(self, url):
+    def logged_url(self, url=None):
         '''The host and port part, for logging.'''
+        url = url or self.url()
         return url[url.rindex('@') + 1:]
 
     async def _send_single(self, method, params=None):

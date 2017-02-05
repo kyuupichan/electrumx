@@ -450,6 +450,7 @@ class Controller(util.LoggedClass):
     def getinfo(self):
         '''A one-line summary of server state.'''
         return {
+            'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
@@ -463,6 +464,7 @@ class Controller(util.LoggedClass):
             'sessions': self.session_count(),
             'subs': self.sub_count(),
             'txs_sent': self.txs_sent,
+            'uptime': util.formatted_time(time.time() - self.start_time),
         }
 
     def sub_count(self):
@@ -514,12 +516,6 @@ class Controller(util.LoggedClass):
         '''A generator returning lines for a list of sessions.
 
         data is the return value of rpc_sessions().'''
-
-        def time_fmt(t):
-            t = int(t)
-            return ('{:3d}:{:02d}:{:02d}'
-                    .format(t // 3600, (t % 3600) // 60, t % 60))
-
         fmt = ('{:<6} {:<5} {:>17} {:>5} {:>5} '
                '{:>7} {:>7} {:>7} {:>7} {:>7} {:>9} {:>21}')
         yield fmt.format('ID', 'Flags', 'Client', 'Reqs', 'Txs', 'Subs',
@@ -534,7 +530,7 @@ class Controller(util.LoggedClass):
                              '{:,d}'.format(recv_size // 1024),
                              '{:,d}'.format(send_count),
                              '{:,d}'.format(send_size // 1024),
-                             time_fmt(time), peer)
+                             util.formatted_time(time, sep=''), peer)
 
     def session_data(self, for_log):
         '''Returned to the RPC 'sessions' call.'''
@@ -599,7 +595,7 @@ class Controller(util.LoggedClass):
             self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
         except Exception as e:
             raise RPCError('an error occured: {}'.format(e))
-        return 'set daemon URL to {}'.format(daemon_url)
+        return 'now using daemon at {}'.format(self.daemon.logged_url())
 
     def rpc_stop(self):
         '''Shut down the server cleanly.'''
