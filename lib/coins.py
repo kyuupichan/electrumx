@@ -43,16 +43,22 @@ class Coin(object):
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
-    TX_COUNT_HEIGHT = 0
 
     @classmethod
     def lookup_coin_class(cls, name, net):
         '''Return a coin class given name and network.
 
         Raise an exception if unrecognised.'''
+        req_attrs = ('TX_COUNT', 'TX_COUNT_HEIGHT', 'TX_PER_BLOCK',
+                     'IRC_CHANNEL', 'IRC_PREFIX')
         for coin in util.subclasses(Coin):
             if (coin.NAME.lower() == name.lower()
                     and coin.NET.lower() == net.lower()):
+                missing = [attr for attr in req_attrs
+                           if not hasattr(coin, attr)]
+                if missing:
+                    raise CoinError('coin {} missing {} attributes'
+                                    .format(name, missing))
                 return coin
         raise CoinError('unknown coin {} and network {} combination'
                         .format(name, net))

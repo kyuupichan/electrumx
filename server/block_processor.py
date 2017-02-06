@@ -388,27 +388,22 @@ class BlockProcessor(server.db.DB):
             self.logger.info('tx/sec since genesis: {:,d}, '
                              'since last flush: {:,d}'
                              .format(tx_per_sec, this_tx_per_sec))
-            if self.coin.TX_COUNT_HEIGHT > 0:
-                daemon_height = self.daemon.cached_height()
-                if self.height > self.coin.TX_COUNT_HEIGHT:
-                    tx_est = (daemon_height - self.height) * self.coin.TX_PER_BLOCK
-                else:
-                    tx_est = ((daemon_height - self.coin.TX_COUNT_HEIGHT)
-                              * self.coin.TX_PER_BLOCK
-                              + (self.coin.TX_COUNT - self.tx_count))
 
-                # Damp the enthusiasm
-                realism = 2.0 - 0.9 * self.height / self.coin.TX_COUNT_HEIGHT
-                tx_est *= max(realism, 1.0)
-
-
-                self.logger.info('sync time: {}  ETA: {}'
-                                 .format(formatted_time(self.wall_time),
-                                         formatted_time(tx_est / this_tx_per_sec)))
+            daemon_height = self.daemon.cached_height()
+            if self.height > self.coin.TX_COUNT_HEIGHT:
+                tx_est = (daemon_height - self.height) * self.coin.TX_PER_BLOCK
             else:
-                self.logger.info('sync time: {}'
-                                 .format(formatted_time(self.wall_time)))
+                tx_est = ((daemon_height - self.coin.TX_COUNT_HEIGHT)
+                          * self.coin.TX_PER_BLOCK
+                          + (self.coin.TX_COUNT - self.tx_count))
 
+            # Damp the enthusiasm
+            realism = 2.0 - 0.9 * self.height / self.coin.TX_COUNT_HEIGHT
+            tx_est *= max(realism, 1.0)
+
+            self.logger.info('sync time: {}  ETA: {}'
+                             .format(formatted_time(self.wall_time),
+                                     formatted_time(tx_est / this_tx_per_sec)))
 
     def fs_flush(self):
         '''Flush the things stored on the filesystem.'''
