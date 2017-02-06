@@ -38,6 +38,7 @@ class SessionBase(JSONSession):
         self.requests = []
         self.start_time = time.time()
         self.close_time = 0
+        self.bw_limit = self.env.bandwidth_limit
         self.bw_time = self.start_time
         self.bw_interval = 3600
         self.bw_used = 0
@@ -85,6 +86,15 @@ class SessionBase(JSONSession):
             msg = 'disconnected' + msg
             self.log_info(msg)
         self.controller.remove_session(self)
+
+    def using_bandwidth(self, amount):
+        now = time.time()
+        # Reduce the recorded usage in proportion to the elapsed time
+        elapsed = now - self.bw_time
+        self.bandwidth_start = now
+        refund = int(elapsed / self.bw_interval * self.bw_limit)
+        refund = min(refund, self.bw_used)
+        self.bw_used += amount - refund
 
     def sub_count(self):
         return 0
