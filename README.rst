@@ -135,6 +135,11 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.18
+---------------
+
+* bandwidth accounting was unintentionally lost in 0.10.11, restore it
+
 Version 0.10.17
 ---------------
 
