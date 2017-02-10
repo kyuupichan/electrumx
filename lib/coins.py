@@ -21,7 +21,7 @@ import sys
 
 from lib.hash import Base58, hash160, ripemd160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
-from lib.tx import Deserializer, DeserializerSegWit
+from lib.tx import Deserializer, DeserializerSegWit, DeserializerFairCoin
 import lib.util as util
 
 
@@ -545,3 +545,68 @@ class DigiByteTestnet(DigiByte):
     IRC_CHANNEL = "#electrum-dgb"
     RPC_PORT = 15022
     REORG_LIMIT = 2000
+
+
+class FairCoin(Coin):
+    NAME = "FairCoin"
+    SHORTNAME = "FAIR"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = 0x5f
+    P2SH_VERBYTE = 0x24
+    WIF_BYTE = 0xdf
+    GENESIS_HASH=('1f701f2b8de1339dc0ec908f3fb6e9b0'
+                  'b870b6f20ba893e120427e42bbc048d7')
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 1000
+    TX_PER_BLOCK = 1
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#fairlectrum"
+    RPC_PORT = 40405
+    PEER_DEFAULT_PORTS = {'t': '51811', 's': '51812'}
+    PEERS = [
+        'fairlectrum.fair-coin.net s',
+        'fairlectrum.fair.to s'
+    ]
+
+    @classmethod
+    def header_offset(cls, height):
+        '''Given a header height return its offset in the headers file.
+        If header sizes change at some point, this is the only code
+        that needs updating.'''
+        return height * 108
+
+    @classmethod
+    def header_len(cls, height):
+        '''Given a header height return its length.'''
+        return 108
+
+    @classmethod
+    def block_txs(cls, block, height):
+        '''Returns a list of (deserialized_tx, tx_hash) pairs given a
+        block and its height.'''
+
+        if height == 0:
+            return []
+
+        deserializer = cls.deserializer()
+        return deserializer(block[cls.header_len(height):]).read_block()
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, creatorId = struct.unpack('<II', header[100:108])
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'payload_hash': hash_to_str(header[68:100]),
+            'timestamp': timestamp,
+            'creatorId': creatorId,
+        }
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerFairCoin
