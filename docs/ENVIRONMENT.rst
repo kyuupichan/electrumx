@@ -142,9 +142,9 @@ The following environment variables are all optional and help to limit
 server resource consumption and prevent simple DoS.
 
 Address subscriptions in ElectrumX are very cheap - they consume about
-100 bytes of memory each (160 bytes from version 0.10.0) and are
-processed efficiently.  I feel the two subscription-related defaults
-below are low and encourage you to raise them.
+160 bytes of memory each and are processed efficiently.  I feel the
+two subscription-related defaults below are low and encourage you to
+raise them.
 
 * **MAX_SESSIONS**
 
@@ -191,11 +191,11 @@ below are low and encourage you to raise them.
   Bandwidth usage over each period is totalled, and when this limit is
   exceeded each subsequent request is stalled by sleeping before
   handling it, effectively giving higher processing priority to other
-  sessions.  Each time this happens the event is logged.
+  sessions.
 
   The more bandwidth usage exceeds this soft limit the longer the next
   request will sleep.  Sleep times are a round number of seconds with
-  a minimum of 1.
+  a minimum of 1.  Each time the delay changes the event is logged.
 
   Bandwidth usage is gradually reduced over time by "refunding" a
   proportional part of the limit every now and then.
@@ -205,8 +205,7 @@ below are low and encourage you to raise them.
   An integer number of seconds defaulting to 600.  Sessions with no
   activity for longer than this are disconnected.  Properly
   functioning Electrum clients by default will send pings roughly
-  every 60 seconds, and servers doing peer discovery roughly every 300
-  seconds.
+  every 60 seconds.
 
 IRC
 ---
