@@ -135,6 +135,12 @@ version prior to the release of 1.0.
 ChangeLog
 =========
 
+Version 0.10.19
+---------------
+
+* update `docs/PEER_DISCOVERY.rst`_
+* accept IPv6 addresses in DAEMON_URL (fixes #126)
+
 Version 0.10.18
 ---------------
 
