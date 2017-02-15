@@ -34,7 +34,7 @@ class Coin(object):
 
     REORG_LIMIT = 200
     # Not sure if these are coin-specific
-    RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
+    RPC_URL_REGEX = re.compile('.+@(\[[0-9:]+\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE = 2016
     IRC_SERVER = "irc.freenode.net"
