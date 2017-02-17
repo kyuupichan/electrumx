@@ -735,7 +735,7 @@ class BlockProcessor(server.db.DB):
         for cache_key, cache_value in self.utxo_cache.items():
             # suffix = tx_idx + tx_num
             hashX = cache_value[:-12]
-            suffix =  cache_key[-2:] + cache_value[-12:-8]
+            suffix = cache_key[-2:] + cache_value[-12:-8]
             batch_put(b'h' + cache_key[:4] + suffix, hashX)
             batch_put(b'u' + hashX + suffix, cache_value[-8:])
         self.utxo_cache = {}

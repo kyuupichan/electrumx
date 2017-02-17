@@ -109,6 +109,7 @@ def deep_getsizeof(obj):
 
     return size(obj)
 
+
 def subclasses(base_class, strict=True):
     '''Return a list of subclasses of base_class in its module.'''
     def select(obj):

@@ -93,8 +93,8 @@ class MemPool(util.LoggedClass):
         process_some = self.async_process_some(unfetched, fetch_size // 2)
 
         await self.daemon.mempool_refresh_event.wait()
-        self.logger.info ('beginning processing of daemon mempool.  '
-                          'This can take some time...')
+        self.logger.info('beginning processing of daemon mempool.  '
+                         'This can take some time...')
         next_log = 0
         loops = -1  # Zero during initial catchup
 
@@ -187,7 +187,7 @@ class MemPool(util.LoggedClass):
 
         # Skip hashes the daemon has dropped.  Either they were
         # evicted or they got in a block.
-        return {hh:raw for hh, raw in zip(hex_hashes, raw_txs) if raw}
+        return {hh: raw for hh, raw in zip(hex_hashes, raw_txs) if raw}
 
     def process_raw_txs(self, raw_tx_map, pending):
         '''Process the dictionary of raw transactions and return a dictionary
@@ -204,7 +204,7 @@ class MemPool(util.LoggedClass):
 
         # Deserialize each tx and put it in our priority queue
         for tx_hash, raw_tx in raw_tx_map.items():
-            if not tx_hash in txs:
+            if tx_hash not in txs:
                 continue
             tx, _tx_hash = deserializer(raw_tx).read_tx()
 
@@ -267,7 +267,7 @@ class MemPool(util.LoggedClass):
         unconfirmed is True if any txin is unconfirmed.
         '''
         # hashXs is a defaultdict
-        if not hashX in self.hashXs:
+        if hashX not in self.hashXs:
             return []
 
         deserializer = self.coin.deserializer()

@@ -67,7 +67,7 @@ class Env(LoggedClass):
             ''
         )
         self.tor_identity = NetIdentity(
-            self.default('REPORT_HOST_TOR', ''), # must be a string
+            self.default('REPORT_HOST_TOR', ''),  # must be a string
             self.integer('REPORT_TCP_PORT_TOR',
                          self.identity.tcp_port
                          if self.identity.tcp_port else
@@ -84,7 +84,6 @@ class Env(LoggedClass):
                 raise self.Error('IRC host is empty')
             if self.identity.tcp_port == self.identity.ssl_port:
                 raise self.Error('IRC TCP and SSL ports are the same')
-
 
     def default(self, envvar, default):
         return environ.get(envvar, default)

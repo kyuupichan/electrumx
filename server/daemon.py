@@ -20,6 +20,7 @@ import lib.util as util
 class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
+
 class Daemon(util.LoggedClass):
     '''Handles connections to a daemon at the given URL.'''
 

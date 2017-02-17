@@ -87,7 +87,7 @@ class JSONRPCv1(JSONRPC):
     def is_request(cls, payload):
         '''Returns True if the payload (which has a method) is a request.
         False means it is a notification.'''
-        return payload.get('id') != None
+        return payload.get('id') is not None
 
 
 class JSONRPCv2(JSONRPC):
@@ -296,7 +296,7 @@ class JSONSessionBase(util.LoggedClass):
         '''Extract and return the ID from the payload.
 
         Raises an RPCError if it is missing or invalid.'''
-        if not 'id' in payload:
+        if 'id' not in payload:
             raise RPCError('missing id', JSONRPC.INVALID_REQUEST)
 
         id_ = payload['id']
