@@ -578,11 +578,6 @@ class FairCoin(Coin):
         return height * 108
 
     @classmethod
-    def header_len(cls, height):
-        '''Given a header height return its length.'''
-        return 108
-
-    @classmethod
     def block_txs(cls, block, height):
         '''Returns a list of (deserialized_tx, tx_hash) pairs given a
         block and its height.'''
