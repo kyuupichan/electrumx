@@ -70,7 +70,7 @@ class Coin(object):
         match = cls.RPC_URL_REGEX.match(url)
         if not match:
             raise CoinError('invalid daemon URL: "{}"'.format(url))
-        if match.groups()[0] is None:
+        if match.groups()[1] is None:
             url += ':{:d}'.format(cls.RPC_PORT)
         if not url.startswith('http://'):
             url = 'http://' + url
