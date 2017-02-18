@@ -275,9 +275,6 @@ class Controller(util.LoggedClass):
         for session in self.sessions:
             self.close_session(session)
 
-        # This might resolve "future never awaited" log
-        await asyncio.sleep(0)
-
         # Cancel pending futures
         for future in self.futures:
             future.cancel()
