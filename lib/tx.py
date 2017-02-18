@@ -24,6 +24,7 @@ class Tx(namedtuple("Tx", "version inputs outputs locktime")):
 
     # FIXME: add hash as a cached property?
 
+
 class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
     '''Class representing a transaction input.'''
 
@@ -98,10 +99,10 @@ class Deserializer(object):
 
     def _read_input(self):
         return TxInput(
-            self._read_nbytes(32),  # prev_hash
-            self._read_le_uint32(), # prev_idx
-            self._read_varbytes(),  # script
-            self._read_le_uint32()  # sequence
+            self._read_nbytes(32),   # prev_hash
+            self._read_le_uint32(),  # prev_idx
+            self._read_varbytes(),   # script
+            self._read_le_uint32()   # sequence
         )
 
     def _read_outputs(self):
