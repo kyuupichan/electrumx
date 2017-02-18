@@ -167,7 +167,7 @@ class Controller(util.LoggedClass):
 
     def enqueue_session(self, session):
         # Might have disconnected whilst waiting
-        if not session in self.sessions:
+        if session not in self.sessions:
             return
         priority = self.session_priority(session)
         item = (priority, self.next_queue_id, session)
@@ -283,7 +283,7 @@ class Controller(util.LoggedClass):
             future.cancel()
 
         # Wait for all futures to finish
-        while not all (future.done() for future in self.futures):
+        while not all(future.done() for future in self.futures):
             await asyncio.sleep(0.1)
 
         # Finally shut down the block processor and executor
@@ -336,7 +336,7 @@ class Controller(util.LoggedClass):
         '''
         self.state = self.LISTENING
 
-        env= self.env
+        env = self.env
         if env.tcp_port is not None:
             await self.start_server('TCP', env.host, env.tcp_port)
         if env.ssl_port is not None:

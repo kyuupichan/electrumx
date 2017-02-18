@@ -498,7 +498,7 @@ class DashTestnet(Dash):
     TX_PER_BLOCK = 1
     RPC_PORT = 19998
     IRC_PREFIX = "d_"
-    PEER_DEFAULT_PORTS = {'t':'51001', 's':'51002'}
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     PEERS = [
         'electrum.dash.siampm.com s t',
     ]

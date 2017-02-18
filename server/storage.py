@@ -12,6 +12,7 @@ from functools import partial
 
 import lib.util as util
 
+
 def db_class(name):
     '''Returns a DB engine class.'''
     for db_class in util.subclasses(Storage):

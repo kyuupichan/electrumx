@@ -25,6 +25,7 @@ SUPPRESS_MESSAGES = [
     'Fatal write error on socket transport',
 ]
 
+
 def main_loop():
     '''Start the server.'''
     if os.geteuid() == 0:
@@ -32,7 +33,7 @@ def main_loop():
                         'account and use that')
 
     loop = asyncio.get_event_loop()
-    #loop.set_debug(True)
+    # loop.set_debug(True)
 
     def on_signal(signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
@@ -43,7 +44,7 @@ def main_loop():
     def on_exception(loop, context):
         '''Suppress spurious messages it appears we cannot control.'''
         message = context.get('message')
-        if not message in SUPPRESS_MESSAGES:
+        if message not in SUPPRESS_MESSAGES:
             if not ('task' in context and
                     'accept_connection2()' in repr(context.get('task'))):
                 loop.default_exception_handler(context)
