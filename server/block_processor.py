@@ -87,10 +87,11 @@ class Prefetcher(LoggedClass):
         with await self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
-                # Constrain fetch count to between 0 and 2500 regardless.
+                # Constrain fetch count to between 0 and 500 regardless;
+                # testnet can be lumpy.
                 cache_room = self.min_cache_size // self.ave_size
                 count = min(daemon_height - self.fetched_height, cache_room)
-                count = min(2500, max(count, 0))
+                count = min(500, max(count, 0))
                 if not count:
                     if not self.caught_up:
                         self.caught_up = True
