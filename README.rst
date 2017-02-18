@@ -8,7 +8,7 @@ ElectrumX - Reimplementation of electrum-server
 ===============================================
 
   :Licence: MIT
-  :Language: Python (>= 3.5)
+  :Language: Python (>= 3.5.1)
   :Author: Neil Booth
 
 Getting Started
@@ -42,6 +42,7 @@ Features
 - Daemon failover.  More than one daemon can be specified, and
   ElectrumX will failover round-robin style if the current one fails
   for any reason.
+- peer discovery protocol removes need for IRC
 - Coin abstraction makes compatible altcoin and testnet support easy.
 
 Motivation
@@ -113,8 +114,8 @@ and associated complications.
 Roadmap Pre-1.0
 ===============
 
-- minor code cleanups.
-- implement simple protocol to discover peers without resorting to IRC.
+- minor code cleanups
+- fixes for a couple of outstanding issues
 
 Roadmap Post-1.0
 ================
@@ -128,18 +129,33 @@ Roadmap Post-1.0
 Database Format
 ===============
 
-The database format of ElectrumX is unlikely to change from the 0.10.0
-version prior to the release of 1.0.
+The database format of ElectrumX will not change from the 0.10.0
+version for the release of 1.0.
 
 
 ChangeLog
 =========
 
+Version 0.11.0
+--------------
+
+* implementation of `docs/PEER_DISCOVERY.rst`_ for discovery of server
+  peers without using IRC.  Closes `#104`_.  Since all testnet peers
+  are ElectrumX servers, IRC advertising is now disabled on bitcoin
+  testnet.
+
+  Thanks to bauerj, hsmiths and JWU42 for their help testing these
+  changes over the last month.
+* you can now specify a tor proxy (or have it autodetected if local),
+  and if an incoming connection seems to be from the proxy a
+  tor-specific banner file is served.  See **TOR_BANNER_FILE** in
+  `docs/ENVIRONMENT.rst`_.
+
 Version 0.10.19
 ---------------
 
 * update `docs/PEER_DISCOVERY.rst`_
-* accept IPv6 addresses in DAEMON_URL (fixes #126)
+* accept IPv6 addresses in DAEMON_URL (fixes `#126`_)
 
 Version 0.10.18
 ---------------
@@ -312,7 +328,10 @@ stability please stick with the 0.9 series.
 .. _#101: https://github.com/kyuupichan/electrumx/issues/101
 .. _#102: https://github.com/kyuupichan/electrumx/issues/102
 .. _#103: https://github.com/kyuupichan/electrumx/issues/103
+.. _#104: https://github.com/kyuupichan/electrumx/issues/104
 .. _#110: https://github.com/kyuupichan/electrumx/issues/110
 .. _#111: https://github.com/kyuupichan/electrumx/issues/111
+.. _#126: https://github.com/kyuupichan/electrumx/issues/126
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
+.. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
