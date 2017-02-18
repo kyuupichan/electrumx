@@ -667,22 +667,29 @@ class Controller(util.LoggedClass):
     # Helpers for RPC "blockchain" command handlers
 
     def address_to_hashX(self, address):
-        if isinstance(address, str):
-            try:
-                return self.coin.address_to_hashX(address)
-            except Exception:
-                pass
+        try:
+            return self.coin.address_to_hashX(address)
+        except Exception:
+            pass
         raise RPCError('{} is not a valid address'.format(address))
 
-    def to_tx_hash(self, value):
+    def script_hash_to_hashX(self, script_hash):
+        try:
+            bin_hash = hex_str_to_hash(script_hash)
+            if len(bin_hash) == 32:
+                return bin_hash[:self.coin.HASHX_LEN]
+        except Exception:
+            pass
+        raise RPCError('{} is not a valid script hash'.format(script_hash))
+
+    def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction
         hash.'''
-        if isinstance(value, str) and len(value) == 64:
-            try:
-                bytes.fromhex(value)
-                return value
-            except ValueError:
-                pass
+        try:
+            if len(bytes.fromhex(value)) == 32:
+                return
+        except Exception:
+            pass
         raise RPCError('{} should be a transaction hash'.format(value))
 
     def non_negative_integer(self, value):
@@ -703,7 +710,7 @@ class Controller(util.LoggedClass):
         except DaemonError as e:
             raise RPCError('daemon error: {}'.format(e))
 
-    def new_subscription(self, address):
+    def new_subscription(self):
         if self.subs_room <= 0:
             self.subs_room = self.max_subs - self.sub_count()
             if self.subs_room <= 0:
@@ -853,7 +860,7 @@ class Controller(util.LoggedClass):
         '''
         # For some reason Electrum passes a height.  We don't require
         # it in anticipation it might be dropped in the future.
-        tx_hash = self.to_tx_hash(tx_hash)
+        self.assert_tx_hash(tx_hash)
         return await self.daemon_request('getrawtransaction', tx_hash)
 
     async def transaction_get_merkle(self, tx_hash, height):
@@ -863,7 +870,7 @@ class Controller(util.LoggedClass):
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
         '''
-        tx_hash = self.to_tx_hash(tx_hash)
+        self.assert_tx_hash(tx_hash)
         height = self.non_negative_integer(height)
         return await self.tx_merkle(tx_hash, height)
 
@@ -876,7 +883,7 @@ class Controller(util.LoggedClass):
         # Used only for electrum client command-line requests.  We no
         # longer index by address, so need to request the raw
         # transaction.  So it works for any TXO not just UTXOs.
-        tx_hash = self.to_tx_hash(tx_hash)
+        self.assert_tx_hash(tx_hash)
         index = self.non_negative_integer(index)
         raw_tx = await self.daemon_request('getrawtransaction', tx_hash)
         if not raw_tx:

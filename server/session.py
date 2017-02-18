@@ -121,6 +121,7 @@ class ElectrumX(SessionBase):
             'blockchain.address.subscribe': self.address_subscribe,
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
+            'blockchain.script_hash.subscribe': self.script_hash_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
@@ -142,9 +143,9 @@ class ElectrumX(SessionBase):
 
         matches = touched.intersection(self.hashX_subs)
         for hashX in matches:
-            address = self.hashX_subs[hashX]
+            alias = self.hashX_subs[hashX]
             status = await self.address_status(hashX)
-            changed.append((address, status))
+            changed.append((alias, status))
 
         if height != self.notified_height:
             self.notified_height = height
@@ -161,11 +162,15 @@ class ElectrumX(SessionBase):
                 old_status = self.mempool_statuses[hashX]
                 status = await self.address_status(hashX)
                 if status != old_status:
-                    address = self.hashX_subs[hashX]
-                    changed.append((address, status))
+                    alias = self.hashX_subs[hashX]
+                    changed.append((alias, status))
 
-        for address_status in changed:
-            pairs.append(('blockchain.address.subscribe', address_status))
+        for alias_status in changed:
+            if len(alias_status[0]) == 64:
+                method = 'blockchain.script_hash.subscribe'
+            else:
+                method = 'blockchain.address.subscribe'
+            pairs.append((method, alias_status))
 
         if pairs:
             self.send_notifications(pairs)
@@ -232,21 +237,30 @@ class ElectrumX(SessionBase):
 
         return status
 
-    async def address_subscribe(self, address):
-        '''Subscribe to an address.
-
-        address: the address to subscribe to'''
+    async def hashX_subscribe(self, hashX, alias):
         # First check our limit.
         if len(self.hashX_subs) >= self.max_subs:
             raise RPCError('your address subscription limit {:,d} reached'
                            .format(self.max_subs))
 
         # Now let the controller check its limit
-        self.controller.new_subscription(address)
-
-        hashX = self.env.coin.address_to_hashX(address)
-        self.hashX_subs[hashX] = address
+        self.controller.new_subscription()
+        self.hashX_subs[hashX] = alias
         return await self.address_status(hashX)
+
+    async def address_subscribe(self, address):
+        '''Subscribe to an address.
+
+        address: the address to subscribe to'''
+        hashX = self.controller.address_to_hashX(address)
+        return await self.hashX_subscribe(hashX, address)
+
+    async def script_hash_subscribe(self, script_hash):
+        '''Subscribe to a script hash.
+
+        script_hash: the SHA256 hash of the script to subscribe to'''
+        hashX = self.controller.script_hash_to_hashX(script_hash)
+        return await self.hashX_subscribe(hashX, script_hash)
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
