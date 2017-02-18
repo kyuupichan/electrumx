@@ -136,6 +136,12 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.11.1
+--------------
+
+* report unconfirmed parent tx status correctly, and notify if that
+  parent status changes.  Fixes `#129`_.
+
 Version 0.11.0
 --------------
 
@@ -332,6 +338,7 @@ stability please stick with the 0.9 series.
 .. _#110: https://github.com/kyuupichan/electrumx/issues/110
 .. _#111: https://github.com/kyuupichan/electrumx/issues/111
 .. _#126: https://github.com/kyuupichan/electrumx/issues/126
+.. _#129: https://github.com/kyuupichan/electrumx/issues/129
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
