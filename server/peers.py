@@ -77,8 +77,8 @@ class PeerSession(JSONSession):
         proto_ver = (version.PROTOCOL_MIN, version.PROTOCOL_MAX)
         self.send_request(self.on_version, 'server.version',
                           [version.VERSION, proto_ver])
-        self.send_request(self.on_peers_subscribe, 'server.peers.subscribe')
         self.send_request(self.on_features, 'server.features')
+        self.send_request(self.on_peers_subscribe, 'server.peers.subscribe')
 
     def connection_lost(self, exc):
         '''Handle disconnection.'''
@@ -108,6 +108,10 @@ class PeerSession(JSONSession):
                      for real_name in real_names]
         except Exception:
             self.log_error('bad server.peers.subscribe response')
+            return False
+
+        if self.failed:
+            self.log_warning('refrain from calling add_peers for bad peer')
             return False
 
         self.peer_mgr.add_peers(peers)
@@ -143,7 +147,7 @@ class PeerSession(JSONSession):
                 self.peer.update_features(features)
         # For legacy peers not implementing features, check their height
         # as a proxy to determining they're on our network
-        if not verified:
+        if not verified and not self.failed:
             self.send_request(self.on_headers, 'blockchain.headers.subscribe')
         self.close_if_done()
 
@@ -281,6 +285,9 @@ class PeerManager(util.LoggedClass):
             self.logger.info('accepted {:d}/{:d} new peers of {:d} from {}'
                              .format(len(use_peers), len(new_peers),
                                      len(peers), source))
+            for updated in use_peers:
+                self.logger.info('accepted [{} t{} s{}] from {}'
+                                 .format(updated, updated.tcp_port, updated.ssl_port, source))
             self.peers.update(use_peers)
 
         if retry:
