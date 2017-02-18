@@ -220,9 +220,6 @@ class ElectrumX(SessionBase):
                          for tx_hash, height in history)
         status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
                           for hex_hash, tx_fee, unconfirmed in mempool)
-        for hex_hash, tx_fee, unconfirmed in mempool:
-            self.log_info('UNCONFIRMED: {} {}'
-                          .format(self.hashX_subs[hashX], unconfirmed))
         if status:
             status = sha256(status.encode()).hex()
         else:
