@@ -10,7 +10,7 @@ setuptools.setup(
     # "irc" package is only required if IRC connectivity is enabled
     # via environment variables, in which case I've tested with 15.0.4
     # "x11_hash" package (1.4) is required to sync DASH network.
-    install_requires=['plyvel', 'pylru', 'aiohttp >= 1'],
+    install_requires=['plyvel', 'pylru', 'irc', 'aiohttp >= 1'],
     packages=setuptools.find_packages(),
     description='ElectrumX Server',
     author='Neil Booth',
