@@ -136,6 +136,11 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.11.3
+--------------
+
+* fixed a typo in lib/peer.py pointed out by hsmiths
+
 Version 0.11.2
 --------------
 

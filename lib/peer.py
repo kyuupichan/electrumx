@@ -119,7 +119,7 @@ class Peer(object):
         # ports first.
         pairs = [('SSL', self.ssl_port), ('TCP', self.tcp_port)]
         while self.other_port_pairs:
-            pairs.append(other_port_pairs.pop())
+            pairs.append(self.other_port_pairs.pop())
         return [pair for pair in pairs if pair[1]]
 
     def mark_bad(self):
