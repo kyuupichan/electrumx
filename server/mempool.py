@@ -162,8 +162,8 @@ class MemPool(util.LoggedClass):
                 deferred = pending
                 pending = []
 
-            result, deferred = await self.controller.run_in_executor \
-                (self.process_raw_txs, raw_txs, deferred)
+            result, deferred = await self.controller.run_in_executor(
+                self.process_raw_txs, raw_txs, deferred)
 
             pending.extend(deferred)
             hashXs = self.hashXs
@@ -279,8 +279,8 @@ class MemPool(util.LoggedClass):
             if not item or not raw_tx:
                 continue
             txin_pairs, txout_pairs = item
-            tx_fee = (sum(v for hashX, v in txin_pairs)
-                      - sum(v for hashX, v in txout_pairs))
+            tx_fee = (sum(v for hashX, v in txin_pairs) -
+                      sum(v for hashX, v in txout_pairs))
             tx, tx_hash = deserializer(raw_tx).read_tx()
             unconfirmed = any(txin.prev_hash in self.txs for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))

@@ -32,8 +32,8 @@ WAKEUP_SECS = 300
 def peer_from_env(env):
     '''Return ourself as a peer from the environment settings.'''
     main_identity = env.identities[0]
-    hosts = {identity.host : {'tcp_port': identity.tcp_port,
-                              'ssl_port': identity.ssl_port}
+    hosts = {identity.host: {'tcp_port': identity.tcp_port,
+                             'ssl_port': identity.ssl_port}
              for identity in env.identities}
     features = {
         'hosts': hosts,
@@ -156,7 +156,7 @@ class PeerSession(JSONSession):
             our_height = self.peer_mgr.controller.bp.db_height
             their_height = result.get('block_height')
             if (not isinstance(their_height, int) or
-                   abs(our_height - their_height) > 5):
+                    abs(our_height - their_height) > 5):
                 self.failed = True
                 self.peer.mark_bad()
                 self.log_warning('bad height {}'.format(their_height))
@@ -244,9 +244,9 @@ class PeerManager(util.LoggedClass):
     def rpc_data(self):
         '''Peer data for the peers RPC method.'''
         self.set_peer_statuses()
-
         descs = ['good', 'stale', 'never', 'bad']
-        def peer_data( peer):
+
+        def peer_data(peer):
             data = peer.serialize()
             data['status'] = descs[peer.status]
             return data
@@ -304,8 +304,8 @@ class PeerManager(util.LoggedClass):
         '''
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers
-                  if peer.last_connect > cutoff
-                  and not peer.bad and peer.is_public]
+                  if peer.last_connect > cutoff and
+                  not peer.bad and peer.is_public]
         onion_peers = []
 
         # Always report ourselves if valid (even if not public)

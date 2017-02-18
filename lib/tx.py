@@ -52,8 +52,8 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 
     @cachedproperty
     def is_coinbase(self):
-        return (self.prev_hash == TxInput.ZERO
-                and self.prev_idx == TxInput.MINUS_1)
+        return (self.prev_hash == TxInput.ZERO and
+                self.prev_idx == TxInput.MINUS_1)
 
     @cachedproperty
     def script_sig_info(self):

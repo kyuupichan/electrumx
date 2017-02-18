@@ -394,7 +394,7 @@ class Controller(util.LoggedClass):
                          .format(session.kind, session.peername(),
                                  len(self.sessions)))
         if (len(self.sessions) >= self.max_sessions
-               and self.state == self.LISTENING):
+                and self.state == self.LISTENING):
             self.state = self.PAUSED
             session.log_info('maximum sessions {:,d} reached, stopping new '
                              'connections until count drops to {:,d}'

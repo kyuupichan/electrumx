@@ -71,8 +71,8 @@ class Coin(object):
         req_attrs = ('TX_COUNT', 'TX_COUNT_HEIGHT', 'TX_PER_BLOCK',
                      'IRC_CHANNEL')
         for coin in util.subclasses(Coin):
-            if (coin.NAME.lower() == name.lower()
-                    and coin.NET.lower() == net.lower()):
+            if (coin.NAME.lower() == name.lower() and
+                    coin.NET.lower() == net.lower()):
                 missing = [attr for attr in req_attrs
                            if not hasattr(coin, attr)]
                 if missing:

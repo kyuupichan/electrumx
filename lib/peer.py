@@ -88,7 +88,7 @@ class Peer(object):
         minor_version) pair.
         '''
         if isinstance(vstr, str) and VERSION_REGEX.match(vstr):
-            if not '.' in vstr:
+            if '.' not in vstr:
                 vstr += '.0'
         else:
             vstr = '1.0'

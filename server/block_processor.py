@@ -568,7 +568,7 @@ class BlockProcessor(server.db.DB):
             header = coin.block_header(block, self.height)
             header_hash = coin.header_hash(header)
             if header_hash != self.tip:
-                raise ChainError('backup block {} is not tip {} at height {:,d}'
+                raise ChainError('backup block {} not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
             self.tip = coin.header_prevhash(header)

@@ -105,7 +105,7 @@ class IRC(LoggedClass):
         nick = event.arguments[4]
         if nick.startswith(self.prefix):
             line = event.arguments[6].split()
-            hp_string = ' '.join(line[1:]) # hostname, ports, version etc.
+            hp_string = ' '.join(line[1:])  # hostname, ports, version etc.
             self.peer_mgr.add_irc_peer(nick, hp_string)
 
 
