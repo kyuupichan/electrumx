@@ -282,7 +282,8 @@ class MemPool(util.LoggedClass):
             tx_fee = (sum(v for hashX, v in txin_pairs) -
                       sum(v for hashX, v in txout_pairs))
             tx, tx_hash = deserializer(raw_tx).read_tx()
-            unconfirmed = any(txin.prev_hash in self.txs for txin in tx.inputs)
+            unconfirmed = any(hash_to_str(txin.prev_hash) in self.txs
+                              for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result
 

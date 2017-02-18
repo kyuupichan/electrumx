@@ -20,7 +20,7 @@ from functools import partial
 import pylru
 
 from lib.jsonrpc import JSONRPC, JSONSessionBase, RPCError
-from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
+from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
 from server.daemon import Daemon, DaemonError
@@ -706,16 +706,13 @@ class Controller(util.LoggedClass):
         except DaemonError as e:
             raise RPCError('daemon error: {}'.format(e))
 
-    async def new_subscription(self, address):
+    def new_subscription(self, address):
         if self.subs_room <= 0:
             self.subs_room = self.max_subs - self.sub_count()
             if self.subs_room <= 0:
                 raise RPCError('server subscription limit {:,d} reached'
                                .format(self.max_subs))
         self.subs_room -= 1
-        hashX = self.address_to_hashX(address)
-        status = await self.address_status(hashX)
-        return hashX, status
 
     async def tx_merkle(self, tx_hash, height):
         '''tx_hash is a hex string.'''
@@ -778,21 +775,6 @@ class Controller(util.LoggedClass):
         conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)
-
-    async def address_status(self, hashX):
-        '''Returns status as 32 bytes.'''
-        # Note history is ordered and mempool unordered in electrum-server
-        # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.get_history(hashX)
-        mempool = await self.mempool_transactions(hashX)
-
-        status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
-                         for tx_hash, height in history)
-        status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
-                          for hex_hash, tx_fee, unconfirmed in mempool)
-        if status:
-            return sha256(status.encode()).hex()
-        return None
 
     async def get_utxos(self, hashX):
         '''Get UTXOs asynchronously to reduce latency.'''

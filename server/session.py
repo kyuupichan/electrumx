@@ -11,6 +11,7 @@ import codecs
 import time
 from functools import partial
 
+from lib.hash import sha256, hash_to_str
 from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2
 from server.daemon import DaemonError
 import server.version as version
@@ -115,6 +116,7 @@ class ElectrumX(SessionBase):
         self.max_send = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
+        self.mempool_statuses = {}
         self.electrumx_handlers = {
             'blockchain.address.subscribe': self.address_subscribe,
             'blockchain.headers.subscribe': self.headers_subscribe,
@@ -135,29 +137,42 @@ class ElectrumX(SessionBase):
 
         Cache is a shared cache for this update.
         '''
-        controller = self.controller
         pairs = []
+        changed = []
+
+        matches = touched.intersection(self.hashX_subs)
+        for hashX in matches:
+            address = self.hashX_subs[hashX]
+            status = await self.address_status(hashX)
+            changed.append((address, status))
 
         if height != self.notified_height:
             self.notified_height = height
             if self.subscribe_headers:
-                args = (controller.electrum_header(height), )
+                args = (self.controller.electrum_header(height), )
                 pairs.append(('blockchain.headers.subscribe', args))
 
             if self.subscribe_height:
                 pairs.append(('blockchain.numblocks.subscribe', (height, )))
 
-        matches = touched.intersection(self.hashX_subs)
-        for hashX in matches:
-            address = self.hashX_subs[hashX]
-            status = await controller.address_status(hashX)
-            pairs.append(('blockchain.address.subscribe', (address, status)))
+            # Check mempool hashXs - the status is a function of the
+            # confirmed state of other transactions
+            for hashX in set(self.mempool_statuses).difference(matches):
+                old_status = self.mempool_statuses[hashX]
+                status = await self.address_status(hashX)
+                if status != old_status:
+                    address = self.hashX_subs[hashX]
+                    changed.append((address, status))
 
-        self.send_notifications(pairs)
-        if matches:
-            es = '' if len(matches) == 1 else 'es'
-            self.log_info('notified of {:,d} address{}'
-                          .format(len(matches), es))
+        for address_status in changed:
+            pairs.append(('blockchain.address.subscribe', address_status))
+
+        if pairs:
+            self.send_notifications(pairs)
+            if changed:
+                es = '' if len(changed) == 1 else 'es'
+                self.log_info('notified of {:,d} address{}'
+                              .format(len(changed), es))
 
     def height(self):
         '''Return the current flushed database height.'''
@@ -191,6 +206,35 @@ class ElectrumX(SessionBase):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
         return self.controller.peer_mgr.on_peers_subscribe(self.is_tor())
 
+    async def address_status(self, hashX):
+        '''Returns an address status.
+
+        Status is a hex string, but must be None if there is no history.
+        '''
+        # Note history is ordered and mempool unordered in electrum-server
+        # For mempool, height is -1 if unconfirmed txins, otherwise 0
+        history = await self.controller.get_history(hashX)
+        mempool = await self.controller.mempool_transactions(hashX)
+
+        status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
+                         for tx_hash, height in history)
+        status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
+                          for hex_hash, tx_fee, unconfirmed in mempool)
+        for hex_hash, tx_fee, unconfirmed in mempool:
+            self.log_info('UNCONFIRMED: {} {}'
+                          .format(self.hashX_subs[hashX], unconfirmed))
+        if status:
+            status = sha256(status.encode()).hex()
+        else:
+            status = None
+
+        if mempool:
+            self.mempool_statuses[hashX] = status
+        else:
+            self.mempool_statuses.pop(hashX, None)
+
+        return status
+
     async def address_subscribe(self, address):
         '''Subscribe to an address.
 
@@ -199,10 +243,13 @@ class ElectrumX(SessionBase):
         if len(self.hashX_subs) >= self.max_subs:
             raise RPCError('your address subscription limit {:,d} reached'
                            .format(self.max_subs))
+
         # Now let the controller check its limit
-        hashX, status = await self.controller.new_subscription(address)
+        self.controller.new_subscription(address)
+
+        hashX = self.env.coin.address_to_hashX(address)
         self.hashX_subs[hashX] = address
-        return status
+        return await self.address_status(hashX)
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
