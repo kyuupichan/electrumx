@@ -136,6 +136,15 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.11.2
+--------------
+
+* Preliminary implementation of script hash subscriptions to enable
+  subscribing to updates of arbitrary scripts, not just those of
+  standard bitcoin addresses.  I'll fully document once confirmed
+  working as expected.
+  Closes #124
+
 Version 0.11.1
 --------------
 
