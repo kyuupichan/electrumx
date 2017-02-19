@@ -59,13 +59,16 @@ class PeerSession(JSONSession):
         self.failed = False
         self.log_prefix = '[{}] '.format(self.peer)
 
-    def have_pending_items(self):
-        self.peer_mgr.ensure_future(self.process_pending_items())
+    async def wait_on_items(self):
+        while True:
+            await self.items_event.wait()
+            await self.process_pending_items()
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
         self.log_prefix = '[{}] '.format(str(self.peer)[:25])
+        self.future = self.peer_mgr.ensure_future(self.wait_on_items())
 
         # Update IP address
         if not self.peer.is_tor:
@@ -82,6 +85,7 @@ class PeerSession(JSONSession):
     def connection_lost(self, exc):
         '''Handle disconnection.'''
         super().connection_lost(exc)
+        self.future.cancel()
         self.peer_mgr.connection_lost(self)
 
     def on_peers_subscribe(self, result, error):
@@ -108,13 +112,16 @@ class PeerSession(JSONSession):
             return
 
         self.peer_mgr.add_peers(peers)
+
+        if not self.peer_mgr.env.peer_announce:
+            return
+
+        # Announce ourself if not present
         my = self.peer_mgr.myself
         for peer in my.matches(peers):
             if peer.tcp_port == my.tcp_port and peer.ssl_port == my.ssl_port:
                 return
-
-        # Announce ourself if not present
-        self.log_info('registering with server.add_peer')
+        self.log_info('registering ourself with server.add_peer')
         self.send_request(self.on_add_peer, 'server.add_peer', [my.features])
 
     def on_add_peer(self, result, error):
@@ -306,8 +313,8 @@ class PeerManager(util.LoggedClass):
         '''Returns the server peers as a list of (ip, host, details) tuples.
 
         We return all peers we've connected to in the last day.
-        Additionally, if we don't have onion routing, we return up to
-        three randomly selected onion servers.
+        Additionally, if we don't have onion routing, we return a few
+        hard-coded onion servers.
         '''
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers
@@ -403,6 +410,11 @@ class PeerManager(util.LoggedClass):
           3) Retrying old peers at regular intervals.
         '''
         self.connect_to_irc()
+        if not self.env.peer_discovery:
+            self.logger.info('peer discovery is disabled')
+            return
+
+        self.logger.info('beginning peer discovery')
         try:
             while True:
                 timeout = self.loop.call_later(WAKEUP_SECS,

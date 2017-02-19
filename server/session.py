@@ -47,11 +47,6 @@ class SessionBase(JSONSession):
         self.bw_used = 0
         self.peer_added = False
 
-    def have_pending_items(self):
-        '''Called each time the pending item queue goes from empty to having
-        one item.'''
-        self.controller.enqueue_session(self)
-
     def close_connection(self):
         '''Call this to close the connection.'''
         self.close_time = time.time()

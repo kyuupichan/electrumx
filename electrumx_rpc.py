@@ -26,13 +26,9 @@ class RPCClient(JSONSession):
         super().__init__(version=JSONRPCv2)
         self.max_send = 0
         self.max_buffer_size = 5*10**6
-        self.event = asyncio.Event()
-
-    def have_pending_items(self):
-        self.event.set()
 
     async def wait_for_response(self):
-        await self.event.wait()
+        await self.items_event.wait()
         await self.process_pending_items()
 
     def send_rpc_request(self, method, params):

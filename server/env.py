@@ -48,7 +48,9 @@ class Env(LoggedClass):
                                             self.banner_file)
         self.anon_logs = self.default('ANON_LOGS', False)
         self.log_sessions = self.integer('LOG_SESSIONS', 3600)
-        # Tor proxy
+        # Peer discovery
+        self.peer_discovery = bool(self.default('PEER_DISCOVERY', True))
+        self.peer_announce = bool(self.default('PEER_ANNOUNCE', True))
         # Python 3.5.3 - revert back to localhost?
         self.tor_proxy_host = self.default('TOR_PROXY_HOST', '127.0.0.1')
         self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
