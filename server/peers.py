@@ -189,7 +189,6 @@ class PeerSession(JSONSession):
     def close_if_done(self):
         if not self.has_pending_requests():
             is_good = not self.failed
-            self.peer.last_connect = time.time()
             self.peer_mgr.set_connection_status(self.peer, is_good)
             if is_good:
                 if self.peer.is_tor:
@@ -512,6 +511,7 @@ class PeerManager(util.LoggedClass):
         '''Called when a connection succeeded or failed.'''
         if good:
             peer.try_count = 0
+            peer.last_connect = time.time()
             peer.source = 'peer'
             # Remove matching IP addresses
             for match in peer.matches(self.peers):
