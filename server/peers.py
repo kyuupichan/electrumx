@@ -59,13 +59,16 @@ class PeerSession(JSONSession):
         self.failed = False
         self.log_prefix = '[{}] '.format(self.peer)
 
-    def have_pending_items(self):
-        self.peer_mgr.ensure_future(self.process_pending_items())
+    async def wait_on_items(self):
+        while True:
+            await self.items_event.wait()
+            await self.process_pending_items()
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
         self.log_prefix = '[{}] '.format(str(self.peer)[:25])
+        self.future = self.peer_mgr.ensure_future(self.wait_on_items())
 
         # Update IP address
         if not self.peer.is_tor:
@@ -82,6 +85,7 @@ class PeerSession(JSONSession):
     def connection_lost(self, exc):
         '''Handle disconnection.'''
         super().connection_lost(exc)
+        self.future.cancel()
         self.peer_mgr.connection_lost(self)
 
     def on_peers_subscribe(self, result, error):
@@ -306,8 +310,8 @@ class PeerManager(util.LoggedClass):
         '''Returns the server peers as a list of (ip, host, details) tuples.
 
         We return all peers we've connected to in the last day.
-        Additionally, if we don't have onion routing, we return up to
-        three randomly selected onion servers.
+        Additionally, if we don't have onion routing, we return a few
+        hard-coded onion servers.
         '''
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers

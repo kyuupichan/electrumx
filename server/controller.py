@@ -69,9 +69,6 @@ class Controller(util.LoggedClass):
         self.next_stale_check = 0
         self.history_cache = pylru.lrucache(256)
         self.header_cache = pylru.lrucache(8)
-        self.queue = asyncio.PriorityQueue()
-        self.delayed_sessions = []
-        self.next_queue_id = 0
         self.cache_height = 0
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
@@ -136,67 +133,6 @@ class Controller(util.LoggedClass):
     def is_deprioritized(self, session):
         return self.session_priority(session) > self.BANDS
 
-    async def enqueue_delayed_sessions(self):
-        while True:
-            now = time.time()
-            keep = []
-            for pair in self.delayed_sessions:
-                timeout, item = pair
-                priority, queue_id, session = item
-                if not session.pause and timeout <= now:
-                    self.queue.put_nowait(item)
-                else:
-                    keep.append(pair)
-            self.delayed_sessions = keep
-
-            # If paused and session count has fallen, start listening again
-            if (len(self.sessions) <= self.low_watermark
-                    and self.state == self.PAUSED):
-                await self.start_external_servers()
-
-            # Periodically log sessions
-            if self.env.log_sessions and time.time() > self.next_log_sessions:
-                if self.next_log_sessions:
-                    data = self.session_data(for_log=True)
-                    for line in Controller.sessions_text_lines(data):
-                        self.logger.info(line)
-                    self.logger.info(json.dumps(self.getinfo()))
-                self.next_log_sessions = time.time() + self.env.log_sessions
-
-            await asyncio.sleep(1)
-
-    def enqueue_session(self, session):
-        # Might have disconnected whilst waiting
-        if session not in self.sessions:
-            return
-        priority = self.session_priority(session)
-        item = (priority, self.next_queue_id, session)
-        self.next_queue_id += 1
-
-        excess = max(0, priority - self.BANDS)
-        if excess != session.last_delay:
-            session.last_delay = excess
-            if excess:
-                session.log_info('high bandwidth use, deprioritizing by '
-                                 'delaying responses {:d}s'.format(excess))
-            else:
-                session.log_info('stopped delaying responses')
-        delay = max(int(session.pause), excess)
-        if delay:
-            self.delayed_sessions.append((time.time() + delay, item))
-        else:
-            self.queue.put_nowait(item)
-
-    async def serve_requests(self):
-        '''Asynchronously run through the task queue.'''
-        while True:
-            priority_, id_, session = await self.queue.get()
-            if session in self.sessions:
-                await session.process_pending_items()
-                # Re-enqueue the session if stuff is left
-                if session.items:
-                    self.enqueue_session(session)
-
     async def run_in_executor(self, func, *args):
         '''Wait whilst running func in the executor.'''
         return await self.loop.run_in_executor(None, func, *args)
@@ -225,11 +161,30 @@ class Controller(util.LoggedClass):
         except Exception:
             self.log_error(traceback.format_exc())
 
-    async def check_request_timeouts(self):
-        '''Regularly check pending JSON requests for timeouts.'''
+    async def housekeeping(self):
+        '''Regular housekeeping checks.'''
+        n = 0
         while True:
-            await asyncio.sleep(30)
+            n += 1
+            await asyncio.sleep(15)
             JSONSessionBase.timeout_check()
+            if n % 10 == 0:
+                self.clear_stale_sessions()
+
+            # Start listening for incoming connections if paused and
+            # session count has fallen
+            if (self.state == self.PAUSED and
+                    len(self.sessions) <= self.low_watermark):
+                await self.start_external_servers()
+
+            # Periodically log sessions
+            if self.env.log_sessions and time.time() > self.next_log_sessions:
+                if self.next_log_sessions:
+                    data = self.session_data(for_log=True)
+                    for line in Controller.sessions_text_lines(data):
+                        self.logger.info(line)
+                    self.logger.info(json.dumps(self.getinfo()))
+                self.next_log_sessions = time.time() + self.env.log_sessions
 
     async def wait_for_bp_catchup(self):
         '''Called when the block processor catches up.'''
@@ -237,12 +192,9 @@ class Controller(util.LoggedClass):
         self.logger.info('block processor has caught up')
         self.ensure_future(self.peer_mgr.main_loop())
         self.ensure_future(self.start_servers())
-        self.ensure_future(self.check_request_timeouts())
+        self.ensure_future(self.housekeeping())
         self.ensure_future(self.mempool.main_loop())
-        self.ensure_future(self.enqueue_delayed_sessions())
         self.ensure_future(self.notify())
-        for n in range(4):
-            self.ensure_future(self.serve_requests())
 
     async def main_loop(self):
         '''Controller main loop.'''
@@ -379,11 +331,28 @@ class Controller(util.LoggedClass):
         self.header_cache[height] = header
         return header
 
+    def session_delay(self, session):
+        priority = self.session_priority(session)
+        excess = max(0, priority - self.BANDS)
+        if excess != session.last_delay:
+            session.last_delay = excess
+            if excess:
+                session.log_info('high bandwidth use, deprioritizing by '
+                                 'delaying responses {:d}s'.format(excess))
+            else:
+                session.log_info('stopped delaying responses')
+        return max(int(session.pause), excess)
+
+    async def process_items(self, session):
+        '''Waits for incoming session items and processes them.'''
+        while True:
+            await session.items_event.wait()
+            await asyncio.sleep(self.session_delay(session))
+            if not session.pause:
+                await session.process_pending_items()
+
     def add_session(self, session):
-        now = time.time()
-        if now > self.next_stale_check:
-            self.next_stale_check = now + 300
-            self.clear_stale_sessions()
+        session.items_future = self.ensure_future(self.process_items(session))
         gid = int(session.start_time - self.start_time) // 900
         self.groups[gid].append(session)
         self.sessions[session] = gid
@@ -400,6 +369,7 @@ class Controller(util.LoggedClass):
 
     def remove_session(self, session):
         '''Remove a session from our sessions list if there.'''
+        session.items_future.cancel()
         if session in self.sessions:
             gid = self.sessions.pop(session)
             assert gid in self.groups

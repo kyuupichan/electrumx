@@ -10,6 +10,7 @@ daemon.'''
 
 import asyncio
 import json
+import time
 import traceback
 
 import aiohttp
@@ -38,6 +39,8 @@ class Daemon(util.LoggedClass):
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
+        self.down = False
+        self.last_error_time = 0
 
     def set_urls(self, urls):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -65,48 +68,56 @@ class Daemon(util.LoggedClass):
             return True
         return False
 
+    async def _send_data(self, data):
+        async with self.workqueue_semaphore:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(self.url(), data=data) as resp:
+                    # If bitcoind can't find a tx, for some reason
+                    # it returns 500 but fills out the JSON.
+                    # Should still return 200 IMO.
+                    if resp.status in (200, 500):
+                        return await resp.json()
+                    return (resp.status, resp.reason)
+
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
 
         Handles temporary connection issues.  Daemon reponse errors
         are raise through DaemonError.
         '''
-        self.prior_msg = None
-        self.skip_count = None
-
-        def log_error(msg, skip_once=False):
-            if skip_once and self.skip_count is None:
-                self.skip_count = 1
-            if msg != self.prior_msg or self.skip_count == 0:
-                self.skip_count = 10
-                self.prior_msg = msg
-                self.logger.error('{}  Retrying between sleeps...'
-                                  .format(msg))
-            self.skip_count -= 1
+        def log_error(error):
+            self.down = True
+            now = time.time()
+            prior_time = self.last_error_time
+            if now - prior_time > 60:
+                self.last_error_time = now
+                if prior_time and self.failover():
+                    secs = 0
+                else:
+                    self.logger.error('{}  Retrying occasionally...'
+                                      .format(error))
 
         data = json.dumps(payload)
         secs = 1
-        max_secs = 16
+        max_secs = 4
         while True:
             try:
-                async with self.workqueue_semaphore:
-                    async with aiohttp.post(self.url(), data=data) as resp:
-                        # If bitcoind can't find a tx, for some reason
-                        # it returns 500 but fills out the JSON.
-                        # Should still return 200 IMO.
-                        if resp.status in (200, 500):
-                            if self.prior_msg:
-                                self.logger.info('connection restored')
-                            result = processor(await resp.json())
-                            return result
+                result = await self._send_data(data)
+                if not isinstance(result, tuple):
+                    result = processor(result)
+                    if self.down:
+                        self.down = False
+                        self.last_error_time = 0
+                        self.logger.info('connection restored')
+                    return result
                 log_error('HTTP error code {:d}: {}'
-                          .format(resp.status, resp.reason))
+                          .format(result[0], result[1]))
             except asyncio.TimeoutError:
-                log_error('timeout error.', skip_once=True)
+                log_error('timeout error.')
             except aiohttp.ClientHttpProcessingError:
-                log_error('HTTP error.', skip_once=True)
+                log_error('HTTP error.')
             except aiohttp.ServerDisconnectedError:
-                log_error('disconnected.', skip_once=True)
+                log_error('disconnected.')
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
             except self.DaemonWarmingUpError:
@@ -116,11 +127,8 @@ class Daemon(util.LoggedClass):
             except Exception:
                 self.log_error(traceback.format_exc())
 
-            if secs >= max_secs and self.failover():
-                secs = 1
-            else:
-                await asyncio.sleep(secs)
-                secs = min(max_secs, secs * 2)
+            await asyncio.sleep(secs)
+            secs = min(max_secs, secs * 2, 1)
 
     def logged_url(self, url=None):
         '''The host and port part, for logging.'''

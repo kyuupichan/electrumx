@@ -258,7 +258,7 @@ class JSONSessionBase(util.LoggedClass):
     from empty
     '''
     _next_session_id = 0
-    _pending_reqs = {}
+    _pending_reqs = {}    # Outgoing requests waiting for a response
 
     @classmethod
     def next_session_id(cls):
@@ -320,6 +320,7 @@ class JSONSessionBase(util.LoggedClass):
         self.pause = False
         # Handling of incoming items
         self.items = collections.deque()
+        self.items_event = asyncio.Event()
         self.batch_results = []
         # Handling of outgoing requests
         self.next_request_id = 0
@@ -461,10 +462,8 @@ class JSONSessionBase(util.LoggedClass):
             self.send_error('empty batch', JSONRPC.INVALID_REQUEST)
             return
 
-        # Incoming items get queued for later asynchronous processing.
-        if not self.items:
-            self.have_pending_items()
         self.items.append(payload)
+        self.items_event.set()
 
     async def process_batch(self, batch, count):
         '''Processes count items from the batch according to the JSON 2.0
@@ -626,6 +625,9 @@ class JSONSessionBase(util.LoggedClass):
             if binary:
                 self.send_binary(binary)
 
+        if not self.items:
+            self.items_event.clear()
+
     def count_pending_items(self):
         '''Counts the number of pending items.'''
         return sum(len(item) if isinstance(item, list) else 1
@@ -716,15 +718,6 @@ class JSONSessionBase(util.LoggedClass):
 
     # App layer
 
-    def have_pending_items(self):
-        '''Called to indicate there are items pending to be processed
-        asynchronously by calling process_pending_items.
-
-        This is *not* called every time an item is added, just when
-        there were previously none and now there is at least one.
-        '''
-        raise NotImplementedError
-
     def using_bandwidth(self, amount):
         '''Called as bandwidth is consumed.
 
@@ -749,8 +742,12 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
     '''A JSONSessionBase instance specialized for use with
     asyncio.protocol to implement the transport layer.
 
-    Derived classes must provide have_pending_items() and may want to
-    override the request and notification handlers.
+    The app should await on items_event, which is set when unprocessed
+    incoming items remain and cleared when the queue is empty, and
+    then arrange to call process_pending_items asynchronously.
+
+    Derived classes may want to override the request and notification
+    handlers.
     '''
 
     def __init__(self, version=JSONRPCCompat):
