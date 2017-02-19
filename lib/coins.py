@@ -21,7 +21,7 @@ import sys
 
 from lib.hash import Base58, hash160, ripemd160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
-from lib.tx import Deserializer, DeserializerSegWit, DeserializerFairCoin
+from lib.tx import Deserializer, DeserializerSegWit
 import lib.util as util
 
 
@@ -285,7 +285,7 @@ class Bitcoin(Coin):
     IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332
     PEERS = [
-        '4cii7ryno5j3axe4.onion t'
+        '4cii7ryno5j3axe4.onion t',
         'btc.smsys.me s995',
         'ca6ulp2j2mpsft3y.onion s t',
         'electrum.be s t',
@@ -447,7 +447,7 @@ class Dash(Coin):
     IRC_PREFIX = "D_"
     IRC_CHANNEL = "#electrum-dash"
     PEERS = [
-        'electrum.dash.org s t'
+        'electrum.dash.org s t',
         'electrum.masternode.io s t',
         'electrum-drk.club s t',
         'dashcrypto.space s t',
@@ -567,7 +567,7 @@ class FairCoin(Coin):
     PEER_DEFAULT_PORTS = {'t': '51811', 's': '51812'}
     PEERS = [
         'fairlectrum.fair-coin.net s',
-        'fairlectrum.fair.to s'
+        'fairlectrum.fair.to s',
     ]
 
     @classmethod
@@ -601,7 +601,3 @@ class FairCoin(Coin):
             'timestamp': timestamp,
             'creatorId': creatorId,
         }
-
-    @classmethod
-    def deserializer(cls):
-        return DeserializerFairCoin

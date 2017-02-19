@@ -89,7 +89,7 @@ class Deserializer(object):
         '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
         read_tx = self.read_tx
         txs = [read_tx() for n in range(self._read_varint())]
-        assert self.cursor == len(self.binary)
+        # Some coins have excess data beyond the end of the transactions
         return txs
 
     def _read_inputs(self):
@@ -217,11 +217,3 @@ class DeserializerSegWit(Deserializer):
 
         return TxSegWit(version, marker, flag, inputs,
                         outputs, witness, locktime), double_sha256(orig_ser)
-
-
-class DeserializerFairCoin(Deserializer):
-    def read_block(self):
-        '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
-        read_tx = self.read_tx
-        txs = [read_tx() for n in range(self._read_varint())]
-        return txs
