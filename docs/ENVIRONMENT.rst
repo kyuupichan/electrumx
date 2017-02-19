@@ -63,6 +63,9 @@ These environment variables are optional:
   Must be a *NET* from one of the **Coin** classes in `lib/coins.py`_.
   Defaults to `mainnet`.
 
+  Note Bitcoin Core >= 0.13.1 requires a special *NET* for testnet:
+  `testnet-segwit`.
+
 * **DB_ENGINE**
 
   Database engine for the UTXO and history database.  The default is
@@ -122,6 +125,11 @@ These environment variables are optional:
   + **$DONATION_ADDRESS** is replaced with the address from the
     **DONATION_ADDRESS** environment variable.
 
+* **TOR_BANNER_FILE**
+
+  As for **BANNER_FILE** (which is also the default) but shown to
+  incoming connections believed to be to your Tor hidden service.
+
 * **ANON_LOGS**
 
   Set to anything non-empty to replace IP addresses in logs with
@@ -142,9 +150,9 @@ The following environment variables are all optional and help to limit
 server resource consumption and prevent simple DoS.
 
 Address subscriptions in ElectrumX are very cheap - they consume about
-100 bytes of memory each (160 bytes from version 0.10.0) and are
-processed efficiently.  I feel the two subscription-related defaults
-below are low and encourage you to raise them.
+160 bytes of memory each and are processed efficiently.  I feel the
+two subscription-related defaults below are low and encourage you to
+raise them.
 
 * **MAX_SESSIONS**
 
@@ -191,11 +199,11 @@ below are low and encourage you to raise them.
   Bandwidth usage over each period is totalled, and when this limit is
   exceeded each subsequent request is stalled by sleeping before
   handling it, effectively giving higher processing priority to other
-  sessions.  Each time this happens the event is logged.
+  sessions.
 
   The more bandwidth usage exceeds this soft limit the longer the next
   request will sleep.  Sleep times are a round number of seconds with
-  a minimum of 1.
+  a minimum of 1.  Each time the delay changes the event is logged.
 
   Bandwidth usage is gradually reduced over time by "refunding" a
   proportional part of the limit every now and then.
@@ -205,8 +213,34 @@ below are low and encourage you to raise them.
   An integer number of seconds defaulting to 600.  Sessions with no
   activity for longer than this are disconnected.  Properly
   functioning Electrum clients by default will send pings roughly
-  every 60 seconds, and servers doing peer discovery roughly every 300
-  seconds.
+  every 60 seconds.
+
+TOR
+---
+
+In response to the `server.peers.subscribe` RPC call, ElectrumX will
+only return peer servers that is has recently connected to and
+verified basic functionality.
+
+If you are not running a Tor proxy ElectrumX will be unable to connect
+to onion server peers, in which case rather than returning no onion
+peers it will fall back to a hard-coded list.
+
+To give incoming clients a full range of onion servers you will need
+to be running a Tor proxy for ElectrumX to use.
+
+* **TOR_PROXY_HOST**
+
+  The host where the Tor proxy is running.  Defaults to *127.0.0.1*.
+  If you use a hostname here rather than an IP address, you must have
+  Python version >= 3.5.3, Python 3.5.2 will **not** work.
+
+* **TOR_PROXY_PORT**
+
+  The port on which the Tor proxy is running.  If not set, ElectrumX
+  will autodetect any proxy running on the usual ports 9050 (Tor),
+  9150 (Tor browser bundle) and 1080 (socks).
+
 
 IRC
 ---
@@ -255,6 +289,11 @@ connectivity on IRC:
   The SSL port to advertise for Tor.  Defaults to **REPORT_SSL_PORT**,
   unless it is '0', otherwise **SSL_PORT**.  '0' disables publishing
   the port.
+
+  **NOTE**: Certificate-Authority signed certificates don't work over
+  Tor, so you should set **REPORT_SSL_PORT_TOR** to 0 if yours is not
+  self-signed.
+
 
 Cache
 -----

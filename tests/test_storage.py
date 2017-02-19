@@ -44,8 +44,8 @@ def test_batch(db):
 
 def test_iterator(db):
     """
-    The iterator should contain all key/value pairs starting with prefix ordered
-    by key.
+    The iterator should contain all key/value pairs starting with prefix
+    ordered by key.
     """
     for i in range(5):
         db.put(b"abc" + str.encode(str(i)), str.encode(str(i)))

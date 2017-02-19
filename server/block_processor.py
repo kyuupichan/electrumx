@@ -87,10 +87,11 @@ class Prefetcher(LoggedClass):
         with await self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
-                # Constrain fetch count to between 0 and 2500 regardless.
+                # Constrain fetch count to between 0 and 500 regardless;
+                # testnet can be lumpy.
                 cache_room = self.min_cache_size // self.ave_size
                 count = min(daemon_height - self.fetched_height, cache_room)
-                count = min(2500, max(count, 0))
+                count = min(500, max(count, 0))
                 if not count:
                     if not self.caught_up:
                         self.caught_up = True
@@ -568,7 +569,7 @@ class BlockProcessor(server.db.DB):
             header = coin.block_header(block, self.height)
             header_hash = coin.header_hash(header)
             if header_hash != self.tip:
-                raise ChainError('backup block {} is not tip {} at height {:,d}'
+                raise ChainError('backup block {} not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
             self.tip = coin.header_prevhash(header)
@@ -735,7 +736,7 @@ class BlockProcessor(server.db.DB):
         for cache_key, cache_value in self.utxo_cache.items():
             # suffix = tx_idx + tx_num
             hashX = cache_value[:-12]
-            suffix =  cache_key[-2:] + cache_value[-12:-8]
+            suffix = cache_key[-2:] + cache_value[-12:-8]
             batch_put(b'h' + cache_key[:4] + suffix, hashX)
             batch_put(b'u' + hashX + suffix, cache_value[-8:])
         self.utxo_cache = {}

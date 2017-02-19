@@ -6,7 +6,6 @@
 # and warranty status of this software.
 
 import asyncio
-import codecs
 import json
 import os
 import ssl
@@ -20,15 +19,14 @@ from functools import partial
 
 import pylru
 
-from lib.jsonrpc import JSONRPC, RPCError
-from lib.hash import sha256, double_sha256, hash_to_str, hex_str_to_hash
+from lib.jsonrpc import JSONRPC, JSONSessionBase, RPCError
+from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 import lib.util as util
 from server.block_processor import BlockProcessor
 from server.daemon import Daemon, DaemonError
 from server.mempool import MemPool
 from server.peers import PeerManager
 from server.session import LocalRPC, ElectrumX
-from server.version import VERSION
 
 
 class Controller(util.LoggedClass):
@@ -88,8 +86,7 @@ class Controller(util.LoggedClass):
              'address.get_proof address.listunspent '
              'block.get_header block.get_chunk estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
-            ('server',
-             'banner donation_address'),
+            ('server', 'donation_address'),
         ]
         self.electrumx_handlers = {'.'.join([prefix, suffix]):
                                    getattr(self, suffix.replace('.', '_'))
@@ -170,7 +167,7 @@ class Controller(util.LoggedClass):
 
     def enqueue_session(self, session):
         # Might have disconnected whilst waiting
-        if not session in self.sessions:
+        if session not in self.sessions:
             return
         priority = self.session_priority(session)
         item = (priority, self.next_queue_id, session)
@@ -218,15 +215,21 @@ class Controller(util.LoggedClass):
     def on_future_done(self, future):
         '''Collect the result of a future after removing it from our set.'''
         callback = self.futures.pop(future)
-        if callback:
-            callback(future)
-        else:
-            try:
+        try:
+            if callback:
+                callback(future)
+            else:
                 future.result()
-            except asyncio.CancelledError:
-                pass
-            except Exception:
-                self.log_error(traceback.format_exc())
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self.log_error(traceback.format_exc())
+
+    async def check_request_timeouts(self):
+        '''Regularly check pending JSON requests for timeouts.'''
+        while True:
+            await asyncio.sleep(30)
+            JSONSessionBase.timeout_check()
 
     async def wait_for_bp_catchup(self):
         '''Called when the block processor catches up.'''
@@ -234,6 +237,7 @@ class Controller(util.LoggedClass):
         self.logger.info('block processor has caught up')
         self.ensure_future(self.peer_mgr.main_loop())
         self.ensure_future(self.start_servers())
+        self.ensure_future(self.check_request_timeouts())
         self.ensure_future(self.mempool.main_loop())
         self.ensure_future(self.enqueue_delayed_sessions())
         self.ensure_future(self.notify())
@@ -242,6 +246,8 @@ class Controller(util.LoggedClass):
 
     async def main_loop(self):
         '''Controller main loop.'''
+        if self.env.rpc_port is not None:
+            await self.start_server('RPC', 'localhost', self.env.rpc_port)
         self.ensure_future(self.bp.main_loop())
         self.ensure_future(self.wait_for_bp_catchup())
 
@@ -274,7 +280,7 @@ class Controller(util.LoggedClass):
             future.cancel()
 
         # Wait for all futures to finish
-        while not all (future.done() for future in self.futures):
+        while not all(future.done() for future in self.futures):
             await asyncio.sleep(0.1)
 
         # Finally shut down the block processor and executor
@@ -306,9 +312,7 @@ class Controller(util.LoggedClass):
                              .format(kind, host, port))
 
     async def start_servers(self):
-        '''Start RPC, TCP and SSL servers once caught up.'''
-        if self.env.rpc_port is not None:
-            await self.start_server('RPC', 'localhost', self.env.rpc_port)
+        '''Start TCP and SSL servers.'''
         self.logger.info('max session count: {:,d}'.format(self.max_sessions))
         self.logger.info('session timeout: {:,d} seconds'
                          .format(self.env.session_timeout))
@@ -329,7 +333,7 @@ class Controller(util.LoggedClass):
         '''
         self.state = self.LISTENING
 
-        env= self.env
+        env = self.env
         if env.tcp_port is not None:
             await self.start_server('TCP', env.host, env.tcp_port)
         if env.ssl_port is not None:
@@ -387,7 +391,7 @@ class Controller(util.LoggedClass):
                          .format(session.kind, session.peername(),
                                  len(self.sessions)))
         if (len(self.sessions) >= self.max_sessions
-               and self.state == self.LISTENING):
+                and self.state == self.LISTENING):
             self.state = self.PAUSED
             session.log_info('maximum sessions {:,d} reached, stopping new '
                              'connections until count drops to {:,d}'
@@ -459,7 +463,7 @@ class Controller(util.LoggedClass):
             'logged': len([s for s in self.sessions if s.log_me]),
             'paused': sum(s.pause for s in self.sessions),
             'pid': os.getpid(),
-            'peers': self.peer_mgr.count(),
+            'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
             'sessions': self.session_count(),
             'subs': self.sub_count(),
@@ -510,6 +514,38 @@ class Controller(util.LoggedClass):
                            sum(s.send_size for s in sessions),
                            ])
         return result
+
+    @staticmethod
+    def peers_text_lines(data):
+        '''A generator returning lines for a list of peers.
+
+        data is the return value of rpc_peers().'''
+        def time_fmt(t):
+            if not t:
+                return 'Never'
+            return util.formatted_time(now - t)
+
+        now = time.time()
+        fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>3} '
+               '{:>3} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
+        yield fmt.format('Host', 'Status', 'TCP', 'SSL', 'Server', 'Min',
+                         'Max', 'Pruning', 'Last Conn', 'Last Try',
+                         'Tries', 'Source', 'IP Address')
+        for item in data:
+            features = item['features']
+            yield fmt.format(item['host'][:30],
+                             item['status'],
+                             features['tcp_port'] or '',
+                             features['ssl_port'] or '',
+                             features['server_version'] or 'unknown',
+                             features['protocol_min'],
+                             features['protocol_max'],
+                             features['pruning'] or '',
+                             time_fmt(item['last_connect']),
+                             time_fmt(item['last_try']),
+                             item['try_count'],
+                             item['source'][:20],
+                             item['ip_addr'] or '')
 
     @staticmethod
     def sessions_text_lines(data):
@@ -631,22 +667,29 @@ class Controller(util.LoggedClass):
     # Helpers for RPC "blockchain" command handlers
 
     def address_to_hashX(self, address):
-        if isinstance(address, str):
-            try:
-                return self.coin.address_to_hashX(address)
-            except Exception:
-                pass
+        try:
+            return self.coin.address_to_hashX(address)
+        except Exception:
+            pass
         raise RPCError('{} is not a valid address'.format(address))
 
-    def to_tx_hash(self, value):
+    def script_hash_to_hashX(self, script_hash):
+        try:
+            bin_hash = hex_str_to_hash(script_hash)
+            if len(bin_hash) == 32:
+                return bin_hash[:self.coin.HASHX_LEN]
+        except Exception:
+            pass
+        raise RPCError('{} is not a valid script hash'.format(script_hash))
+
+    def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction
         hash.'''
-        if isinstance(value, str) and len(value) == 64:
-            try:
-                bytes.fromhex(value)
-                return value
-            except ValueError:
-                pass
+        try:
+            if len(bytes.fromhex(value)) == 32:
+                return
+        except Exception:
+            pass
         raise RPCError('{} should be a transaction hash'.format(value))
 
     def non_negative_integer(self, value):
@@ -667,16 +710,13 @@ class Controller(util.LoggedClass):
         except DaemonError as e:
             raise RPCError('daemon error: {}'.format(e))
 
-    async def new_subscription(self, address):
+    def new_subscription(self):
         if self.subs_room <= 0:
             self.subs_room = self.max_subs - self.sub_count()
             if self.subs_room <= 0:
                 raise RPCError('server subscription limit {:,d} reached'
                                .format(self.max_subs))
         self.subs_room -= 1
-        hashX = self.address_to_hashX(address)
-        status = await self.address_status(hashX)
-        return hashX, status
 
     async def tx_merkle(self, tx_hash, height):
         '''tx_hash is a hex string.'''
@@ -739,21 +779,6 @@ class Controller(util.LoggedClass):
         conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)
-
-    async def address_status(self, hashX):
-        '''Returns status as 32 bytes.'''
-        # Note history is ordered and mempool unordered in electrum-server
-        # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.get_history(hashX)
-        mempool = await self.mempool_transactions(hashX)
-
-        status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
-                         for tx_hash, height in history)
-        status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
-                          for hex_hash, tx_fee, unconfirmed in mempool)
-        if status:
-            return sha256(status.encode()).hex()
-        return None
 
     async def get_utxos(self, hashX):
         '''Get UTXOs asynchronously to reduce latency.'''
@@ -835,7 +860,7 @@ class Controller(util.LoggedClass):
         '''
         # For some reason Electrum passes a height.  We don't require
         # it in anticipation it might be dropped in the future.
-        tx_hash = self.to_tx_hash(tx_hash)
+        self.assert_tx_hash(tx_hash)
         return await self.daemon_request('getrawtransaction', tx_hash)
 
     async def transaction_get_merkle(self, tx_hash, height):
@@ -845,7 +870,7 @@ class Controller(util.LoggedClass):
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
         '''
-        tx_hash = self.to_tx_hash(tx_hash)
+        self.assert_tx_hash(tx_hash)
         height = self.non_negative_integer(height)
         return await self.tx_merkle(tx_hash, height)
 
@@ -858,7 +883,7 @@ class Controller(util.LoggedClass):
         # Used only for electrum client command-line requests.  We no
         # longer index by address, so need to request the raw
         # transaction.  So it works for any TXO not just UTXOs.
-        tx_hash = self.to_tx_hash(tx_hash)
+        self.assert_tx_hash(tx_hash)
         index = self.non_negative_integer(index)
         raw_tx = await self.daemon_request('getrawtransaction', tx_hash)
         if not raw_tx:
@@ -871,33 +896,6 @@ class Controller(util.LoggedClass):
         return self.coin.address_from_script(tx.outputs[index].pk_script)
 
     # Client RPC "server" command handlers
-
-    async def banner(self):
-        '''Return the server banner text.'''
-        banner = 'Welcome to Electrum!'
-        if self.env.banner_file:
-            try:
-                with codecs.open(self.env.banner_file, 'r', 'utf-8') as f:
-                    banner = f.read()
-            except Exception as e:
-                self.log_error('reading banner file {}: {}'
-                               .format(self.env.banner_file, e))
-            else:
-                network_info = await self.daemon_request('getnetworkinfo')
-                version = network_info['version']
-                major, minor = divmod(version, 1000000)
-                minor, revision = divmod(minor, 10000)
-                revision //= 100
-                version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
-                for pair in [
-                    ('$VERSION', VERSION),
-                    ('$DAEMON_VERSION', version),
-                    ('$DAEMON_SUBVERSION', network_info['subversion']),
-                    ('$DONATION_ADDRESS', self.env.donation_address),
-                ]:
-                    banner = banner.replace(*pair)
-
-        return banner
 
     def donation_address(self):
         '''Return the donation address as a string, empty if there is none.'''

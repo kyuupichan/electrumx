@@ -2,8 +2,26 @@
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# The MIT License (MIT)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 '''Module providing coin abstraction.
 
@@ -34,9 +52,10 @@ class Coin(object):
 
     REORG_LIMIT = 200
     # Not sure if these are coin-specific
-    RPC_URL_REGEX = re.compile('.+@[^:]+(:[0-9]+)?')
+    RPC_URL_REGEX = re.compile('.+@(\[[0-9a-fA-F:]+\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE = 2016
+    IRC_PREFIX = None
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
     HASHX_LEN = 11
@@ -50,10 +69,10 @@ class Coin(object):
 
         Raise an exception if unrecognised.'''
         req_attrs = ('TX_COUNT', 'TX_COUNT_HEIGHT', 'TX_PER_BLOCK',
-                     'IRC_CHANNEL', 'IRC_PREFIX')
+                     'IRC_CHANNEL')
         for coin in util.subclasses(Coin):
-            if (coin.NAME.lower() == name.lower()
-                    and coin.NET.lower() == net.lower()):
+            if (coin.NAME.lower() == name.lower() and
+                    coin.NET.lower() == net.lower()):
                 missing = [attr for attr in req_attrs
                            if not hasattr(coin, attr)]
                 if missing:
@@ -70,7 +89,7 @@ class Coin(object):
         match = cls.RPC_URL_REGEX.match(url)
         if not match:
             raise CoinError('invalid daemon URL: "{}"'.format(url))
-        if match.groups()[0] is None:
+        if match.groups()[1] is None:
             url += ':{:d}'.format(cls.RPC_PORT)
         if not url.startswith('http://'):
             url = 'http://' + url
@@ -285,25 +304,28 @@ class Bitcoin(Coin):
     IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332
     PEERS = [
-        '4cii7ryno5j3axe4.onion t',
         'btc.smsys.me s995',
         'ca6ulp2j2mpsft3y.onion s t',
         'electrum.be s t',
-        'electrum.trouth.net s t',
+        'electrum.trouth.net p10000 s t',
         'electrum.vom-stausee.de s t',
-        'electrum3.hachre.de s t',
+        'electrum3.hachre.de p10000 s t',
         'electrum.hsmiths.com s t',
         'erbium1.sytes.net s t',
-        'h.1209k.com s t',
+        'fdkbwjykvl2f3hup.onion p10000 s t',
+        'h.1209k.com p10000 s t',
         'helicarrier.bauerj.eu s t',
+        'hsmiths4fyqlw5xw.onion s t',
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
+        'ELEX01.blackpole.online s t',
     ]
 
 
 class BitcoinTestnet(Bitcoin):
     SHORTNAME = "XTN"
     NET = "testnet"
+    IRC_PREFIX = None
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = 0x6f
@@ -315,16 +337,15 @@ class BitcoinTestnet(Bitcoin):
     TX_COUNT = 12242438
     TX_COUNT_HEIGHT = 1035428
     TX_PER_BLOCK = 21
-    IRC_PREFIX = "ET_"
     RPC_PORT = 18332
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     PEERS = [
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
         'electrum-btc-testnet.petrkr.net s t',
-        'testnet.hsmiths.com t53011 s53012',
-        'hsmithsxurybd7uh.onion t53011',
-        'testnet.not.fyi s t',
+        'testnet.hsmiths.com t53011',
+        'hsmithsxurybd7uh.onion t53011 s53012',
+        'ELEX05.blackpole.online t52001 s52002',
     ]
 
 
@@ -477,7 +498,7 @@ class DashTestnet(Dash):
     TX_PER_BLOCK = 1
     RPC_PORT = 19998
     IRC_PREFIX = "d_"
-    PEER_DEFAULT_PORTS = {'t':'51001', 's':'51002'}
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     PEERS = [
         'electrum.dash.siampm.com s t',
     ]

@@ -23,6 +23,7 @@ from server.version import VERSION
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
+
 class DB(util.LoggedClass):
     '''Simple wrapper of the backend database for querying.
 

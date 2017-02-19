@@ -50,7 +50,7 @@ class IRC(LoggedClass):
 
         # Register handlers for events we're interested in
         reactor = irc_client.Reactor()
-        for event in 'welcome join quit whoreply disconnect'.split():
+        for event in 'welcome join whoreply disconnect'.split():
             reactor.add_global_handler(event, getattr(self, 'on_' + event))
 
         # Note: Multiple nicks in same channel will trigger duplicate events
@@ -96,12 +96,6 @@ class IRC(LoggedClass):
             if match:
                 connection.who(match.group(1))
 
-    def on_quit(self, connection, event):
-        '''Called when someone leaves our channel.'''
-        match = self.peer_regexp.match(event.source)
-        if match:
-            self.peer_mgr.remove_irc_peer(match.group(1))
-
     def on_whoreply(self, connection, event):
         '''Called when a response to our who requests arrives.
 
@@ -111,8 +105,8 @@ class IRC(LoggedClass):
         nick = event.arguments[4]
         if nick.startswith(self.prefix):
             line = event.arguments[6].split()
-            hostname, details = line[1], line[2:]
-            self.peer_mgr.add_irc_peer(nick, hostname, details)
+            hp_string = ' '.join(line[1:])  # hostname, ports, version etc.
+            self.peer_mgr.add_irc_peer(nick, hp_string)
 
 
 class IrcClient(object):

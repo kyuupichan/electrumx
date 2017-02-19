@@ -19,7 +19,6 @@ def test_cachedproperty():
             cls.CALL_COUNT += 1
             return cls.CALL_COUNT
 
-
     t = Target()
     assert t.prop == t.prop == 1
     assert Target.cls_prop == Target.cls_prop == 1
@@ -56,4 +55,4 @@ def test_chunks():
 def test_increment_byte_string():
     assert util.increment_byte_string(b'1') == b'2'
     assert util.increment_byte_string(b'\x01\x01') == b'\x01\x02'
-    assert util.increment_byte_string(b'\xff\xff') == None
+    assert util.increment_byte_string(b'\xff\xff') is None
