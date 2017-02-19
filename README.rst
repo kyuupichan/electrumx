@@ -136,6 +136,11 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.11.4
+--------------
+
+* peer handling fixes / improvements based on suggestions of hsmiths
+
 Version 0.11.3
 --------------
 
