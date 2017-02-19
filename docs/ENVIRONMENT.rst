@@ -215,8 +215,8 @@ raise them.
   functioning Electrum clients by default will send pings roughly
   every 60 seconds.
 
-TOR
----
+PEER DISCOVERY
+--------------
 
 In response to the `server.peers.subscribe` RPC call, ElectrumX will
 only return peer servers that is has recently connected to and
@@ -229,11 +229,35 @@ peers it will fall back to a hard-coded list.
 To give incoming clients a full range of onion servers you will need
 to be running a Tor proxy for ElectrumX to use.
 
+ElectrumX will perform peer-discovery by default and announce itself
+to other peers.  If your server is private you may wish to disable
+some of this.
+
+* **PEER_DISCOVERY**
+
+  If not defined, or non-empty, ElectrumX will occasionally connect to
+  and verify its network of peer servers.  Set to empty to disable
+  peer discovery.
+
+* **PEER_ANNOUNCE**
+
+  Set this environemnt variable to empty to disable announcing itself.
+  If not defined, or non-empty, ElectrumX will announce itself to
+  peers.
+
+  If peer discovery is disabled this environment variable has no
+  effect, because ElectrumX only announces itself to peers when doing
+  peer discovery if it notices it is not present in the peer's
+  returned list.
+
 * **TOR_PROXY_HOST**
 
-  The host where the Tor proxy is running.  Defaults to *127.0.0.1*.
+  The host where your Tor proxy is running.  Defaults to *127.0.0.1*.
   If you use a hostname here rather than an IP address, you must have
   Python version >= 3.5.3, Python 3.5.2 will **not** work.
+
+  If you are not running a Tor proxy just leave this environment
+  variable undefined.
 
 * **TOR_PROXY_PORT**
 

@@ -112,13 +112,16 @@ class PeerSession(JSONSession):
             return
 
         self.peer_mgr.add_peers(peers)
+
+        if not self.peer_mgr.env.peer_announce:
+            return
+
+        # Announce ourself if not present
         my = self.peer_mgr.myself
         for peer in my.matches(peers):
             if peer.tcp_port == my.tcp_port and peer.ssl_port == my.ssl_port:
                 return
-
-        # Announce ourself if not present
-        self.log_info('registering with server.add_peer')
+        self.log_info('registering ourself with server.add_peer')
         self.send_request(self.on_add_peer, 'server.add_peer', [my.features])
 
     def on_add_peer(self, result, error):
@@ -407,6 +410,11 @@ class PeerManager(util.LoggedClass):
           3) Retrying old peers at regular intervals.
         '''
         self.connect_to_irc()
+        if not self.env.peer_discovery:
+            self.logger.info('peer discovery is disabled')
+            return
+
+        self.logger.info('beginning peer discovery')
         try:
             while True:
                 timeout = self.loop.call_later(WAKEUP_SECS,
