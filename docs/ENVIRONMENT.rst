@@ -63,8 +63,8 @@ These environment variables are optional:
   Must be a *NET* from one of the **Coin** classes in `lib/coins.py`_.
   Defaults to `mainnet`.
 
-  Please note that for Bitcoin Core 0.13.1+ there is a special *NET* for
-  testnet: `testnet-segwit`.
+  Note Bitcoin Core >= 0.13.1 requires a special *NET* for testnet:
+  `testnet-segwit`.
 
 * **DB_ENGINE**
 
