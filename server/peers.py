@@ -77,7 +77,6 @@ class PeerSession(JSONSession):
         proto_ver = (version.PROTOCOL_MIN, version.PROTOCOL_MAX)
         self.send_request(self.on_version, 'server.version',
                           [version.VERSION, proto_ver])
-        self.send_request(self.on_peers_subscribe, 'server.peers.subscribe')
         self.send_request(self.on_features, 'server.features')
 
     def connection_lost(self, exc):
@@ -99,8 +98,6 @@ class PeerSession(JSONSession):
 
         Each update is expected to be of the form:
             [ip_addr, hostname, ['v1.0', 't51001', 's51002']]
-
-        Return True if we're in the list of peers.
         '''
         try:
             real_names = [' '.join([u[1]] + u[2]) for u in updates]
@@ -108,7 +105,7 @@ class PeerSession(JSONSession):
                      for real_name in real_names]
         except Exception:
             self.log_error('bad server.peers.subscribe response')
-            return False
+            return
 
         self.peer_mgr.add_peers(peers)
         my = self.peer_mgr.myself
@@ -124,41 +121,51 @@ class PeerSession(JSONSession):
         '''Handle the response to the add_peer message.'''
         self.close_if_done()
 
+    def peer_verified(self, is_good):
+        '''Call when it has been determined whether or not the peer seems to
+        be on the same network.
+        '''
+        if is_good:
+            self.send_request(self.on_peers_subscribe,
+                              'server.peers.subscribe')
+        else:
+            self.peer.mark_bad()
+            self.failed = True
+
     def on_features(self, features, error):
         # Several peers don't implement this.  If they do, check they are
         # the same network with the genesis hash.
         verified = False
         if not error and isinstance(features, dict):
-            forget = False
             our_hash = self.peer_mgr.env.coin.GENESIS_HASH
-            their_hash = features.get('genesis_hash')
-            if their_hash:
-                verified = their_hash == our_hash
-                forget = their_hash != our_hash
-            if forget:
-                self.failed = True
-                self.peer.mark_bad()
+            if our_hash != features.get('genesis_hash'):
+                self.peer_verified(False)
                 self.log_warning('incorrect genesis hash')
             else:
+                self.peer_verified(True)
                 self.peer.update_features(features)
+                verified = True
         # For legacy peers not implementing features, check their height
         # as a proxy to determining they're on our network
-        if not verified:
+        if not verified and not self.peer.bad:
             self.send_request(self.on_headers, 'blockchain.headers.subscribe')
         self.close_if_done()
 
     def on_headers(self, result, error):
         '''Handle the response to the version message.'''
-        if error or not isinstance(result, dict):
+        if error:
             self.failed = True
+            self.log_error('blockchain.headers.subscribe returned an error')
+        elif not isinstance(result, dict):
             self.log_error('bad blockchain.headers.subscribe response')
+            self.peer_verified(False)
         else:
             our_height = self.peer_mgr.controller.bp.db_height
             their_height = result.get('block_height')
-            if (not isinstance(their_height, int) or
-                    abs(our_height - their_height) > 5):
-                self.failed = True
-                self.peer.mark_bad()
+            is_good = (isinstance(their_height, int) and
+                       abs(our_height - their_height) <= 5)
+            self.peer_verified(is_good)
+            if not is_good:
                 self.log_warning('bad height {}'.format(their_height))
         self.close_if_done()
 

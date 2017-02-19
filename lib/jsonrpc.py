@@ -776,6 +776,7 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
 
     def connection_lost(self, exc):
         '''Trigger timeouts of all pending requests.'''
+        self.transport = None
         self.timeout_session()
 
     def is_closing(self):
