@@ -321,6 +321,48 @@ The ETA shown is just a rough guide and in the short term can be quite
 volatile.  It tends to be a little optimistic at first; once you get
 to height 280,000 is should be fairly accurate.
 
+Creating an self-signed SSL certificate
+=======================================
+
+These instructions are based on those of the `electrum-server` documentation.
+
+To run an SSL server you need to generate a self-signed certificate
+using openssl.  Alternatively you could not set **SSL_PORT** in the
+environment and not serve over SSL, but this is not recommended.
+
+Use the sample code below to create a self-signed cert with a
+recommended validity of 5 years. You may supply any information for
+your sign request to identify your server.  They are not currently
+checked by the client except for the validity date.  When asked for a
+challenge password just leave it empty and press enter::
+
+    $ openssl genrsa -des3 -passout pass:x -out server.pass.key 2048
+    $ openssl rsa -passin pass:x -in server.pass.key -out server.key
+    writing RSA key
+    $ rm server.pass.key
+    $ openssl req -new -key server.key -out server.csr
+    ...
+    Country Name (2 letter code) [AU]:US
+    State or Province Name (full name) [Some-State]:California
+    Common Name (eg, YOUR name) []: electrum-server.tld
+    ...
+    A challenge password []:
+    ...
+    $ openssl x509 -req -days 1825 -in server.csr -signkey server.key -out server.crt
+
+The `server.crt` file goes in **SSL_CERTFILE** and `server.key` in
+**SSL_KEYFILE** in the server process's environment.
+
+Starting with Electrum 1.9, the client will learn and locally cache
+the SSL certificate for your server upon the first request to prevent
+man-in-the middle attacks for all further connections.
+
+If your certificate is lost or expires on the server side, you will
+need to run your server with a different server name and a new
+certificate.  Therefore it's a good idea to make an offline backup
+copy of your certificate and key in case you need to restore them.
+
+
 .. _`ENVIRONMENT.rst`: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _`samples/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/samples/systemd/electrumx.service
 .. _`daemontools`: http://cr.yp.to/daemontools.html

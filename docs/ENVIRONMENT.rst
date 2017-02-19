@@ -215,7 +215,7 @@ raise them.
   functioning Electrum clients by default will send pings roughly
   every 60 seconds.
 
-PEER DISCOVERY
+Peer Discovery
 --------------
 
 In response to the `server.peers.subscribe` RPC call, ElectrumX will

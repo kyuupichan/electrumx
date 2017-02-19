@@ -111,18 +111,14 @@ Python's ``asyncio`` means ElectrumX has no (direct) use for threads
 and associated complications.
 
 
-Roadmap Pre-1.0
-===============
-
-- minor code cleanups
-- fixes for a couple of outstanding issues
-
-Roadmap Post-1.0
-================
+Roadmap
+=======
 
 - Python 3.6, which has several performance improvements relevant to
   ElectrumX
 - UTXO root logic and implementation
+- incremental history serving / pruning
+- potential new functionality such as adding label server
 - potentially move some functionality to C or C++
 
 
@@ -135,6 +131,18 @@ version for the release of 1.0.
 
 ChangeLog
 =========
+
+Version 0.99
+------------
+
+Preparation for release of 1.0, which will only have bug fixes and
+documentation updates.
+
+* improve handling of daemon going down so that incoming connections
+  are not blocked.  Also improve logging thereof.  Fixes `#100`_.
+* add facility to disable peer discovery and/or self announcement,
+  see `docs/ENVIRONMENT.rst`_.
+* add FairCoin (thokon00)
 
 Version 0.11.4
 --------------
@@ -153,7 +161,7 @@ Version 0.11.2
   subscribing to updates of arbitrary scripts, not just those of
   standard bitcoin addresses.  I'll fully document once confirmed
   working as expected.
-  Closes #124
+  Closes `#124`_.
 
 Version 0.11.1
 --------------
@@ -356,6 +364,7 @@ stability please stick with the 0.9 series.
 .. _#104: https://github.com/kyuupichan/electrumx/issues/104
 .. _#110: https://github.com/kyuupichan/electrumx/issues/110
 .. _#111: https://github.com/kyuupichan/electrumx/issues/111
+.. _#124: https://github.com/kyuupichan/electrumx/issues/124
 .. _#126: https://github.com/kyuupichan/electrumx/issues/126
 .. _#129: https://github.com/kyuupichan/electrumx/issues/129
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
