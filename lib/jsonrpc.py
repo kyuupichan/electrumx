@@ -760,9 +760,11 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
 
     def peer_info(self):
         '''Returns information about the peer.'''
-        if self.transport:
+        try:
+            # get_extra_info can throw even if self.transport is not None
             return self.transport.get_extra_info('peername')
-        return None
+        except Exception:
+            return None
 
     def abort(self):
         '''Cut the connection abruptly.'''
@@ -776,7 +778,6 @@ class JSONSession(JSONSessionBase, asyncio.Protocol):
 
     def connection_lost(self, exc):
         '''Trigger timeouts of all pending requests.'''
-        self.transport = None
         self.timeout_session()
 
     def is_closing(self):
