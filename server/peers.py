@@ -440,7 +440,7 @@ class PeerManager(util.LoggedClass):
         def retry_peer(peer):
             # Try some Tor at startup to determine the proxy so we can
             # serve the right banner file
-            if self.last_tor_retry_time == 0 and self.is_coin_onion_peer(peer):
+            if self.tor_proxy.port is None and self.is_coin_onion_peer(peer):
                 return True
             # Retry a peer whose ports might have updated
             if peer.other_port_pairs:
