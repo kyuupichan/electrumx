@@ -275,7 +275,7 @@ class ElectrumX(SessionBase):
             msg = ('chunk indices not advancing (wrong network?): {}'
                    .format(self.chunk_indices))
             # INVALID_REQUEST triggers a disconnect
-            raise RPCError(mrg, JSONRPC.INVALID_REQUEST)
+            raise RPCError(msg, JSONRPC.INVALID_REQUEST)
         return self.controller.get_chunk(index)
 
     def is_tor(self):
