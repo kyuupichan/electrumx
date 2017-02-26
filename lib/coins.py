@@ -204,7 +204,7 @@ class Coin(object):
         verbyte = -1
         verlen = len(raw) - 20
         if verlen > 0:
-            verbyte, hash_bytes = raw[0:verlen], raw[verlen:]
+            verbyte, hash_bytes = raw[:verlen], raw[verlen:]
 
         if verbyte == cls.P2PKH_VERBYTE:
             return ScriptPubKey.P2PKH_script(hash_bytes)
