@@ -112,14 +112,17 @@ class PeerSession(JSONSession):
 
         self.peer_mgr.add_peers(peers)
 
+        # Announce ourself if not present.  Don't if disabled or we
+        # are a non-public IP address.
         if not self.peer_mgr.env.peer_announce:
             return
-
-        # Announce ourself if not present
         my = self.peer_mgr.my_clearnet_peer()
+        if not my.is_public:
+            return
         for peer in my.matches(peers):
             if peer.tcp_port == my.tcp_port and peer.ssl_port == my.ssl_port:
                 return
+
         self.log_info('registering ourself with server.add_peer')
         self.send_request(self.on_add_peer, 'server.add_peer', [my.features])
 
@@ -307,8 +310,9 @@ class PeerManager(util.LoggedClass):
         '''Add peers from an incoming connection.'''
         peers = Peer.peers_from_features(features, source)
         if peers:
-            self.log_info('add_peer request received from {}'
-                          .format(peers[0].host))
+            hosts = [peer.host for peer in peers]
+            self.log_info('add_peer request from {} for {}'
+                          .format(source, ', '.join(hosts)))
             self.add_peers(peers, check_ports=True)
         return bool(peers)
 
