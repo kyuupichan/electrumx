@@ -132,6 +132,12 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.99.2
+--------------
+
+* don't announce self if a non-public IP address
+* logging tweaks
+
 Version 0.99.1
 --------------
 
