@@ -35,7 +35,7 @@ class IRC(LoggedClass):
         self.prefix = env.coin.IRC_PREFIX
         self.nick = '{}{}'.format(self.prefix,
                                   env.irc_nick if env.irc_nick else
-                                  double_sha256(env.identity.host.encode())
+                                  double_sha256(env.host.encode())
                                   [:5].hex())
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
 
