@@ -112,8 +112,10 @@ class ElectrumX(SessionBase):
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.mempool_statuses = {}
+        self.chunk_indices = []
         self.electrumx_handlers = {
             'blockchain.address.subscribe': self.address_subscribe,
+            'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
             'blockchain.script_hash.subscribe': self.script_hash_subscribe,
@@ -259,7 +261,22 @@ class ElectrumX(SessionBase):
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
-        return self.controller.peer_mgr.myself.features
+        return self.controller.peer_mgr.my_clearnet_peer().features
+
+    def block_get_chunk(self, index):
+        '''Return a chunk of block headers as a hexadecimal string.
+
+        index: the chunk index'''
+        index = self.controller.non_negative_integer(index)
+        self.chunk_indices.append(index)
+        self.chunk_indices = self.chunk_indices[-5:]
+        # -2 allows backing up a single chunk but no more.
+        if index <= max(self.chunk_indices[:-2], default=-1):
+            msg = ('chunk indices not advancing (wrong network?): {}'
+                   .format(self.chunk_indices))
+            # INVALID_REQUEST triggers a disconnect
+            raise RPCError(mrg, JSONRPC.INVALID_REQUEST)
+        return self.controller.get_chunk(index)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are

@@ -81,7 +81,7 @@ class Controller(util.LoggedClass):
             ('blockchain',
              'address.get_balance address.get_history address.get_mempool '
              'address.get_proof address.listunspent '
-             'block.get_header block.get_chunk estimatefee relayfee '
+             'block.get_header estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
             ('server', 'donation_address'),
         ]
@@ -793,13 +793,6 @@ class Controller(util.LoggedClass):
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in sorted(await self.get_utxos(hashX))]
-
-    def block_get_chunk(self, index):
-        '''Return a chunk of block headers.
-
-        index: the chunk index'''
-        index = self.non_negative_integer(index)
-        return self.get_chunk(index)
 
     def block_get_header(self, height):
         '''The deserialized header at a given height.
