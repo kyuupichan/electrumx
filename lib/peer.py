@@ -243,7 +243,7 @@ class Peer(object):
         details = self.real_name().split()[1:]
         return (self.ip_addr or self.host, self.host, details)
 
-    def real_name(self, host_override=None):
+    def real_name(self):
         '''Real name of this peer as used on IRC.'''
         def port_text(letter, port):
             if port == self.DEFAULT_PORTS.get(letter):
@@ -251,7 +251,7 @@ class Peer(object):
             else:
                 return letter + str(port)
 
-        parts = [host_override or self.host, 'v' + self.protocol_max]
+        parts = [self.host, 'v' + self.protocol_max]
         if self.pruning:
             parts.append('p{:d}'.format(self.pruning))
         for letter, port in (('s', self.ssl_port), ('t', self.tcp_port)):

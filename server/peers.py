@@ -29,9 +29,8 @@ STALE_SECS = 86400
 WAKEUP_SECS = 300
 
 
-def peer_from_env(env):
-    '''Return ourself as a peer from the environment settings.'''
-    main_identity = env.identities[0]
+def peers_from_env(env):
+    '''Return a list of peers from the environment settings.'''
     hosts = {identity.host: {'tcp_port': identity.tcp_port,
                              'ssl_port': identity.ssl_port}
              for identity in env.identities}
@@ -44,7 +43,7 @@ def peer_from_env(env):
         'genesis_hash': env.coin.GENESIS_HASH,
     }
 
-    return Peer(main_identity.host, features, 'env')
+    return [Peer(ident.host, features, 'env') for ident in env.identities]
 
 
 class PeerSession(JSONSession):
@@ -117,7 +116,7 @@ class PeerSession(JSONSession):
             return
 
         # Announce ourself if not present
-        my = self.peer_mgr.myself
+        my = self.peer_mgr.my_clearnet_peer()
         for peer in my.matches(peers):
             if peer.tcp_port == my.tcp_port and peer.ssl_port == my.ssl_port:
                 return
@@ -214,7 +213,7 @@ class PeerManager(util.LoggedClass):
         self.controller = controller
         self.loop = controller.loop
         self.irc = IRC(env, self)
-        self.myself = peer_from_env(env)
+        self.myselves = peers_from_env(env)
         # value is max outgoing connections at a time
         self.semaphore = asyncio.BoundedSemaphore(value=8)
         self.retry_event = asyncio.Event()
@@ -228,6 +227,10 @@ class PeerManager(util.LoggedClass):
         self.tor_proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
                                     loop=self.loop)
         self.import_peers()
+
+    def my_clearnet_peer(self):
+        '''Returns the clearnet peer representing this server.'''
+        return [peer for peer in self.myselves if not peer.is_tor][0]
 
     def info(self):
         '''The number of peers.'''
@@ -322,9 +325,8 @@ class PeerManager(util.LoggedClass):
         onion_peers = []
 
         # Always report ourselves if valid (even if not public)
-        peers = set()
-        if self.myself.last_connect > cutoff:
-            peers.add(self.myself)
+        peers = set(myself for myself in self.myselves
+                    if myself.last_connect > cutoff)
 
         # Bucket the clearnet peers and select one from each
         buckets = defaultdict(list)
@@ -370,7 +372,7 @@ class PeerManager(util.LoggedClass):
 
     def import_peers(self):
         '''Import hard-coded peers from a file or the coin defaults.'''
-        self.add_peers([self.myself])
+        self.add_peers(self.myselves)
         coin_peers = self.env.coin.PEERS
         self.onion_peers = [Peer.from_real_name(rn, 'coins.py')
                             for rn in coin_peers if '.onion ' in rn]
@@ -386,8 +388,8 @@ class PeerManager(util.LoggedClass):
     def connect_to_irc(self):
         '''Connect to IRC if not disabled.'''
         if self.env.irc and self.env.coin.IRC_PREFIX:
-            pairs = [(self.myself.real_name(ident.host), ident.nick_suffix)
-                     for ident in self.env.identities]
+            pairs = [(peer.real_name(), ident.nick_suffix) for peer, ident
+                     in zip(self.myselves, self.env.identities)]
             self.ensure_future(self.irc.start(pairs))
         else:
             self.logger.info('IRC is disabled')
