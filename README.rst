@@ -132,6 +132,17 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.99.1
+--------------
+
+* Add more verbose logging in attempt to understand issue `#135`_
+* REPORT_TCP_PORT_TOR and REPORT_SSL_PORT_TOR were ignored when constructing
+  IRC real names.  Fixes `#136`_
+* Only serve chunk requests in forward direction; disconnect clients iterating
+  backwards.  Minimizes bandwidth consumption caused by misbehaving Electrum
+  clients.  Closes `#132`_
+* Tor coin peers would always be scheduled for check, fixes `#138`_ (fr3aker)
+
 Version 0.99
 ------------
 
@@ -367,6 +378,10 @@ stability please stick with the 0.9 series.
 .. _#124: https://github.com/kyuupichan/electrumx/issues/124
 .. _#126: https://github.com/kyuupichan/electrumx/issues/126
 .. _#129: https://github.com/kyuupichan/electrumx/issues/129
+.. _#132: https://github.com/kyuupichan/electrumx/issues/132
+.. _#135: https://github.com/kyuupichan/electrumx/issues/135
+.. _#136: https://github.com/kyuupichan/electrumx/issues/136
+.. _#138: https://github.com/kyuupichan/electrumx/issues/138
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
