@@ -189,13 +189,14 @@ class PeerSession(JSONSession):
         if not self.has_pending_requests():
             is_good = not self.failed
             self.peer_mgr.set_connection_status(self.peer, is_good)
-            if is_good:
-                if self.peer.is_tor:
-                    self.log_info('verified via {} over Tor'.format(self.kind))
-                else:
-                    self.log_info('verified via {} at {}'
-                                  .format(self.kind,
-                                          self.peer_addr(anon=False)))
+            if self.peer.is_tor:
+                how = 'via {} over Tor'.format(self.kind)
+            else:
+                how = 'via {} at {}'.format(self.kind,
+                                            self.peer_addr(anon=False))
+            status = 'verified' if is_good else 'failed to verify'
+            elapsed = time.time() - self.peer.last_try
+            self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
             self.close_connection()
 
 
@@ -463,16 +464,21 @@ class PeerManager(util.LoggedClass):
                 self.last_tor_retry_time = now
 
         for peer in peers:
-            peer.last_try = time.time()
             peer.try_count += 1
             pairs = peer.connection_port_pairs()
             if peer.bad or not pairs:
                 self.maybe_forget_peer(peer)
             else:
+                start = time.time()
                 await self.semaphore.acquire()
+                elapsed = time.time() - start
+                if elapsed > 5:
+                    self.log_warning('waited {:.1f}s for connection semaphore'
+                                     .format(elapsed))
                 self.retry_peer(peer, pairs)
 
     def retry_peer(self, peer, port_pairs):
+        peer.last_try = time.time()
         kind, port = port_pairs[0]
         # Python 3.5.3: use PROTOCOL_TLS
         sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23) if kind == 'SSL' else None
@@ -496,8 +502,10 @@ class PeerManager(util.LoggedClass):
         exception = future.exception()
         if exception:
             kind, port = port_pairs[0]
-            self.logger.info('failed connecting to {} at {} port {:d}: {}'
-                             .format(peer, kind, port, exception))
+            self.logger.info('failed connecting to {} at {} port {:d} '
+                             'in {:.1f}s: {}'
+                             .format(peer, kind, port,
+                                     time.time() - peer.last_try, exception))
             port_pairs = port_pairs[1:]
             if port_pairs:
                 self.retry_peer(peer, port_pairs)
