@@ -12,7 +12,7 @@ import time
 from functools import partial
 
 from lib.hash import sha256, hash_to_str
-from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2
+from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2, JSONRPC
 from server.daemon import DaemonError
 import server.version as version
 
