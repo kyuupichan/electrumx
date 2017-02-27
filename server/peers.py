@@ -25,7 +25,7 @@ import server.version as version
 
 PEERS_FILE = 'peers'
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
-STALE_SECS = 3600 #86400
+STALE_SECS = 3600 * 4 # 86400
 WAKEUP_SECS = 300
 
 
@@ -85,7 +85,6 @@ class PeerSession(JSONSession):
         '''Handle disconnection.'''
         super().connection_lost(exc)
         self.future.cancel()
-        self.peer_mgr.connection_lost(self)
 
     def on_peers_subscribe(self, result, error):
         '''Handle the response to the peers.subcribe message.'''
@@ -218,8 +217,6 @@ class PeerManager(util.LoggedClass):
         self.loop = controller.loop
         self.irc = IRC(env, self)
         self.myselves = peers_from_env(env)
-        # value is max outgoing connections at a time
-        self.semaphore = asyncio.BoundedSemaphore(value=2)
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the
@@ -231,7 +228,6 @@ class PeerManager(util.LoggedClass):
         self.tor_proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
                                     loop=self.loop)
         self.import_peers()
-        self.conn_count = 0
 
     def my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server.'''
@@ -474,16 +470,6 @@ class PeerManager(util.LoggedClass):
             if peer.bad or not pairs:
                 self.maybe_forget_peer(peer)
             else:
-                peer.conn_count = self.conn_count
-                self.conn_count += 1
-                self.log_info('preparing connection {:d} to {}'
-                              .format(peer.conn_count, peer))
-                start = time.time()
-                await self.semaphore.acquire()
-                elapsed = time.time() - start
-                if elapsed > 5:
-                    self.log_warning('waited {:.1f}s for connection semaphore'
-                                     .format(elapsed))
                 self.retry_peer(peer, pairs)
 
     def retry_peer(self, peer, port_pairs):
@@ -520,16 +506,6 @@ class PeerManager(util.LoggedClass):
                 self.retry_peer(peer, port_pairs)
             else:
                 self.set_connection_status(peer, False)
-                self.semaphore.release()
-                self.log_info('connection {:d} to {} failed'
-                              .format(peer.conn_count, peer))
-
-    def connection_lost(self, session):
-        '''Called by the peer session when disconnected.'''
-        peer = session.peer
-        self.log_info('connection {:d} to {} closed'
-                      .format(peer.conn_count, peer))
-        self.semaphore.release()
 
     def set_connection_status(self, peer, good):
         '''Called when a connection succeeded or failed.'''
