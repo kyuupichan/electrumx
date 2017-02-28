@@ -132,6 +132,14 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.99.3
+--------------
+
+* Require Python 3.5.3.  3.5.2 has asyncio API and socket-related issues.
+  Resolves `#135`_
+* Remove peer semaphore
+* Improved Base58 handling for >1 byte version prefix (erasmospunk)
+
 Version 0.99.2
 --------------
 
@@ -289,80 +297,6 @@ Version 0.10.7
   faster sync
 * fix and speed up RocksDB iterator slightly
 * expect JSON with bitcoind HTTP status code 500
-
-Version 0.10.6
---------------
-
-* fix for rest of second part of issue `#100`_
-* check HTTP error codes from bitcoind and log appropriately
-* don't error opening a new DB that has nothing written yet
-
-Version 0.10.5
---------------
-
-* fix for some of second part of issue `#100`_ where the ElectrumX was not
-  killable if bitcoind was unavailable
-
-
-Version 0.10.4
---------------
-
-* Named argument handling as per JSON RPC 2.0 (issue `#99`_).  This
-  takes argument names from the Python RPC handlers, and paves the way
-  for creating help output automatically from the handler docstrings
-* Write reorg undo info with the UTXO flushes (issue `#101`_)
-
-Version 0.10.3
---------------
-
-* Add an RPC call to force a reorg at run-time, issue `#103`_
-* Make flushes and reorgs async, issue `#102`_
-* add Argentum and Digibyte support to coins.py (protonn)
-
-Version 0.10.2
---------------
-
-* The **NETWORK** environment variable was renamed **NET** to bring it
-  into line with lib/coins.py.
-* The genesis hash is now compared with the genesis hash expected by
-  **COIN** and **NET**.  This sanity check was not done previously, so
-  you could easily be syncing to a network daemon different to what
-  you thought.
-* SegWit-compatible testnet support for bitcoin core versions 0.13.1
-  or higher.  Resolves issue `#92`_.  Testnet worked with prior
-  versions of ElectrumX as long as you used an older bitcoind too,
-  such as 0.13.0 or Bitcoin Unlimited.
-
-  **Note**: for testnet, you need to set **NET** to *testnet-segwit*
-  if using a recent Core bitcoind that broke RPC compatibility, or
-  *testnet* if using a bitcoind that maintains RPC compatibility.
-  Changing **NET** for Bitcoin testnet can be done dynamically; it is
-  not necessary to resync from scratch.
-
-Version 0.10.1
---------------
-
-* Includes what should be a fix for issue `#94`_ - stale references to
-  old sessions.  This would effectively memory and network handles.
-
-Version 0.10.0
---------------
-
-* Major rewrite of DB layer as per issue `#72`_.  UTXOs and history
-  are now indexed by the hash of the pay to script, making the index
-  independent of the address scheme.
-* The history and UTXO DBs are also now separate.
-
-Together these changes reduce the size of the DB by approximately 15%
-and the time taken to sync from genesis by about 20%.
-
-Note the **UTXO_MB** and **HIST_MB** environment variables have been
-removed and replaced with the single environment variable
-**CACHE_MB**.  I suggest you set this to 90% of the sum of the old
-variables to use roughly the same amount of memory.
-
-For now this code should be considered experimental; if you want
-stability please stick with the 0.9 series.
 
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
