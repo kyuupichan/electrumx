@@ -10,7 +10,8 @@ small - pull requests are welcome.
 ================ ========================
 Package          Notes
 ================ ========================
-Python3          ElectrumX uses asyncio.  Python version >= 3.5 is **required**.
+Python3          ElectrumX uses asyncio.  Python version >= 3.5.3 is
+                 **required**.
 `aiohttp`_       Python library for asynchronous HTTP.  Version >=
                  1.0 required; I am using 1.0.5.
 `pylru`_         Python LRU cache package.  I'm using 1.0.9.

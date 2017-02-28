@@ -51,8 +51,7 @@ class Env(LoggedClass):
         # Peer discovery
         self.peer_discovery = bool(self.default('PEER_DISCOVERY', True))
         self.peer_announce = bool(self.default('PEER_ANNOUNCE', True))
-        # Python 3.5.3 - revert back to localhost?
-        self.tor_proxy_host = self.default('TOR_PROXY_HOST', '127.0.0.1')
+        self.tor_proxy_host = self.default('TOR_PROXY_HOST', 'localhost')
         self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')

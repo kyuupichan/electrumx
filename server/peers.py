@@ -475,8 +475,7 @@ class PeerManager(util.LoggedClass):
     def retry_peer(self, peer, port_pairs):
         peer.last_try = time.time()
         kind, port = port_pairs[0]
-        # Python 3.5.3: use PROTOCOL_TLS
-        sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23) if kind == 'SSL' else None
+        sslc = ssl.SSLContext(ssl.PROTOCOL_TLS) if kind == 'SSL' else None
 
         if peer.is_tor:
             create_connection = self.tor_proxy.create_connection

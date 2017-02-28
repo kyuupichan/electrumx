@@ -252,9 +252,7 @@ some of this.
 
 * **TOR_PROXY_HOST**
 
-  The host where your Tor proxy is running.  Defaults to *127.0.0.1*.
-  If you use a hostname here rather than an IP address, you must have
-  Python version >= 3.5.3, Python 3.5.2 will **not** work.
+  The host where your Tor proxy is running.  Defaults to *localhost*.
 
   If you are not running a Tor proxy just leave this environment
   variable undefined.

@@ -289,8 +289,7 @@ class Controller(util.LoggedClass):
         if env.tcp_port is not None:
             await self.start_server('TCP', env.host, env.tcp_port)
         if env.ssl_port is not None:
-            # Python 3.5.3: use PROTOCOL_TLS
-            sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
 

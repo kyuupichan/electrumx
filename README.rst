@@ -8,7 +8,7 @@ ElectrumX - Reimplementation of electrum-server
 ===============================================
 
   :Licence: MIT
-  :Language: Python (>= 3.5.1)
+  :Language: Python (>= 3.5.3)
   :Author: Neil Booth
 
 Getting Started

@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import signal
+import sys
 import traceback
 from functools import partial
 
@@ -28,9 +29,12 @@ SUPPRESS_MESSAGES = [
 
 def main_loop():
     '''Start the server.'''
+    if sys.version_info < (3, 5, 3):
+        raise RuntimeError('Python >= 3.5.3 is required to run ElectrumX')
+
     if os.geteuid() == 0:
-        raise Exception('DO NOT RUN AS ROOT! Create an unpriveleged user '
-                        'account and use that')
+        raise RuntimeError('DO NOT RUN AS ROOT! Create an unpriveleged user '
+                           'account and use that')
 
     loop = asyncio.get_event_loop()
     # loop.set_debug(True)
