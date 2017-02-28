@@ -440,7 +440,7 @@ class PeerManager(util.LoggedClass):
         now = time.time()
         nearly_stale_time = (now - STALE_SECS) + WAKEUP_SECS * 2
 
-        def retry_peer(peer):
+        def should_retry(peer):
             # Try some Tor at startup to determine the proxy so we can
             # serve the right banner file
             if self.tor_proxy.port is None and self.is_coin_onion_peer(peer):
@@ -454,7 +454,7 @@ class PeerManager(util.LoggedClass):
             # Retry a failed connection if enough time has passed
             return peer.last_try < now - WAKEUP_SECS * 2 ** peer.try_count
 
-        peers = [peer for peer in self.peers if retry_peer(peer)]
+        peers = [peer for peer in self.peers if should_retry(peer)]
 
         # If we don't have a tor proxy drop tor peers, but retry
         # occasionally
