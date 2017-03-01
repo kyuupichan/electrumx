@@ -25,7 +25,7 @@ import server.version as version
 
 PEERS_FILE = 'peers'
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
-STALE_SECS = 3600 * 4 # 86400
+STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
 
 
@@ -330,14 +330,16 @@ class PeerManager(util.LoggedClass):
         peers = set(myself for myself in self.myselves
                     if myself.last_connect > cutoff)
 
-        # Bucket the clearnet peers and select one from each
+        # Bucket the clearnet peers and select up to two from each
         buckets = defaultdict(list)
         for peer in recent:
             if peer.is_tor:
                 onion_peers.append(peer)
             else:
                 buckets[peer.bucket()].append(peer)
-        peers.update(random.choice(bpeers) for bpeers in buckets.values())
+        for bucket_peers in buckets.values():
+            random.shuffle(bucket_peers)
+            peers.update(bucket_peers[:2])
 
         # Add up to 20% onion peers (but up to 10 is OK anyway)
         onion_peers = onion_peers or self.onion_peers
