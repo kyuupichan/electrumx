@@ -339,12 +339,13 @@ class JSONSessionBase(util.LoggedClass):
         self.log_info('resuming processing')
         self.pause = False
 
-    def is_oversized(self, length):
-        '''Return True if the given outgoing message size is too large.'''
+    def is_oversized(self, length, id_):
+        '''Return an error payload if the given outgoing message size is too
+        large, or False if not.
+        '''
         if self.max_send and length > max(1000, self.max_send):
             msg = 'response too large (at least {:d} bytes)'.format(length)
-            return self.error_bytes(msg, JSONRPC.INVALID_REQUEST,
-                                    payload.get('id'))
+            return self.error_bytes(msg, JSONRPC.INVALID_REQUEST, id_)
         return False
 
     def send_binary(self, binary):
@@ -418,15 +419,15 @@ class JSONSessionBase(util.LoggedClass):
         '''Encode a Python object as binary bytes.'''
         assert isinstance(payload, dict)
 
+        id_ = payload.get('id')
         try:
             binary = json.dumps(payload).encode()
         except TypeError:
             msg = 'JSON encoding failure: {}'.format(payload)
             self.log_error(msg)
-            binary = self.error_bytes(msg, JSONRPC.INTERNAL_ERROR,
-                                      payload.get('id'))
+            binary = self.error_bytes(msg, JSONRPC.INTERNAL_ERROR, id_)
 
-        error_bytes = self.is_oversized(len(binary))
+        error_bytes = self.is_oversized(len(binary), id_)
         return error_bytes or binary
 
     def decode_message(self, payload):
@@ -483,7 +484,7 @@ class JSONSessionBase(util.LoggedClass):
         if not batch:
             return self.version.batch_bytes(results)
 
-        error_bytes = self.is_oversized(self.batch_size(results))
+        error_bytes = self.is_oversized(self.batch_size(results), None)
         if error_bytes:
             return error_bytes
 
