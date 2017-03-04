@@ -132,6 +132,13 @@ version for the release of 1.0.
 ChangeLog
 =========
 
+Version 0.99.4
+--------------
+
+* Add support for Bitcoin Unlimited's nolnet (**NET**=nolnet)
+* Choose 2 peers per bucket
+* Minor bugfix
+
 Version 0.99.3
 --------------
 
