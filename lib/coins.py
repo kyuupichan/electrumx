@@ -332,7 +332,7 @@ class BitcoinTestnet(Bitcoin):
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
                     'aec3ced90fa3f408719526f8d77f4943')
-    REORG_LIMIT = 2000
+    REORG_LIMIT = 4000
     TX_COUNT = 12242438
     TX_COUNT_HEIGHT = 1035428
     TX_PER_BLOCK = 21
@@ -361,6 +361,24 @@ class BitcoinTestnetSegWit(BitcoinTestnet):
     @classmethod
     def deserializer(cls):
         return DeserializerSegWit
+
+
+class BitcoinNolnet(Bitcoin):
+    '''Bitcoin Unlimited nolimit testnet.'''
+
+    NET = "nolnet"
+    GENESIS_HASH = ('00000000e752e935119102b142b5c27a'
+                    '346a023532a42edcf7c8ffd0a22206e9')
+    REORG_LIMIT = 8000
+    TX_COUNT = 195106
+    TX_COUNT_HEIGHT = 24920
+    TX_PER_BLOCK = 8
+    IRC_PREFIX = "EN_"
+    RPC_PORT = 28332
+    PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
+    PEERS = [
+        '14.3.140.101 s t',
+    ]
 
 
 class Litecoin(Coin):
