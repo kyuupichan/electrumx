@@ -26,6 +26,18 @@ DB Engine        I use `plyvel`_ 0.9, a Python interface to LevelDB.
                  required if for Dash.  Version 1.4 tested.
 ================ ========================
 
+You need to be running a non-pruning bitcoin daemon with::
+
+  txindex=1
+
+set in its configuration file.  If you have an existing installation
+of bitcoind and have not previously set this you will need to reindex
+the blockchain with::
+
+    bitcoind -reindex
+
+which can take some time.
+
 While not a requirement for running ElectrumX, it is intended to be
 run with supervisor software such as Daniel Bernstein's
 `daemontools`_, Gerald Pape's `runit`_ package or `systemd`.  These

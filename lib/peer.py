@@ -143,14 +143,18 @@ class Peer(object):
     @cachedproperty
     def is_valid(self):
         ip = self.ip_address
-        if not ip:
-            return True
-        return not ip.is_multicast and (ip.is_global or ip.is_private)
+        if ip:
+            return ((ip.is_global or ip.is_private)
+                    and not (ip.is_multicast or ip.is_unspecified))
+        return True
 
     @cachedproperty
     def is_public(self):
         ip = self.ip_address
-        return self.is_valid and not (ip and ip.is_private)
+        if ip:
+            return self.is_valid and not ip.is_private
+        else:
+            return self.host != 'localhost'
 
     @cachedproperty
     def ip_address(self):

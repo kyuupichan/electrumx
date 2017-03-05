@@ -241,7 +241,7 @@ some of this.
 
 * **PEER_ANNOUNCE**
 
-  Set this environemnt variable to empty to disable announcing itself.
+  Set this environment variable to empty to disable announcing itself.
   If not defined, or non-empty, ElectrumX will announce itself to
   peers.
 

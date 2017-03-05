@@ -278,6 +278,8 @@ class PeerManager(util.LoggedClass):
         retry = False
         new_peers = []
         for peer in peers:
+            if not peer.is_valid:
+                continue
             matches = peer.matches(self.peers)
             if not matches:
                 new_peers.append(peer)

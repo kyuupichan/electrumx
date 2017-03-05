@@ -7,6 +7,8 @@
 ElectrumX - Reimplementation of electrum-server
 ===============================================
 
+For a future network with bigger blocks.
+
   :Licence: MIT
   :Language: Python (>= 3.5.3)
   :Author: Neil Booth
@@ -20,7 +22,7 @@ Features
 ========
 
 - Efficient, lightweight reimplementation of electrum-server
-- Efficient synchronization of bitcoin mainnet from Genesis.  Recent
+- Fast synchronization of bitcoin mainnet from Genesis.  Recent
   hardware should synchronize in well under 24 hours.  The fastest
   time to height 448k (mid January 2017) reported is under 4h 30m.  On
   the same hardware JElectrum would take around 4 days and
@@ -42,7 +44,7 @@ Features
 - Daemon failover.  More than one daemon can be specified, and
   ElectrumX will failover round-robin style if the current one fails
   for any reason.
-- peer discovery protocol removes need for IRC
+- Peer discovery protocol removes need for IRC
 - Coin abstraction makes compatible altcoin and testnet support easy.
 
 Motivation
@@ -52,7 +54,7 @@ Mainly for privacy reasons, I have long wanted to run my own Electrum
 server, but I struggled to set it up or get it to work on my
 DragonFlyBSD system and lost interest for over a year.
 
-In September 2015 I heard that electrum-server databases were getting
+In September 2016 I heard that electrum-server databases were getting
 large (35-45GB when gzipped), and it would take several weeks to sync
 from Genesis (and was sufficiently painful that no one seems to have
 done it for about a year).  This made me curious about improvements
@@ -118,24 +120,22 @@ Roadmap
   ElectrumX
 - UTXO root logic and implementation
 - incremental history serving / pruning
-- potential new functionality such as adding label server
+- new features such as possibly adding label server functionality
 - potentially move some functionality to C or C++
-
-
-Database Format
-===============
-
-The database format of ElectrumX will not change from the 0.10.0
-version for the release of 1.0.
 
 
 ChangeLog
 =========
 
+Version 1.0
+-----------
+
+* Minor doc tweaks only
+
 Version 0.99.4
 --------------
 
-* Add support for Bitcoin Unlimited's nolnet (**NET**=nolnet)
+* Add support for Bitcoin Unlimited's nolnet; set **NET** to nolnet
 * Choose 2 peers per bucket
 * Minor bugfix
 
@@ -216,114 +216,15 @@ Version 0.11.0
   tor-specific banner file is served.  See **TOR_BANNER_FILE** in
   `docs/ENVIRONMENT.rst`_.
 
-Version 0.10.19
----------------
-
-* update `docs/PEER_DISCOVERY.rst`_
-* accept IPv6 addresses in DAEMON_URL (fixes `#126`_)
-
-Version 0.10.18
----------------
-
-* bandwidth accounting was unintentionally lost in 0.10.11, restore it
-
-Version 0.10.17
----------------
-
-Minor upgrade
-
-* added current daemon URL and uptime to getinfo RPC call
-* altcoin cleanups / fixes (erasmospunk)
-
-Version 0.10.16
----------------
-
-* disable batch notifications; unintentionally enabled in a prior version
-
-Version 0.10.15
----------------
-
-* Force JSONRPCv2 for backwards compat with Coinomi wallets that don't
-  speak JSON RPCv1 properly.  This will only be forced for a few
-  months to give Coinomi users a chance to upgrade.
-* Basic sanity check on IRC reported settings (closes `#110`_)
-* Add an RPC interface to set **DAEMON_URL** at run-time and switch back
-  to the primary daemon (closes `#111`_)
-
-Version 0.10.14
----------------
-
-* misc cleanups and code changes to prepare for peer discovery in 0.11.0
-* add `docs/PEER_DISCOVERY.rst`_
-
-Version 0.10.13
----------------
-
-* worked around asyncio issue to suppress the annoying log spew on shutdown
-  that makes it look like a bomb hit
-* implement peer subscriptions as real subscriptions with incremental updates
-* misc cleanups
-
-Version 0.10.12
----------------
-
-* fixed a bug in 0.10.11 where a dict changed whilst iterating it
-
-Version 0.10.11
----------------
-
-* rewrite of JSON RPC layer to improve usability for clients.
-  Includes support of JSON RPC v1, v2 and a compat layer that tries to
-  detect the peer's version.
-
-Version 0.10.10
----------------
-
-* move peer management from irc.py to peers.py.  This is preparataion
-  for peer discovery without IRC.
-* misc cleanups
-* fix Litecoin genesis hash (petrkr)
-
-Version 0.10.9
---------------
-
-* restore client to sessions output
-* cleanup shutdown process; hopefully this resolves the log spew for good
-
-Version 0.10.8
---------------
-
-* fix import for reverse iterator for RocksDB
-* fix tests
-
-Version 0.10.7
---------------
-
-* remove LMDB
-* turn on snappy compression for LevelDB and RocksDB; gives smaller DBs and
-  faster sync
-* fix and speed up RocksDB iterator slightly
-* expect JSON with bitcoind HTTP status code 500
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 
-.. _#72: https://github.com/kyuupichan/electrumx/issues/72
-.. _#92: https://github.com/kyuupichan/electrumx/issues/92
-.. _#94: https://github.com/kyuupichan/electrumx/issues/94
-.. _#99: https://github.com/kyuupichan/electrumx/issues/99
 .. _#100: https://github.com/kyuupichan/electrumx/issues/100
-.. _#101: https://github.com/kyuupichan/electrumx/issues/101
-.. _#102: https://github.com/kyuupichan/electrumx/issues/102
-.. _#103: https://github.com/kyuupichan/electrumx/issues/103
 .. _#104: https://github.com/kyuupichan/electrumx/issues/104
-.. _#110: https://github.com/kyuupichan/electrumx/issues/110
-.. _#111: https://github.com/kyuupichan/electrumx/issues/111
 .. _#124: https://github.com/kyuupichan/electrumx/issues/124
-.. _#126: https://github.com/kyuupichan/electrumx/issues/126
 .. _#129: https://github.com/kyuupichan/electrumx/issues/129
 .. _#132: https://github.com/kyuupichan/electrumx/issues/132
 .. _#135: https://github.com/kyuupichan/electrumx/issues/135
