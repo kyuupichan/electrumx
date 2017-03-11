@@ -11,6 +11,9 @@ of Electrum, some of which it itself took from other projects such as
 Abe and pywallet, remain.  Thanks to the authors of all the software
 this is derived from.
 
+I'd like to thank bauerj, hsmiths and JWU42 of #electrum for their
+help and support in testing the versions of ElectrumX prior to 1.0.
+
 Thanks to Daniel Bernstein for daemontools and other software, and to
 Matthew Dillon for DragonFlyBSD.  They are both deeply inspirational
 people.
