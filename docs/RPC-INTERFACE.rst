@@ -156,6 +156,17 @@ The following commands are available:
   Currently peer data is obtained via a peer discovery protocol; it
   used to be taken from IRC.
 
+* **add_peer**
+
+  Add a peer to the peers list.  ElectrumX will schdule an immediate
+  connection attempt.  This command takes a single argument: the
+  peer's "real name" as it would advertise itself on IRC.
+
+  .. code::
+
+    $ ./electrumx_rpc.py add_peer "ecdsa.net v1.0 s110 t"
+    "peer 'ecdsa.net v1.0 s110 t' added"
+
 * **daemon_url**
 
   This command takes an optional argument that is interpreted
