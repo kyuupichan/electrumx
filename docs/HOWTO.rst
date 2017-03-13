@@ -108,7 +108,7 @@ to at least 2,500.
 Note that setting the limit in your shell does *NOT* affect ElectrumX
 unless you are invoking ElectrumX directly from your shell.  If you
 are using `systemd`, you need to set it in the `.service` file (see
-`samples/systemd/electrumx.service`_).
+`contrib/systemd/electrumx.service`_).
 
 
 Using daemontools
@@ -136,7 +136,7 @@ you might do::
 
 Then copy the all sample scripts from the ElectrumX source tree there::
 
-    cp -R /path/to/repo/electrumx/samples/daemontools ~/scripts/electrumx
+    cp -R /path/to/repo/electrumx/contrib/daemontools ~/scripts/electrumx
 
 This copies 3 things: the top level server run script, a log/ directory
 with the logger run script, an env/ directory.
@@ -172,7 +172,7 @@ Using systemd
 This repository contains a sample systemd unit file that you can use to
 setup ElectrumX with systemd. Simply copy it to :code:`/etc/systemd/system`::
 
-    cp samples/systemd/electrumx.service /etc/systemd/system/
+    cp contrib/systemd/electrumx.service /etc/systemd/system/
 
 The sample unit file assumes that the repository is located at
 :code:`/home/electrumx/electrumx`. If that differs on your system, you need to
@@ -197,6 +197,24 @@ Once configured you may want to start ElectrumX at boot::
 processes.  Depending on your hardware, ElectrumX can need several
 minutes to flush cached data to disk during initial sync.  You should
 set TimeoutStopSec to *at least* 10 mins in your `.service` file.
+
+
+Installing Python 3.6 under Ubuntu
+----------------------------------
+
+Many Ubuntu distributions have an incompatible Python version baked in.
+Because of this, it is easier to install Python 3.6 rather than attempting
+to update Python 3.5.2 to 3.5.3.  See `contrib/python3.6/python-3.6.sh`_.
+
+
+Installing on Raspberry Pi 3
+----------------------------
+
+To install on the Raspberry Pi 3 you will need to update to the "stretch" distribution. 
+See the full procedure in `contrib/raspberrypi3/install_electrumx.sh`_.
+
+See also `contrib/raspberrypi3/run_electrumx.sh`_ for an easy way to configure and 
+launch electrumx.
 
 
 Sync Progress
@@ -377,10 +395,14 @@ copy of your certificate and key in case you need to restore them.
 
 
 .. _`ENVIRONMENT.rst`: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
-.. _`samples/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/samples/systemd/electrumx.service
+.. _`contrib/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/contrib/systemd/electrumx.service
 .. _`daemontools`: http://cr.yp.to/daemontools.html
 .. _`runit`: http://smarden.org/runit/index.html
 .. _`aiohttp`: https://pypi.python.org/pypi/aiohttp
 .. _`pylru`: https://pypi.python.org/pypi/pylru
 .. _`IRC`: https://pypi.python.org/pypi/irc
 .. _`x11_hash`: https://pypi.python.org/pypi/x11_hash
+.. _`contrib/python3.6/python-3.6.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/contrib/python3.6/python-3.6.sh
+.. _`contrib/raspberrypi3/install_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/contrib/raspberrypi3/install_electrumx.sh
+.. _`contrib/raspberrypi3/run_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/contrib/raspberrypi3/run_electrumx.sh
+
