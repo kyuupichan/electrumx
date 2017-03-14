@@ -1,4 +1,5 @@
 # Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
 #
@@ -105,10 +106,10 @@ class Deserializer(object):
             self._read_le_uint32()  # locktime
         ), double_sha256(self.binary[start:self.cursor])
 
-    def read_block(self):
+    def read_tx_block(self):
         '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
         read_tx = self.read_tx
-        txs = [read_tx() for n in range(self._read_varint())]
+        txs = [read_tx() for _ in range(self._read_varint())]
         # Some coins have excess data beyond the end of the transactions
         return txs
 
