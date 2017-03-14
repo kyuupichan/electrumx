@@ -485,7 +485,6 @@ class BlockProcessor(server.db.DB):
 
         It is already verified they correctly connect onto our tip.
         '''
-        headers = [block.header for block in blocks]
         min_height = self.min_undo_height(self.daemon.cached_height())
         height = self.height
 
@@ -495,6 +494,7 @@ class BlockProcessor(server.db.DB):
             if height >= min_height:
                 self.undo_infos.append((undo_info, height))
 
+        headers = [block.header for block in blocks]
         self.height = height
         self.headers.extend(headers)
         self.tip = self.coin.header_hash(headers[-1])
@@ -569,14 +569,14 @@ class BlockProcessor(server.db.DB):
         coin = self.coin
         for block in blocks:
             # Check and update self.tip
-            header, txs = coin.block_full(block, self.height)
-            header_hash = coin.header_hash(header)
+            block_full = coin.block_full(block, self.height)
+            header_hash = coin.header_hash(block_full.header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
-            self.tip = coin.header_prevhash(header)
-            self.backup_txs(txs)
+            self.tip = coin.header_prevhash(block_full.header)
+            self.backup_txs(block_full.transactions)
             self.height -= 1
             self.tx_counts.pop()
 

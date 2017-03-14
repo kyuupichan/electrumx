@@ -665,7 +665,7 @@ class FairCoin(Coin):
         block and its height.'''
 
         if height > 0:
-            return cls.block_full(block, height)
+            return super().block_full(block, height)
         else:
             return Block(cls.block_header(block, height), [])
 
