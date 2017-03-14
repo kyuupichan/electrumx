@@ -1,4 +1,5 @@
 # Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
 #
@@ -231,15 +232,15 @@ class BlockProcessor(server.db.DB):
                                 .format(len(blocks), first, self.height + 1))
             return
 
-        headers = [self.coin.block_header(block, first + n)
-                   for n, block in enumerate(blocks)]
+        blocks = [self.coin.block_full(block, first + n)
+                         for n, block in enumerate(blocks)]
+        headers = [b.header for b in blocks]
         hprevs = [self.coin.header_prevhash(h) for h in headers]
         chain = [self.tip] + [self.coin.header_hash(h) for h in headers[:-1]]
 
         if hprevs == chain:
             start = time.time()
-            await self.controller.run_in_executor(self.advance_blocks,
-                                                  blocks, headers)
+            await self.controller.run_in_executor(self.advance_blocks, blocks)
             if not self.first_sync:
                 s = '' if len(blocks) == 1 else 's'
                 self.logger.info('processed {:,d} block{} in {:.1f}s'
@@ -477,18 +478,18 @@ class BlockProcessor(server.db.DB):
         if utxo_MB + hist_MB >= self.cache_MB or hist_MB >= self.cache_MB // 5:
             self.flush(utxo_MB >= self.cache_MB * 4 // 5)
 
-    def advance_blocks(self, blocks, headers):
+    def advance_blocks(self, blocks):
         '''Synchronously advance the blocks.
 
         It is already verified they correctly connect onto our tip.
         '''
-        block_txs = self.coin.block_txs
+        headers = [block.header for block in blocks]
         min_height = self.min_undo_height(self.daemon.cached_height())
         height = self.height
 
         for block in blocks:
             height += 1
-            undo_info = self.advance_txs(block_txs(block, height))
+            undo_info = self.advance_txs(block.transactions)
             if height >= min_height:
                 self.undo_infos.append((undo_info, height))
 
@@ -566,14 +567,14 @@ class BlockProcessor(server.db.DB):
         coin = self.coin
         for block in blocks:
             # Check and update self.tip
-            header = coin.block_header(block, self.height)
+            header, txs = coin.block_full(block, self.height)
             header_hash = coin.header_hash(header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
             self.tip = coin.header_prevhash(header)
-            self.backup_txs(coin.block_txs(block, self.height))
+            self.backup_txs(txs)
             self.height -= 1
             self.tx_counts.pop()
 
