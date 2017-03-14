@@ -238,3 +238,67 @@ class DeserializerSegWit(Deserializer):
 
         return TxSegWit(version, marker, flag, inputs,
                         outputs, witness, locktime), double_sha256(orig_ser)
+
+
+class DeserializerAuxPow(Deserializer):
+    VERSION_AUXPOW = (1 << 8)
+
+    def read_header(self, height, static_header_size):
+        '''Return the AuxPow block header bytes'''
+        start = self.cursor
+        version = self._read_le_uint32()
+        if version & self.VERSION_AUXPOW:
+            # We are going to calculate the block size then read it as bytes
+            self.cursor = start
+            self.cursor += static_header_size # Block normal header
+            self.read_tx() # AuxPow transaction
+            self.cursor += 32 # Parent block hash
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size # Merkle branch
+            self.cursor += 4 # Index
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size # Chain merkle branch
+            self.cursor += 4 # Chain index
+            self.cursor += 80 # Parent block header
+            header_end = self.cursor
+        else:
+            header_end = static_header_size
+        self.cursor = start
+        return self._read_nbytes(header_end)
+
+
+class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a JoinSplit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+
+
+class DeserializerZcash(Deserializer):
+    def read_header(self, height, static_header_size):
+        '''Return the block header bytes'''
+        start = self.cursor
+        # We are going to calculate the block size then read it as bytes
+        self.cursor += static_header_size
+        solution_size = self._read_varint()
+        self.cursor += solution_size
+        header_end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(header_end)
+
+    def read_tx(self):
+        start = self.cursor
+        base_tx =  TxJoinSplit(
+            self._read_le_int32(),  # version
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
+        )
+        if base_tx.version >= 2:
+            joinsplit_size = self._read_varint()
+            if joinsplit_size > 0:
+                self.cursor += joinsplit_size * 1802 # JSDescription
+                self.cursor += 32 # joinSplitPubKey
+                self.cursor += 64 # joinSplitSig
+        return base_tx, double_sha256(self.binary[start:self.cursor])

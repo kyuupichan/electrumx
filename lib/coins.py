@@ -39,7 +39,7 @@ from hashlib import sha256
 import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
-from lib.tx import Deserializer, DeserializerSegWit
+from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, DeserializerZcash
 
 Block = namedtuple("Block", "header transactions")
 
@@ -293,6 +293,23 @@ class Coin(object):
     def deserializer(cls):
         return Deserializer
 
+class CoinAuxPow(Coin):
+    # Set NAME and NET to avoid exception in Coin::lookup_coin_class
+    NAME = ""
+    NET = ""
+    STATIC_BLOCK_HEADERS = False
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        return double_sha256(header[:cls.BASIC_HEADER_SIZE])
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the AuxPow block header bytes'''
+        block = DeserializerAuxPow(block)
+        return block.read_header(height, cls.BASIC_HEADER_SIZE)
+
 
 class Bitcoin(Coin):
     NAME = "Bitcoin"
@@ -423,7 +440,7 @@ class LitecoinTestnet(Litecoin):
 
 
 # Source: namecoin.org
-class Namecoin(Coin):
+class Namecoin(CoinAuxPow):
     NAME = "Namecoin"
     SHORTNAME = "NMC"
     NET = "mainnet"
@@ -456,7 +473,7 @@ class NamecoinTestnet(Namecoin):
 
 # For DOGE there is disagreement across sites like bip32.org and
 # pycoin.  Taken from bip32.org and bitmerchant on github
-class Dogecoin(Coin):
+class Dogecoin(CoinAuxPow):
     NAME = "Dogecoin"
     SHORTNAME = "DOGE"
     NET = "mainnet"
@@ -654,3 +671,50 @@ class FairCoin(Coin):
             'timestamp': timestamp,
             'creatorId': creatorId,
         }
+
+
+class Zcash(Coin):
+    NAME = "Zcash"
+    SHORTNAME = "ZEC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1CB8")
+    P2SH_VERBYTE = bytes.fromhex("1CBD")
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00040fe8ec8471911baa1db1266ea15d'
+                    'd06b4a8a5c453883c000b031973dce08')
+    STATIC_BLOCK_HEADERS = False
+    BASIC_HEADER_SIZE = 140 # Excluding Equihash solution
+    TX_COUNT = 329196
+    TX_COUNT_HEIGHT = 68379
+    TX_PER_BLOCK = 5
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-zcash"
+    RPC_PORT = 8232
+    REORG_LIMIT = 800
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits = struct.unpack('<II', header[100:108])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': hash_to_str(header[108:140]),
+        }
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        block = DeserializerZcash(block)
+        return block.read_header(height, cls.BASIC_HEADER_SIZE)
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerZcash
