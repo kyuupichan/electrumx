@@ -385,8 +385,8 @@ class Litecoin(Coin):
     NAME = "Litecoin"
     SHORTNAME = "LTC"
     NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("019da462")
-    XPRV_VERBYTES = bytes.fromhex("019d9cfe")
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("30")
     P2SH_VERBYTE = bytes.fromhex("05")
     WIF_BYTE = bytes.fromhex("b0")
@@ -399,18 +399,46 @@ class Litecoin(Coin):
     IRC_CHANNEL = "#electrum-ltc"
     RPC_PORT = 9332
     REORG_LIMIT = 800
+    PEERS = [
+        'elec.luggs.co s444',
+        'electrum-ltc.bysh.me s t',
+        'electrum-ltc.ddns.net s t',
+        'electrum.cryptomachine.com p1000 s t',
+        'electrum.ltc.xurious.com s t',
+        'eywr5eubdbbe2laq.onion s50008 t50007',
+        'us11.einfachmalnettsein.de s50008 t50007',
+    ]
 
 
 class LitecoinTestnet(Litecoin):
     SHORTNAME = "XLT"
     NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("0436f6e1")
-    XPRV_VERBYTES = bytes.fromhex("0436ef7d")
+    IRC_PREFIX = None
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
     P2SH_VERBYTE = bytes.fromhex("c4")
     WIF_BYTE = bytes.fromhex("ef")
-    GENESIS_HASH = ('f5ae71e26c74beacc88382716aced69c'
-                    'ddf3dffff24f384e1808905e0188f68f')
+    GENESIS_HASH = ('4966625a4b2851d9fdee139e56211a0d'
+                    '88575f59ed816ff5e6a63deb4e3e29a0')
+    TX_COUNT = 21772
+    TX_COUNT_HEIGHT = 20800
+    TX_PER_BLOCK = 2
+    RPC_PORT = 19332
+    REORG_LIMIT = 4000
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
+    PEERS = [
+        'electrum-ltc.bysh.me s t',
+        'electrum.ltc.xurious.com s t',
+    ]
+
+
+class LitecoinTestnetSegWit(LitecoinTestnet):
+    NET = "testnet-segwit"
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerSegWit
 
 
 # Source: namecoin.org
