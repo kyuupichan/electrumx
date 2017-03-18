@@ -498,8 +498,8 @@ class DogecoinTestnet(Dogecoin):
     NAME = "Dogecoin"
     SHORTNAME = "XDT"
     NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("0432a9a8")
-    XPRV_VERBYTES = bytes.fromhex("0432a243")
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("71")
     P2SH_VERBYTE = bytes.fromhex("c4")
     WIF_BYTE = bytes.fromhex("f1")
