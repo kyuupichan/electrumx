@@ -153,9 +153,9 @@ class PeerSession(JSONSession):
                 self.peer_verified(True)
                 self.peer.update_features(features)
                 verified = True
-        # For legacy peers not implementing features, check their height
+        # For all peers, check their height
         # as a proxy to determining they're on our network
-        if not verified and not self.peer.bad:
+        if not self.peer.bad:
             self.send_request(self.on_headers, 'blockchain.headers.subscribe')
         self.close_if_done()
 
