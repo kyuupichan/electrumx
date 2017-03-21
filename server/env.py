@@ -9,6 +9,7 @@
 
 
 from collections import namedtuple
+from ipaddress import ip_address
 from os import environ
 
 from lib.coins import Coin
@@ -68,8 +69,10 @@ class Env(LoggedClass):
         self.irc_nick = self.default('IRC_NICK', None)
 
         # Identities
+        report_host = self.default('REPORT_HOST', self.host)
+        self.check_report_host(report_host)
         main_identity = NetIdentity(
-            self.default('REPORT_HOST', self.host),
+            report_host,
             self.integer('REPORT_TCP_PORT', self.tcp_port) or None,
             self.integer('REPORT_SSL_PORT', self.ssl_port) or None,
             ''
@@ -113,6 +116,16 @@ class Env(LoggedClass):
         except Exception:
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
+
+    def check_report_host(self, host):
+        try:
+            ip = ip_address(host)
+        except ValueError:
+            bad = not bool(host)
+        else:
+            bad = ip.is_multicast or ip.is_unspecified
+        if bad:
+            raise self.Error('{} is not a valid REPORT_HOST'.format(host))
 
     def obsolete(self, envvars):
         bad = [envvar for envvar in envvars if environ.get(envvar)]
