@@ -332,7 +332,7 @@ class BitcoinTestnet(Bitcoin):
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
                     'aec3ced90fa3f408719526f8d77f4943')
-    REORG_LIMIT = 4000
+    REORG_LIMIT = 8000
     TX_COUNT = 12242438
     TX_COUNT_HEIGHT = 1035428
     TX_PER_BLOCK = 21
