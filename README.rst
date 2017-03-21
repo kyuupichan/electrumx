@@ -127,6 +127,16 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.1
+-------------
+
+* Rate-limit add_peer calls in a random way
+* Fix discovery of base height in reorgs
+* Don't permit common but invalid REPORT_HOST values
+* Set reorg limit to 8000 blocks on testnet
+* dogecoin / litecoin parameter fixes (erasmospunk, pooler)
+* minor doc tweaks
+
 Version 1.0
 -----------
 
