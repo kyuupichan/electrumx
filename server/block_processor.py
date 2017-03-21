@@ -291,11 +291,13 @@ class BlockProcessor(server.db.DB):
 
         The hashes are returned in order of increasing height.'''
 
-        def match_pos(hashes1, hashes2):
+        def diff_pos(hashes1, hashes2):
+            '''Returns the index of the first difference in the hash lists.
+            If both lists match returns their length.'''
             for n, (hash1, hash2) in enumerate(zip(hashes1, hashes2)):
-                if hash1 == hash2:
+                if hash1 != hash2:
                     return n
-            return -1
+            return len(hashes)
 
         if count is None:
             # A real reorg
@@ -305,9 +307,9 @@ class BlockProcessor(server.db.DB):
                 hashes = self.fs_block_hashes(start, count)
                 hex_hashes = [hash_to_str(hash) for hash in hashes]
                 d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
-                n = match_pos(hex_hashes, d_hex_hashes)
-                if n >= 0:
-                    start += n + 1
+                n = diff_pos(hex_hashes, d_hex_hashes)
+                if n > 0:
+                    start += n
                     break
                 count = min(count * 2, start)
                 start -= count
