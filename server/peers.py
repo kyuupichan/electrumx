@@ -80,6 +80,7 @@ class PeerSession(JSONSession):
         self.send_request(self.on_version, 'server.version',
                           [version.VERSION, proto_ver])
         self.send_request(self.on_features, 'server.features')
+        self.send_request(self.on_headers, 'blockchain.headers.subscribe')
 
     def connection_lost(self, exc):
         '''Handle disconnection.'''
@@ -153,10 +154,6 @@ class PeerSession(JSONSession):
                 self.peer_verified(True)
                 self.peer.update_features(features)
                 verified = True
-        # For legacy peers not implementing features, check their height
-        # as a proxy to determining they're on our network
-        if not verified and not self.peer.bad:
-            self.send_request(self.on_headers, 'blockchain.headers.subscribe')
         self.close_if_done()
 
     def on_headers(self, result, error):
