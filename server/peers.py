@@ -273,7 +273,7 @@ class PeerManager(util.LoggedClass):
 
         return [peer_data(peer) for peer in sorted(self.peers, key=peer_key)]
 
-    def add_peers(self, peers, limit=3, check_ports=False, source=None):
+    def add_peers(self, peers, limit=2, check_ports=False, source=None):
         '''Add a limited number of peers that are not already present.'''
         retry = False
         new_peers = []
