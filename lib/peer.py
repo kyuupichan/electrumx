@@ -39,9 +39,7 @@ class Peer(object):
              # metadata
              'source', 'ip_addr', 'good_ports',
              'last_connect', 'last_try', 'try_count')
-    PORTS = ('ssl_port', 'tcp_port')
-    FEATURES = PORTS + ('pruning', 'server_version',
-                        'protocol_min', 'protocol_max')
+    FEATURES = ('pruning', 'server_version', 'protocol_min', 'protocol_max')
     # This should be set by the application
     DEFAULT_PORTS = {}
 

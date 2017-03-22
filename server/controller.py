@@ -513,10 +513,12 @@ class Controller(util.LoggedClass):
                          'Tries', 'Source', 'IP Address')
         for item in data:
             features = item['features']
-            yield fmt.format(item['host'][:30],
+            hostname = item['host']
+            host = features['hosts'][hostname]
+            yield fmt.format(hostname[:30],
                              item['status'],
-                             features['tcp_port'] or '',
-                             features['ssl_port'] or '',
+                             host['tcp_port'] or '',
+                             host['ssl_port'] or '',
                              features['server_version'] or 'unknown',
                              features['protocol_min'],
                              features['protocol_max'],
