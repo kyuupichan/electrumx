@@ -49,7 +49,6 @@ class Controller(util.LoggedClass):
         self.executor = ThreadPoolExecutor()
         self.loop.set_default_executor(self.executor)
         self.start_time = time.time()
-        self.next_add_peer_time = self.start_time
         self.coin = env.coin
         self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
         self.bp = BlockProcessor(env, self, self.daemon)
@@ -135,15 +134,6 @@ class Controller(util.LoggedClass):
 
     def is_deprioritized(self, session):
         return self.session_priority(session) > self.BANDS
-
-    def permit_add_peer(self):
-        '''To prevent lots of add_peer requests filling up the peer
-        table, accept only one per random time interval.'''
-        now = time.time()
-        if now < self.next_add_peer_time:
-            return False
-        self.next_add_peer_time = now + random.randrange(0, 1800)
-        return True
 
     async def run_in_executor(self, func, *args):
         '''Wait whilst running func in the executor.'''

@@ -14,6 +14,7 @@ import ssl
 import time
 from collections import defaultdict, Counter
 from functools import partial
+from socket import SOCK_STREAM
 
 from lib.jsonrpc import JSONSession
 from lib.peer import Peer
@@ -221,6 +222,7 @@ class PeerManager(util.LoggedClass):
         # any other peers with the same host name or IP address.
         self.peers = set()
         self.onion_peers = []
+        self.permit_onion_peer_time = time.time()
         self.last_tor_retry_time = 0
         self.tor_proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
                                     loop=self.loop)
@@ -302,15 +304,43 @@ class PeerManager(util.LoggedClass):
         if retry:
             self.retry_event.set()
 
-    def on_add_peer(self, features, source):
-        '''Add peers from an incoming connection.'''
+    def permit_new_onion_peer(self):
+        '''Accept a new onion peer only once per random time interval.'''
+        now = time.time()
+        if now < self.permit_onion_peer_time:
+            return False
+        self.permit_onion_peer_time = now + random.randrange(0, 1200)
+        return True
+
+    async def on_add_peer(self, features, source_info):
+        '''Add a peer (but only if the peer resolves to the source).'''
+        if not source_info:
+            return False
+        source = source_info[0]
         peers = Peer.peers_from_features(features, source)
-        if peers:
-            hosts = [peer.host for peer in peers]
-            self.log_info('add_peer request from {} for {}'
-                          .format(source, ', '.join(hosts)))
-            self.add_peers(peers, check_ports=True)
-        return bool(peers)
+        if not peers:
+            return False
+
+        # Just look at the first peer, require it
+        peer = peers[0]
+        host = peer.host
+        if peer.is_tor:
+            permit = self.permit_new_onion_peer()
+            reason = 'rate limiting'
+        else:
+            infos = await self.loop.getaddrinfo(host, 80, type=SOCK_STREAM)
+            permit = any(source == info[-1][0] for info in infos)
+            reason = 'source-destination mismatch'
+
+        if permit:
+            self.log_info('accepted add_peer request from {} for {}'
+                          .format(source, host))
+            self.add_peers([peer], check_ports=True)
+        else:
+            self.log_warning('rejected add_peer request from {} for {} ({})'
+                             .format(source, host, reason))
+
+        return permit
 
     def on_peers_subscribe(self, is_tor):
         '''Returns the server peers as a list of (ip, host, details) tuples.
