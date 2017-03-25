@@ -127,6 +127,11 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.3
+-------------
+
+* fix a verification loop that happened occasionally with bad peers
+
 Version 1.0.2
 -------------
 
