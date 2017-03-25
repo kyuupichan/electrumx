@@ -5,7 +5,7 @@
 # configure electrumx
 export COIN=Bitcoin
 export DAEMON_URL=http://rpcuser:rpcpassword@127.0.0.1
-export NETWORK=mainnet
+export NET=mainnet
 export CACHE_MB=400
 export DB_DIRECTORY=/home/username/.electrumx/db
 export SSL_CERTFILE=/home/username/.electrumx/certfile.crt
@@ -34,5 +34,3 @@ ulimit -n 10000
 
 # add this line to crontab -e
 # @reboot /path/to/run_electrumx.sh
-
-
