@@ -703,37 +703,62 @@ Get a list of features and services supported by the server.
   The following features MUST be reported by the server.  Additional
   key-value pairs may be returned.
 
-  * **hosts**
+* **hosts**
 
-    A dictionary of host names the server can be reached at.  Each
-    value is a dictionary with keys "ssl_port" and "tcp_port" at which
-    the given host can be reached.  If there is no open port for a
-    transport, its value should be *null*.
+  An dictionary, keyed by host name, that this server can be reached
+  at.  Normally this will only have a single entry; other entries can
+  be used in case there are other connection routes (e.g. Tor).
 
-  * **server_version**
+  The value for a host is itself a dictionary, with the following
+  optional keys:
 
-    The same identifying string as returned in response to *server.version*.
+  * **ssl_port**
 
-  * **protocol_version**
+    An integer.  Omit or set to *null* if SSL connectivity is not
+    provided.
 
-    A pair [`protocol_min`, `protocol_max`] of the protocols supported
-    by the server, each of which is itself a [major_version,
-    minor_version] pair.
+  * **tcp_port**
 
-  * **pruning**
+    An integer.  Omit or set to *null* if TCP connectivity is not
+    provided.
 
-    The history pruning limit of the server as an integer.  If the
-    server does not prune return *null*.
+  A server should ignore information provided about any host other
+  than the one it connected to.
+
+* **genesis_hash**
+
+  The hash of the genesis block.  This is used to detect if a peer is
+  connected to one serving a different network.
+
+* **server_version**
+
+  A string that identifies the server software.  Should be the same as
+  the response to **server.version** RPC call.
+
+* **protocol_max**
+* **protocol_min**
+
+  Strings that are the minimum and maximum Electrum protcol versions
+  this server speaks.  The maximum value should be the same as what
+  would suffix the letter **v** in the IRC real name.  Example: "1.1".
+
+* **pruning**
+
+  An integer, the pruning limit.  Omit or set to *null* if there is no
+  pruning limit.  Should be the same as what would suffix the letter
+  **p** in the IRC real name.
 
 **Example Response**
 
 ::
 
   {
-     "server_version": "ElectrumX 0.10.14",
-     "protocol_version": [[1, 0], [1, 1]],
-     "hosts": {"14.3.140.101": {"ssl_port": 50002, "tcp_port": 50001}},
-     "pruning": null
+      "genesis_hash": "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943",
+      "hosts": {"14.3.140.101": {"tcp_port": 51001, "ssl_port": 51002}},
+      "protocol_max": "1.0",
+      "protocol_min": "1.0",
+      "pruning": null,
+      "server_version": "ElectrumX 1.0.1"
   }
 
 .. _JSON RPC 1.0: http://json-rpc.org/wiki/specification
