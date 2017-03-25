@@ -78,9 +78,10 @@ class Env(LoggedClass):
             ''
         )
         if not main_identity.host.strip():
-            raise self.Error('IRC host is empty')
+            raise self.Error('REPORT_HOST host is empty')
         if main_identity.tcp_port == main_identity.ssl_port:
-            raise self.Error('IRC TCP and SSL ports are the same')
+            raise self.Error('REPORT_TCP_PORT and REPORT_SSL_PORT are both {}'
+                             .format(main_identity.tcp_port))
 
         self.identities = [main_identity]
         tor_host = self.default('REPORT_HOST_TOR', '')
