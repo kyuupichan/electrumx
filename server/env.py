@@ -8,6 +8,7 @@
 '''Class for handling environment configuration and defaults.'''
 
 
+import resource
 from collections import namedtuple
 from ipaddress import ip_address
 from os import environ
@@ -60,7 +61,7 @@ class Env(LoggedClass):
         # Server limits to help prevent DoS
         self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
-        self.max_sessions = self.integer('MAX_SESSIONS', 1000)
+        self.max_sessions = self.sane_max_sessions()
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
@@ -117,6 +118,20 @@ class Env(LoggedClass):
         except Exception:
             raise self.Error('cannot convert envvar {} value {} to an integer'
                              .format(envvar, value))
+
+    def sane_max_sessions(self):
+        '''Return the maximum number of sessions to permit.  Normally this
+        is MAX_SESSIONS.  However, to prevent open file exhaustion, ajdust
+        downwards if running with a small open file rlimit.'''
+        env_value = self.integer('MAX_SESSIONS', 1000)
+        nofile_limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+        # We give the DB 250 files; allow ElectrumX 100 for itself
+        value = max(0, min(env_value, nofile_limit - 350))
+        if value < env_value:
+            self.log_warning('lowered maximum seessions from {:,d} to {:,d} '
+                             'because your open file limit is {:,d}'
+                             .format(env_value, value, nofile_limit))
+        return value
 
     def check_report_host(self, host):
         try:
