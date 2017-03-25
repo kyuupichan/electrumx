@@ -49,6 +49,7 @@ class Peer(object):
         a dictionary of features, and a record of the source.'''
         assert isinstance(host, str)
         assert isinstance(features, dict)
+        assert host in features.get('hosts', {})
         self.host = host
         self.features = features.copy()
         # Canonicalize / clean-up
@@ -105,10 +106,14 @@ class Peer(object):
 
     def update_features(self, features):
         '''Update features in-place.'''
-        tmp = Peer(self.host, features)
-        self.features = tmp.features
-        for feature in self.FEATURES:
-            setattr(self, feature, getattr(tmp, feature))
+        try:
+            tmp = Peer(self.host, features)
+        except Exception:
+            pass
+        else:
+            self.features = tmp.features
+            for feature in self.FEATURES:
+                setattr(self, feature, getattr(tmp, feature))
 
     def connection_port_pairs(self):
         '''Return a list of (kind, port) pairs to try when making a

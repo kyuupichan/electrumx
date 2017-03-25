@@ -400,7 +400,12 @@ class PeerManager(util.LoggedClass):
             if data:
                 version, items = ast.literal_eval(data)
                 if version == 1:
-                    peers = [Peer.deserialize(item) for item in items]
+                    peers = []
+                    for item in items:
+                        try:
+                            peers.append(Peer.deserialize(item))
+                        except Exception:
+                            pass
                     self.add_peers(peers, source='peers file', limit=None)
 
     def import_peers(self):

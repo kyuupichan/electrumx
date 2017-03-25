@@ -508,8 +508,8 @@ class Controller(util.LoggedClass):
             host = features['hosts'][hostname]
             yield fmt.format(hostname[:30],
                              item['status'],
-                             host['tcp_port'] or '',
-                             host['ssl_port'] or '',
+                             host.get('tcp_port') or '',
+                             host.get('ssl_port') or '',
                              features['server_version'] or 'unknown',
                              features['protocol_min'],
                              features['protocol_max'],
