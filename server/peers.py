@@ -56,7 +56,7 @@ class PeerSession(JSONSession):
         self.peer = peer
         self.peer_mgr = peer_mgr
         self.kind = kind
-        self.failed = False
+        self.bad = False
         self.log_prefix = '[{}] '.format(self.peer)
 
     async def wait_on_items(self):
@@ -82,6 +82,7 @@ class PeerSession(JSONSession):
                           [version.VERSION, proto_ver])
         self.send_request(self.on_features, 'server.features')
         self.send_request(self.on_headers, 'blockchain.headers.subscribe')
+        self.send_request(self.on_peers_subscribe, 'server.peers.subscribe')
 
     def connection_lost(self, exc):
         '''Handle disconnection.'''
@@ -91,7 +92,7 @@ class PeerSession(JSONSession):
     def on_peers_subscribe(self, result, error):
         '''Handle the response to the peers.subcribe message.'''
         if error:
-            self.failed = True
+            self.bad = True
             self.log_error('server.peers.subscribe: {}'.format(error))
         else:
             self.check_remote_peers(result)
@@ -133,54 +134,40 @@ class PeerSession(JSONSession):
         '''Handle the response to the add_peer message.'''
         self.close_if_done()
 
-    def peer_verified(self, is_good):
-        '''Call when it has been determined whether or not the peer seems to
-        be on the same network.
-        '''
-        if is_good:
-            self.send_request(self.on_peers_subscribe,
-                              'server.peers.subscribe')
-        else:
-            self.peer.mark_bad()
-            self.failed = True
-
     def on_features(self, features, error):
         # Several peers don't implement this.  If they do, check they are
         # the same network with the genesis hash.
-        verified = False
         if not error and isinstance(features, dict):
             our_hash = self.peer_mgr.env.coin.GENESIS_HASH
             if our_hash != features.get('genesis_hash'):
-                self.peer_verified(False)
+                self.bad = True
                 self.log_warning('incorrect genesis hash')
             else:
-                self.peer_verified(True)
                 self.peer.update_features(features)
-                verified = True
         self.close_if_done()
 
     def on_headers(self, result, error):
         '''Handle the response to the version message.'''
         if error:
-            self.failed = True
+            self.bad = True
             self.log_error('blockchain.headers.subscribe returned an error')
         elif not isinstance(result, dict):
+            self.bad = True
             self.log_error('bad blockchain.headers.subscribe response')
-            self.peer_verified(False)
         else:
             our_height = self.peer_mgr.controller.bp.db_height
             their_height = result.get('block_height')
             is_good = (isinstance(their_height, int) and
                        abs(our_height - their_height) <= 5)
-            self.peer_verified(is_good)
             if not is_good:
+                self.bad = True
                 self.log_warning('bad height {}'.format(their_height))
         self.close_if_done()
 
     def on_version(self, result, error):
         '''Handle the response to the version message.'''
         if error:
-            self.failed = True
+            self.bad = True
             self.log_error('server.version returned an error')
         elif isinstance(result, str):
             self.peer.server_version = result
@@ -189,14 +176,15 @@ class PeerSession(JSONSession):
 
     def close_if_done(self):
         if not self.has_pending_requests():
-            is_good = not self.failed
-            self.peer_mgr.set_connection_status(self.peer, is_good)
+            if self.bad:
+                peer.mark_bad()
+            self.peer_mgr.set_connection_status(self.peer, not self.bad)
             if self.peer.is_tor:
                 how = 'via {} over Tor'.format(self.kind)
             else:
                 how = 'via {} at {}'.format(self.kind,
                                             self.peer_addr(anon=False))
-            status = 'verified' if is_good else 'failed to verify'
+            status = 'failed to verify' if self.bad else 'verified'
             elapsed = time.time() - self.peer.last_try
             self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
             self.close_connection()
@@ -559,11 +547,8 @@ class PeerManager(util.LoggedClass):
 
     def maybe_forget_peer(self, peer):
         '''Forget the peer if appropriate, e.g. long-term unreachable.'''
-        if peer.bad:
-            forget = peer.last_connect < time.time() - STALE_SECS // 2
-        else:
-            try_limit = 10 if peer.last_connect else 3
-            forget = peer.try_count >= try_limit
+        try_limit = 10 if peer.last_connect else 3
+        forget = peer.try_count >= try_limit
 
         if forget:
             desc = 'bad' if peer.bad else 'unreachable'
