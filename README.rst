@@ -127,6 +127,20 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.2
+-------------
+
+* stricter acceptance of add_peer requests: rate-limit onion peers,
+  and require incoming requests to resolve to the requesting IP address
+* validate peer hostnames (closes `#157`_)
+* verify height for all peers (closes `#152`_)
+* various improvements to peer handling
+* various documentation tweaks
+* limit the maximum number of sessions based on the process's
+  open file soft limit (closes `#158`_)
+* improved altcoin support for variable-length block headers and AuxPoW
+  (erasmospunk) (closes `#128`_ and `#83`_)
+
 Version 1.0.1
 -------------
 
@@ -186,60 +200,22 @@ documentation updates.
   see `docs/ENVIRONMENT.rst`_.
 * add FairCoin (thokon00)
 
-Version 0.11.4
---------------
-
-* peer handling fixes / improvements based on suggestions of hsmiths
-
-Version 0.11.3
---------------
-
-* fixed a typo in lib/peer.py pointed out by hsmiths
-
-Version 0.11.2
---------------
-
-* Preliminary implementation of script hash subscriptions to enable
-  subscribing to updates of arbitrary scripts, not just those of
-  standard bitcoin addresses.  I'll fully document once confirmed
-  working as expected.
-  Closes `#124`_.
-
-Version 0.11.1
---------------
-
-* report unconfirmed parent tx status correctly, and notify if that
-  parent status changes.  Fixes `#129`_.
-
-Version 0.11.0
---------------
-
-* implementation of `docs/PEER_DISCOVERY.rst`_ for discovery of server
-  peers without using IRC.  Closes `#104`_.  Since all testnet peers
-  are ElectrumX servers, IRC advertising is now disabled on bitcoin
-  testnet.
-
-  Thanks to bauerj, hsmiths and JWU42 for their help testing these
-  changes over the last month.
-* you can now specify a tor proxy (or have it autodetected if local),
-  and if an incoming connection seems to be from the proxy a
-  tor-specific banner file is served.  See **TOR_BANNER_FILE** in
-  `docs/ENVIRONMENT.rst`_.
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 
+.. _#83: https://github.com/kyuupichan/electrumx/issues/83
 .. _#100: https://github.com/kyuupichan/electrumx/issues/100
-.. _#104: https://github.com/kyuupichan/electrumx/issues/104
-.. _#124: https://github.com/kyuupichan/electrumx/issues/124
-.. _#129: https://github.com/kyuupichan/electrumx/issues/129
+.. _#128: https://github.com/kyuupichan/electrumx/issues/128
 .. _#132: https://github.com/kyuupichan/electrumx/issues/132
 .. _#135: https://github.com/kyuupichan/electrumx/issues/135
 .. _#136: https://github.com/kyuupichan/electrumx/issues/136
 .. _#138: https://github.com/kyuupichan/electrumx/issues/138
+.. _#152: https://github.com/kyuupichan/electrumx/issues/152
+.. _#157: https://github.com/kyuupichan/electrumx/issues/157
+.. _#158: https://github.com/kyuupichan/electrumx/issues/158
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
