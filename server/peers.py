@@ -177,7 +177,7 @@ class PeerSession(JSONSession):
     def close_if_done(self):
         if not self.has_pending_requests():
             if self.bad:
-                peer.mark_bad()
+                self.peer.mark_bad()
             self.peer_mgr.set_connection_status(self.peer, not self.bad)
             if self.peer.is_tor:
                 how = 'via {} over Tor'.format(self.kind)
