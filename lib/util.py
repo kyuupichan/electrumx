@@ -31,6 +31,7 @@ import array
 import inspect
 from ipaddress import ip_address
 import logging
+import re
 import sys
 from collections import Container, Mapping
 
@@ -241,3 +242,13 @@ def address_string(address):
         if host.version == 6:
             fmt = '[{}]:{:d}'
     return fmt.format(host, port)
+
+# See http://stackoverflow.com/questions/2532053/validate-a-hostname-string
+SEGMENT_REGEX = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
+def is_valid_hostname(hostname):
+    if len(hostname) > 255:
+        return False
+    # strip exactly one dot from the right, if present
+    if hostname[-1] == ".":
+        hostname = hostname[:-1]
+    return all(SEGMENT_REGEX.match(x) for x in hostname.split("."))

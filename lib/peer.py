@@ -28,7 +28,7 @@
 import re
 from ipaddress import ip_address
 
-from lib.util import cachedproperty
+from lib.util import cachedproperty, is_valid_hostname
 
 
 class Peer(object):
@@ -144,7 +144,7 @@ class Peer(object):
         if ip:
             return ((ip.is_global or ip.is_private)
                     and not (ip.is_multicast or ip.is_unspecified))
-        return True
+        return is_valid_hostname(self.host)
 
     @cachedproperty
     def is_public(self):
@@ -152,7 +152,7 @@ class Peer(object):
         if ip:
             return self.is_valid and not ip.is_private
         else:
-            return self.host != 'localhost'
+            return self.is_valid and self.host != 'localhost'
 
     @cachedproperty
     def ip_address(self):

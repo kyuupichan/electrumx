@@ -277,7 +277,7 @@ class PeerManager(util.LoggedClass):
         retry = False
         new_peers = []
         for peer in peers:
-            if not peer.is_valid:
+            if not peer.is_public:
                 continue
             matches = peer.matches(self.peers)
             if not matches:
