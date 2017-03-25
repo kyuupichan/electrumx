@@ -113,9 +113,11 @@ class PeerSession(JSONSession):
 
         self.peer_mgr.add_peers(peers)
 
-        # Announce ourself if not present.  Don't if disabled or we
-        # are a non-public IP address.
+        # Announce ourself if not present.  Don't if disabled, we
+        # are a non-public IP address, or to ourselves.
         if not self.peer_mgr.env.peer_announce:
+            return
+        if self.peer in self.peer_mgr.myselves:
             return
         my = self.peer_mgr.my_clearnet_peer()
         if not my.is_public:
