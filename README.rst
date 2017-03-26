@@ -127,6 +127,11 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.4
+-------------
+
+* fix another unwanted loop in peer discovery, tweak diagnostics
+
 Version 1.0.3
 -------------
 
