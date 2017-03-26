@@ -295,8 +295,6 @@ class Coin(object):
 
 class CoinAuxPow(Coin):
     # Set NAME and NET to avoid exception in Coin::lookup_coin_class
-    NAME = ""
-    NET = ""
     STATIC_BLOCK_HEADERS = False
 
     @classmethod
@@ -499,8 +497,6 @@ class NamecoinTestnet(Namecoin):
                     'a4cccff2a4767a8eee39c11db367b008')
 
 
-# For DOGE there is disagreement across sites like bip32.org and
-# pycoin.  Taken from bip32.org and bitmerchant on github
 class Dogecoin(CoinAuxPow):
     NAME = "Dogecoin"
     SHORTNAME = "DOGE"
