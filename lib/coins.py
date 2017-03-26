@@ -588,7 +588,7 @@ class DashTestnet(Dash):
     ]
 
 
-class Argentum(Coin):
+class Argentum(CoinAuxPow):
     NAME = "Argentum"
     SHORTNAME = "ARG"
     NET = "mainnet"
