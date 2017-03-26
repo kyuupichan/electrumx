@@ -295,6 +295,8 @@ class Coin(object):
 
 class CoinAuxPow(Coin):
     # Set NAME and NET to avoid exception in Coin::lookup_coin_class
+    NAME = ''
+    NET = ''
     STATIC_BLOCK_HEADERS = False
 
     @classmethod
