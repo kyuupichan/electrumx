@@ -313,10 +313,12 @@ class PeerManager(util.LoggedClass):
     async def on_add_peer(self, features, source_info):
         '''Add a peer (but only if the peer resolves to the source).'''
         if not source_info:
+            self.log_info('ignored add_peer request: no source info')
             return False
         source = source_info[0]
         peers = Peer.peers_from_features(features, source)
         if not peers:
+            self.log_info('ignored add_peer request: no peers given')
             return False
 
         # Just look at the first peer, require it
