@@ -127,6 +127,12 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.5
+-------------
+
+* the peer looping was actually just looping of logging output, not
+  connections.  Hopefully fixed for good in this release.  Closes `#160`_.
+
 Version 1.0.4
 -------------
 
@@ -226,6 +232,7 @@ documentation updates.
 .. _#152: https://github.com/kyuupichan/electrumx/issues/152
 .. _#157: https://github.com/kyuupichan/electrumx/issues/157
 .. _#158: https://github.com/kyuupichan/electrumx/issues/158
+.. _#160: https://github.com/kyuupichan/electrumx/issues/160
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst

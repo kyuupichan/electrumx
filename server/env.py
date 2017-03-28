@@ -78,8 +78,6 @@ class Env(LoggedClass):
             self.integer('REPORT_SSL_PORT', self.ssl_port) or None,
             ''
         )
-        if not main_identity.host.strip():
-            raise self.Error('REPORT_HOST host is empty')
         if main_identity.tcp_port == main_identity.ssl_port:
             raise self.Error('REPORT_TCP_PORT and REPORT_SSL_PORT are both {}'
                              .format(main_identity.tcp_port))
@@ -137,11 +135,11 @@ class Env(LoggedClass):
         try:
             ip = ip_address(host)
         except ValueError:
-            bad = not bool(host)
+            bad = not bool(host.strip())
         else:
             bad = ip.is_multicast or ip.is_unspecified
         if bad:
-            raise self.Error('{} is not a valid REPORT_HOST'.format(host))
+            raise self.Error('"{}" is not a valid REPORT_HOST'.format(host))
 
     def obsolete(self, envvars):
         bad = [envvar for envvar in envvars if environ.get(envvar)]
