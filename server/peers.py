@@ -97,12 +97,14 @@ class PeerSession(JSONSession):
             self.failed = True
             self.log_error('server.peers.subscribe: {}'.format(error))
         else:
+            # Save for later analysis
             self.remote_peers = result
         self.close_if_done()
 
     def on_add_peer(self, result, error):
-        '''Handle the response to the add_peer message.'''
-        self.close_if_done()
+        '''We got a response the add_peer message.'''
+        # This is the last thing we were waiting for; shutdown the connection
+        self.shutdown_connection()
 
     def on_features(self, features, error):
         # Several peers don't implement this.  If they do, check they are
@@ -147,10 +149,12 @@ class PeerSession(JSONSession):
         self.close_if_done()
 
     def check_remote_peers(self):
-        '''When a peer gives us a peer update.
+        '''Check the peers list we got from a remote peer.
 
         Each update is expected to be of the form:
             [ip_addr, hostname, ['v1.0', 't51001', 's51002']]
+
+        Call add_peer if the remote doesn't appear to know about us.
         '''
         try:
             real_names = [' '.join([u[1]] + u[2]) for u in self.remote_peers]
@@ -184,18 +188,23 @@ class PeerSession(JSONSession):
                 self.peer.mark_bad()
             elif self.remote_peers:
                 self.check_remote_peers()
-            self.peer.last_connect = time.time()
-            is_good = not (self.failed or self.bad)
-            self.peer_mgr.set_connection_status(self.peer, is_good)
-            if self.peer.is_tor:
-                how = 'via {} over Tor'.format(self.kind)
-            else:
-                how = 'via {} at {}'.format(self.kind,
-                                            self.peer_addr(anon=False))
-            status = 'verified' if is_good else 'failed to verify'
-            elapsed = time.time() - self.peer.last_try
-            self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
-            self.close_connection()
+            # We might now be waiting for an add_peer response
+            if not self.has_pending_requests():
+                self.shutdown_connection()
+
+    def shutdown_connection(self):
+        self.peer.last_connect = time.time()
+        is_good = not (self.failed or self.bad)
+        self.peer_mgr.set_connection_status(self.peer, is_good)
+        if self.peer.is_tor:
+            how = 'via {} over Tor'.format(self.kind)
+        else:
+            how = 'via {} at {}'.format(self.kind,
+                                        self.peer_addr(anon=False))
+        status = 'verified' if is_good else 'failed to verify'
+        elapsed = time.time() - self.peer.last_try
+        self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
+        self.close_connection()
 
 
 class PeerManager(util.LoggedClass):
