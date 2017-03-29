@@ -66,7 +66,8 @@ was much worse.
 You will need to install one of:
 
 + `plyvel <https://plyvel.readthedocs.io/en/latest/installation.html>`_ for LevelDB
-+ `pyrocksdb <http://pyrocksdb.readthedocs.io/en/v0.4/installation.html>`_ for RocksDB
++ `python-rocksdb <https://pypi.python.org/pypi/python-rocksdb>`_ for RocksDB (`pip3 install python-rocksdb`)
++ `pyrocksdb <http://pyrocksdb.readthedocs.io/en/v0.4/installation.html>`_ for an unmaintained version that doesn't work with recent releases of RocksDB
 
 Running
 =======
@@ -210,10 +211,10 @@ to update Python 3.5.2 to 3.5.3.  See `contrib/python3.6/python-3.6.sh`_.
 Installing on Raspberry Pi 3
 ----------------------------
 
-To install on the Raspberry Pi 3 you will need to update to the "stretch" distribution. 
+To install on the Raspberry Pi 3 you will need to update to the "stretch" distribution.
 See the full procedure in `contrib/raspberrypi3/install_electrumx.sh`_.
 
-See also `contrib/raspberrypi3/run_electrumx.sh`_ for an easy way to configure and 
+See also `contrib/raspberrypi3/run_electrumx.sh`_ for an easy way to configure and
 launch electrumx.
 
 
@@ -405,4 +406,3 @@ copy of your certificate and key in case you need to restore them.
 .. _`contrib/python3.6/python-3.6.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/contrib/python3.6/python-3.6.sh
 .. _`contrib/raspberrypi3/install_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/contrib/raspberrypi3/install_electrumx.sh
 .. _`contrib/raspberrypi3/run_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/contrib/raspberrypi3/run_electrumx.sh
-
