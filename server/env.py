@@ -143,7 +143,7 @@ class Env(LoggedClass):
         host = self.default('REPORT_HOST_TOR', None)
         if host is None:
             return None
-        if not tor_host.endswith('.onion'):
+        if not host.endswith('.onion'):
             raise self.Error('tor host "{}" must end with ".onion"'
                              .format(host))
 
