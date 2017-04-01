@@ -70,33 +70,11 @@ class Env(LoggedClass):
         self.irc_nick = self.default('IRC_NICK', None)
 
         # Identities
-        report_host = self.default('REPORT_HOST', self.host)
-        self.check_report_host(report_host)
-        main_identity = NetIdentity(
-            report_host,
-            self.integer('REPORT_TCP_PORT', self.tcp_port) or None,
-            self.integer('REPORT_SSL_PORT', self.ssl_port) or None,
-            ''
-        )
-        if main_identity.tcp_port == main_identity.ssl_port:
-            raise self.Error('REPORT_TCP_PORT and REPORT_SSL_PORT are both {}'
-                             .format(main_identity.tcp_port))
-
-        self.identities = [main_identity]
-        tor_host = self.default('REPORT_HOST_TOR', '')
-        if tor_host.endswith('.onion'):
-            self.identities.append(NetIdentity(
-                tor_host,
-                self.integer('REPORT_TCP_PORT_TOR',
-                             main_identity.tcp_port
-                             if main_identity.tcp_port else
-                             self.tcp_port) or None,
-                self.integer('REPORT_SSL_PORT_TOR',
-                             main_identity.ssl_port
-                             if main_identity.ssl_port else
-                             self.ssl_port) or None,
-                '_tor',
-            ))
+        clearnet_identity = self.clearnet_identity()
+        tor_identity = self.tor_identity(clearnet_identity)
+        self.identities = [identity
+                           for identity in (clearnet_identity, tor_identity)
+                           if identity is not None]
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
@@ -131,7 +109,16 @@ class Env(LoggedClass):
                              .format(env_value, value, nofile_limit))
         return value
 
-    def check_report_host(self, host):
+    def obsolete(self, envvars):
+        bad = [envvar for envvar in envvars if environ.get(envvar)]
+        if bad:
+            raise self.Error('remove obsolete environment variables {}'
+                             .format(bad))
+
+    def clearnet_identity(self):
+        host = self.default('REPORT_HOST', None)
+        if host is None:
+            return None
         try:
             ip = ip_address(host)
         except ValueError:
@@ -140,9 +127,43 @@ class Env(LoggedClass):
             bad = ip.is_multicast or ip.is_unspecified
         if bad:
             raise self.Error('"{}" is not a valid REPORT_HOST'.format(host))
+        tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port) or None
+        ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port) or None
+        if tcp_port == ssl_port:
+            raise self.Error('REPORT_TCP_PORT and REPORT_SSL_PORT '
+                             'both resolve to {}'.format(tcp_port))
+        return NetIdentity(
+            host,
+            tcp_port,
+            ssl_port,
+            ''
+        )
 
-    def obsolete(self, envvars):
-        bad = [envvar for envvar in envvars if environ.get(envvar)]
-        if bad:
-            raise self.Error('remove obsolete environment variables {}'
-                             .format(bad))
+    def tor_identity(self, clearnet):
+        host = self.default('REPORT_HOST_TOR', None)
+        if host is None:
+            return None
+        if not tor_host.endswith('.onion'):
+            raise self.Error('tor host "{}" must end with ".onion"'
+                             .format(host))
+
+        def port(port_kind):
+            '''Returns the clearnet identity port, if any and not zero,
+            otherwise the listening port.'''
+            result = 0
+            if clearnet:
+                result = getattr(clearnet, port_kind)
+            return result or getattr(self, port_kind)
+
+        tcp_port = self.integer('REPORT_TCP_PORT_TOR', port('tcp_port')) or None
+        ssl_port = self.integer('REPORT_SSL_PORT_TOR', port('ssl_port')) or None
+        if tcp_port == ssl_port:
+            raise self.Error('REPORT_TCP_PORT_TOR and REPORT_SSL_PORT_TOR '
+                             'both resolve to {}'.format(tcp_port))
+
+        return NetIdentity(
+            host,
+            tcp_port,
+            ssl_port,
+            '_tor',
+        )
