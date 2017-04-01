@@ -34,6 +34,7 @@ class SessionBase(JSONSession):
         self.env = controller.env
         self.daemon = self.bp.daemon
         self.client = 'unknown'
+        self.client_version = (1)
         self.protocol_version = '1.0'
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
@@ -262,14 +263,15 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        self.chunk_indices.append(index)
-        self.chunk_indices = self.chunk_indices[-5:]
-        # -2 allows backing up a single chunk but no more.
-        if index <= max(self.chunk_indices[:-2], default=-1):
-            msg = ('chunk indices not advancing (wrong network?): {}'
-                   .format(self.chunk_indices))
-            # INVALID_REQUEST triggers a disconnect
-            raise RPCError(msg, JSONRPC.INVALID_REQUEST)
+        if self.client_version < (2, 8, 3):
+            self.chunk_indices.append(index)
+            self.chunk_indices = self.chunk_indices[-5:]
+            # -2 allows backing up a single chunk but no more.
+            if index <= max(self.chunk_indices[:-2], default=-1):
+                msg = ('chunk indices not advancing (wrong network?): {}'
+                       .format(self.chunk_indices))
+                # use INVALID_REQUEST to trigger a disconnect
+                raise RPCError(msg, JSONRPC.INVALID_REQUEST)
         return self.controller.get_chunk(index)
 
     def is_tor(self):
@@ -323,6 +325,11 @@ class ElectrumX(SessionBase):
         '''
         if client_name:
             self.client = str(client_name)[:17]
+            try:
+                self.client_version = tuple(int(part) for part
+                                            in self.client.split('.'))
+            except Exception:
+                pass
         if protocol_version is not None:
             self.protocol_version = protocol_version
         return version.VERSION
