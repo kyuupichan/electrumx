@@ -127,6 +127,18 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.6
+-------------
+
+* updated to handle incompatibilities between aiohttp 1.0 and 2.0.
+  ElexctrumX should work with either for now; I will drop support for
+  1.0 in a few months.  Fixes `#163`_.
+* relax get_chunk restrictions for clients 1.8.3 and higher.  Closes
+  `#162`_.
+* **REPORT_HOST** no longer defaults to **HOST**.  If not set, no
+  clearnet identity will be advertised.
+* Add Viacoin support (romanornr)
+
 Version 1.0.5
 -------------
 
@@ -233,6 +245,8 @@ documentation updates.
 .. _#157: https://github.com/kyuupichan/electrumx/issues/157
 .. _#158: https://github.com/kyuupichan/electrumx/issues/158
 .. _#160: https://github.com/kyuupichan/electrumx/issues/160
+.. _#162: https://github.com/kyuupichan/electrumx/issues/162
+.. _#163: https://github.com/kyuupichan/electrumx/issues/163
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
