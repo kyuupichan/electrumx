@@ -467,6 +467,57 @@ class LitecoinTestnetSegWit(LitecoinTestnet):
         return DeserializerSegWit
 
 
+class Viacoin(CoinAuxPow):
+    NAME="Viacoin"
+    SHORTNAME = "VIA"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("47")
+    P2SH_VERBYTE = bytes.fromhex("21")
+    WIF_BYTE = bytes.fromhex("c7")
+    GENESIS_HASH = ('4e9b54001f9976049830128ec0331515'
+                    'eaabe35a70970d79971da1539a400ba1')
+    TX_COUNT = 113638
+    TX_COUNT_HEIGHT = 3473674
+    TX_PER_BLOCK = 30
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL="#vialectrum"
+    RPC_PORT = 5222
+    REORG_LIMIT = 5000
+    PEERS = [
+        'vialectrum.bitops.me s t',
+        'server.vialectrum.org s t',
+        'vialectrum.viacoin.net s t',
+        'viax1.bitops.me s t',
+    ]
+
+
+class ViacoinTestnet(Viacoin):
+    SHORTNAME = "TVI"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("7f")
+    P2SH_VERBYTE = bytes.fromhex("c4")
+    WIF_BYTE = bytes.fromhex("ff")
+    GENESIS_HASH = ('00000007199508e34a9ff81e6ec0c477'
+                    'a4cccff2a4767a8eee39c11db367b008')
+    RPC_PORT = 25222
+    REORG_LIMIT = 2500
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
+    PEERS = [
+        'vialectrum.bysh.me s t',
+    ]
+
+class ViacoinTestnetSegWit(ViacoinTestnet):
+    NET = "testnet-segwit"
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerSegWit
+
+
 # Source: namecoin.org
 class Namecoin(CoinAuxPow):
     NAME = "Namecoin"
