@@ -41,6 +41,13 @@ class Daemon(util.LoggedClass):
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
         self.down = False
         self.last_error_time = 0
+        # assignment of asyncio.TimeoutError are essentially ignored
+        if aiohttp.__version__.startswith('1.'):
+            self.ClientHttpProcessingError = aiohttp.ClientHttpProcessingError
+            self.ClientPayloadError = asyncio.TimeoutError
+        else:
+            self.ClientHttpProcessingError = asyncio.TimeoutError
+            self.ClientPayloadError = aiohttp.ClientPayloadError
 
     def set_urls(self, urls):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -114,10 +121,12 @@ class Daemon(util.LoggedClass):
                           .format(result[0], result[1]))
             except asyncio.TimeoutError:
                 log_error('timeout error.')
-            except aiohttp.ClientHttpProcessingError:
-                log_error('HTTP error.')
             except aiohttp.ServerDisconnectedError:
                 log_error('disconnected.')
+            except self.ClientHttpProcessingError:
+                log_error('HTTP error.')
+            except self.ClientPayloadError:
+                log_error('payload encoding error.')
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
             except self.DaemonWarmingUpError:
