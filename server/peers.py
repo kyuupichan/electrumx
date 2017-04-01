@@ -10,11 +10,11 @@
 import ast
 import asyncio
 import random
+import socket
 import ssl
 import time
 from collections import defaultdict, Counter
 from functools import partial
-from socket import SOCK_STREAM
 
 from lib.jsonrpc import JSONSession
 from lib.peer import Peer
@@ -337,9 +337,15 @@ class PeerManager(util.LoggedClass):
             permit = self.permit_new_onion_peer()
             reason = 'rate limiting'
         else:
-            infos = await self.loop.getaddrinfo(host, 80, type=SOCK_STREAM)
-            permit = any(source == info[-1][0] for info in infos)
-            reason = 'source-destination mismatch'
+            try:
+                infos = await self.loop.getaddrinfo(host, 80,
+                                                    type=socket.SOCK_STREAM)
+            except socket.gaierror:
+                permit = False
+                reason = 'address resolution failure'
+            else:
+                permit = any(source == info[-1][0] for info in infos)
+                reason = 'source-destination mismatch'
 
         if permit:
             self.log_info('accepted add_peer request from {} for {}'
