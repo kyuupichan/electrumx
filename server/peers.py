@@ -173,7 +173,7 @@ class PeerSession(JSONSession):
         if self.peer in self.peer_mgr.myselves:
             return
         my = self.peer_mgr.my_clearnet_peer()
-        if not my.is_public:
+        if not my or not my.is_public:
             return
         for peer in my.matches(peers):
             if peer.tcp_port == my.tcp_port and peer.ssl_port == my.ssl_port:
@@ -227,8 +227,9 @@ class PeerManager(util.LoggedClass):
         self.import_peers()
 
     def my_clearnet_peer(self):
-        '''Returns the clearnet peer representing this server.'''
-        return [peer for peer in self.myselves if not peer.is_tor][0]
+        '''Returns the clearnet peer representing this server, if any.'''
+        clearnet = [peer for peer in self.myselves if not peer.is_tor]
+        return clearnet[0] if clearnet else None
 
     def info(self):
         '''The number of peers.'''
