@@ -230,7 +230,6 @@ class PeerManager(util.LoggedClass):
         self.peers = set()
         self.onion_peers = []
         self.permit_onion_peer_time = time.time()
-        self.last_tor_retry_time = 0
         self.tor_proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
                                     loop=self.loop)
         self.import_peers()
@@ -463,6 +462,7 @@ class PeerManager(util.LoggedClass):
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
         '''
+        self.ensure_future(self.tor_proxy.auto_detect_loop())
         self.connect_to_irc()
         if not self.env.peer_discovery:
             self.logger.info('peer discovery is disabled')
@@ -492,10 +492,6 @@ class PeerManager(util.LoggedClass):
         nearly_stale_time = (now - STALE_SECS) + WAKEUP_SECS * 2
 
         def should_retry(peer):
-            # Try some Tor at startup to determine the proxy so we can
-            # serve the right banner file
-            if self.tor_proxy.port is None and self.is_coin_onion_peer(peer):
-                return True
             # Retry a peer whose ports might have updated
             if peer.other_port_pairs:
                 return True
@@ -506,14 +502,6 @@ class PeerManager(util.LoggedClass):
             return peer.last_try < now - WAKEUP_SECS * 2 ** peer.try_count
 
         peers = [peer for peer in self.peers if should_retry(peer)]
-
-        # If we don't have a tor proxy drop tor peers, but retry
-        # occasionally
-        if self.tor_proxy.port is None:
-            if now < self.last_tor_retry_time + 3600:
-                peers = [peer for peer in peers if not peer.is_tor]
-            elif any(peer.is_tor for peer in peers):
-                self.last_tor_retry_time = now
 
         for peer in peers:
             peer.try_count += 1
@@ -529,6 +517,9 @@ class PeerManager(util.LoggedClass):
         sslc = ssl.SSLContext(ssl.PROTOCOL_TLS) if kind == 'SSL' else None
 
         if peer.is_tor:
+            # Don't attempt an onion connection if we don't have a tor proxy
+            if not self.tor_proxy.is_up():
+                return
             create_connection = self.tor_proxy.create_connection
         else:
             create_connection = self.loop.create_connection
