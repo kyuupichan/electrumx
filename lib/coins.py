@@ -330,7 +330,6 @@ class Bitcoin(Coin):
     RPC_PORT = 8332
     PEERS = [
         'btc.smsys.me s995',
-        'ca6ulp2j2mpsft3y.onion s t',
         'electrum.be s t',
         'electrum.trouth.net p10000 s t',
         'electrum.vom-stausee.de s t',
