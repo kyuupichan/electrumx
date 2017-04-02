@@ -251,6 +251,15 @@ some of this.
   peer discovery if it notices it is not present in the peer's
   returned list.
 
+* **FORCE_PROXY**
+
+  By default peer discovery happens over the clear internet.  Set this
+  to non-empty to force peer discovery to be done via the proxy.  This
+  might be useful if you are running a Tor service exclusively and
+  wish to keep your IP address private.  **NOTE**: in such a case you
+  should leave **IRC** unset as IRC connections are *always* over the
+  normal internet.
+
 * **TOR_PROXY_HOST**
 
   The host where your Tor proxy is running.  Defaults to *localhost*.
@@ -316,7 +325,8 @@ connectivity on IRC:
 
 * **IRC**
 
-  Set to anything non-empty to advertise on IRC
+  Set to anything non-empty to advertise on IRC.  ElectrumX connects
+  to IRC over the clear internet, always.
 
 * **IRC_NICK**
 

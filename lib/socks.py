@@ -146,6 +146,7 @@ class SocksProxy(util.LoggedClass):
         self.errors = 0
         self.ip_addr = None
         self.lost_event = asyncio.Event()
+        self.tried_event = asyncio.Event()
         self.loop = loop or asyncio.get_event_loop()
         self.set_lost()
 
@@ -208,6 +209,8 @@ class SocksProxy(util.LoggedClass):
                 if log_failure:
                     self.logger.info('failed to detect proxy at {}: {}'
                                      .format(util.address_string(paddress), e))
+
+        self.tried_event.set()
 
         # Failed all ports?
         if sock is None:

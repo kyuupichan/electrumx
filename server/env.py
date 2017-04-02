@@ -53,6 +53,7 @@ class Env(LoggedClass):
         # Peer discovery
         self.peer_discovery = bool(self.default('PEER_DISCOVERY', True))
         self.peer_announce = bool(self.default('PEER_ANNOUNCE', True))
+        self.force_proxy = bool(self.default('FORCE_PROXY', False))
         self.tor_proxy_host = self.default('TOR_PROXY_HOST', 'localhost')
         self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
         # The electrum client takes the empty string as unspecified

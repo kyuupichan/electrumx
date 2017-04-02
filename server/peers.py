@@ -195,15 +195,7 @@ class PeerSession(JSONSession):
     def shutdown_connection(self):
         self.peer.last_connect = time.time()
         is_good = not (self.failed or self.bad)
-        self.peer_mgr.set_connection_status(self.peer, is_good)
-        if self.peer.is_tor:
-            how = 'via {} over Tor'.format(self.kind)
-        else:
-            how = 'via {} at {}'.format(self.kind,
-                                        self.peer_addr(anon=False))
-        status = 'verified' if is_good else 'failed to verify'
-        elapsed = time.time() - self.peer.last_try
-        self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
+        self.peer_mgr.set_verification_status(self.peer, self.kind, is_good)
         self.close_connection()
 
 
@@ -230,8 +222,8 @@ class PeerManager(util.LoggedClass):
         self.peers = set()
         self.onion_peers = []
         self.permit_onion_peer_time = time.time()
-        self.tor_proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
-                                    loop=self.loop)
+        self.proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
+                                loop=self.loop)
         self.import_peers()
 
     def my_clearnet_peer(self):
@@ -462,13 +454,19 @@ class PeerManager(util.LoggedClass):
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
         '''
-        self.ensure_future(self.tor_proxy.auto_detect_loop())
         self.connect_to_irc()
         if not self.env.peer_discovery:
             self.logger.info('peer discovery is disabled')
             return
 
+        # Wait a few seconds after starting the proxy detection loop
+        # for proxy detection to succeed
+        self.ensure_future(self.proxy.auto_detect_loop())
+        await self.proxy.tried_event.wait()
+
         self.logger.info('beginning peer discovery')
+        self.logger.info('force use of proxy: {}'.format(self.env.force_proxy))
+
         try:
             while True:
                 timeout = self.loop.call_later(WAKEUP_SECS,
@@ -516,11 +514,11 @@ class PeerManager(util.LoggedClass):
         kind, port = port_pairs[0]
         sslc = ssl.SSLContext(ssl.PROTOCOL_TLS) if kind == 'SSL' else None
 
-        if peer.is_tor:
-            # Don't attempt an onion connection if we don't have a tor proxy
-            if not self.tor_proxy.is_up():
+        if self.env.force_proxy or peer.is_tor:
+            # Only attempt a proxy connection if the proxy is up
+            if not self.proxy.is_up():
                 return
-            create_connection = self.tor_proxy.create_connection
+            create_connection = self.proxy.create_connection
         else:
             create_connection = self.loop.create_connection
 
@@ -546,10 +544,18 @@ class PeerManager(util.LoggedClass):
             if port_pairs:
                 self.retry_peer(peer, port_pairs)
             else:
-                self.set_connection_status(peer, False)
+                self.maybe_forget_peer(peer)
 
-    def set_connection_status(self, peer, good):
-        '''Called when a connection succeeded or failed.'''
+    def set_verification_status(self, peer, kind, good):
+        '''Called when a verification succeeded or failed.'''
+        if self.env.force_proxy or peer.is_tor:
+            how = 'via {} over Tor'.format(kind)
+        else:
+            how = 'via {} at {}'.format(kind, peer.ip_addr)
+        status = 'verified' if good else 'failed to verify'
+        elapsed = time.time() - peer.last_try
+        self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
+
         if good:
             peer.try_count = 0
             peer.source = 'peer'
