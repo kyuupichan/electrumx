@@ -94,12 +94,14 @@ class Peer(object):
         return tuple(int(part) for part in vstr.split('.'))
 
     def matches(self, peers):
-        '''Return peers whose host matches the given peer's host or IP
-        address.  This results in our favouring host names over IP
-        addresses.
+        '''Return peers whose host matches our hostname or IP address.
+        Additionally include all peers whose IP address matches our
+        hostname if that is an IP address.
         '''
         candidates = (self.host.lower(), self.ip_addr)
-        return [peer for peer in peers if peer.host.lower() in candidates]
+        return [peer for peer in peers
+                if peer.host.lower() in candidates
+                or peer.ip_addr == self.host]
 
     def __str__(self):
         return self.host
@@ -111,9 +113,13 @@ class Peer(object):
         except Exception:
             pass
         else:
-            self.features = tmp.features
+            self.update_features_from_peer(tmp)
+
+    def update_features_from_peer(self, peer):
+        if peer != self:
+            self.features = peer.features
             for feature in self.FEATURES:
-                setattr(self, feature, getattr(tmp, feature))
+                setattr(self, feature, getattr(peer, feature))
 
     def connection_port_pairs(self):
         '''Return a list of (kind, port) pairs to try when making a

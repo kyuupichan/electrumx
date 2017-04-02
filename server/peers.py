@@ -555,15 +555,20 @@ class PeerManager(util.LoggedClass):
             how = 'via {} at {}'.format(kind, peer.ip_addr)
         status = 'verified' if good else 'failed to verify'
         elapsed = time.time() - peer.last_try
-        self.log_info('{} {} in {:.1f}s'.format(status, how, elapsed))
+        self.log_info('{} {} {} in {:.1f}s'.format(status, peer, how, elapsed))
 
         if good:
             peer.try_count = 0
             peer.source = 'peer'
-            # Remove matching IP addresses
-            for match in peer.matches(self.peers):
-                if match != peer and peer.host == peer.ip_addr:
-                    self.peers.remove(match)
+            # At most 2 matches if we're a host name, potentially several if
+            # we're an IP address (several instances can share a NAT).
+            matches = peer.matches(self.peers)
+            for match in matches:
+                if match.ip_address:
+                    if len(matches) > 1:
+                        self.peers.remove(match)
+                elif peer.host in match.features['hosts']:
+                    match.update_features_from_peer(peer)
         else:
             self.maybe_forget_peer(peer)
 
