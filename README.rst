@@ -127,6 +127,21 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.7
+-------------
+
+Improvements to proxy handling and peer discovery
+
+* background async proxy detection loop.  Removes responsibility for
+  proxy detection and maintenance from the peer manager.
+* peer discovery waits for an initial proxy detection attempt to complete
+  before starting
+* new feature: flag to force peer discovery to happen via the proxy.
+  This might be useful for someone exlusively running a Tor service
+  that doesn't want to reveal its IP address.  See **FORCE_PROXY** in
+  `docs/ENVIRONMENT.rst`_ for details and caveats.
+* other minor fixes and tweaks
+
 Version 1.0.6
 -------------
 
