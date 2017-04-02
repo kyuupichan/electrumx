@@ -122,9 +122,10 @@ class Env(LoggedClass):
         try:
             ip = ip_address(host)
         except ValueError:
-            bad = not bool(host.strip())
+            bad = host.lower().strip() in ('', 'localhost')
         else:
-            bad = ip.is_multicast or ip.is_unspecified
+            bad = (ip.is_multicast or ip.is_unspecified
+                   or (ip.is_private and (self.irc or self.peer_announce)))
         if bad:
             raise self.Error('"{}" is not a valid REPORT_HOST'.format(host))
         tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port) or None
