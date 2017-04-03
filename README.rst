@@ -127,6 +127,17 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.8
+-------------
+
+Minor peer-discovery tweaks:
+
+* I intended that if a host and its IP address were both registered as
+  peers, that the real hostname replace the IP address.  That wasn't
+  working properly and is fixed now.
+* 1.0.6 no longer required a clearnet identity but part of the peer
+  discovery logic assumed one existed.  That is now fixed.
+
 Version 1.0.7
 -------------
 
