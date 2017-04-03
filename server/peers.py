@@ -465,8 +465,8 @@ class PeerManager(util.LoggedClass):
         self.ensure_future(self.proxy.auto_detect_loop())
         await self.proxy.tried_event.wait()
 
-        self.logger.info('beginning peer discovery')
-        self.logger.info('force use of proxy: {}'.format(self.env.force_proxy))
+        self.logger.info('beginning peer discovery; force use of proxy: {}'
+                         .format(self.env.force_proxy))
 
         try:
             while True:
