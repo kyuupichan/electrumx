@@ -38,13 +38,13 @@ class Peer(object):
     ATTRS = ('host', 'features',
              # metadata
              'source', 'ip_addr', 'good_ports',
-             'last_connect', 'last_try', 'try_count')
+             'last_good', 'last_try', 'try_count')
     FEATURES = ('pruning', 'server_version', 'protocol_min', 'protocol_max')
     # This should be set by the application
     DEFAULT_PORTS = {}
 
     def __init__(self, host, features, source='unknown', ip_addr=None,
-                 good_ports=[], last_connect=0, last_try=0, try_count=0):
+                 good_ports=[], last_good=0, last_try=0, try_count=0):
         '''Create a peer given a host name (or IP address as a string),
         a dictionary of features, and a record of the source.'''
         assert isinstance(host, str)
@@ -59,7 +59,11 @@ class Peer(object):
         self.source = source
         self.ip_addr = ip_addr
         self.good_ports = good_ports.copy()
-        self.last_connect = last_connect
+        # last_good represents the last connection that was
+        # successful *and* successfully verified, at which point
+        # try_count is set to 0.  Failure to connect or failure to
+        # verify increment the try_count.
+        self.last_good = last_good
         self.last_try = last_try
         self.try_count = try_count
         # Transient, non-persisted metadata

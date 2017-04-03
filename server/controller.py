@@ -500,7 +500,7 @@ class Controller(util.LoggedClass):
         fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>3} '
                '{:>3} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
         yield fmt.format('Host', 'Status', 'TCP', 'SSL', 'Server', 'Min',
-                         'Max', 'Pruning', 'Last Conn', 'Last Try',
+                         'Max', 'Pruning', 'Last Good', 'Last Try',
                          'Tries', 'Source', 'IP Address')
         for item in data:
             features = item['features']
@@ -514,7 +514,7 @@ class Controller(util.LoggedClass):
                              features['protocol_min'],
                              features['protocol_max'],
                              features['pruning'] or '',
-                             time_fmt(item['last_connect']),
+                             time_fmt(item['last_good']),
                              time_fmt(item['last_try']),
                              item['try_count'],
                              item['source'][:20],

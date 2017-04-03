@@ -193,7 +193,6 @@ class PeerSession(JSONSession):
                 self.shutdown_connection()
 
     def shutdown_connection(self):
-        self.peer.last_connect = time.time()
         is_good = not (self.failed or self.bad)
         self.peer_mgr.set_verification_status(self.peer, self.kind, is_good)
         self.close_connection()
@@ -249,9 +248,9 @@ class PeerManager(util.LoggedClass):
         for peer in self.peers:
             if peer.bad:
                 peer.status = PEER_BAD
-            elif peer.last_connect > cutoff:
+            elif peer.last_good > cutoff:
                 peer.status = PEER_GOOD
-            elif peer.last_connect:
+            elif peer.last_good:
                 peer.status = PEER_STALE
             else:
                 peer.status = PEER_NEVER
@@ -267,7 +266,7 @@ class PeerManager(util.LoggedClass):
             return data
 
         def peer_key(peer):
-            return (peer.bad, -peer.last_connect)
+            return (peer.bad, -peer.last_good)
 
         return [peer_data(peer) for peer in sorted(self.peers, key=peer_key)]
 
@@ -358,13 +357,13 @@ class PeerManager(util.LoggedClass):
         '''
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers
-                  if peer.last_connect > cutoff and
+                  if peer.last_good > cutoff and
                   not peer.bad and peer.is_public]
         onion_peers = []
 
         # Always report ourselves if valid (even if not public)
         peers = set(myself for myself in self.myselves
-                    if myself.last_connect > cutoff)
+                    if myself.last_good > cutoff)
 
         # Bucket the clearnet peers and select up to two from each
         buckets = defaultdict(list)
@@ -409,6 +408,8 @@ class PeerManager(util.LoggedClass):
                 if version == 1:
                     peers = []
                     for item in items:
+                        if 'last_connect' in item:
+                            item['last_good'] = item.pop('last_connect')
                         try:
                             peers.append(Peer.deserialize(item))
                         except Exception:
@@ -496,7 +497,7 @@ class PeerManager(util.LoggedClass):
                 return True
             # Retry a good connection if it is about to turn stale
             if peer.try_count == 0:
-                return peer.last_connect < nearly_stale_time
+                return peer.last_good < nearly_stale_time
             # Retry a failed connection if enough time has passed
             return peer.last_try < now - WAKEUP_SECS * 2 ** peer.try_count
 
@@ -549,16 +550,18 @@ class PeerManager(util.LoggedClass):
 
     def set_verification_status(self, peer, kind, good):
         '''Called when a verification succeeded or failed.'''
+        now = time.time()
         if self.env.force_proxy or peer.is_tor:
             how = 'via {} over Tor'.format(kind)
         else:
             how = 'via {} at {}'.format(kind, peer.ip_addr)
         status = 'verified' if good else 'failed to verify'
-        elapsed = time.time() - peer.last_try
+        elapsed = now - peer.last_try
         self.log_info('{} {} {} in {:.1f}s'.format(status, peer, how, elapsed))
 
         if good:
             peer.try_count = 0
+            peer.last_good = now
             peer.source = 'peer'
             # At most 2 matches if we're a host name, potentially several if
             # we're an IP address (several instances can share a NAT).
@@ -574,7 +577,7 @@ class PeerManager(util.LoggedClass):
 
     def maybe_forget_peer(self, peer):
         '''Forget the peer if appropriate, e.g. long-term unreachable.'''
-        if peer.last_connect and not peer.bad:
+        if peer.last_good and not peer.bad:
             try_limit = 10
         else:
             try_limit = 3
