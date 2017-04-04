@@ -294,9 +294,9 @@ class PeerManager(util.LoggedClass):
                 use_peers = new_peers[:limit]
             else:
                 use_peers = new_peers
-            self.logger.info('accepted {:d}/{:d} new peers of {:d} from {}'
-                             .format(len(use_peers), len(new_peers),
-                                     len(peers), source))
+            for n, peer in enumerate(use_peers):
+                self.logger.info('accepted new peer {:d}/{:d} {} from {} '
+                                 .format(n + 1, len(use_peers), peer, source))
             self.peers.update(use_peers)
 
         if retry:

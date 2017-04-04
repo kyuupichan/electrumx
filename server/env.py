@@ -29,14 +29,14 @@ class Env(LoggedClass):
     def __init__(self):
         super().__init__()
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
+        self.db_dir = self.required('DB_DIRECTORY')
+        self.daemon_url = self.required('DAEMON_URL')
         coin_name = self.default('COIN', 'Bitcoin')
         network = self.default('NET', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
-        self.db_dir = self.required('DB_DIRECTORY')
         self.cache_MB = self.integer('CACHE_MB', 1200)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
-        self.daemon_url = self.required('DAEMON_URL')
         # Server stuff
         self.tcp_port = self.integer('TCP_PORT', None)
         self.ssl_port = self.integer('SSL_PORT', None)
@@ -48,12 +48,12 @@ class Env(LoggedClass):
         self.banner_file = self.default('BANNER_FILE', None)
         self.tor_banner_file = self.default('TOR_BANNER_FILE',
                                             self.banner_file)
-        self.anon_logs = self.default('ANON_LOGS', False)
+        self.anon_logs = self.boolean('ANON_LOGS', False)
         self.log_sessions = self.integer('LOG_SESSIONS', 3600)
         # Peer discovery
-        self.peer_discovery = bool(self.default('PEER_DISCOVERY', True))
-        self.peer_announce = bool(self.default('PEER_ANNOUNCE', True))
-        self.force_proxy = bool(self.default('FORCE_PROXY', False))
+        self.peer_discovery = self.boolean('PEER_DISCOVERY', True)
+        self.peer_announce = self.boolean('PEER_ANNOUNCE', True)
+        self.force_proxy = self.boolean('FORCE_PROXY', False)
         self.tor_proxy_host = self.default('TOR_PROXY_HOST', 'localhost')
         self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
         # The electrum client takes the empty string as unspecified
@@ -67,7 +67,7 @@ class Env(LoggedClass):
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         # IRC
-        self.irc = self.default('IRC', False)
+        self.irc = self.boolean('IRC', False)
         self.irc_nick = self.default('IRC_NICK', None)
 
         # Identities
@@ -79,6 +79,9 @@ class Env(LoggedClass):
 
     def default(self, envvar, default):
         return environ.get(envvar, default)
+
+    def boolean(self, envvar, default):
+        return bool(self.default(envvar, default))
 
     def required(self, envvar):
         value = environ.get(envvar)
