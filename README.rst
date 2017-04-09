@@ -17,6 +17,9 @@ Getting Started
 ===============
 
 See `docs/HOWTO.rst`_.
+There is also an `installer`_ available that simplifies the installation on various Linux-based distributions.
+
+.. _installer: https://github.com/bauerj/electrumx-installer
 
 Features
 ========
