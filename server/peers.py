@@ -114,8 +114,11 @@ class PeerSession(JSONSession):
             if our_hash != features.get('genesis_hash'):
                 self.bad = True
                 self.log_warning('incorrect genesis hash')
-            else:
+            elif self.peer.host in features.get('hosts', {}):
                 self.peer.update_features(features)
+            else:
+                self.bad = True
+                self.log_warning('marking DNS alias bad')
         self.close_if_done()
 
     def on_headers(self, result, error):
