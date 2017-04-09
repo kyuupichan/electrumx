@@ -142,6 +142,11 @@ class BlockProcessor(server.db.DB):
 
     def __init__(self, env, controller, daemon):
         super().__init__(env)
+
+        # An incomplete compaction needs to be cancelled otherwise
+        # restarting it will corrupt the history
+        self.cancel_history_compaction()
+
         self.daemon = daemon
         self.controller = controller
 
@@ -332,7 +337,7 @@ class BlockProcessor(server.db.DB):
         self.wall_time += now - self.last_flush
         self.last_flush = now
         self.last_flush_tx_count = self.tx_count
-        self.write_state(batch)
+        self.utxo_write_state(batch)
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
