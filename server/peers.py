@@ -110,15 +110,17 @@ class PeerSession(JSONSession):
         # Several peers don't implement this.  If they do, check they are
         # the same network with the genesis hash.
         if not error and isinstance(features, dict):
+            hosts = [host.lower() for host in features.get('hosts', {})]
             our_hash = self.peer_mgr.env.coin.GENESIS_HASH
             if our_hash != features.get('genesis_hash'):
                 self.bad = True
                 self.log_warning('incorrect genesis hash')
-            elif self.peer.host in features.get('hosts', {}):
+            elif self.peer.host.lower() in hosts:
                 self.peer.update_features(features)
             else:
                 self.bad = True
-                self.log_warning('ignoring - not listed in features')
+                self.log_warning('ignoring - not listed in host list {}'
+                                 .format(hosts))
         self.close_if_done()
 
     def on_headers(self, result, error):
