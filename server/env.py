@@ -14,13 +14,13 @@ from ipaddress import ip_address
 from os import environ
 
 from lib.coins import Coin
-from lib.util import LoggedClass
+import lib.util as lib_util
 
 
 NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
-class Env(LoggedClass):
+class Env(lib_util.LoggedClass):
     '''Wraps environment configuration.'''
 
     class Error(Exception):
@@ -126,7 +126,8 @@ class Env(LoggedClass):
         try:
             ip = ip_address(host)
         except ValueError:
-            bad = host.lower().strip() in ('', 'localhost')
+            bad = (not lib_util.is_valid_hostname(host)
+                   or hostname.lower() == 'localhost')
         else:
             bad = (ip.is_multicast or ip.is_unspecified
                    or (ip.is_private and (self.irc or self.peer_announce)))

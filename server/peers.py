@@ -118,7 +118,7 @@ class PeerSession(JSONSession):
                 self.peer.update_features(features)
             else:
                 self.bad = True
-                self.log_warning('marking DNS alias bad')
+                self.log_warning('ignoring - not listed in features')
         self.close_if_done()
 
     def on_headers(self, result, error):
