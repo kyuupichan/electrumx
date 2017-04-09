@@ -127,6 +127,15 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.9
+-------------
+
+- ignore peers not appearing in their features list
+- validate hostnames in Env object
+- added tests for env.py
+- Einsteinium support and contrib script shebang fix (erasmospunk)
+- set last_good only if successfully verified
+
 Version 1.0.8
 -------------
 

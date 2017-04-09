@@ -205,6 +205,9 @@ def test_clearnet_identity():
     os.environ['REPORT_HOST'] = '224.0.0.2'
     with pytest.raises(Env.Error):
         Env()
+    os.environ['REPORT_HOST'] = '$HOST'
+    with pytest.raises(Env.Error):
+        Env()
     # Accept private IP, unless IRC or PEER_ANNOUNCE
     os.environ.pop('IRC', None)
     os.environ['PEER_ANNOUNCE'] = ''

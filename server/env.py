@@ -127,7 +127,7 @@ class Env(lib_util.LoggedClass):
             ip = ip_address(host)
         except ValueError:
             bad = (not lib_util.is_valid_hostname(host)
-                   or hostname.lower() == 'localhost')
+                   or host.lower() == 'localhost')
         else:
             bad = (ip.is_multicast or ip.is_unspecified
                    or (ip.is_private and (self.irc or self.peer_announce)))
