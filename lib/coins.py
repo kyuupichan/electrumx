@@ -420,8 +420,8 @@ class Litecoin(Coin):
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10
-    IRC_PREFIX = "EL_"
-    IRC_CHANNEL = "#electrum-ltc"
+    IRC_CHANNEL = "#electrum-ltc"   # obsolete
+    IRC_PREFIX = None
     RPC_PORT = 9332
     REORG_LIMIT = 800
     PEERS = [
@@ -431,14 +431,16 @@ class Litecoin(Coin):
         'electrum.cryptomachine.com p1000 s t',
         'electrum.ltc.xurious.com s t',
         'eywr5eubdbbe2laq.onion s50008 t50007',
-        'us11.einfachmalnettsein.de s50008 t50007',
     ]
+
+    @classmethod
+    def deserializer(cls):
+        return DeserializerSegWit
 
 
 class LitecoinTestnet(Litecoin):
     SHORTNAME = "XLT"
     NET = "testnet"
-    IRC_PREFIX = None
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
@@ -456,14 +458,6 @@ class LitecoinTestnet(Litecoin):
         'electrum-ltc.bysh.me s t',
         'electrum.ltc.xurious.com s t',
     ]
-
-
-class LitecoinTestnetSegWit(LitecoinTestnet):
-    NET = "testnet-segwit"
-
-    @classmethod
-    def deserializer(cls):
-        return DeserializerSegWit
 
 
 class Viacoin(CoinAuxPow):
