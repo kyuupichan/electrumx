@@ -130,6 +130,17 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.10
+--------------
+
+- add bauerj's installer docs
+- segwit has activated on Litecoin.  Make segwit deserialization the
+  default.  Also as the first Segwit block probably will break old
+  electrum-server implementation servers, disable IRC and make
+  Litecoin mainnet and testnet use the peer-discovery protocol.  If
+  you previously used "testnet-segwit" as your NET you should instead
+  use "testnet".
+
 Version 1.0.9
 -------------
 
