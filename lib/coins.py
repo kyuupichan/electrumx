@@ -170,7 +170,7 @@ class Coin(object):
     def P2SH_address_from_hash160(cls, hash160):
         '''Return a coin address given a hash160.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2SH_VERBYTE + hash160)
+        return Base58.encode_check(cls.P2SH_VERBYTES[0] + hash160)
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
@@ -213,7 +213,7 @@ class Coin(object):
 
         if verbyte == cls.P2PKH_VERBYTE:
             return ScriptPubKey.P2PKH_script(hash_bytes)
-        if verbyte == cls.P2SH_VERBYTE:
+        if verbyte in cls.P2SH_VERBYTES:
             return ScriptPubKey.P2SH_script(hash_bytes)
 
         raise CoinError('invalid address: {}'.format(address))
@@ -318,7 +318,7 @@ class Bitcoin(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("00")
-    P2SH_VERBYTE = bytes.fromhex("05")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
@@ -353,7 +353,7 @@ class BitcoinTestnet(Bitcoin):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
                     'aec3ced90fa3f408719526f8d77f4943')
@@ -413,7 +413,7 @@ class Litecoin(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("30")
-    P2SH_VERBYTE = bytes.fromhex("05")
+    P2SH_VERBYTES = [bytes.fromhex("32"), bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("b0")
     GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
                     'c99d9714d334efa41a195a7e7e04bfe2')
@@ -444,7 +444,7 @@ class LitecoinTestnet(Litecoin):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("3a"), bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('4966625a4b2851d9fdee139e56211a0d'
                     '88575f59ed816ff5e6a63deb4e3e29a0')
@@ -467,7 +467,7 @@ class Viacoin(CoinAuxPow):
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
     XPRV_VERBYTES = bytes.fromhex("0488ADE4")
     P2PKH_VERBYTE = bytes.fromhex("47")
-    P2SH_VERBYTE = bytes.fromhex("21")
+    P2SH_VERBYTES = [bytes.fromhex("21")]
     WIF_BYTE = bytes.fromhex("c7")
     GENESIS_HASH = ('4e9b54001f9976049830128ec0331515'
                     'eaabe35a70970d79971da1539a400ba1')
@@ -492,7 +492,7 @@ class ViacoinTestnet(Viacoin):
     XPUB_VERBYTES = bytes.fromhex("043587CF")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("7f")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ff")
     GENESIS_HASH = ('00000007199508e34a9ff81e6ec0c477'
                     'a4cccff2a4767a8eee39c11db367b008')
@@ -519,7 +519,7 @@ class Namecoin(CoinAuxPow):
     XPUB_VERBYTES = bytes.fromhex("d7dd6370")
     XPRV_VERBYTES = bytes.fromhex("d7dc6e31")
     P2PKH_VERBYTE = bytes.fromhex("34")
-    P2SH_VERBYTE = bytes.fromhex("0d")
+    P2SH_VERBYTES = [bytes.fromhex("0d")]
     WIF_BYTE = bytes.fromhex("e4")
     GENESIS_HASH = ('000000000062b72c5e2ceb45fbc8587e'
                     '807c155b0da735e6483dfba2f0a9c770')
@@ -537,7 +537,7 @@ class NamecoinTestnet(Namecoin):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('00000007199508e34a9ff81e6ec0c477'
                     'a4cccff2a4767a8eee39c11db367b008')
@@ -550,7 +550,7 @@ class Dogecoin(CoinAuxPow):
     XPUB_VERBYTES = bytes.fromhex("02facafd")
     XPRV_VERBYTES = bytes.fromhex("02fac398")
     P2PKH_VERBYTE = bytes.fromhex("1e")
-    P2SH_VERBYTE = bytes.fromhex("16")
+    P2SH_VERBYTES = [bytes.fromhex("16")]
     WIF_BYTE = bytes.fromhex("9e")
     GENESIS_HASH = ('1a91e3dace36e2be3bf030a65679fe82'
                     '1aa1d6ef92e7c9902eb318182c355691')
@@ -569,7 +569,7 @@ class DogecoinTestnet(Dogecoin):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("71")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("f1")
     GENESIS_HASH = ('bb0a78264637406b6360aad926284d54'
                     '4d7049f45189db5664f3c4d07350559e')
@@ -585,7 +585,7 @@ class Dash(Coin):
     GENESIS_HASH = ('00000ffd590b1485b3caadc19b22e637'
                     '9c733355108f107a430458cdf3407ab6')
     P2PKH_VERBYTE = bytes.fromhex("4c")
-    P2SH_VERBYTE = bytes.fromhex("10")
+    P2SH_VERBYTES = [bytes.fromhex("10")]
     WIF_BYTE = bytes.fromhex("cc")
     TX_COUNT_HEIGHT = 569399
     TX_COUNT = 2157510
@@ -617,7 +617,7 @@ class DashTestnet(Dash):
     GENESIS_HASH = ('00000bafbc94add76cb75e2ec9289483'
                     '7288a481e5c005f6563d91623bf8bc2c')
     P2PKH_VERBYTE = bytes.fromhex("8c")
-    P2SH_VERBYTE = bytes.fromhex("13")
+    P2SH_VERBYTES = [bytes.fromhex("13")]
     WIF_BYTE = bytes.fromhex("ef")
     TX_COUNT_HEIGHT = 101619
     TX_COUNT = 132681
@@ -637,7 +637,7 @@ class Argentum(CoinAuxPow):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("17")
-    P2SH_VERBYTE = bytes.fromhex("05")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("97")
     GENESIS_HASH = ('88c667bc63167685e4e4da058fffdfe8'
                     'e007e5abffd6855de52ad59df7bb0bb2')
@@ -655,7 +655,7 @@ class ArgentumTestnet(Argentum):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ef")
     REORG_LIMIT = 2000
 
@@ -667,7 +667,7 @@ class DigiByte(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("1E")
-    P2SH_VERBYTE = bytes.fromhex("05")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('7497ea1b465eb39f1c8f507bc877078f'
                     'e016d6fcb6dfad3a64c98dcc6e1e8496')
@@ -684,7 +684,7 @@ class DigiByteTestnet(DigiByte):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
-    P2SH_VERBYTE = bytes.fromhex("c4")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('b5dca8039e300198e5fe7cd23bdd1728'
                     'e2a444af34c447dbd0916fa3430a68c2')
@@ -701,7 +701,7 @@ class FairCoin(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("5f")
-    P2SH_VERBYTE = bytes.fromhex("24")
+    P2SH_VERBYTES = [bytes.fromhex("24")]
     WIF_BYTE = bytes.fromhex("df")
     GENESIS_HASH = ('1f701f2b8de1339dc0ec908f3fb6e9b0'
                     'b870b6f20ba893e120427e42bbc048d7')
@@ -750,7 +750,7 @@ class Zcash(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("1CB8")
-    P2SH_VERBYTE = bytes.fromhex("1CBD")
+    P2SH_VERBYTES = [bytes.fromhex("1CBD")]
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('00040fe8ec8471911baa1db1266ea15d'
                     'd06b4a8a5c453883c000b031973dce08')
@@ -798,7 +798,7 @@ class Einsteinium(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("21")
-    P2SH_VERBYTE = bytes.fromhex("05")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("a1")
     GENESIS_HASH = ('4e56204bb7b8ac06f860ff1c845f03f9'
                     '84303b5b97eb7b42868f714611aed94b')
