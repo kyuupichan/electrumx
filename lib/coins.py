@@ -322,8 +322,8 @@ class Bitcoin(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
-    TX_COUNT = 156335304
-    TX_COUNT_HEIGHT = 429972
+    TX_COUNT = 217380620
+    TX_COUNT_HEIGHT = 464000
     TX_PER_BLOCK = 1800
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum"
