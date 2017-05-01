@@ -198,7 +198,7 @@ class MemPool(util.LoggedClass):
         not depend on the result remaining the same are fine.
         '''
         script_hashX = self.coin.hashX_from_script
-        deserializer = self.coin.deserializer()
+        deserializer = self.coin.DESERIALIZER
         db_utxo_lookup = self.db.db_utxo_lookup
         txs = self.txs
 
@@ -270,7 +270,7 @@ class MemPool(util.LoggedClass):
         if hashX not in self.hashXs:
             return []
 
-        deserializer = self.coin.deserializer()
+        deserializer = self.coin.DESERIALIZER
         hex_hashes = self.hashXs[hashX]
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         result = []

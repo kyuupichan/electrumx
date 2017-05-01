@@ -40,6 +40,8 @@ import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, DeserializerZcash
+from server.block_processor import BlockProcessor
+from server.daemon import Daemon
 
 Block = namedtuple("Block", "header transactions")
 
@@ -56,12 +58,15 @@ class Coin(object):
     RPC_URL_REGEX = re.compile('.+@(\[[0-9a-fA-F:]+\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE = 2016
+    HASHX_LEN = 11
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
+    DESERIALIZER = Deserializer
+    DAEMON = Daemon
+    BLOCK_PROCESSOR = BlockProcessor
     IRC_PREFIX = None
     IRC_SERVER = "irc.freenode.net"
     IRC_PORT = 6667
-    HASHX_LEN = 11
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -261,8 +266,7 @@ class Coin(object):
         '''Returns (header, [(deserialized_tx, tx_hash), ...]) given a
         block and its height.'''
         header = cls.block_header(block, height)
-        deserializer = cls.deserializer()
-        txs = deserializer(block[len(header):]).read_tx_block()
+        txs = cls.DESERIALIZER(block[len(header):]).read_tx_block()
         return Block(header, txs)
 
     @classmethod
@@ -289,15 +293,13 @@ class Coin(object):
             'nonce': nonce,
         }
 
-    @classmethod
-    def deserializer(cls):
-        return Deserializer
 
 class CoinAuxPow(Coin):
     # Set NAME and NET to avoid exception in Coin::lookup_coin_class
     NAME = ''
     NET = ''
     STATIC_BLOCK_HEADERS = False
+    DESERIALIZER = DeserializerAuxPow
 
     @classmethod
     def header_hash(cls, header):
@@ -307,7 +309,7 @@ class CoinAuxPow(Coin):
     @classmethod
     def block_header(cls, block, height):
         '''Return the AuxPow block header bytes'''
-        block = DeserializerAuxPow(block)
+        block = cls.DESERIALIZER(block)
         return block.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
@@ -382,10 +384,7 @@ class BitcoinTestnetSegWit(BitcoinTestnet):
     bitcoind on testnet, you must use this class as your "COIN".
     '''
     NET = "testnet-segwit"
-
-    @classmethod
-    def deserializer(cls):
-        return DeserializerSegWit
+    DESERIALIZER = DeserializerSegWit
 
 
 class BitcoinNolnet(Bitcoin):
@@ -417,6 +416,7 @@ class Litecoin(Coin):
     WIF_BYTE = bytes.fromhex("b0")
     GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
                     'c99d9714d334efa41a195a7e7e04bfe2')
+    DESERIALIZER = DeserializerSegWit
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10
@@ -432,10 +432,6 @@ class Litecoin(Coin):
         'electrum.ltc.xurious.com s t',
         'eywr5eubdbbe2laq.onion s50008 t50007',
     ]
-
-    @classmethod
-    def deserializer(cls):
-        return DeserializerSegWit
 
 
 class LitecoinTestnet(Litecoin):
@@ -505,10 +501,7 @@ class ViacoinTestnet(Viacoin):
 
 class ViacoinTestnetSegWit(ViacoinTestnet):
     NET = "testnet-segwit"
-
-    @classmethod
-    def deserializer(cls):
-        return DeserializerSegWit
+    DESERIALIZER = DeserializerSegWit
 
 
 # Source: namecoin.org
@@ -756,6 +749,7 @@ class Zcash(Coin):
                     'd06b4a8a5c453883c000b031973dce08')
     STATIC_BLOCK_HEADERS = False
     BASIC_HEADER_SIZE = 140 # Excluding Equihash solution
+    DESERIALIZER = DeserializerZcash
     TX_COUNT = 329196
     TX_COUNT_HEIGHT = 68379
     TX_PER_BLOCK = 5
@@ -782,12 +776,8 @@ class Zcash(Coin):
     @classmethod
     def block_header(cls, block, height):
         '''Return the block header bytes'''
-        block = DeserializerZcash(block)
+        block = cls.DESERIALIZER(block)
         return block.read_header(height, cls.BASIC_HEADER_SIZE)
-
-    @classmethod
-    def deserializer(cls):
-        return DeserializerZcash
 
 
 class Einsteinium(Coin):
