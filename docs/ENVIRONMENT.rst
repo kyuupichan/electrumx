@@ -116,8 +116,10 @@ These environment variables are optional:
   You can place several meta-variables in your banner file, which will be
   replaced before serving to a client.
 
-  + **$VERSION** is replaced with the ElectrumX version you are
-    runnning, such as *ElectrumX 0.9.22*.
+  + **$SERVER_VERSION** is replaced with the ElectrumX version you are
+    runnning, such as *1.0.10*.
+  + **$SERVER_SUBVERSION** is replaced with the ElectrumX user agent
+    string.  For example, `ElectrumX 1.0.10`.
   + **$DAEMON_VERSION** is replaced with the daemon's version as a
     dot-separated string. For example *0.12.1*.
   + **$DAEMON_SUBVERSION** is replaced with the daemon's user agent
