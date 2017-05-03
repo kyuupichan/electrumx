@@ -118,7 +118,7 @@ These environment variables are optional:
 
   + **$SERVER_VERSION** is replaced with the ElectrumX version you are
     runnning, such as *1.0.10*.
-  + **$_SERVER_SUBVERSION** is replace with the ElectrumX user agent
+  + **$SERVER_SUBVERSION** is replace with the ElectrumX user agent
     string.  For example, `ElectrumX 1.0.10`.
   + **$DAEMON_VERSION** is replaced with the daemon's version as a
     dot-separated string. For example *0.12.1*.
