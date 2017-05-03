@@ -288,10 +288,11 @@ class ElectrumX(SessionBase):
         minor, revision = divmod(minor, 10000)
         revision //= 100
         daemon_version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
+        server_version = version.VERSION.split()[-1]
         for pair in [
-                ('$VERSION', version.SUB_VERSION), # legacy
-                ('$SERVER_VERSION', version.VERSION),
-                ('$SERVER_SUBVERSION', version.SUB_VERSION),
+                ('$VERSION', version.VERSION), # legacy
+                ('$SERVER_VERSION', server_version),
+                ('$SERVER_SUBVERSION', version.VERSION),
                 ('$DAEMON_VERSION', daemon_version),
                 ('$DAEMON_SUBVERSION', network_info['subversion']),
                 ('$DONATION_ADDRESS', self.env.donation_address),
