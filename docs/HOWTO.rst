@@ -46,7 +46,7 @@ recommend you install one of these and familiarise yourself with them.
 The instructions below and sample run scripts assume `daemontools`;
 adapting to `runit` should be trivial for someone used to either.
 
-When building the database form the genesis block, ElectrumX has to
+When building the database from the genesis block, ElectrumX has to
 flush large quantities of data to disk and its DB.  You will have a
 better experience if the database directory is on an SSD than on an
 HDD.  Currently to around height 447,100 of the Bitcoin blockchain the
