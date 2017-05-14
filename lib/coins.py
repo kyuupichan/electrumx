@@ -596,6 +596,10 @@ class Dash(Coin):
         'electrum.dash.siampm.com s t',
         'wl4sfwq2hwxnodof.onion s t',
     ]
+    from server.session import DashElectrumX
+    SESSIONCLS = DashElectrumX
+    from server.daemon import DashDaemon
+    DAEMON = DashDaemon
 
     @classmethod
     def header_hash(cls, header):

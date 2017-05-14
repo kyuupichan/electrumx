@@ -387,3 +387,59 @@ class LocalRPC(SessionBase):
     def request_handler(self, method):
         '''Return the async handler for the given request method.'''
         return self.controller.rpc_handlers.get(method)
+
+
+class DashElectrumX(ElectrumX):
+    '''A TCP server that handles incoming Electrum Dash connections.'''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.electrumx_handlers['masternode.announce.broadcast'] = self.masternode_announce_broadcast
+        self.electrumx_handlers['masternode.subscribe'] = self.masternode_subscribe
+        self.subscribe_mns = False
+        self.mns = set()
+
+    async def notify(self, height, touched):
+        '''Notify the client about changes in masternode list.'''
+
+        await super().notify(height, touched)
+
+        if self.subscribe_mns:
+            for masternode in self.mns:
+                status = await self.daemon.masternode_list(['status', masternode])
+                payload = {
+                    'id': None,
+                    'method': 'masternode.subscribe',
+                    'params': [masternode],
+                    'result': status.get(masternode),
+                }
+                self.send_binary(self.encode_payload(payload))
+
+    # Masternode command handlers
+    async def masternode_announce_broadcast(self, signmnb):
+        '''Pass through the parameters to the daemon.
+
+        An ugly API: current Electrum clients only pass the masternode
+        broadcast message in hex and expect error messages to be returned in
+        the result field.  And the server shouldn't be doing the client's
+        user interface job here.
+        '''
+        try:
+            mnb_info = await self.daemon.masternode_broadcast(['relay',signmnb])
+            return mnb_info
+        except DaemonError as e:
+            error = e.args[0]
+            message = error['message']
+            self.log_info('masternode_broadcast: {}'.format(message))
+            return (
+                'The masternode broadcast was rejected.  ({})\n[{}]'
+                .format(message, signmnb)
+            )
+
+    async def masternode_subscribe(self, vin):
+        '''Returns the status of masternode.'''
+        result = await self.daemon.masternode_list(['status',vin])
+        if result is not None:
+            self.mns.add(vin)
+            self.subscribe_mns = True
+        return result.get(vin)
