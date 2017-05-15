@@ -572,6 +572,8 @@ class DogecoinTestnet(Dogecoin):
 
 # Source: https://github.com/dashpay/dash
 class Dash(Coin):
+    from server.session import DashElectrumX
+    from server.daemon import DashDaemon
     NAME = "Dash"
     SHORTNAME = "DASH"
     NET = "mainnet"
@@ -596,9 +598,7 @@ class Dash(Coin):
         'electrum.dash.siampm.com s t',
         'wl4sfwq2hwxnodof.onion s t',
     ]
-    from server.session import DashElectrumX
     SESSIONCLS = DashElectrumX
-    from server.daemon import DashDaemon
     DAEMON = DashDaemon
 
     @classmethod
