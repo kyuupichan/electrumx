@@ -25,7 +25,7 @@ import lib.util as util
 from server.daemon import DaemonError
 from server.mempool import MemPool
 from server.peers import PeerManager
-from server.session import LocalRPC, ElectrumX
+from server.session import LocalRPC
 
 
 class Controller(util.LoggedClass):
@@ -248,7 +248,7 @@ class Controller(util.LoggedClass):
                 server.close()
 
     async def start_server(self, kind, *args, **kw_args):
-        protocol_class = LocalRPC if kind == 'RPC' else ElectrumX
+        protocol_class = LocalRPC if kind == 'RPC' else self.coin.SESSIONCLS
         protocol_factory = partial(protocol_class, self, kind)
         server = self.loop.create_server(protocol_factory, *args, **kw_args)
 
@@ -309,7 +309,7 @@ class Controller(util.LoggedClass):
                 self.header_cache.clear()
 
             # Make a copy; self.sessions can change whilst await-ing
-            sessions = [s for s in self.sessions if isinstance(s, ElectrumX)]
+            sessions = [s for s in self.sessions if isinstance(s, self.coin.SESSIONCLS)]
             for session in sessions:
                 await session.notify(self.bp.db_height, touched)
 

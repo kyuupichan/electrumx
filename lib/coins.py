@@ -42,6 +42,7 @@ from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, DeserializerZcash
 from server.block_processor import BlockProcessor
 from server.daemon import Daemon
+from server.session import ElectrumX
 
 Block = namedtuple("Block", "header transactions")
 
@@ -61,6 +62,7 @@ class Coin(object):
     HASHX_LEN = 11
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
+    SESSIONCLS = ElectrumX
     DESERIALIZER = Deserializer
     DAEMON = Daemon
     BLOCK_PROCESSOR = BlockProcessor
