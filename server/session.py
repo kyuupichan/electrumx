@@ -415,7 +415,8 @@ class DashElectrumX(ElectrumX):
 
     def server_version(self, client_name=None, protocol_version=None):
         '''Returns the server version as a string.
-        Force version string response for Electrum-Dash 2.6.4
+        Force version string response for Electrum-Dash 2.6.4 client caused by
+        https://github.com/dashpay/electrum-dash/commit/638cf6c0aeb7be14a85ad98f873791cb7b49ee29
         '''
 
         default_return = super().server_version(client_name, protocol_version)
