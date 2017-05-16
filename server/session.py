@@ -34,7 +34,7 @@ class SessionBase(JSONSession):
         self.env = controller.env
         self.daemon = self.bp.daemon
         self.client = 'unknown'
-        self.client_version = (1)
+        self.client_version = (1, )
         self.protocol_version = '1.0'
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
