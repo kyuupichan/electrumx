@@ -16,6 +16,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
+import aiohttp
 import pylru
 
 from lib.jsonrpc import JSONSessionBase, RPCError
@@ -871,3 +872,15 @@ class Controller(util.LoggedClass):
     def donation_address(self):
         '''Return the donation address as a string, empty if there is none.'''
         return self.env.donation_address
+
+    @util.expiring_cachedproperty(86400)
+    async def latest_version(self):
+        if not self.coin.LATEST_CLIENT_VERSION_URL:
+            return None
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.coin.LATEST_CLIENT_VERSION_URL) as response:
+                if response.status == 200:
+                    return await response.text()
+
+
+
