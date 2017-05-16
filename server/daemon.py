@@ -247,3 +247,12 @@ class Daemon(util.LoggedClass):
 
         If the daemon has not been queried yet this returns None.'''
         return self._height
+
+class DashDaemon(Daemon):
+    async def masternode_broadcast(self, params):
+        '''Broadcast a transaction to the network.'''
+        return await self._send_single('masternodebroadcast', params)
+
+    async def masternode_list(self, params ):
+        '''Return the masternode status.'''
+        return await self._send_single('masternodelist', params)

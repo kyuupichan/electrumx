@@ -387,3 +387,63 @@ class LocalRPC(SessionBase):
     def request_handler(self, method):
         '''Return the async handler for the given request method.'''
         return self.controller.rpc_handlers.get(method)
+
+
+class DashElectrumX(ElectrumX):
+    '''A TCP server that handles incoming Electrum Dash connections.'''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.electrumx_handlers['masternode.announce.broadcast'] = self.masternode_announce_broadcast
+        self.electrumx_handlers['masternode.subscribe'] = self.masternode_subscribe
+        self.mns = set()
+
+    async def notify(self, height, touched):
+        '''Notify the client about changes in masternode list.'''
+
+        await super().notify(height, touched)
+
+        for masternode in self.mns:
+            status = await self.daemon.masternode_list(['status', masternode])
+            payload = {
+                'id': None,
+                'method': 'masternode.subscribe',
+                'params': [masternode],
+                'result': status.get(masternode),
+            }
+            self.send_binary(self.encode_payload(payload))
+
+    def server_version(self, client_name=None, protocol_version=None):
+        '''Returns the server version as a string.
+        Force version string response for Electrum-Dash 2.6.4 client caused by
+        https://github.com/dashpay/electrum-dash/commit/638cf6c0aeb7be14a85ad98f873791cb7b49ee29
+        '''
+
+        default_return = super().server_version(client_name, protocol_version)
+        if self.client == '2.6.4':
+            return '1.0'
+        return default_return
+
+    # Masternode command handlers
+    async def masternode_announce_broadcast(self, signmnb):
+        '''Pass through the masternode announce message to be broadcast by the daemon.'''
+
+        try:
+            mnb_info = await self.daemon.masternode_broadcast(['relay', signmnb])
+            return mnb_info
+        except DaemonError as e:
+            error = e.args[0]
+            message = error['message']
+            self.log_info('masternode_broadcast: {}'.format(message))
+            return (
+                'The masternode broadcast was rejected.  ({})\n[{}]'
+                .format(message, signmnb)
+            )
+
+    async def masternode_subscribe(self, vin):
+        '''Returns the status of masternode.'''
+        result = await self.daemon.masternode_list(['status', vin])
+        if result is not None:
+            self.mns.add(vin)
+            return result.get(vin)
+        return None
