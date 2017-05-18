@@ -17,8 +17,10 @@ from time import strptime
 
 import aiohttp
 
-from electrumx.lib.util import int_to_varint, hex_to_bytes, class_logger
-from electrumx.lib.hash import hex_str_to_hash
+from electrumx.lib.util import int_to_varint, hex_to_bytes, class_logger, \
+    unpack_uint16_from
+from electrumx.lib.hash import hex_str_to_hash, hash_to_hex_str
+from electrumx.lib.tx import DeserializerDecred
 from aiorpcx import JSONRPC
 
 
@@ -365,3 +367,86 @@ class LegacyRPCDaemon(Daemon):
         if isinstance(t, int):
             return t
         return timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
+
+
+class DecredDaemon(Daemon):
+    async def raw_blocks(self, hex_hashes):
+        '''Return the raw binary blocks with the given hex hashes.'''
+
+        params_iterable = ((h, False) for h in hex_hashes)
+        blocks = await self._send_vector('getblock', params_iterable)
+
+        raw_blocks = []
+        valid_tx_tree = {}
+        for block in blocks:
+            # Convert to bytes from hex
+            raw_block = hex_to_bytes(block)
+            raw_blocks.append(raw_block)
+            # Check if previous block is valid
+            prev = self.prev_hex_hash(raw_block)
+            votebits = unpack_uint16_from(raw_block[100:102])[0]
+            valid_tx_tree[prev] = self.is_valid_tx_tree(votebits)
+
+        processed_raw_blocks = []
+        for hash, raw_block in zip(hex_hashes, raw_blocks):
+            if hash in valid_tx_tree:
+                is_valid = valid_tx_tree[hash]
+            else:
+                # Do something complicated to figure out if this block is valid
+                header = await self._send_single('getblockheader', (hash, ))
+                if 'nextblockhash' not in header:
+                    raise DaemonError(f'Could not find next block for {hash}')
+                next_hash = header['nextblockhash']
+                next_header = await self._send_single('getblockheader',
+                                                      (next_hash, ))
+                is_valid = self.is_valid_tx_tree(next_header['votebits'])
+
+            if is_valid:
+                processed_raw_blocks.append(raw_block)
+            else:
+                # If this block is invalid remove the normal transactions
+                self.logger.info(f'block {hash} is invalidated')
+                processed_raw_blocks.append(self.strip_tx_tree(raw_block))
+
+        return processed_raw_blocks
+
+    @staticmethod
+    def prev_hex_hash(raw_block):
+        return hash_to_hex_str(raw_block[4:36])
+
+    @staticmethod
+    def is_valid_tx_tree(votebits):
+        # Check if previous block was invalidated.
+        return bool(votebits & (1 << 0) != 0)
+
+    def strip_tx_tree(self, raw_block):
+        c = self.coin
+        assert issubclass(c.DESERIALIZER, DeserializerDecred)
+        d = c.DESERIALIZER(raw_block, start=c.BASIC_HEADER_SIZE)
+        d.read_tx_tree()  # Skip normal transactions
+        # Create a fake block without any normal transactions
+        return raw_block[:c.BASIC_HEADER_SIZE] + b'\x00' + raw_block[d.cursor:]
+
+    async def height(self):
+        height = await super().height()
+        if height > 0:
+            # Lie about the daemon height as the current tip can be invalidated
+            height -= 1
+            self._height = height
+        return height
+
+    async def mempool_hashes(self):
+        mempool = await super().mempool_hashes()
+        # Add current tip transactions to the 'fake' mempool.
+        tip_hash = await self._send_single('getblockhash', (self._height,))
+        tip = await self.deserialised_block(tip_hash)
+        # Add normal transactions except coinbase
+        mempool += tip['tx'][1:]
+        # Add stake transactions if applicable
+        mempool += tip.get('stx', [])
+        return mempool
+
+    def client_session(self):
+        # FIXME allow self signed certificates
+        connector = aiohttp.TCPConnector(verify_ssl=False)
+        return aiohttp.ClientSession(connector=connector)
