@@ -56,13 +56,6 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
         return (self.prev_hash == TxInput.ZERO and
                 self.prev_idx == TxInput.MINUS_1)
 
-    @cachedproperty
-    def script_sig_info(self):
-        # No meaning for coinbases
-        if self.is_coinbase:
-            return None
-        return Script.parse_script_sig(self.script)
-
     def __str__(self):
         script = self.script.hex()
         prev_hash = hash_to_str(self.prev_hash)
@@ -71,12 +64,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 
 
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
-    '''Class representing a transaction output.'''
-
-    @cachedproperty
-    def pay_to(self):
-        return Script.parse_pk_script(self.pk_script)
-
+    pass
 
 class Deserializer(object):
     '''Deserializes blocks into transactions.
