@@ -33,7 +33,7 @@ def main_loop():
         raise RuntimeError('Python >= 3.5.3 is required to run ElectrumX')
 
     if os.geteuid() == 0:
-        raise RuntimeError('DO NOT RUN AS ROOT! Create an unpriveleged user '
+        raise RuntimeError('DO NOT RUN AS ROOT! Create an unprivileged user '
                            'account and use that')
 
     loop = asyncio.get_event_loop()
