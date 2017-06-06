@@ -1,3 +1,5 @@
+import time
+
 from lib import util
 
 
@@ -19,9 +21,18 @@ def test_cachedproperty():
             cls.CALL_COUNT += 1
             return cls.CALL_COUNT
 
+        @util.expiring_cachedproperty(0.1)
+        def expiring_prop(self):
+            self.call_count += 1
+            return self.call_count
+
     t = Target()
     assert t.prop == t.prop == 1
     assert Target.cls_prop == Target.cls_prop == 1
+    assert t.expiring_prop == 2
+    assert t.expiring_prop == 2
+    time.sleep(0.1)
+    assert t.expiring_prop == 3
 
 
 def test_deep_getsizeof():

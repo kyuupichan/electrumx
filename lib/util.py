@@ -35,6 +35,8 @@ import re
 import sys
 from collections import Container, Mapping
 
+import time
+
 
 class LoggedClass(object):
 
@@ -62,11 +64,12 @@ class LoggedClass(object):
         self.logger.error(self.log_prefix + msg)
 
 
-# Method decorator.  To be used for calculations that will always
-# deliver the same result.  The method cannot take any arguments
-# and should be accessed as an attribute.
 class cachedproperty(object):
-
+    '''
+    Method decorator.
+    The result of the decorated method will be cached forever and
+    will be available as an attribute with the same name as the decorated method.
+    '''
     def __init__(self, f):
         self.f = f
 
@@ -76,6 +79,31 @@ class cachedproperty(object):
         setattr(obj, self.f.__name__, value)
         return value
 
+
+class expiring_cachedproperty(object):
+    '''
+    Method decorator.
+    The result of the decorated method will be cached for `expire_time` seconds
+    and will be available as an attribute with the same name as the decorated
+    method.
+    '''
+    def __init__(self, expire_time):
+        self.expire_time = expire_time
+        self.last_call = 0
+
+    def __call__(self, f):
+        self.f = f
+        return self
+
+    def __get__(self, obj, type):
+        if hasattr(obj, "_cached_" + self.f.__name__) and self.last_call + self.expire_time > time.time():
+            return getattr(obj, "_cached_" + self.f.__name__)
+        obj = obj or type
+        value = self.f(obj)
+
+        self.last_call = time.time()
+        setattr(obj, "_cached_" + self.f.__name__, value)
+        return value
 
 def formatted_time(t, sep=' '):
     '''Return a number of seconds as a string in days, hours, mins and

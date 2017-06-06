@@ -72,6 +72,7 @@ class Coin(object):
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
+    LATEST_CLIENT_VERSION_URL = None
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -332,6 +333,7 @@ class Bitcoin(Coin):
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332
+    LATEST_CLIENT_VERSION_URL = "https://electrum.org/version"
     PEERS = [
         'btc.smsys.me s995',
         'electrum.be s t',

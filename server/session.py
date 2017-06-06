@@ -125,6 +125,7 @@ class ElectrumX(SessionBase):
             'server.features': self.server_features,
             'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
+            'client.latest_version': self.client_latest_version
         }
 
     def sub_count(self):
@@ -336,6 +337,13 @@ class ElectrumX(SessionBase):
         if protocol_version is not None:
             self.protocol_version = protocol_version
         return version.VERSION
+
+    async def client_latest_version(self):
+        v = await self.controller.latest_version
+        if not v:
+            raise RPCError("unknown method: '{}'".format("client.latest_version"),
+                           JSONRPC.METHOD_NOT_FOUND)
+        return v
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
