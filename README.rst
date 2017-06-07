@@ -130,6 +130,19 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.11
+--------------
+
+- disable IRC for bitcoin mainnet
+- remove dead code, allow custom Daemon & BlockProcessor classes (erasmospunk)
+- add SERVER_(SUB)VERSION to banner metavariables (LaoDC)
+- masternode methods for Dash (TheLazier)
+- allow multiple P2SH address versions, implement for Litecoin (pooler)
+- update Bitcoin's TX_COUNT and block height (JWU42)
+- update BU nolnet parameters
+- fix diagnostic typo (anduck)
+- Issues fixed: `#180`_
+
 Version 1.0.10
 --------------
 
@@ -296,6 +309,7 @@ documentation updates.
 .. _#160: https://github.com/kyuupichan/electrumx/issues/160
 .. _#162: https://github.com/kyuupichan/electrumx/issues/162
 .. _#163: https://github.com/kyuupichan/electrumx/issues/163
+.. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
