@@ -216,7 +216,10 @@ class PeerManager(util.LoggedClass):
         self.env = env
         self.controller = controller
         self.loop = controller.loop
-        self.irc = IRC(env, self)
+        if env.irc and env.coin.IRC_PREFIX:
+            self.irc = IRC(env, self)
+        else:
+            self.irc = None
         self.myselves = peers_from_env(env)
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
@@ -438,10 +441,12 @@ class PeerManager(util.LoggedClass):
 
     def connect_to_irc(self):
         '''Connect to IRC if not disabled.'''
-        if self.env.irc and self.env.coin.IRC_PREFIX:
+        if self.irc:
             pairs = [(peer.real_name(), ident.nick_suffix) for peer, ident
                      in zip(self.myselves, self.env.identities)]
             self.ensure_future(self.irc.start(pairs))
+        elif self.env.irc:
+            self.logger.info('IRC is disabled for this coin')
         else:
             self.logger.info('IRC is disabled')
 

@@ -78,12 +78,14 @@ class Coin(object):
         '''Return a coin class given name and network.
 
         Raise an exception if unrecognised.'''
-        req_attrs = ('TX_COUNT', 'TX_COUNT_HEIGHT', 'TX_PER_BLOCK',
-                     'IRC_CHANNEL')
+        req_attrs = ['TX_COUNT', 'TX_COUNT_HEIGHT', 'TX_PER_BLOCK']
         for coin in util.subclasses(Coin):
             if (coin.NAME.lower() == name.lower() and
                     coin.NET.lower() == net.lower()):
-                missing = [attr for attr in req_attrs
+                coin_req_attrs = req_attrs.copy()
+                if coin.IRC_PREFIX is not None:
+                    coin_req_attrs.append('IRC_CHANNEL')
+                missing = [attr for attr in coin_req_attrs
                            if not hasattr(coin, attr)]
                 if missing:
                     raise CoinError('coin {} missing {} attributes'
@@ -329,8 +331,6 @@ class Bitcoin(Coin):
     TX_COUNT = 217380620
     TX_COUNT_HEIGHT = 464000
     TX_PER_BLOCK = 1800
-    IRC_PREFIX = "E_"
-    IRC_CHANNEL = "#electrum"
     RPC_PORT = 8332
     PEERS = [
         'btc.smsys.me s995',
@@ -353,7 +353,6 @@ class Bitcoin(Coin):
 class BitcoinTestnet(Bitcoin):
     SHORTNAME = "XTN"
     NET = "testnet"
-    IRC_PREFIX = None
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
@@ -422,8 +421,6 @@ class Litecoin(Coin):
     TX_COUNT = 8908766
     TX_COUNT_HEIGHT = 1105256
     TX_PER_BLOCK = 10
-    IRC_CHANNEL = "#electrum-ltc"   # obsolete
-    IRC_PREFIX = None
     RPC_PORT = 9332
     REORG_LIMIT = 800
     PEERS = [
