@@ -392,12 +392,12 @@ class BitcoinNolnet(Bitcoin):
     '''Bitcoin Unlimited nolimit testnet.'''
 
     NET = "nolnet"
-    GENESIS_HASH = ('00000000e752e935119102b142b5c27a'
-                    '346a023532a42edcf7c8ffd0a22206e9')
+    GENESIS_HASH = ('0000000057e31bd2066c939a63b7b862'
+                    '3bd0f10d8c001304bdfc1a7902ae6d35')
     REORG_LIMIT = 8000
-    TX_COUNT = 195106
-    TX_COUNT_HEIGHT = 24920
-    TX_PER_BLOCK = 8
+    TX_COUNT = 583589
+    TX_COUNT_HEIGHT = 8617
+    TX_PER_BLOCK = 50
     IRC_PREFIX = "EN_"
     RPC_PORT = 28332
     PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
