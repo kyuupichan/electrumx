@@ -47,7 +47,7 @@ for name in os.listdir(BLOCKS_DIR):
         with open(os.path.join(BLOCKS_DIR, name)) as f:
             blocks.append((coin, json.load(f)))
     except Exception as e:
-        blocks.append(pytest.mark.skip(name))
+        blocks.append(pytest.fail(name))
 
 
 @pytest.fixture(params=blocks)
