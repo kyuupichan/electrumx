@@ -40,7 +40,7 @@ import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
-    DeserializerZcash, DeserializerTxTime
+    DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
 from server.daemon import Daemon, LegacyRPCDaemon
 from server.session import ElectrumX
@@ -860,3 +860,23 @@ class Peercoin(Coin):
     IRC_CHANNEL = "#electrum-ppc"
     RPC_PORT = 9902
     REORG_LIMIT = 5000
+
+
+class Reddcoin(Coin):
+    NAME = "Reddcoin"
+    SHORTNAME = "RDD"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("3d")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("bd")
+    GENESIS_HASH = ('b868e0d95a3c3c0e0dadc67ee587aaf9'
+                    'dc8acbf99e3b4b3110fad4eb74c1decc')
+    DESERIALIZER = DeserializerReddcoin
+    TX_COUNT = 5413508
+    TX_COUNT_HEIGHT = 1717382
+    TX_PER_BLOCK = 3
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-rdd"
+    RPC_PORT = 45443
