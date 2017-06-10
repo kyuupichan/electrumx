@@ -12,10 +12,14 @@ import asyncio
 import json
 import time
 import traceback
+from calendar import timegm
+from struct import pack
+from time import strptime
 
 import aiohttp
 
 import lib.util as util
+from lib.hash import hex_str_to_hash
 
 
 class DaemonError(Exception):
@@ -256,3 +260,61 @@ class DashDaemon(Daemon):
     async def masternode_list(self, params ):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
+
+
+class LegacyRPCDaemon(Daemon):
+    '''Handles connections to a daemon at the given URL.
+
+    This class is useful for daemons that don't have the new 'getblock'
+    RPC call that returns the block in hex, the workaround is to manually
+    recreate the block bytes. The recreated block bytes may not be the exact
+    as in the underlying blockchain but it is good enough for our indexing
+    purposes.'''
+
+
+    async def raw_blocks(self, hex_hashes):
+        '''Return the raw binary blocks with the given hex hashes.'''
+        params_iterable = ((h, False) for h in hex_hashes)
+        block_info = await self._send_vector('getblock', params_iterable)
+
+        blocks = []
+        for i in block_info:
+            raw_block = await self.make_raw_block(i)
+            blocks.append(raw_block)
+
+        # Convert hex string to bytes
+        return blocks
+
+    async def make_raw_header(self, b):
+        pbh = b.get('previousblockhash')
+        if pbh is None:
+            pbh = '0' * 64
+        header = pack('<L', b.get('version')) \
+                 + hex_str_to_hash(pbh) \
+                 + hex_str_to_hash(b.get('merkleroot')) \
+                 + pack('<L', self.timestamp_safe(b['time'])) \
+                 + pack('<L', int(b.get('bits'), 16)) \
+                 + pack('<L', int(b.get('nonce')))
+        return header
+
+    async def make_raw_block(self, b):
+        '''Construct a raw block'''
+
+        header = await self.make_raw_header(b)
+
+        transactions = []
+        if b.get('height') > 0:
+            transactions = await self.getrawtransactions(b.get('tx'), False)
+
+        raw_block = header
+        num_txs = len(transactions)
+        if num_txs > 0:
+            raw_block += util.int_to_varint(num_txs)
+            raw_block += b''.join(transactions)
+        else:
+            raw_block += b'\x00'
+
+        return raw_block
+
+    def timestamp_safe(self, t):
+        return t if isinstance(t, int) else timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
