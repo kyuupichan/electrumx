@@ -123,6 +123,11 @@ class Deserializer(object):
             self._read_varbytes(),  # pk_script
         )
 
+    def _read_byte(self):
+        cursor = self.cursor
+        self.cursor += 1
+        return self.binary[cursor]
+
     def _read_nbytes(self, n):
         cursor = self.cursor
         self.cursor = end = cursor + n
@@ -181,11 +186,6 @@ class TxSegWit(namedtuple("Tx", "version marker flag inputs outputs "
 class DeserializerSegWit(Deserializer):
 
     # https://bitcoincore.org/en/segwit_wallet_dev/#transaction-serialization
-
-    def _read_byte(self):
-        cursor = self.cursor
-        self.cursor += 1
-        return self.binary[cursor]
 
     def _read_witness(self, fields):
         read_witness_field = self._read_witness_field
@@ -290,3 +290,46 @@ class DeserializerZcash(Deserializer):
                 self.cursor += 32 # joinSplitPubKey
                 self.cursor += 64 # joinSplitSig
         return base_tx, double_sha256(self.binary[start:self.cursor])
+
+
+class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
+    '''Class representing transaction that has a time field.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase
+
+
+class DeserializerTxTime(Deserializer):
+    def read_tx(self):
+        start = self.cursor
+
+        return TxTime(
+            self._read_le_int32(),  # version
+            self._read_le_uint32(), # time
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32(), # locktime
+        ), double_sha256(self.binary[start:self.cursor])
+
+
+class DeserializerReddcoin(Deserializer):
+    def read_tx(self):
+        start = self.cursor
+
+        version = self._read_le_int32()
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        if version > 1:
+            time = self._read_le_uint32()
+        else:
+            time = 0
+
+        return TxTime(
+            version,
+            time,
+            inputs,
+            outputs,
+            locktime,
+        ), double_sha256(self.binary[start:self.cursor])

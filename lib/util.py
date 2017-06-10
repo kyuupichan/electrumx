@@ -34,6 +34,7 @@ import logging
 import re
 import sys
 from collections import Container, Mapping
+from struct import pack
 
 
 class LoggedClass(object):
@@ -154,6 +155,20 @@ def bytes_to_int(be_bytes):
 def int_to_bytes(value):
     '''Converts an integer to a big-endian sequence of bytes'''
     return value.to_bytes((value.bit_length() + 7) // 8, 'big')
+
+
+def int_to_varint(value):
+    '''Converts an integer to a Bitcoin-like varint bytes'''
+    if value < 0:
+        raise Exception("attempt to write size < 0")
+    elif value < 253:
+        return pack('<B', value)
+    elif value < 2**16:
+        return b'\xfd' + pack('<H', value)
+    elif value < 2**32:
+        return b'\xfe' + pack('<I', value)
+    elif value < 2**64:
+        return b'\xff' + pack('<Q', value)
 
 
 def increment_byte_string(bs):

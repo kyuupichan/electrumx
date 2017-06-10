@@ -39,9 +39,10 @@ from hashlib import sha256
 import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
-from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, DeserializerZcash
+from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
+    DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
-from server.daemon import Daemon
+from server.daemon import Daemon, LegacyRPCDaemon
 from server.session import ElectrumX
 
 Block = namedtuple("Block", "header transactions")
@@ -667,6 +668,7 @@ class DigiByte(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('7497ea1b465eb39f1c8f507bc877078f'
                     'e016d6fcb6dfad3a64c98dcc6e1e8496')
+    DESERIALIZER = DeserializerSegWit
     TX_COUNT = 1046018
     TX_COUNT_HEIGHT = 1435000
     TX_PER_BLOCK = 1000
@@ -801,3 +803,80 @@ class Einsteinium(Coin):
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum-emc2"
     RPC_PORT = 41879
+    REORG_LIMIT = 2000
+
+
+class Blackcoin(Coin):
+    NAME = "Blackcoin"
+    SHORTNAME = "BLK"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('000001faef25dec4fbcf906e6242621d'
+                    'f2c183bf232f263d0ba5b101911e4563')
+    DESERIALIZER = DeserializerTxTime
+    DAEMON = LegacyRPCDaemon
+    TX_COUNT = 4594999
+    TX_COUNT_HEIGHT = 1667070
+    TX_PER_BLOCK = 3
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-blk"
+    RPC_PORT = 15715
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header);
+
+
+class Peercoin(Coin):
+    NAME = "Peercoin"
+    SHORTNAME = "PPC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("75")]
+    WIF_BYTE = bytes.fromhex("b7")
+    GENESIS_HASH = ('0000000032fe677166d54963b62a4677'
+                    'd8957e87c508eaa4fd7eb1c880cd27e3')
+    DESERIALIZER = DeserializerTxTime
+    DAEMON = LegacyRPCDaemon
+    TX_COUNT = 1207356
+    TX_COUNT_HEIGHT = 306425
+    TX_PER_BLOCK = 4
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-ppc"
+    RPC_PORT = 9902
+    REORG_LIMIT = 5000
+
+
+class Reddcoin(Coin):
+    NAME = "Reddcoin"
+    SHORTNAME = "RDD"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("3d")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("bd")
+    GENESIS_HASH = ('b868e0d95a3c3c0e0dadc67ee587aaf9'
+                    'dc8acbf99e3b4b3110fad4eb74c1decc')
+    DESERIALIZER = DeserializerReddcoin
+    TX_COUNT = 5413508
+    TX_COUNT_HEIGHT = 1717382
+    TX_PER_BLOCK = 3
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-rdd"
+    RPC_PORT = 45443
