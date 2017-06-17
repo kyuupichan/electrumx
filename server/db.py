@@ -471,13 +471,11 @@ class DB(util.LoggedClass):
 
         return nremoves
 
-    def get_history(self, hashX, limit=1000):
-        '''Generator that returns an unpruned, sorted list of (tx_hash,
-        height) tuples of confirmed transactions that touched the address,
-        earliest in the blockchain first.  Includes both spending and
-        receiving transactions.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
-        '''
+    def get_history_txnums(self, hashX, limit=1000):
+        '''Generator that returns an unpruned, sorted list of tx_nums in the
+        history of a hashX.  Includes both spending and receiving
+        transactions.  By default yields at most 1000 entries.  Set
+        limit to None to get them all.  '''
         limit = self._resolve_limit(limit)
         for key, hist in self.hist_db.iterator(prefix=hashX):
             a = array.array('I')
@@ -485,5 +483,15 @@ class DB(util.LoggedClass):
             for tx_num in a:
                 if limit == 0:
                     return
-                yield self.fs_tx_hash(tx_num)
+                yield tx_num
                 limit -= 1
+
+    def get_history(self, hashX, limit=1000):
+        '''Generator that returns an unpruned, sorted list of (tx_hash,
+        height) tuples of confirmed transactions that touched the address,
+        earliest in the blockchain first.  Includes both spending and
+        receiving transactions.  By default yields at most 1000 entries.
+        Set limit to None to get them all.
+        '''
+        for tx_num in self.get_history_txnums(hashX, limit):
+            yield self.fs_tx_hash(tx_num)
