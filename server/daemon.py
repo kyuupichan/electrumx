@@ -274,7 +274,7 @@ class LegacyRPCDaemon(Daemon):
 
     async def raw_blocks(self, hex_hashes):
         '''Return the raw binary blocks with the given hex hashes.'''
-        params_iterable = ((h, False) for h in hex_hashes)
+        params_iterable = ((h, True) for h in hex_hashes)
         block_info = await self._send_vector('getblock', params_iterable)
 
         blocks = []
