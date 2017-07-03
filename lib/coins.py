@@ -42,7 +42,7 @@ from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
     DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
-from server.daemon import Daemon, LegacyRPCDaemon
+from server.daemon import Daemon, FujiDaemon, LegacyRPCDaemon
 from server.session import ElectrumX
 
 Block = namedtuple("Block", "header transactions")
@@ -404,6 +404,33 @@ class BitcoinNolnet(Bitcoin):
     PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
     PEERS = [
         '14.3.140.101 s t',
+    ]
+
+
+class Fujicoin(Coin):
+    NAME = "Fujicoin"
+    SHORTNAME = "FJC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("24")
+    P2SH_VERBYTES = [bytes.fromhex("10")]
+    WIF_BYTE = bytes.fromhex("a4")
+    GENESIS_HASH = ('adb6d9cfd74075e7f91608add4bd2a2e'
+                    'a636f70856183086842667a1597714a0')
+#    DESERIALIZER = DeserializerSegWit
+    DAEMON = FujiDaemon
+    TX_COUNT = 170478
+    TX_COUNT_HEIGHT = 1521676
+    TX_PER_BLOCK = 1
+    IRC_CHANNEL = "#electrum-fjc"   # obsolete
+    IRC_PREFIX = None
+    RPC_PORT = 3776
+#    REORG_LIMIT = 800
+    PEERS = [
+        'electrumx1.fujicoin.org s t',
+        'electrumx2.fujicoin.org s t',
+        'electrumx3.fujicoin.org s t',
     ]
 
 
