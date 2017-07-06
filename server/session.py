@@ -312,11 +312,10 @@ class ElectrumX(SessionBase):
             try:
                 with codecs.open(banner_file, 'r', 'utf-8') as f:
                     banner = f.read()
+                    #banner = await self.replaced_banner(banner)
             except Exception as e:
                 self.log_error('reading banner file {}: {}'
                                .format(banner_file, e))
-            else:
-                banner = await self.replaced_banner(banner)
 
         return banner
 
