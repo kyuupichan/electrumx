@@ -34,13 +34,11 @@ from lib.util import bytes_to_int, int_to_bytes
 
 def sha256(x):
     '''Simple wrapper of hashlib sha256.'''
-    assert isinstance(x, (bytes, bytearray, memoryview))
     return hashlib.sha256(x).digest()
 
 
 def ripemd160(x):
     '''Simple wrapper of hashlib ripemd160.'''
-    assert isinstance(x, (bytes, bytearray, memoryview))
     h = hashlib.new('ripemd160')
     h.update(x)
     return h.digest()
@@ -63,13 +61,15 @@ def hash160(x):
     return ripemd160(sha256(x))
 
 
-def hash_to_str(x):
+def hash_to_hex_str(x):
     '''Convert a big-endian binary hash to displayed hex string.
 
     Display form of a binary hash is reversed and converted to hex.
     '''
     return bytes(reversed(x)).hex()
 
+# Temporary
+hash_to_str = hash_to_hex_str
 
 def hex_str_to_hash(x):
     '''Convert a displayed hex string to a binary hash.'''
@@ -98,7 +98,7 @@ class Base58(object):
     def decode(txt):
         """Decodes txt into a big-endian bytearray."""
         if not isinstance(txt, str):
-            raise Base58Error('a string is required')
+            raise TypeError('a string is required')
 
         if not txt:
             raise Base58Error('string cannot be empty')
@@ -151,7 +151,5 @@ class Base58(object):
     def encode_check(payload):
         """Encodes a payload bytearray (which includes the version byte(s))
         into a Base58Check string."""
-        assert isinstance(payload, (bytes, bytearray, memoryview))
-
         be_bytes = payload + double_sha256(payload)[:4]
         return Base58.encode(be_bytes)
