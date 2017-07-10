@@ -337,7 +337,7 @@ class BlockProcessor(server.db.DB):
         self.wall_time += now - self.last_flush
         self.last_flush = now
         self.last_flush_tx_count = self.tx_count
-        self.utxo_write_state(batch)
+        self.write_utxo_state(batch)
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''

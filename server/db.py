@@ -142,54 +142,6 @@ class DB(util.LoggedClass):
             self.logger.info('sync time so far: {}'
                              .format(util.formatted_time(self.wall_time)))
 
-    def read_utxo_state(self):
-        state = self.utxo_db.get(b'state')
-        if not state:
-            self.db_height = -1
-            self.db_tx_count = 0
-            self.db_tip = b'\0' * 32
-            self.db_version = max(self.DB_VERSIONS)
-            self.utxo_flush_count = 0
-            self.wall_time = 0
-            self.first_sync = True
-        else:
-            state = ast.literal_eval(state.decode())
-            if not isinstance(state, dict):
-                raise self.DBError('failed reading state from DB')
-            self.db_version = state['db_version']
-            if self.db_version not in self.DB_VERSIONS:
-                raise self.DBError('your DB version is {} but this software '
-                                   'only handles versions {}'
-                                   .format(self.db_version, self.DB_VERSIONS))
-            # backwards compat
-            genesis_hash = state['genesis']
-            if isinstance(genesis_hash, bytes):
-                genesis_hash = genesis_hash.decode()
-            if genesis_hash != self.coin.GENESIS_HASH:
-                raise self.DBError('DB genesis hash {} does not match coin {}'
-                                   .format(state['genesis_hash'],
-                                           self.coin.GENESIS_HASH))
-            self.db_height = state['height']
-            self.db_tx_count = state['tx_count']
-            self.db_tip = state['tip']
-            self.utxo_flush_count = state['utxo_flush_count']
-            self.wall_time = state['wall_time']
-            self.first_sync = state['first_sync']
-
-    def utxo_write_state(self, batch):
-        '''Write (UTXO) state to the batch.'''
-        state = {
-            'genesis': self.coin.GENESIS_HASH,
-            'height': self.db_height,
-            'tx_count': self.db_tx_count,
-            'tip': self.db_tip,
-            'utxo_flush_count': self.utxo_flush_count,
-            'wall_time': self.wall_time,
-            'first_sync': self.first_sync,
-            'db_version': self.db_version,
-        }
-        batch.put(b'state', repr(state).encode())
-
     def clean_db(self):
         '''Clean out stale DB items.
 
@@ -299,70 +251,6 @@ class DB(util.LoggedClass):
         assert isinstance(limit, int) and limit >= 0
         return limit
 
-    def get_balance(self, hashX):
-        '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
-
-    def get_utxos(self, hashX, limit=1000):
-        '''Generator that yields all UTXOs for an address sorted in no
-        particular order.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
-        '''
-        limit = self._resolve_limit(limit)
-        s_unpack = unpack
-        # Key: b'u' + address_hashX + tx_idx + tx_num
-        # Value: the UTXO value as a 64-bit unsigned integer
-        prefix = b'u' + hashX
-        for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-            if limit == 0:
-                return
-            limit -= 1
-            tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
-            value, = unpack('<Q', db_value)
-            tx_hash, height = self.fs_tx_hash(tx_num)
-            yield UTXO(tx_num, tx_pos, tx_hash, height, value)
-
-    def db_hashX(self, tx_hash, idx_packed):
-        '''Return (hashX, tx_num_packed) for the given TXO.
-
-        Both are None if not found.'''
-        # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-        # Value: hashX
-        prefix = b'h' + tx_hash[:4] + idx_packed
-
-        # Find which entry, if any, the TX_HASH matches.
-        for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
-            tx_num_packed = db_key[-4:]
-            tx_num, = unpack('<I', tx_num_packed)
-            hash, height = self.fs_tx_hash(tx_num)
-            if hash == tx_hash:
-                return hashX, tx_num_packed
-
-        return None, None
-
-    def db_utxo_lookup(self, tx_hash, tx_idx):
-        '''Given a prevout return a (hashX, value) pair.
-
-        Raises MissingUTXOError if the UTXO is not found.  Used by the
-        mempool code.
-        '''
-        idx_packed = pack('<H', tx_idx)
-        hashX, tx_num_packed = self.db_hashX(tx_hash, idx_packed)
-        if not hashX:
-            # This can happen when the daemon is a block ahead of us
-            # and has mempool txs spending outputs from that new block
-            raise self.MissingUTXOError
-
-        # Key: b'u' + address_hashX + tx_idx + tx_num
-        # Value: the UTXO value as a 64-bit unsigned integer
-        key = b'u' + hashX + idx_packed + tx_num_packed
-        db_value = self.utxo_db.get(key)
-        if not db_value:
-            raise self.DBError('UTXO {} / {:,d} in one table only'
-                               .format(hash_to_str(tx_hash), tx_idx))
-        value, = unpack('<Q', db_value)
-        return hashX, value
-
     # -- Undo information
 
     def min_undo_height(self, max_height):
@@ -399,6 +287,120 @@ class DB(util.LoggedClass):
                     batch.delete(key)
             self.logger.info('deleted {:,d} stale undo entries'
                              .format(len(keys)))
+
+    # -- UTXO database
+
+    def read_utxo_state(self):
+        state = self.utxo_db.get(b'state')
+        if not state:
+            self.db_height = -1
+            self.db_tx_count = 0
+            self.db_tip = b'\0' * 32
+            self.db_version = max(self.DB_VERSIONS)
+            self.utxo_flush_count = 0
+            self.wall_time = 0
+            self.first_sync = True
+        else:
+            state = ast.literal_eval(state.decode())
+            if not isinstance(state, dict):
+                raise self.DBError('failed reading state from DB')
+            self.db_version = state['db_version']
+            if self.db_version not in self.DB_VERSIONS:
+                raise self.DBError('your DB version is {} but this software '
+                                   'only handles versions {}'
+                                   .format(self.db_version, self.DB_VERSIONS))
+            # backwards compat
+            genesis_hash = state['genesis']
+            if isinstance(genesis_hash, bytes):
+                genesis_hash = genesis_hash.decode()
+            if genesis_hash != self.coin.GENESIS_HASH:
+                raise self.DBError('DB genesis hash {} does not match coin {}'
+                                   .format(state['genesis_hash'],
+                                           self.coin.GENESIS_HASH))
+            self.db_height = state['height']
+            self.db_tx_count = state['tx_count']
+            self.db_tip = state['tip']
+            self.utxo_flush_count = state['utxo_flush_count']
+            self.wall_time = state['wall_time']
+            self.first_sync = state['first_sync']
+
+    def write_utxo_state(self, batch):
+        '''Write (UTXO) state to the batch.'''
+        state = {
+            'genesis': self.coin.GENESIS_HASH,
+            'height': self.db_height,
+            'tx_count': self.db_tx_count,
+            'tip': self.db_tip,
+            'utxo_flush_count': self.utxo_flush_count,
+            'wall_time': self.wall_time,
+            'first_sync': self.first_sync,
+            'db_version': self.db_version,
+        }
+        batch.put(b'state', repr(state).encode())
+
+    def get_balance(self, hashX):
+        '''Returns the confirmed balance of an address.'''
+        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
+
+    def get_utxos(self, hashX, limit=1000):
+        '''Generator that yields all UTXOs for an address sorted in no
+        particular order.  By default yields at most 1000 entries.
+        Set limit to None to get them all.
+        '''
+        limit = self._resolve_limit(limit)
+        s_unpack = unpack
+        # Key: b'u' + address_hashX + tx_idx + tx_num
+        # Value: the UTXO value as a 64-bit unsigned integer
+        prefix = b'u' + hashX
+        for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+            if limit == 0:
+                return
+            limit -= 1
+            tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
+            value, = unpack('<Q', db_value)
+            tx_hash, height = self.fs_tx_hash(tx_num)
+            yield UTXO(tx_num, tx_pos, tx_hash, height, value)
+
+    def db_utxo_lookup(self, tx_hash, tx_idx):
+        '''Given a prevout return a (hashX, value) pair.
+
+        Raises MissingUTXOError if the UTXO is not found.  Used by the
+        mempool code.
+        '''
+        idx_packed = pack('<H', tx_idx)
+        hashX, tx_num_packed = self._db_hashX(tx_hash, idx_packed)
+        if not hashX:
+            # This can happen when the daemon is a block ahead of us
+            # and has mempool txs spending outputs from that new block
+            raise self.MissingUTXOError
+
+        # Key: b'u' + address_hashX + tx_idx + tx_num
+        # Value: the UTXO value as a 64-bit unsigned integer
+        key = b'u' + hashX + idx_packed + tx_num_packed
+        db_value = self.utxo_db.get(key)
+        if not db_value:
+            raise self.DBError('UTXO {} / {:,d} in one table only'
+                               .format(hash_to_str(tx_hash), tx_idx))
+        value, = unpack('<Q', db_value)
+        return hashX, value
+
+    def _db_hashX(self, tx_hash, idx_packed):
+        '''Return (hashX, tx_num_packed) for the given TXO.
+
+        Both are None if not found.'''
+        # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
+        # Value: hashX
+        prefix = b'h' + tx_hash[:4] + idx_packed
+
+        # Find which entry, if any, the TX_HASH matches.
+        for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
+            tx_num_packed = db_key[-4:]
+            tx_num, = unpack('<I', tx_num_packed)
+            hash, height = self.fs_tx_hash(tx_num)
+            if hash == tx_hash:
+                return hashX, tx_num_packed
+
+        return None, None
 
     # -- History database
 
@@ -553,7 +555,7 @@ class DB(util.LoggedClass):
         if cursor == 65536:
             self.utxo_flush_count = self.flush_count
             with self.utxo_db.write_batch() as batch:
-                self.utxo_write_state(batch)
+                self.write_utxo_state(batch)
 
     def _compact_hashX(self, hashX, hist_map, hist_list,
                        write_items, keys_to_delete):
