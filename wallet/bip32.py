@@ -110,8 +110,7 @@ class PubKey(_KeyBase):
         # p is the finite field order
         a, b, p = curve.a(), curve.b(), curve.p()
         y2 = pow(x, 3, p) + b
-        if a:
-            y2 += a * pow(x, 2, p)
+        assert a == 0  # Otherwise y2 += a * pow(x, 2, p)
         y = NT.square_root_mod_prime(y2 % p, p)
         if bool(y & 1) != is_odd:
             y = p - y

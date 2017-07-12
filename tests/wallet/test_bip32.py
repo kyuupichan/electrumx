@@ -59,6 +59,8 @@ class TestPubKey(object):
             cls(raw_pubkey, chain_code, 0, -1)
         with pytest.raises(ValueError):
             cls(raw_pubkey, chain_code, 0, 256)
+        with pytest.raises(ValueError):
+            cls(b'\0' + b'\2' * 32, chain_code, 0, 0)
 
         # These are OK
         cls(b'\2' + b'\2' * 32, chain_code, 0, 0)
@@ -87,6 +89,18 @@ class TestPubKey(object):
         assert mpubkey.parent is None
         assert mpubkey.chain_code == b'>V\x83\x92`\r\x17\xb3"\xa6\x7f\xaf\xc0\x930\xf7\x1e\xdc\x12i\x9c\xe4\xc0,a\x1a\x04\xec\x16\x19\xaeK'
         assert mpubkey.ec_point().x() == 44977109961578369385937116592536468905742111247230478021459394832226142714624
+
+    def test_extended_key(self):
+        # Test argument validation
+        with pytest.raises(TypeError):
+            mpubkey._extended_key('foot', bytes(33))
+        with pytest.raises(ValueError):
+            mpubkey._extended_key(b'foo', bytes(33))
+        with pytest.raises(TypeError):
+            mpubkey._extended_key(bytes(4), ' ' * 33)
+        with pytest.raises(ValueError):
+            mpubkey._extended_key(b'foot', bytes(32))
+        mpubkey._extended_key(b'foot', bytes(33))
 
     def test_extended_key_string(self):
         # Implictly tests extended_key()
@@ -183,6 +197,10 @@ class TestPrivKey(object):
         cls(bip32._exponent_to_bytes(cls.CURVE.order - 1), chain_code, 0, 0)
         privkey = cls(MPRIVKEY, chain_code, 0, 255)
 
+        # Construction with bad parent
+        with pytest.raises(TypeError):
+            cls(MPRIVKEY, chain_code, 0, 0, privkey.public_key)
+
         # Construction from signing key
         dup = cls(privkey.signing_key, chain_code, 0, 0)
         assert dup.ec_point() == privkey.ec_point()
@@ -216,6 +234,18 @@ class TestPrivKey(object):
         assert mprivkey.public_key.chain_code == mpubkey.chain_code
         assert mprivkey.public_key.n == mpubkey.n
         assert mprivkey.public_key.depth == mpubkey.depth
+
+    def test_extended_key(self):
+        # Test argument validation
+        with pytest.raises(TypeError):
+            mprivkey._extended_key('foot', bytes(33))
+        with pytest.raises(ValueError):
+            mprivkey._extended_key(b'foo', bytes(33))
+        with pytest.raises(TypeError):
+            mprivkey._extended_key(bytes(4), ' ' * 33)
+        with pytest.raises(ValueError):
+            mprivkey._extended_key(b'foot', bytes(32))
+        mprivkey._extended_key(b'foot', bytes(33))
 
     def test_extended_key_string(self):
         # Also tests extended_key, WIF and privkey_bytes
