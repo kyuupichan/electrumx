@@ -18,5 +18,5 @@ install:
   - pip install pytest-cov
   - pip install python-coveralls
 # command to run tests
-script: pytest --cov=server --cov=lib
+script: pytest --cov=server --cov=lib --cov=wallet
 after_success: coveralls
