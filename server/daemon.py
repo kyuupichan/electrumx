@@ -45,6 +45,7 @@ class Daemon(util.LoggedClass):
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
         self.down = False
         self.last_error_time = 0
+        self.req_id = 0
         # assignment of asyncio.TimeoutError are essentially ignored
         if aiohttp.__version__.startswith('1.'):
             self.ClientHttpProcessingError = aiohttp.ClientHttpProcessingError
@@ -68,6 +69,10 @@ class Daemon(util.LoggedClass):
         '''Returns the current daemon URL.'''
         return self.urls[self.url_index]
 
+    def _set_id(self, payload):
+        payload["id"] = self.req_id
+        self.req_id += 1
+
     def failover(self):
         '''Call to fail-over to the next daemon URL.
 
@@ -79,9 +84,13 @@ class Daemon(util.LoggedClass):
             return True
         return False
 
+    def get_connector(self):
+        return None
+
     async def _send_data(self, data):
         async with self.workqueue_semaphore:
-            async with aiohttp.ClientSession() as session:
+            con = self.get_connector()
+            async with aiohttp.ClientSession(connector=con) as session:
                 async with session.post(self.url(), data=data) as resp:
                     # If bitcoind can't find a tx, for some reason
                     # it returns 500 but fills out the JSON.
@@ -107,6 +116,12 @@ class Daemon(util.LoggedClass):
                 else:
                     self.logger.error('{}  Retrying occasionally...'
                                       .format(error))
+
+        if isinstance(payload, list):
+            for p in payload:
+                self._set_id(p)
+        else:
+            self._set_id(payload)
 
         data = json.dumps(payload)
         secs = 1
@@ -251,6 +266,7 @@ class Daemon(util.LoggedClass):
 
         If the daemon has not been queried yet this returns None.'''
         return self._height
+
 
 class DashDaemon(Daemon):
     async def masternode_broadcast(self, params):
