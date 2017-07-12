@@ -12,6 +12,7 @@ python:
 # command to install dependencies
 install:
   - pip install aiohttp
+  - pip install ecdsa
   - pip install plyvel
   - pip install pyrocksdb
   - pip install pytest-cov
