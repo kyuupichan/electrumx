@@ -70,6 +70,8 @@ class Coin(object):
     BLOCK_PROCESSOR = BlockProcessor
     XPUB_VERBYTES = bytes('????', 'utf-8')
     XPRV_VERBYTES = bytes('????', 'utf-8')
+    ENCODE_CHECK = Base58.encode_check
+    DECODE_CHECK = Base58.decode_check
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -168,7 +170,7 @@ class Coin(object):
     def P2PKH_address_from_hash160(cls, hash160):
         '''Return a P2PKH address given a public key.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2PKH_VERBYTE + hash160)
+        return cls.ENCODE_CHECK(cls.P2PKH_VERBYTE + hash160)
 
     @classmethod
     def P2PKH_address_from_pubkey(cls, pubkey):
@@ -179,7 +181,7 @@ class Coin(object):
     def P2SH_address_from_hash160(cls, hash160):
         '''Return a coin address given a hash160.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2SH_VERBYTES[0] + hash160)
+        return cls.ENCODE_CHECK(cls.P2SH_VERBYTES[0] + hash160)
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
@@ -212,7 +214,7 @@ class Coin(object):
 
         Pass the address (either P2PKH or P2SH) in base58 form.
         '''
-        raw = Base58.decode_check(address)
+        raw = cls.DECODE_CHECK(address)
 
         # Require version byte(s) plus hash160.
         verbyte = -1
@@ -233,7 +235,7 @@ class Coin(object):
         payload = bytearray(cls.WIF_BYTE) + privkey_bytes
         if compressed:
             payload.append(0x01)
-        return Base58.encode_check(payload)
+        return cls.ENCODE_CHECK(payload)
 
     @classmethod
     def header_hash(cls, header):

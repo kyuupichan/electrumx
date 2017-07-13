@@ -143,18 +143,18 @@ class Base58(object):
         return txt[::-1]
 
     @staticmethod
-    def decode_check(txt):
+    def decode_check(txt, *, hash_fn=double_sha256):
         '''Decodes a Base58Check-encoded string to a payload.  The version
         prefixes it.'''
         be_bytes = Base58.decode(txt)
         result, check = be_bytes[:-4], be_bytes[-4:]
-        if check != double_sha256(result)[:4]:
+        if check != hash_fn(result)[:4]:
             raise Base58Error('invalid base 58 checksum for {}'.format(txt))
         return result
 
     @staticmethod
-    def encode_check(payload):
+    def encode_check(payload, *, hash_fn=double_sha256):
         """Encodes a payload bytearray (which includes the version byte(s))
         into a Base58Check string."""
-        be_bytes = payload + double_sha256(payload)[:4]
+        be_bytes = payload + hash_fn(payload)[:4]
         return Base58.encode(be_bytes)
