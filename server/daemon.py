@@ -45,6 +45,7 @@ class Daemon(util.LoggedClass):
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
         self.down = False
         self.last_error_time = 0
+        self.req_id = 0
         # assignment of asyncio.TimeoutError are essentially ignored
         if aiohttp.__version__.startswith('1.'):
             self.ClientHttpProcessingError = aiohttp.ClientHttpProcessingError
@@ -52,6 +53,11 @@ class Daemon(util.LoggedClass):
         else:
             self.ClientHttpProcessingError = asyncio.TimeoutError
             self.ClientPayloadError = aiohttp.ClientPayloadError
+
+    def next_req_id(self):
+        '''Retrns the next request ID.'''
+        self.req_id += 1
+        return self.req_id
 
     def set_urls(self, urls):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -79,9 +85,13 @@ class Daemon(util.LoggedClass):
             return True
         return False
 
+    def client_session(self):
+        '''An aiohttp client session.'''
+        return aiohttp.ClientSession()
+
     async def _send_data(self, data):
         async with self.workqueue_semaphore:
-            async with aiohttp.ClientSession() as session:
+            async with self.client_session() as session:
                 async with session.post(self.url(), data=data) as resp:
                     # If bitcoind can't find a tx, for some reason
                     # it returns 500 but fills out the JSON.
@@ -158,7 +168,7 @@ class Daemon(util.LoggedClass):
                 raise self.DaemonWarmingUpError
             raise DaemonError(err)
 
-        payload = {'method': method}
+        payload = {'method': method, 'id': self.next_req_id()}
         if params:
             payload['params'] = params
         return await self._send(payload, processor)
@@ -177,7 +187,8 @@ class Daemon(util.LoggedClass):
                 return [item['result'] for item in result]
             raise DaemonError(errs)
 
-        payload = [{'method': method, 'params': p} for p in params_iterable]
+        payload = [{'method': method, 'params': p, 'id': self.next_req_id()}
+                   for p in params_iterable]
         if payload:
             return await self._send(payload, processor)
         return []
