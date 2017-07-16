@@ -341,13 +341,14 @@ class Bitcoin(Coin):
         'electrum3.hachre.de p10000 s t',
         'electrum.hsmiths.com s t',
         'erbium1.sytes.net s t',
-        'fdkbwjykvl2f3hup.onion p10000 s t',
-        'h.1209k.com p10000 s t',
+        'fdkhv2bb7hqel2e7.onion s t',
+        'h.1209k.com s t',
         'helicarrier.bauerj.eu s t',
         'hsmiths4fyqlw5xw.onion s t',
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
+        'electrum_abc.criptolayer.net s50012',
     ]
 
 
