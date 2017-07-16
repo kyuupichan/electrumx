@@ -133,6 +133,18 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.12
+--------------
+
+- handle legacy daemons, add support for Blackcoin and Peercoin (erasmospunk)
+- implement history compression; can currently only be done from a script
+  with the server down
+- Add dockerfile reference (followtheart)
+- doc, runfile fixes (Henry, emilrus)
+- add bip32 implementation, currently unused
+- daemon compatibility improvements (erasmospunk)
+- permit underscores in hostnames, updated Bitcoin server list
+
 Version 1.0.11
 --------------
 
@@ -249,50 +261,6 @@ Version 1.0
 
 * Minor doc tweaks only
 
-Version 0.99.4
---------------
-
-* Add support for Bitcoin Unlimited's nolnet; set **NET** to nolnet
-* Choose 2 peers per bucket
-* Minor bugfix
-
-Version 0.99.3
---------------
-
-* Require Python 3.5.3.  3.5.2 has asyncio API and socket-related issues.
-  Resolves `#135`_
-* Remove peer semaphore
-* Improved Base58 handling for >1 byte version prefix (erasmospunk)
-
-Version 0.99.2
---------------
-
-* don't announce self if a non-public IP address
-* logging tweaks
-
-Version 0.99.1
---------------
-
-* Add more verbose logging in attempt to understand issue `#135`_
-* REPORT_TCP_PORT_TOR and REPORT_SSL_PORT_TOR were ignored when constructing
-  IRC real names.  Fixes `#136`_
-* Only serve chunk requests in forward direction; disconnect clients iterating
-  backwards.  Minimizes bandwidth consumption caused by misbehaving Electrum
-  clients.  Closes `#132`_
-* Tor coin peers would always be scheduled for check, fixes `#138`_ (fr3aker)
-
-Version 0.99
-------------
-
-Preparation for release of 1.0, which will only have bug fixes and
-documentation updates.
-
-* improve handling of daemon going down so that incoming connections
-  are not blocked.  Also improve logging thereof.  Fixes `#100`_.
-* add facility to disable peer discovery and/or self announcement,
-  see `docs/ENVIRONMENT.rst`_.
-* add FairCoin (thokon00)
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
@@ -300,12 +268,7 @@ documentation updates.
 
 
 .. _#83: https://github.com/kyuupichan/electrumx/issues/83
-.. _#100: https://github.com/kyuupichan/electrumx/issues/100
 .. _#128: https://github.com/kyuupichan/electrumx/issues/128
-.. _#132: https://github.com/kyuupichan/electrumx/issues/132
-.. _#135: https://github.com/kyuupichan/electrumx/issues/135
-.. _#136: https://github.com/kyuupichan/electrumx/issues/136
-.. _#138: https://github.com/kyuupichan/electrumx/issues/138
 .. _#152: https://github.com/kyuupichan/electrumx/issues/152
 .. _#157: https://github.com/kyuupichan/electrumx/issues/157
 .. _#158: https://github.com/kyuupichan/electrumx/issues/158
