@@ -29,7 +29,6 @@ class Prefetcher(LoggedClass):
     def __init__(self, bp):
         super().__init__()
         self.bp = bp
-        self.caught_up = False
         # Access to fetched_height should be protected by the semaphore
         self.fetched_height = None
         self.semaphore = asyncio.Semaphore()
@@ -84,7 +83,14 @@ class Prefetcher(LoggedClass):
         Repeats until the queue is full or caught up.
         '''
         daemon = self.bp.daemon
-        daemon_height = await daemon.height(self.bp.caught_up_event.is_set())
+        # If caught up, refresh the mempool before the current height
+        caught_up = self.bp.caught_up_event.is_set()
+        if caught_up:
+            mempool = await daemon.mempool_hashes()
+        else:
+            mempool = []
+
+        daemon_height = await daemon.height()
         with await self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
@@ -94,14 +100,15 @@ class Prefetcher(LoggedClass):
                 count = min(daemon_height - self.fetched_height, cache_room)
                 count = min(500, max(count, 0))
                 if not count:
-                    if not self.caught_up:
-                        self.caught_up = True
+                    if caught_up:
+                        self.bp.set_mempool_hashes(mempool)
+                    else:
                         self.bp.on_prefetcher_first_caught_up()
                     return False
 
                 first = self.fetched_height + 1
                 hex_hashes = await daemon.block_hex_hashes(first, count)
-                if self.caught_up:
+                if caught_up:
                     self.logger.info('new block height {:,d} hash {}'
                                      .format(first + count-1, hex_hashes[-1]))
                 blocks = await daemon.raw_blocks(hex_hashes)
@@ -121,7 +128,7 @@ class Prefetcher(LoggedClass):
                 else:
                     self.ave_size = (size + (10 - count) * self.ave_size) // 10
 
-                self.bp.on_prefetched_blocks(blocks, first)
+                self.bp.on_prefetched_blocks(blocks, first, mempool)
                 self.cache_size += size
                 self.fetched_height += count
 
@@ -188,9 +195,10 @@ class BlockProcessor(server.db.DB):
         '''Add the task to our task queue.'''
         self.task_queue.put_nowait(task)
 
-    def on_prefetched_blocks(self, blocks, first):
+    def on_prefetched_blocks(self, blocks, first, mempool):
         '''Called by the prefetcher when it has prefetched some blocks.'''
-        self.add_task(partial(self.check_and_advance_blocks, blocks, first))
+        self.add_task(partial(self.check_and_advance_blocks, blocks, first,
+                              mempool))
 
     def on_prefetcher_first_caught_up(self):
         '''Called by the prefetcher when it first catches up.'''
@@ -225,7 +233,10 @@ class BlockProcessor(server.db.DB):
         self.open_dbs()
         self.caught_up_event.set()
 
-    async def check_and_advance_blocks(self, blocks, first):
+    def set_mempool_hashes(self, mempool):
+        self.controller.mempool.set_hashes(mempool)
+
+    async def check_and_advance_blocks(self, blocks, first, mempool):
         '''Process the list of blocks passed.  Detects and handles reorgs.'''
         self.prefetcher.processing_blocks(blocks)
         if first != self.height + 1:
@@ -251,6 +262,7 @@ class BlockProcessor(server.db.DB):
                 self.logger.info('processed {:,d} block{} in {:.1f}s'
                                  .format(len(blocks), s,
                                          time.time() - start))
+            self.set_mempool_hashes(mempool)
         elif hprevs[0] != chain[0]:
             await self.reorg_chain()
         else:
