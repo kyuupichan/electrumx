@@ -352,6 +352,11 @@ class Bitcoin(Coin):
     ]
 
 
+class BitcoinSegwit(Bitcoin):
+    NET = "bitcoin-segwit"
+    DESERIALIZER = DeserializerSegWit
+
+
 class BitcoinTestnet(Bitcoin):
     SHORTNAME = "XTN"
     NET = "testnet"
