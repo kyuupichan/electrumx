@@ -133,6 +133,12 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.13
+--------------
+
+- improve mempool handling and height notifications
+- add bitcoin-segwit as a new COIN
+
 Version 1.0.12
 --------------
 
