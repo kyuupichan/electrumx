@@ -3,7 +3,7 @@ Prerequisites
 =============
 
 **ElectrumX** should run on any flavour of unix.  I have run it
-successfully on MaxOSX and DragonFlyBSD.  It won't run out-of-the-box
+successfully on MacOS and DragonFlyBSD.  It won't run out-of-the-box
 on Windows, but the changes required to make it do so should be
 small - pull requests are welcome.
 
