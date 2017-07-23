@@ -133,6 +133,12 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.14
+--------------
+
+- revert the changes to mempool handling of 1.0.13; I think they introduced
+  a notification bug
+
 Version 1.0.13
 --------------
 
