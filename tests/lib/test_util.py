@@ -56,3 +56,30 @@ def test_increment_byte_string():
     assert util.increment_byte_string(b'1') == b'2'
     assert util.increment_byte_string(b'\x01\x01') == b'\x01\x02'
     assert util.increment_byte_string(b'\xff\xff') is None
+
+def test_is_valid_hostname():
+    is_valid_hostname = util.is_valid_hostname
+    assert not is_valid_hostname('')
+    assert is_valid_hostname('a')
+    assert is_valid_hostname('_')
+    # Hyphens
+    assert not is_valid_hostname('-b')
+    assert not is_valid_hostname('a.-b')
+    assert is_valid_hostname('a-b')
+    assert not is_valid_hostname('b-')
+    assert not is_valid_hostname('b-.c')
+    # Dots
+    assert is_valid_hostname('a.')
+    assert is_valid_hostname('foo1.Foo')
+    assert not is_valid_hostname('foo1..Foo')
+    assert is_valid_hostname('12Foo.Bar.Bax_')
+    assert is_valid_hostname('12Foo.Bar.Baz_12')
+    # 63 octets in part
+    assert is_valid_hostname('a.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN'
+                             'OPQRSTUVWXYZ0123456789_.bar')
+    # Over 63 octets in part
+    assert not is_valid_hostname('a.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN'
+                                 'OPQRSTUVWXYZ0123456789_1.bar')
+    len255 = ('a' * 62 + '.') * 4 + 'abc'
+    assert is_valid_hostname(len255)
+    assert not is_valid_hostname(len255 + 'd')

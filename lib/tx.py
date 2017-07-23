@@ -1,4 +1,5 @@
 # Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
 #
@@ -55,13 +56,6 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
         return (self.prev_hash == TxInput.ZERO and
                 self.prev_idx == TxInput.MINUS_1)
 
-    @cachedproperty
-    def script_sig_info(self):
-        # No meaning for coinbases
-        if self.is_coinbase:
-            return None
-        return Script.parse_script_sig(self.script)
-
     def __str__(self):
         script = self.script.hex()
         prev_hash = hash_to_str(self.prev_hash)
@@ -70,12 +64,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 
 
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
-    '''Class representing a transaction output.'''
-
-    @cachedproperty
-    def pay_to(self):
-        return Script.parse_pk_script(self.pk_script)
-
+    pass
 
 class Deserializer(object):
     '''Deserializes blocks into transactions.
@@ -105,10 +94,10 @@ class Deserializer(object):
             self._read_le_uint32()  # locktime
         ), double_sha256(self.binary[start:self.cursor])
 
-    def read_block(self):
+    def read_tx_block(self):
         '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
         read_tx = self.read_tx
-        txs = [read_tx() for n in range(self._read_varint())]
+        txs = [read_tx() for _ in range(self._read_varint())]
         # Some coins have excess data beyond the end of the transactions
         return txs
 
@@ -133,6 +122,11 @@ class Deserializer(object):
             self._read_le_int64(),  # value
             self._read_varbytes(),  # pk_script
         )
+
+    def _read_byte(self):
+        cursor = self.cursor
+        self.cursor += 1
+        return self.binary[cursor]
 
     def _read_nbytes(self, n):
         cursor = self.cursor
@@ -193,11 +187,6 @@ class DeserializerSegWit(Deserializer):
 
     # https://bitcoincore.org/en/segwit_wallet_dev/#transaction-serialization
 
-    def _read_byte(self):
-        cursor = self.cursor
-        self.cursor += 1
-        return self.binary[cursor]
-
     def _read_witness(self, fields):
         read_witness_field = self._read_witness_field
         return [read_witness_field() for i in range(fields)]
@@ -237,3 +226,110 @@ class DeserializerSegWit(Deserializer):
 
         return TxSegWit(version, marker, flag, inputs,
                         outputs, witness, locktime), double_sha256(orig_ser)
+
+
+class DeserializerAuxPow(Deserializer):
+    VERSION_AUXPOW = (1 << 8)
+
+    def read_header(self, height, static_header_size):
+        '''Return the AuxPow block header bytes'''
+        start = self.cursor
+        version = self._read_le_uint32()
+        if version & self.VERSION_AUXPOW:
+            # We are going to calculate the block size then read it as bytes
+            self.cursor = start
+            self.cursor += static_header_size # Block normal header
+            self.read_tx() # AuxPow transaction
+            self.cursor += 32 # Parent block hash
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size # Merkle branch
+            self.cursor += 4 # Index
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size # Chain merkle branch
+            self.cursor += 4 # Chain index
+            self.cursor += 80 # Parent block header
+            header_end = self.cursor
+        else:
+            header_end = static_header_size
+        self.cursor = start
+        return self._read_nbytes(header_end)
+
+
+class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a JoinSplit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+
+
+class DeserializerZcash(Deserializer):
+    def read_header(self, height, static_header_size):
+        '''Return the block header bytes'''
+        start = self.cursor
+        # We are going to calculate the block size then read it as bytes
+        self.cursor += static_header_size
+        solution_size = self._read_varint()
+        self.cursor += solution_size
+        header_end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(header_end)
+
+    def read_tx(self):
+        start = self.cursor
+        base_tx =  TxJoinSplit(
+            self._read_le_int32(),  # version
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
+        )
+        if base_tx.version >= 2:
+            joinsplit_size = self._read_varint()
+            if joinsplit_size > 0:
+                self.cursor += joinsplit_size * 1802 # JSDescription
+                self.cursor += 32 # joinSplitPubKey
+                self.cursor += 64 # joinSplitSig
+        return base_tx, double_sha256(self.binary[start:self.cursor])
+
+
+class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
+    '''Class representing transaction that has a time field.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase
+
+
+class DeserializerTxTime(Deserializer):
+    def read_tx(self):
+        start = self.cursor
+
+        return TxTime(
+            self._read_le_int32(),  # version
+            self._read_le_uint32(), # time
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32(), # locktime
+        ), double_sha256(self.binary[start:self.cursor])
+
+
+class DeserializerReddcoin(Deserializer):
+    def read_tx(self):
+        start = self.cursor
+
+        version = self._read_le_int32()
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        if version > 1:
+            time = self._read_le_uint32()
+        else:
+            time = 0
+
+        return TxTime(
+            version,
+            time,
+            inputs,
+            outputs,
+            locktime,
+        ), double_sha256(self.binary[start:self.cursor])

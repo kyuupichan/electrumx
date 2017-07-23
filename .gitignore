@@ -1,4 +1,6 @@
 */__pycache__/
+.cache/
+tests/*/__pycache__/
 */*~
 *.#*
 *#

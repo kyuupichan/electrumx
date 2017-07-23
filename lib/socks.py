@@ -137,44 +137,104 @@ class Socks(util.LoggedClass):
 class SocksProxy(util.LoggedClass):
 
     def __init__(self, host, port, loop=None):
-        '''Host can be an IPv4 address, IPv6 address, or a host name.'''
+        '''Host can be an IPv4 address, IPv6 address, or a host name.
+        Port can be None, in which case one is auto-detected.'''
         super().__init__()
+        # Host and port of the proxy
         self.host = host
-        self.port = port
+        self.try_ports = [port, 9050, 9150, 1080]
+        self.errors = 0
         self.ip_addr = None
+        self.lost_event = asyncio.Event()
+        self.tried_event = asyncio.Event()
         self.loop = loop or asyncio.get_event_loop()
+        self.set_lost()
+
+    async def auto_detect_loop(self):
+        '''Try to detect a proxy at regular intervals until one is found.
+        If one is found, do nothing until one is lost.'''
+        while True:
+            await self.lost_event.wait()
+            self.lost_event.clear()
+            tries = 0
+            while True:
+                tries += 1
+                log_failure = tries % 10 == 1
+                await self.detect_proxy(log_failure=log_failure)
+                if self.is_up():
+                    break
+                await asyncio.sleep(600)
+
+    def is_up(self):
+        '''Returns True if we have a good proxy.'''
+        return self.port is not None
+
+    def set_lost(self):
+        '''Called when the proxy appears lost/down.'''
+        self.port = None
+        self.lost_event.set()
+
+    async def connect_via_proxy(self, host, port, proxy_address=None):
+        '''Connect to a (host, port) pair via the proxy.  Returns the
+        connected socket on success.'''
+        proxy_address = proxy_address or (self.host, self.port)
+        sock = socket.socket()
+        sock.setblocking(False)
+        try:
+            await self.loop.sock_connect(sock, proxy_address)
+            socks = Socks(self.loop, sock, host, port)
+            await socks.handshake()
+            return sock
+        except Exception:
+            sock.close()
+            raise
+
+    async def detect_proxy(self, host='www.google.com', port=80,
+                           log_failure=True):
+        '''Attempt to detect a proxy by establishing a connection through it
+        to the given target host / port pair.
+        '''
+        if self.is_up():
+            return
+
+        sock = None
+        for proxy_port in self.try_ports:
+            if proxy_port is None:
+                continue
+            paddress = (self.host, proxy_port)
+            try:
+                sock = await self.connect_via_proxy(host, port, paddress)
+                break
+            except Exception as e:
+                if log_failure:
+                    self.logger.info('failed to detect proxy at {}: {}'
+                                     .format(util.address_string(paddress), e))
+
+        self.tried_event.set()
+
+        # Failed all ports?
+        if sock is None:
+            return
+
+        peername = sock.getpeername()
+        sock.close()
+        self.ip_addr = peername[0]
+        self.port = proxy_port
+        self.errors = 0
+        self.logger.info('detected proxy at {} ({})'
+                         .format(util.address_string(paddress), self.ip_addr))
 
     async def create_connection(self, protocol_factory, host, port, ssl=None):
         '''All arguments are as to asyncio's create_connection method.'''
-        if self.port is None:
-            proxy_ports = [9050, 9150, 1080]
-        else:
-            proxy_ports = [self.port]
-
-        for proxy_port in proxy_ports:
-            address = (self.host, proxy_port)
-            sock = socket.socket()
-            sock.setblocking(False)
-            try:
-                await self.loop.sock_connect(sock, address)
-            except OSError as e:
-                if proxy_port == proxy_ports[-1]:
-                    raise
-                continue
-
-            socks = Socks(self.loop, sock, host, port)
-            try:
-                await socks.handshake()
-                if self.port is None:
-                    self.ip_addr = sock.getpeername()[0]
-                    self.port = proxy_port
-                    self.logger.info('detected proxy at {} ({})'
-                                     .format(util.address_string(address),
-                                             self.ip_addr))
-                break
-            except Exception as e:
-                sock.close()
-                raise
+        try:
+            sock = await self.connect_via_proxy(host, port)
+            self.errors = 0
+        except Exception:
+            self.errors += 1
+            # If we have 3 consecutive errors, consider the proxy undetected
+            if self.errors == 3:
+                self.set_lost()
+            raise
 
         hostname = host if ssl else None
         return await self.loop.create_connection(

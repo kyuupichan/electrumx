@@ -116,8 +116,10 @@ These environment variables are optional:
   You can place several meta-variables in your banner file, which will be
   replaced before serving to a client.
 
-  + **$VERSION** is replaced with the ElectrumX version you are
-    runnning, such as *ElectrumX 0.9.22*.
+  + **$SERVER_VERSION** is replaced with the ElectrumX version you are
+    runnning, such as *1.0.10*.
+  + **$SERVER_SUBVERSION** is replaced with the ElectrumX user agent
+    string.  For example, `ElectrumX 1.0.10`.
   + **$DAEMON_VERSION** is replaced with the daemon's version as a
     dot-separated string. For example *0.12.1*.
   + **$DAEMON_SUBVERSION** is replaced with the daemon's user agent
@@ -215,6 +217,7 @@ raise them.
   functioning Electrum clients by default will send pings roughly
   every 60 seconds.
 
+
 Peer Discovery
 --------------
 
@@ -250,6 +253,15 @@ some of this.
   peer discovery if it notices it is not present in the peer's
   returned list.
 
+* **FORCE_PROXY**
+
+  By default peer discovery happens over the clear internet.  Set this
+  to non-empty to force peer discovery to be done via the proxy.  This
+  might be useful if you are running a Tor service exclusively and
+  wish to keep your IP address private.  **NOTE**: in such a case you
+  should leave **IRC** unset as IRC connections are *always* over the
+  normal internet.
+
 * **TOR_PROXY_HOST**
 
   The host where your Tor proxy is running.  Defaults to *localhost*.
@@ -264,6 +276,49 @@ some of this.
   9150 (Tor browser bundle) and 1080 (socks).
 
 
+Server Advertising
+------------------
+
+These environment variables affect how your server is advertised, both
+by peer discovery (if enabled) and IRC (if enabled).
+
+* **REPORT_HOST**
+
+  The clearnet host to advertise.  If not set, no clearnet host is
+  advertised.
+
+* **REPORT_TCP_PORT**
+
+  The clearnet TCP port to advertise if **REPORT_HOST** is set.
+  Defaults to **TCP_PORT**.  '0' disables publishing a TCP port.
+
+* **REPORT_SSL_PORT**
+
+  The clearnet SSL port to advertise if **REPORT_HOST** is set.
+  Defaults to **SSL_PORT**.  '0' disables publishing an SSL port.
+
+* **REPORT_HOST_TOR**
+
+  If you wish run a Tor service, this is the Tor host name to
+  advertise and must end with `.onion`.
+
+* **REPORT_TCP_PORT_TOR**
+
+  The Tor TCP port to advertise.  The default is the clearnet
+  **REPORT_TCP_PORT**, unless disabled or it is '0', otherwise
+  **TCP_PORT**.  '0' disables publishing a Tor TCP port.
+
+* **REPORT_SSL_PORT_TOR**
+
+  The Tor SSL port to advertise.  The default is the clearnet
+  **REPORT_SSL_PORT**, unless disabled or it is '0', otherwise
+  **SSL_PORT**.  '0' disables publishing a Tor SSL port.
+
+  **NOTE**: Certificate-Authority signed certificates don't work over
+  Tor, so you should set **REPORT_SSL_PORT_TOR** to 0 if yours is not
+  self-signed.
+
+
 IRC
 ---
 
@@ -272,7 +327,8 @@ connectivity on IRC:
 
 * **IRC**
 
-  Set to anything non-empty to advertise on IRC
+  Set to anything non-empty to advertise on IRC.  ElectrumX connects
+  to IRC over the clear internet, always.
 
 * **IRC_NICK**
 
@@ -280,41 +336,8 @@ connectivity on IRC:
   **REPORT_HOST**.  Either way a prefix will be prepended depending on
   **COIN** and **NET**.
 
-* **REPORT_HOST**
-
-  The host to advertise.  Defaults to **HOST**.
-
-* **REPORT_TCP_PORT**
-
-  The TCP port to advertise.  Defaults to **TCP_PORT**.  '0' disables
-  publishing the port.
-
-* **REPORT_SSL_PORT**
-
-  The SSL port to advertise.  Defaults to **SSL_PORT**.  '0' disables
-  publishing the port.
-
-* **REPORT_HOST_TOR**
-
-  The tor address to advertise; must end with `.onion`.  If set, an
-  additional connection to IRC happens with '_tor' appended to
-  **IRC_NICK**.
-
-* **REPORT_TCP_PORT_TOR**
-
-  The TCP port to advertise for Tor.  Defaults to **REPORT_TCP_PORT**,
-  unless it is '0', otherwise **TCP_PORT**.  '0' disables publishing
-  the port.
-
-* **REPORT_SSL_PORT_TOR**
-
-  The SSL port to advertise for Tor.  Defaults to **REPORT_SSL_PORT**,
-  unless it is '0', otherwise **SSL_PORT**.  '0' disables publishing
-  the port.
-
-  **NOTE**: Certificate-Authority signed certificates don't work over
-  Tor, so you should set **REPORT_SSL_PORT_TOR** to 0 if yours is not
-  self-signed.
+  If **REPORT_HOST_TOR** is set, an additional connection to IRC
+  happens with '_tor' appended to **IRC_NICK**.
 
 
 Cache

@@ -17,6 +17,12 @@ Getting Started
 ===============
 
 See `docs/HOWTO.rst`_.
+There is also an `installer`_ available that simplifies the installation on various Linux-based distributions.
+There is also an `Dockerfile`_ available .
+
+.. _installer: https://github.com/bauerj/electrumx-installer
+
+.. _Dockerfile: https://github.com/followtheart/electrumx-docker
 
 Features
 ========
@@ -127,94 +133,139 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.13
+--------------
+
+- improve mempool handling and height notifications
+- add bitcoin-segwit as a new COIN
+
+Version 1.0.12
+--------------
+
+- handle legacy daemons, add support for Blackcoin and Peercoin (erasmospunk)
+- implement history compression; can currently only be done from a script
+  with the server down
+- Add dockerfile reference (followtheart)
+- doc, runfile fixes (Henry, emilrus)
+- add bip32 implementation, currently unused
+- daemon compatibility improvements (erasmospunk)
+- permit underscores in hostnames, updated Bitcoin server list
+
+Version 1.0.11
+--------------
+
+- disable IRC for bitcoin mainnet
+- remove dead code, allow custom Daemon & BlockProcessor classes (erasmospunk)
+- add SERVER_(SUB)VERSION to banner metavariables (LaoDC)
+- masternode methods for Dash (TheLazier)
+- allow multiple P2SH address versions, implement for Litecoin (pooler)
+- update Bitcoin's TX_COUNT and block height (JWU42)
+- update BU nolnet parameters
+- fix diagnostic typo (anduck)
+- Issues fixed: `#180`_
+
+Version 1.0.10
+--------------
+
+- add bauerj's installer docs
+- segwit has activated on Litecoin.  Make segwit deserialization the
+  default.  Also as the first Segwit block probably will break old
+  electrum-server implementation servers, disable IRC and make
+  Litecoin mainnet and testnet use the peer-discovery protocol.  If
+  you previously used "testnet-segwit" as your NET you should instead
+  use "testnet".
+
+Version 1.0.9
+-------------
+
+- ignore peers not appearing in their features list
+- validate hostnames in Env object
+- added tests for env.py
+- Einsteinium support and contrib script shebang fix (erasmospunk)
+- set last_good only if successfully verified
+
+Version 1.0.8
+-------------
+
+Minor peer-discovery tweaks:
+
+* I intended that if a host and its IP address were both registered as
+  peers, that the real hostname replace the IP address.  That wasn't
+  working properly and is fixed now.
+* 1.0.6 no longer required a clearnet identity but part of the peer
+  discovery logic assumed one existed.  That is now fixed.
+
+Version 1.0.7
+-------------
+
+Improvements to proxy handling and peer discovery
+
+* background async proxy detection loop.  Removes responsibility for
+  proxy detection and maintenance from the peer manager.
+* peer discovery waits for an initial proxy detection attempt to complete
+  before starting
+* new feature: flag to force peer discovery to happen via the proxy.
+  This might be useful for someone exlusively running a Tor service
+  that doesn't want to reveal its IP address.  See **FORCE_PROXY** in
+  `docs/ENVIRONMENT.rst`_ for details and caveats.
+* other minor fixes and tweaks
+
+Version 1.0.6
+-------------
+
+* updated to handle incompatibilities between aiohttp 1.0 and 2.0.
+  ElexctrumX should work with either for now; I will drop support for
+  1.0 in a few months.  Fixes `#163`_.
+* relax get_chunk restrictions for clients 1.8.3 and higher.  Closes
+  `#162`_.
+* **REPORT_HOST** no longer defaults to **HOST**.  If not set, no
+  clearnet identity will be advertised.
+* Add Viacoin support (romanornr)
+
+Version 1.0.5
+-------------
+
+* the peer looping was actually just looping of logging output, not
+  connections.  Hopefully fixed for good in this release.  Closes `#160`_.
+
+Version 1.0.4
+-------------
+
+* fix another unwanted loop in peer discovery, tweak diagnostics
+
+Version 1.0.3
+-------------
+
+* fix a verification loop that happened occasionally with bad peers
+
+Version 1.0.2
+-------------
+
+* stricter acceptance of add_peer requests: rate-limit onion peers,
+  and require incoming requests to resolve to the requesting IP address
+* validate peer hostnames (closes `#157`_)
+* verify height for all peers (closes `#152`_)
+* various improvements to peer handling
+* various documentation tweaks
+* limit the maximum number of sessions based on the process's
+  open file soft limit (closes `#158`_)
+* improved altcoin support for variable-length block headers and AuxPoW
+  (erasmospunk) (closes `#128`_ and `#83`_)
+
+Version 1.0.1
+-------------
+
+* Rate-limit add_peer calls in a random way
+* Fix discovery of base height in reorgs
+* Don't permit common but invalid REPORT_HOST values
+* Set reorg limit to 8000 blocks on testnet
+* dogecoin / litecoin parameter fixes (erasmospunk, pooler)
+* minor doc tweaks
+
 Version 1.0
 -----------
 
 * Minor doc tweaks only
-
-Version 0.99.4
---------------
-
-* Add support for Bitcoin Unlimited's nolnet; set **NET** to nolnet
-* Choose 2 peers per bucket
-* Minor bugfix
-
-Version 0.99.3
---------------
-
-* Require Python 3.5.3.  3.5.2 has asyncio API and socket-related issues.
-  Resolves `#135`_
-* Remove peer semaphore
-* Improved Base58 handling for >1 byte version prefix (erasmospunk)
-
-Version 0.99.2
---------------
-
-* don't announce self if a non-public IP address
-* logging tweaks
-
-Version 0.99.1
---------------
-
-* Add more verbose logging in attempt to understand issue `#135`_
-* REPORT_TCP_PORT_TOR and REPORT_SSL_PORT_TOR were ignored when constructing
-  IRC real names.  Fixes `#136`_
-* Only serve chunk requests in forward direction; disconnect clients iterating
-  backwards.  Minimizes bandwidth consumption caused by misbehaving Electrum
-  clients.  Closes `#132`_
-* Tor coin peers would always be scheduled for check, fixes `#138`_ (fr3aker)
-
-Version 0.99
-------------
-
-Preparation for release of 1.0, which will only have bug fixes and
-documentation updates.
-
-* improve handling of daemon going down so that incoming connections
-  are not blocked.  Also improve logging thereof.  Fixes `#100`_.
-* add facility to disable peer discovery and/or self announcement,
-  see `docs/ENVIRONMENT.rst`_.
-* add FairCoin (thokon00)
-
-Version 0.11.4
---------------
-
-* peer handling fixes / improvements based on suggestions of hsmiths
-
-Version 0.11.3
---------------
-
-* fixed a typo in lib/peer.py pointed out by hsmiths
-
-Version 0.11.2
---------------
-
-* Preliminary implementation of script hash subscriptions to enable
-  subscribing to updates of arbitrary scripts, not just those of
-  standard bitcoin addresses.  I'll fully document once confirmed
-  working as expected.
-  Closes `#124`_.
-
-Version 0.11.1
---------------
-
-* report unconfirmed parent tx status correctly, and notify if that
-  parent status changes.  Fixes `#129`_.
-
-Version 0.11.0
---------------
-
-* implementation of `docs/PEER_DISCOVERY.rst`_ for discovery of server
-  peers without using IRC.  Closes `#104`_.  Since all testnet peers
-  are ElectrumX servers, IRC advertising is now disabled on bitcoin
-  testnet.
-
-  Thanks to bauerj, hsmiths and JWU42 for their help testing these
-  changes over the last month.
-* you can now specify a tor proxy (or have it autodetected if local),
-  and if an incoming connection seems to be from the proxy a
-  tor-specific banner file is served.  See **TOR_BANNER_FILE** in
-  `docs/ENVIRONMENT.rst`_.
 
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
@@ -222,14 +273,15 @@ Version 0.11.0
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 
-.. _#100: https://github.com/kyuupichan/electrumx/issues/100
-.. _#104: https://github.com/kyuupichan/electrumx/issues/104
-.. _#124: https://github.com/kyuupichan/electrumx/issues/124
-.. _#129: https://github.com/kyuupichan/electrumx/issues/129
-.. _#132: https://github.com/kyuupichan/electrumx/issues/132
-.. _#135: https://github.com/kyuupichan/electrumx/issues/135
-.. _#136: https://github.com/kyuupichan/electrumx/issues/136
-.. _#138: https://github.com/kyuupichan/electrumx/issues/138
+.. _#83: https://github.com/kyuupichan/electrumx/issues/83
+.. _#128: https://github.com/kyuupichan/electrumx/issues/128
+.. _#152: https://github.com/kyuupichan/electrumx/issues/152
+.. _#157: https://github.com/kyuupichan/electrumx/issues/157
+.. _#158: https://github.com/kyuupichan/electrumx/issues/158
+.. _#160: https://github.com/kyuupichan/electrumx/issues/160
+.. _#162: https://github.com/kyuupichan/electrumx/issues/162
+.. _#163: https://github.com/kyuupichan/electrumx/issues/163
+.. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst

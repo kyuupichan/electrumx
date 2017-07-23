@@ -72,11 +72,12 @@ Maintaining the Peer Database
 In order to keep its peer database up-to-date and fresh, if some time
 has passed since the last successful connection to a peer, an Electrum
 server should make an attempt to connect, choosing either the TCP or
-SSL port.  On connecting it should issue **server.peers.subscribe**
-and **server.features** RPC calls to collect information about the
-server and its peers, and if it is the first time connecting to this
-peer, a **server.add_peer** call to advertise itself.  Once this is
-done and replies received it should terminate the connection.
+SSL port.  On connecting it should issue **server.peers.subscribe**,
+**blockchain.headers.subscribe**, and **server.features** RPC calls to
+collect information about the server and its peers.  If the peer seems
+to not know of you, you can issue a **server.add_peer** call to
+advertise yourself.  Once this is done and replies received it should
+terminate the connection.
 
 The peer database should view information obtained from an outgoing
 connection as authoritative, and prefer it to information obtained
@@ -84,13 +85,12 @@ from any other source.
 
 On connecting, a server should confirm the peer is serving the same
 network, ideally via the genesis block hash of the **server.features**
-RPC call below.  If the peer does not implement that call, perhaps
-instead check the **blockchain.headers.subscribe** RPC call returns a
-peer block height within a small number of the expected value.  If a
-peer is on the wrong network it should never be advertised to clients
-or other peers.  Such invalid peers should perhaps be remembered for a
-short time to prevent redundant revalidation if other peers persist in
-advertising them, and later forgotten.
+RPC call below.  Also the height reported by the peer should be within
+a small number of the expected value.  If a peer is on the wrong
+network it should never be advertised to clients or other peers.  Such
+invalid peers should perhaps be remembered for a short time to prevent
+redundant revalidation if other peers persist in advertising them, and
+later forgotten.
 
 If a connection attempt fails, subsequent reconnection attempts should
 follow some kind of exponential backoff.
@@ -200,3 +200,35 @@ the hard-coded peer list used to seed this process should suffice.
 Any peer on IRC will report other peers on IRC, and so if any one of
 them is known to any single peer implementing this protocol, they will
 all become known to all peers quite rapidly.
+
+
+Notes to Implementators
+-----------------------
+
+* it is very important to only accept peers that appear to be on the
+  same network.  At a minimum the genesis hash should be compared (if
+  the peer supports the *server.features* RPC call), and also that the
+  peer's reported height is within a few blocks of your own server's
+  height.
+* care should be taken with the *add_peer* call.  Consider only
+  accepting it once per connection.  Clearnet peer requests should
+  check the peer resolves to the requesting IP address, to prevent
+  attackers from being able to trigger arbitrary outgoing connections
+  from your server.  This doesn't work for onion peers so they should
+  be rate-limited.
+* it should be possible for a peer to change their port assignments -
+  presumably connecting to the old ports to perform checks will not
+  work.
+* peer host names should be checked for validity before accepting
+  them; and *localhost* should probably be rejected.  If it is an IP
+  address it should be a normal public one (not private, multicast or
+  unspecified).
+* you should limit the number of new peers accepted from any single
+  source to at most a handful, to limit the effectiveness of malicious
+  peers wanting to trigger arbitrary outgoing connections or fill your
+  peer tables with junk data.
+* in the response to *server.peers.subscribe* calls, consider limiting
+  the number of peers on similar IP subnets to protect against sybil
+  attacks, and in the case of onion servers the total returned.
+* you should not advertise a peer's IP address if it also advertises a
+  hostname (avoiding duplicates).

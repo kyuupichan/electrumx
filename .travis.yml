@@ -12,10 +12,11 @@ python:
 # command to install dependencies
 install:
   - pip install aiohttp
+  - pip install ecdsa
   - pip install plyvel
   - pip install pyrocksdb
   - pip install pytest-cov
   - pip install python-coveralls
 # command to run tests
-script: pytest --cov=server --cov=lib
+script: pytest --cov=server --cov=lib --cov=wallet
 after_success: coveralls

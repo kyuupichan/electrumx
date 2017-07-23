@@ -5,6 +5,8 @@ Electrum Protocol
 Until now there was no written specification of the Electrum protocol
 that I am aware of; this document is an attempt to fill that gap.  It
 is intended to be a reference for client and server authors alike.
+[Since writing this I learnt there has been a skeleton protocol
+description on docs.github.io].
 
 I have attempted to ensure what is written is correct for the three
 known server implementations: electrum-server, jelectrum and
@@ -61,8 +63,8 @@ Protocol negotiation is not implemented in any client or server at
 present to the best of my knowledge, so care is needed to ensure
 current clients and servers continue to operate as expected.
 
-Protocol versions are denoted by [major_number, minor_number] pairs,
-for example protocol version 1.15 is [1, 15] as a pair.
+Protocol versions are denoted by "m.n" strings, where *m* is the major
+version number and *n* the minor version number.  For example: "1.5".
 
 A party to a connection will speak all protocol versions in a range,
 say from `protocol_min` to `protocol_max`.  This min and max may be
@@ -189,7 +191,7 @@ Return the unconfirmed transactions of a bitcoin address.
     transaction is a dictionary with keys *height* , *tx_hash* and
     *fee*.  *tx_hash* the transaction hash in hexadecimal, *height* is
     `0` if all inputs are confirmed, and `-1` otherwise, and *fee* is
-    the transaction fee in coin units.
+    the transaction fee in minimum coin units as an integer.
 
 **Response Examples**
 
@@ -298,7 +300,7 @@ blockchain.block.get_header
 
 Return the *deserialized header* [2]_ of the block at the given height.
 
-  blockchain.block.get_chunk(**height**)
+  blockchain.block.get_header(**height**)
 
   **height**
 
@@ -324,10 +326,10 @@ blockchain.block.get_chunk
 ==========================
 
 Return a concatenated chunk of block headers.  A chunk consists of a
-fixed number of block headers over at the end of which difficulty is
-retargeted.
+fixed number of block headers over which difficulty is constant, and
+at the end of which difficulty is retargeted.
 
-So in the case of Bitcoin a chunk is 2,016 headers, each of 80 bytes,
+In the case of Bitcoin a chunk is 2,016 headers, each of 80 bytes,
 and chunk 5 is the block headers from height 10,080 to 12,095
 inclusive.  When encoded as hexadecimal, the response string is twice
 as long, so for Bitcoin it is 322,560 bytes long, making this a
@@ -558,7 +560,7 @@ deprecated.
 **Response**
 
   A Base58 address string, or *null*.  If the transaction doesn't
-  exist, the index is out of range, or the output is not paid to and
+  exist, the index is out of range, or the output is not paid to an
   address, *null* must be returned.  If the output is spent *null* may
   be returned.
 
@@ -600,7 +602,7 @@ subscription and the server must send no notifications.
   The first element is the IP address, the second is the host name
   (which might also be an IP address), and the third is a list of
   server features.  Each feature and starts with a letter.  'v'
-  indicates the server minimum protocol version, 'p' its pruning limit
+  indicates the server maximum protocol version, 'p' its pruning limit
   and is omitted if it does not prune, 't' is the TCP port number, and
   's' is the SSL port number.  If a port is not given for 's' or 't'
   the default port for the coin network is implied.  If 's' or 't' is
@@ -615,7 +617,7 @@ following changes:
 
 * improved semantics of `server.version` to aid protocol negotiation
 * deprecated methods `blockchain.address.get_proof`,
-  'blockchain.utxo.get_address' and `blockchain.numblocks.subscribe`
+  `blockchain.utxo.get_address` and `blockchain.numblocks.subscribe`
   have been removed.
 * method `blockchain.transaction.get` no longer takes a *height*
   argument
@@ -631,7 +633,7 @@ server.version
 Identify the client and inform the server the range of understood
 protocol versions.
 
-  server.version(**client_name**, **protocol_version** = ((1, 1), (1, 1)))
+  server.version(**client_name**, **protocol_version** = ["1.1", "1,1"])
 
 **client_name**
 
@@ -639,31 +641,28 @@ protocol versions.
 
 **protocol_verion**
 
-  Optional with default value ((1, 1), (1, 1)).
+  Optional with default value ["1.1", "1,1"].
 
   It must be a pair [`protocol_min`, `protocol_max`], each of which is
-  itself a [major_version, minor_version] pair.
-
-  If a string was passed it should be interpreted as `protocol_min` and
-  `protocol_max` both being [1, 0].
+  a string.
 
 The server should use the highest protocol version both support:
 
   protocol_version_to_use = min(client.protocol_max, server.protocol_max)
 
-If this is below
+If this is below the value
 
   min(client.protocol_min, server.protocol_min)
 
-there is no protocol version in common and the server must close the
-connection.  Otherwise it should send a response appropriate for that
-protocol version.
+then there is no protocol version in common and the server must close
+the connection.  Otherwise it should send a response appropriate for
+that protocol version.
 
 **Response**
 
-  A pair
+  A string
 
-     [identifying_string, protocol_version]
+     "m.n"
 
   identifying the server and the protocol version that will be used
   for future communication.
@@ -672,7 +671,7 @@ protocol version.
 
 ::
 
-  server.version('2.7.11', ((1, 0), (2, 0)))
+  server.version('2.7.11', ["1.0", "2.0"])
 
 
 server.add_peer
@@ -704,37 +703,62 @@ Get a list of features and services supported by the server.
   The following features MUST be reported by the server.  Additional
   key-value pairs may be returned.
 
-  * **hosts**
+* **hosts**
 
-    A dictionary of host names the server can be reached at.  Each
-    value is a dictionary with keys "ssl_port" and "tcp_port" at which
-    the given host can be reached.  If there is no open port for a
-    transport, its value should be *null*.
+  An dictionary, keyed by host name, that this server can be reached
+  at.  Normally this will only have a single entry; other entries can
+  be used in case there are other connection routes (e.g. Tor).
 
-  * **server_version**
+  The value for a host is itself a dictionary, with the following
+  optional keys:
 
-    The same identifying string as returned in response to *server.version*.
+  * **ssl_port**
 
-  * **protocol_version**
+    An integer.  Omit or set to *null* if SSL connectivity is not
+    provided.
 
-    A pair [`protocol_min`, `protocol_max`] of the protocols supported
-    by the server, each of which is itself a [major_version,
-    minor_version] pair.
+  * **tcp_port**
 
-  * **pruning**
+    An integer.  Omit or set to *null* if TCP connectivity is not
+    provided.
 
-    The history pruning limit of the server as an integer.  If the
-    server does not prune return *null*.
+  A server should ignore information provided about any host other
+  than the one it connected to.
+
+* **genesis_hash**
+
+  The hash of the genesis block.  This is used to detect if a peer is
+  connected to one serving a different network.
+
+* **server_version**
+
+  A string that identifies the server software.  Should be the same as
+  the response to **server.version** RPC call.
+
+* **protocol_max**
+* **protocol_min**
+
+  Strings that are the minimum and maximum Electrum protcol versions
+  this server speaks.  The maximum value should be the same as what
+  would suffix the letter **v** in the IRC real name.  Example: "1.1".
+
+* **pruning**
+
+  An integer, the pruning limit.  Omit or set to *null* if there is no
+  pruning limit.  Should be the same as what would suffix the letter
+  **p** in the IRC real name.
 
 **Example Response**
 
 ::
 
   {
-     "server_version": "ElectrumX 0.10.14",
-     "protocol_version": [[1, 0], [1, 1]],
-     "hosts": {"14.3.140.101": {"ssl_port": 50002, "tcp_port": 50001}},
-     "pruning": null
+      "genesis_hash": "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943",
+      "hosts": {"14.3.140.101": {"tcp_port": 51001, "ssl_port": 51002}},
+      "protocol_max": "1.0",
+      "protocol_min": "1.0",
+      "pruning": null,
+      "server_version": "ElectrumX 1.0.1"
   }
 
 .. _JSON RPC 1.0: http://json-rpc.org/wiki/specification

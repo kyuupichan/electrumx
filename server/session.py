@@ -34,6 +34,7 @@ class SessionBase(JSONSession):
         self.env = controller.env
         self.daemon = self.bp.daemon
         self.client = 'unknown'
+        self.client_version = (1, )
         self.protocol_version = '1.0'
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
@@ -45,7 +46,6 @@ class SessionBase(JSONSession):
         self.bw_time = self.start_time
         self.bw_interval = 3600
         self.bw_used = 0
-        self.peer_added = False
 
     def close_connection(self):
         '''Call this to close the connection.'''
@@ -194,15 +194,10 @@ class ElectrumX(SessionBase):
         self.subscribe_height = True
         return self.height()
 
-    def add_peer(self, features):
-        '''Add a peer.'''
-        if self.peer_added:
-            return False
+    async def add_peer(self, features):
+        '''Add a peer (but only if the peer resolves to the source).'''
         peer_mgr = self.controller.peer_mgr
-        peer_info = self.peer_info()
-        source = peer_info[0] if peer_info else 'unknown'
-        self.peer_added = peer_mgr.on_add_peer(features, source)
-        return self.peer_added
+        return await peer_mgr.on_add_peer(features, self.peer_info())
 
     def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
@@ -268,22 +263,23 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        self.chunk_indices.append(index)
-        self.chunk_indices = self.chunk_indices[-5:]
-        # -2 allows backing up a single chunk but no more.
-        if index <= max(self.chunk_indices[:-2], default=-1):
-            msg = ('chunk indices not advancing (wrong network?): {}'
-                   .format(self.chunk_indices))
-            # INVALID_REQUEST triggers a disconnect
-            raise RPCError(msg, JSONRPC.INVALID_REQUEST)
+        if self.client_version < (2, 8, 3):
+            self.chunk_indices.append(index)
+            self.chunk_indices = self.chunk_indices[-5:]
+            # -2 allows backing up a single chunk but no more.
+            if index <= max(self.chunk_indices[:-2], default=-1):
+                msg = ('chunk indices not advancing (wrong network?): {}'
+                       .format(self.chunk_indices))
+                # use INVALID_REQUEST to trigger a disconnect
+                raise RPCError(msg, JSONRPC.INVALID_REQUEST)
         return self.controller.get_chunk(index)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
         running.'''
-        tor_proxy = self.controller.peer_mgr.tor_proxy
+        proxy = self.controller.peer_mgr.proxy
         peer_info = self.peer_info()
-        return peer_info and peer_info[0] == tor_proxy.ip_addr
+        return peer_info and peer_info[0] == proxy.ip_addr
 
     async def replaced_banner(self, banner):
         network_info = await self.controller.daemon_request('getnetworkinfo')
@@ -292,8 +288,11 @@ class ElectrumX(SessionBase):
         minor, revision = divmod(minor, 10000)
         revision //= 100
         daemon_version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
+        server_version = version.VERSION.split()[-1]
         for pair in [
-                ('$VERSION', version.VERSION),
+                ('$VERSION', version.VERSION), # legacy
+                ('$SERVER_VERSION', server_version),
+                ('$SERVER_SUBVERSION', version.VERSION),
                 ('$DAEMON_VERSION', daemon_version),
                 ('$DAEMON_SUBVERSION', network_info['subversion']),
                 ('$DONATION_ADDRESS', self.env.donation_address),
@@ -329,6 +328,11 @@ class ElectrumX(SessionBase):
         '''
         if client_name:
             self.client = str(client_name)[:17]
+            try:
+                self.client_version = tuple(int(part) for part
+                                            in self.client.split('.'))
+            except Exception:
+                pass
         if protocol_version is not None:
             self.protocol_version = protocol_version
         return version.VERSION
@@ -383,3 +387,63 @@ class LocalRPC(SessionBase):
     def request_handler(self, method):
         '''Return the async handler for the given request method.'''
         return self.controller.rpc_handlers.get(method)
+
+
+class DashElectrumX(ElectrumX):
+    '''A TCP server that handles incoming Electrum Dash connections.'''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.electrumx_handlers['masternode.announce.broadcast'] = self.masternode_announce_broadcast
+        self.electrumx_handlers['masternode.subscribe'] = self.masternode_subscribe
+        self.mns = set()
+
+    async def notify(self, height, touched):
+        '''Notify the client about changes in masternode list.'''
+
+        await super().notify(height, touched)
+
+        for masternode in self.mns:
+            status = await self.daemon.masternode_list(['status', masternode])
+            payload = {
+                'id': None,
+                'method': 'masternode.subscribe',
+                'params': [masternode],
+                'result': status.get(masternode),
+            }
+            self.send_binary(self.encode_payload(payload))
+
+    def server_version(self, client_name=None, protocol_version=None):
+        '''Returns the server version as a string.
+        Force version string response for Electrum-Dash 2.6.4 client caused by
+        https://github.com/dashpay/electrum-dash/commit/638cf6c0aeb7be14a85ad98f873791cb7b49ee29
+        '''
+
+        default_return = super().server_version(client_name, protocol_version)
+        if self.client == '2.6.4':
+            return '1.0'
+        return default_return
+
+    # Masternode command handlers
+    async def masternode_announce_broadcast(self, signmnb):
+        '''Pass through the masternode announce message to be broadcast by the daemon.'''
+
+        try:
+            mnb_info = await self.daemon.masternode_broadcast(['relay', signmnb])
+            return mnb_info
+        except DaemonError as e:
+            error = e.args[0]
+            message = error['message']
+            self.log_info('masternode_broadcast: {}'.format(message))
+            return (
+                'The masternode broadcast was rejected.  ({})\n[{}]'
+                .format(message, signmnb)
+            )
+
+    async def masternode_subscribe(self, vin):
+        '''Returns the status of masternode.'''
+        result = await self.daemon.masternode_list(['status', vin])
+        if result is not None:
+            self.mns.add(vin)
+            return result.get(vin)
+        return None

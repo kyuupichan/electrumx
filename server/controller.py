@@ -11,7 +11,6 @@ import os
 import ssl
 import time
 import traceback
-import warnings
 from bisect import bisect_left
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -19,15 +18,14 @@ from functools import partial
 
 import pylru
 
-from lib.jsonrpc import JSONRPC, JSONSessionBase, RPCError
+from lib.jsonrpc import JSONSessionBase, RPCError
 from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 from lib.peer import Peer
 import lib.util as util
-from server.block_processor import BlockProcessor
-from server.daemon import Daemon, DaemonError
+from server.daemon import DaemonError
 from server.mempool import MemPool
 from server.peers import PeerManager
-from server.session import LocalRPC, ElectrumX
+from server.session import LocalRPC
 
 
 class Controller(util.LoggedClass):
@@ -49,8 +47,8 @@ class Controller(util.LoggedClass):
         self.loop.set_default_executor(self.executor)
         self.start_time = time.time()
         self.coin = env.coin
-        self.daemon = Daemon(env.coin.daemon_urls(env.daemon_url))
-        self.bp = BlockProcessor(env, self, self.daemon)
+        self.daemon = self.coin.DAEMON(env.coin.daemon_urls(env.daemon_url))
+        self.bp = self.coin.BLOCK_PROCESSOR(env, self, self.daemon)
         self.mempool = MemPool(self.bp, self)
         self.peer_mgr = PeerManager(env, self)
         self.env = env
@@ -250,7 +248,7 @@ class Controller(util.LoggedClass):
                 server.close()
 
     async def start_server(self, kind, *args, **kw_args):
-        protocol_class = LocalRPC if kind == 'RPC' else ElectrumX
+        protocol_class = LocalRPC if kind == 'RPC' else self.coin.SESSIONCLS
         protocol_factory = partial(protocol_class, self, kind)
         server = self.loop.create_server(protocol_factory, *args, **kw_args)
 
@@ -311,7 +309,7 @@ class Controller(util.LoggedClass):
                 self.header_cache.clear()
 
             # Make a copy; self.sessions can change whilst await-ing
-            sessions = [s for s in self.sessions if isinstance(s, ElectrumX)]
+            sessions = [s for s in self.sessions if isinstance(s, self.coin.SESSIONCLS)]
             for session in sessions:
                 await session.notify(self.bp.db_height, touched)
 
@@ -499,19 +497,21 @@ class Controller(util.LoggedClass):
         fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>3} '
                '{:>3} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
         yield fmt.format('Host', 'Status', 'TCP', 'SSL', 'Server', 'Min',
-                         'Max', 'Pruning', 'Last Conn', 'Last Try',
+                         'Max', 'Pruning', 'Last Good', 'Last Try',
                          'Tries', 'Source', 'IP Address')
         for item in data:
             features = item['features']
-            yield fmt.format(item['host'][:30],
+            hostname = item['host']
+            host = features['hosts'][hostname]
+            yield fmt.format(hostname[:30],
                              item['status'],
-                             features['tcp_port'] or '',
-                             features['ssl_port'] or '',
+                             host.get('tcp_port') or '',
+                             host.get('ssl_port') or '',
                              features['server_version'] or 'unknown',
                              features['protocol_min'],
                              features['protocol_max'],
                              features['pruning'] or '',
-                             time_fmt(item['last_connect']),
+                             time_fmt(item['last_good']),
                              time_fmt(item['last_try']),
                              item['try_count'],
                              item['source'][:20],
@@ -861,8 +861,7 @@ class Controller(util.LoggedClass):
         if not raw_tx:
             return None
         raw_tx = bytes.fromhex(raw_tx)
-        deserializer = self.coin.deserializer()
-        tx, tx_hash = deserializer(raw_tx).read_tx()
+        tx, tx_hash = self.coin.DESERIALIZER(raw_tx).read_tx()
         if index >= len(tx.outputs):
             return None
         return self.coin.address_from_script(tx.outputs[index].pk_script)

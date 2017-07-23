@@ -12,10 +12,14 @@ import asyncio
 import json
 import time
 import traceback
+from calendar import timegm
+from struct import pack
+from time import strptime
 
 import aiohttp
 
 import lib.util as util
+from lib.hash import hex_str_to_hash
 
 
 class DaemonError(Exception):
@@ -34,13 +38,24 @@ class Daemon(util.LoggedClass):
         super().__init__()
         self.set_urls(urls)
         self._height = None
-        self._mempool_hashes = set()
-        self.mempool_refresh_event = asyncio.Event()
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
         self.down = False
         self.last_error_time = 0
+        self.req_id = 0
+        # assignment of asyncio.TimeoutError are essentially ignored
+        if aiohttp.__version__.startswith('1.'):
+            self.ClientHttpProcessingError = aiohttp.ClientHttpProcessingError
+            self.ClientPayloadError = asyncio.TimeoutError
+        else:
+            self.ClientHttpProcessingError = asyncio.TimeoutError
+            self.ClientPayloadError = aiohttp.ClientPayloadError
+
+    def next_req_id(self):
+        '''Retrns the next request ID.'''
+        self.req_id += 1
+        return self.req_id
 
     def set_urls(self, urls):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -68,9 +83,13 @@ class Daemon(util.LoggedClass):
             return True
         return False
 
+    def client_session(self):
+        '''An aiohttp client session.'''
+        return aiohttp.ClientSession()
+
     async def _send_data(self, data):
         async with self.workqueue_semaphore:
-            async with aiohttp.ClientSession() as session:
+            async with self.client_session() as session:
                 async with session.post(self.url(), data=data) as resp:
                     # If bitcoind can't find a tx, for some reason
                     # it returns 500 but fills out the JSON.
@@ -114,10 +133,12 @@ class Daemon(util.LoggedClass):
                           .format(result[0], result[1]))
             except asyncio.TimeoutError:
                 log_error('timeout error.')
-            except aiohttp.ClientHttpProcessingError:
-                log_error('HTTP error.')
             except aiohttp.ServerDisconnectedError:
                 log_error('disconnected.')
+            except self.ClientHttpProcessingError:
+                log_error('HTTP error.')
+            except self.ClientPayloadError:
+                log_error('payload encoding error.')
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
             except self.DaemonWarmingUpError:
@@ -145,7 +166,7 @@ class Daemon(util.LoggedClass):
                 raise self.DaemonWarmingUpError
             raise DaemonError(err)
 
-        payload = {'method': method}
+        payload = {'method': method, 'id': self.next_req_id()}
         if params:
             payload['params'] = params
         return await self._send(payload, processor)
@@ -164,7 +185,8 @@ class Daemon(util.LoggedClass):
                 return [item['result'] for item in result]
             raise DaemonError(errs)
 
-        payload = [{'method': method, 'params': p} for p in params_iterable]
+        payload = [{'method': method, 'params': p, 'id': self.next_req_id()}
+                   for p in params_iterable]
         if payload:
             return await self._send(payload, processor)
         return []
@@ -186,7 +208,7 @@ class Daemon(util.LoggedClass):
         return [bytes.fromhex(block) for block in blocks]
 
     async def mempool_hashes(self):
-        '''Update our record of the daemon's mempool hashes.'''
+        '''Return a list of the daemon's mempool hashes.'''
         return await self._send_single('getrawmempool')
 
     async def estimatefee(self, params):
@@ -221,20 +243,80 @@ class Daemon(util.LoggedClass):
         '''Broadcast a transaction to the network.'''
         return await self._send_single('sendrawtransaction', params)
 
-    async def height(self, mempool=False):
+    async def height(self):
         '''Query the daemon for its current height.'''
         self._height = await self._send_single('getblockcount')
-        if mempool:
-            self._mempool_hashes = set(await self.mempool_hashes())
-            self.mempool_refresh_event.set()
         return self._height
-
-    def cached_mempool_hashes(self):
-        '''Return the cached mempool hashes.'''
-        return self._mempool_hashes
 
     def cached_height(self):
         '''Return the cached daemon height.
 
         If the daemon has not been queried yet this returns None.'''
         return self._height
+
+class DashDaemon(Daemon):
+    async def masternode_broadcast(self, params):
+        '''Broadcast a transaction to the network.'''
+        return await self._send_single('masternodebroadcast', params)
+
+    async def masternode_list(self, params ):
+        '''Return the masternode status.'''
+        return await self._send_single('masternodelist', params)
+
+
+class LegacyRPCDaemon(Daemon):
+    '''Handles connections to a daemon at the given URL.
+
+    This class is useful for daemons that don't have the new 'getblock'
+    RPC call that returns the block in hex, the workaround is to manually
+    recreate the block bytes. The recreated block bytes may not be the exact
+    as in the underlying blockchain but it is good enough for our indexing
+    purposes.'''
+
+
+    async def raw_blocks(self, hex_hashes):
+        '''Return the raw binary blocks with the given hex hashes.'''
+        params_iterable = ((h, False) for h in hex_hashes)
+        block_info = await self._send_vector('getblock', params_iterable)
+
+        blocks = []
+        for i in block_info:
+            raw_block = await self.make_raw_block(i)
+            blocks.append(raw_block)
+
+        # Convert hex string to bytes
+        return blocks
+
+    async def make_raw_header(self, b):
+        pbh = b.get('previousblockhash')
+        if pbh is None:
+            pbh = '0' * 64
+        header = pack('<L', b.get('version')) \
+                 + hex_str_to_hash(pbh) \
+                 + hex_str_to_hash(b.get('merkleroot')) \
+                 + pack('<L', self.timestamp_safe(b['time'])) \
+                 + pack('<L', int(b.get('bits'), 16)) \
+                 + pack('<L', int(b.get('nonce')))
+        return header
+
+    async def make_raw_block(self, b):
+        '''Construct a raw block'''
+
+        header = await self.make_raw_header(b)
+
+        transactions = []
+        if b.get('height') > 0:
+            transactions = await self.getrawtransactions(b.get('tx'), False)
+
+        raw_block = header
+        num_txs = len(transactions)
+        if num_txs > 0:
+            raw_block += util.int_to_varint(num_txs)
+            raw_block += b''.join(transactions)
+        else:
+            raw_block += b'\x00'
+
+        return raw_block
+
+    def timestamp_safe(self, t):
+        return t if isinstance(t, int) else timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))

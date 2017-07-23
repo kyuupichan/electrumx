@@ -1,3 +1,0 @@
-j#!/bin/sh
-echo "Launching ElectrumX server..."
-exec 2>&1 envdir ./env /bin/sh -c 'envuidgid $USERNAME python3 $ELECTRUMX'
