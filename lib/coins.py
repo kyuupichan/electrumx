@@ -687,19 +687,19 @@ class FairCoin(Coin):
     P2PKH_VERBYTE = bytes.fromhex("5f")
     P2SH_VERBYTES = [bytes.fromhex("24")]
     WIF_BYTE = bytes.fromhex("df")
-    GENESIS_HASH = ('1f701f2b8de1339dc0ec908f3fb6e9b0'
-                    'b870b6f20ba893e120427e42bbc048d7')
+    GENESIS_HASH = ('beed44fa5e96150d95d56ebd5d262578'
+                    '1825a9407a5215dd7eda723373a0a1d7')
     BASIC_HEADER_SIZE = 108
-    TX_COUNT = 1000
-    TX_COUNT_HEIGHT = 1000
+    TX_COUNT = 505
+    TX_COUNT_HEIGHT = 470
     TX_PER_BLOCK = 1
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#fairlectrum"
     RPC_PORT = 40405
     PEER_DEFAULT_PORTS = {'t': '51811', 's': '51812'}
     PEERS = [
-        'fairlectrum.fair-coin.net s',
-        'fairlectrum.fair.to s',
+        'electrum.faircoin.world s',
+        'electrumfair.punto0.org s',
     ]
 
     @classmethod
