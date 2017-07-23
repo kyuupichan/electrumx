@@ -37,8 +37,6 @@ class MemPool(util.LoggedClass):
         self.controller = controller
         self.coin = bp.coin
         self.db = bp
-        self.hashes = set()
-        self.mempool_refresh_event = asyncio.Event()
         self.touched = bp.touched
         self.touched_event = asyncio.Event()
         self.prioritized = set()
@@ -51,11 +49,6 @@ class MemPool(util.LoggedClass):
         initial mempool sync.'''
         self.prioritized.add(tx_hash)
 
-    def set_hashes(self, hashes):
-        '''Save the list of mempool hashes.'''
-        self.hashes = set(hashes)
-        self.mempool_refresh_event.set()
-
     def resync_daemon_hashes(self, unprocessed, unfetched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
 
@@ -66,7 +59,8 @@ class MemPool(util.LoggedClass):
         hashXs = self.hashXs
         touched = self.touched
 
-        gone = set(txs).difference(self.hashes)
+        hashes = self.daemon.cached_mempool_hashes()
+        gone = set(txs).difference(hashes)
         for hex_hash in gone:
             unfetched.discard(hex_hash)
             unprocessed.pop(hex_hash, None)
@@ -81,7 +75,7 @@ class MemPool(util.LoggedClass):
                         del hashXs[hashX]
                 touched.update(tx_hashXs)
 
-        new = self.hashes.difference(txs)
+        new = hashes.difference(txs)
         unfetched.update(new)
         for hex_hash in new:
             txs[hex_hash] = None
@@ -98,14 +92,15 @@ class MemPool(util.LoggedClass):
         fetch_size = 800
         process_some = self.async_process_some(unfetched, fetch_size // 2)
 
-        await self.mempool_refresh_event.wait()
+        await self.daemon.mempool_refresh_event.wait()
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
         next_log = 0
         loops = -1  # Zero during initial catchup
 
         while True:
-            if self.touched:
+            # Avoid double notifications if processing a block
+            if self.touched and not self.processing_new_block():
                 self.touched_event.set()
 
             # Log progress / state
@@ -125,10 +120,10 @@ class MemPool(util.LoggedClass):
             try:
                 if not todo:
                     self.prioritized.clear()
-                    await self.mempool_refresh_event.wait()
+                    await self.daemon.mempool_refresh_event.wait()
 
                 self.resync_daemon_hashes(unprocessed, unfetched)
-                self.mempool_refresh_event.clear()
+                self.daemon.mempool_refresh_event.clear()
 
                 if unfetched:
                     count = min(len(unfetched), fetch_size)
@@ -181,6 +176,10 @@ class MemPool(util.LoggedClass):
                         hashXs[hashX].add(hex_hash)
 
         return process
+
+    def processing_new_block(self):
+        '''Return True if we're processing a new block.'''
+        return self.daemon.cached_height() > self.db.db_height
 
     async def fetch_raw_txs(self, hex_hashes):
         '''Fetch a list of mempool transactions.'''
