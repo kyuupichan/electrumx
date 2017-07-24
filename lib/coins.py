@@ -857,3 +857,22 @@ class Reddcoin(Coin):
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum-rdd"
     RPC_PORT = 45443
+
+
+class Vertcoin(Coin):
+    NAME = "Vertcoin"
+    SHORTNAME = "VTC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("47")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('4d96a915f49d40b1e5c2844d1ee2dccb'
+                    '90013a990ccea12c492d22110489f0c4')
+    DESERIALIZER = DeserializerSegWit
+    TX_COUNT = 2383423
+    TX_COUNT_HEIGHT = 759076
+    TX_PER_BLOCK = 3
+    RPC_PORT = 5888
+    REORG_LIMIT = 1000
