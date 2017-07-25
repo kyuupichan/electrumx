@@ -873,3 +873,22 @@ class Vertcoin(Coin):
     TX_PER_BLOCK = 3
     RPC_PORT = 5888
     REORG_LIMIT = 1000
+
+
+class Monacoin(Coin):
+    NAME = "Monacoin"
+    SHORTNAME = "MONA"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("37"), bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("B2")
+    GENESIS_HASH = ('ff9f1c0116d19de7c9963845e129f9ed'
+                    '1bfc0b376eb54fd7afa42e0d418c8bb6')
+    DESERIALIZER = DeserializerSegWit
+    TX_COUNT = 2568580
+    TX_COUNT_HEIGHT = 1029766
+    TX_PER_BLOCK = 2
+    RPC_PORT = 9402
+    REORG_LIMIT = 1000
