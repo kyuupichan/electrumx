@@ -83,7 +83,7 @@ class PeerSession(JSONSession):
         self.send_request(self.on_version, 'server.version',
                           [version.VERSION, proto_ver])
         self.send_request(self.on_features, 'server.features')
-        self.send_request(self.on_headers, 'blockchain.headers.subscribe')
+        self.send_request(self.on_height, 'blockchain.headers.subscribe')
         self.send_request(self.on_peers_subscribe, 'server.peers.subscribe')
 
     def connection_lost(self, exc):
@@ -123,8 +123,8 @@ class PeerSession(JSONSession):
                                  .format(hosts))
         self.close_if_done()
 
-    def on_headers(self, result, error):
-        '''Handle the response to the version message.'''
+    def on_height(self, result, error):
+        '''Handle the response to blockchain.headers.subscribe message.'''
         if error:
             self.failed = True
             self.log_error('blockchain.headers.subscribe returned an error')
@@ -132,7 +132,8 @@ class PeerSession(JSONSession):
             self.bad = True
             self.log_error('bad blockchain.headers.subscribe response')
         else:
-            our_height = self.peer_mgr.controller.bp.db_height
+            controller = self.peer_mgr.controller
+            our_height = controller.bp.db_height
             their_height = result.get('block_height')
             if not isinstance(their_height, int):
                 self.log_warning('invalid height {}'.format(their_height))
@@ -141,6 +142,32 @@ class PeerSession(JSONSession):
                 self.log_warning('bad height {:,d} (ours: {:,d})'
                                  .format(their_height, our_height))
                 self.bad = True
+
+            # Check prior header too in case of hard fork.
+            if not self.bad:
+                check_height = min(our_height, their_height)
+                self.send_request(self.on_header, 'blockchain.block.get_header',
+                                  [check_height])
+                self.expected_header = controller.electrum_header(check_height)
+        self.close_if_done()
+
+    def on_header(self, result, error):
+        '''Handle the response to blockchain.block.get_header message.
+        Compare hashes of prior header in attempt to determine if forked.'''
+        if error:
+            self.failed = True
+            self.log_error('blockchain.block.get_header returned an error')
+        elif not isinstance(result, dict):
+            self.bad = True
+            self.log_error('bad blockchain.block.get_header response')
+        else:
+            theirs = result.get('prev_block_hash')
+            ours = self.expected_header.get('prev_block_hash')
+            if ours != theirs:
+                self.log_error('our header hash {} and theirs {} differ'
+                               .format(ours, theirs))
+                self.bad = True
+
         self.close_if_done()
 
     def on_version(self, result, error):
