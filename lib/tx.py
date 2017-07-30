@@ -75,10 +75,10 @@ class Deserializer(object):
     millions of times during sync.
     '''
 
-    def __init__(self, binary):
+    def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
         self.binary = binary
-        self.cursor = 0
+        self.cursor = start
 
     def read_tx(self):
         '''Return a (Deserialized TX, TX_HASH) pair.

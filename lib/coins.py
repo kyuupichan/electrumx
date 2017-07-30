@@ -273,7 +273,7 @@ class Coin(object):
     def block(cls, raw_block, height):
         '''Return a Block namedtuple given a raw block and its height.'''
         header = cls.block_header(raw_block, height)
-        txs = cls.DESERIALIZER(raw_block[len(header):]).read_tx_block()
+        txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
         return Block(raw_block, header, txs)
 
     @classmethod
@@ -313,8 +313,8 @@ class AuxPowMixin(object):
     @classmethod
     def block_header(cls, block, height):
         '''Return the AuxPow block header bytes'''
-        block = cls.DESERIALIZER(block)
-        return block.read_header(height, cls.BASIC_HEADER_SIZE)
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
 class Bitcoin(Coin):
@@ -762,8 +762,8 @@ class Zcash(Coin):
     @classmethod
     def block_header(cls, block, height):
         '''Return the block header bytes'''
-        block = cls.DESERIALIZER(block)
-        return block.read_header(height, cls.BASIC_HEADER_SIZE)
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
 class Einsteinium(Coin):
