@@ -58,11 +58,11 @@ def block_details(request):
 def test_block(block_details):
     coin, block_info = block_details
 
-    block = unhexlify(block_info['block'])
-    h, txs = coin.block_full(block, block_info['height'])
+    raw_block = unhexlify(block_info['block'])
+    block = coin.block(raw_block, block_info['height'])
 
-    assert coin.header_hash(h) == hex_str_to_hash(block_info['hash'])
-    assert coin.header_prevhash(h) == hex_str_to_hash(block_info['previousblockhash'])
-    for n, tx in enumerate(txs):
-        _, txid = tx
+    assert coin.header_hash(block.header) == hex_str_to_hash(block_info['hash'])
+    assert (coin.header_prevhash(block.header)
+            == hex_str_to_hash(block_info['previousblockhash']))
+    for n, (tx, txid) in enumerate(block.transactions):
         assert txid == hex_str_to_hash(block_info['tx'][n])

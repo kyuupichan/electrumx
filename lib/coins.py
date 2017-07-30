@@ -46,7 +46,7 @@ from server.daemon import Daemon, DashDaemon, LegacyRPCDaemon
 from server.session import ElectrumX, DashElectrumX
 
 
-Block = namedtuple("Block", "header transactions")
+Block = namedtuple("Block", "raw header transactions")
 
 
 class CoinError(Exception):
@@ -270,12 +270,11 @@ class Coin(object):
         return block[:cls.static_header_len(height)]
 
     @classmethod
-    def block_full(cls, block, height):
-        '''Returns (header, [(deserialized_tx, tx_hash), ...]) given a
-        block and its height.'''
-        header = cls.block_header(block, height)
-        txs = cls.DESERIALIZER(block[len(header):]).read_tx_block()
-        return Block(header, txs)
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        header = cls.block_header(raw_block, height)
+        txs = cls.DESERIALIZER(raw_block[len(header):]).read_tx_block()
+        return Block(raw_block, header, txs)
 
     @classmethod
     def decimal_value(cls, value):
@@ -703,14 +702,12 @@ class FairCoin(Coin):
     ]
 
     @classmethod
-    def block_full(cls, block, height):
-        '''Returns (header, [(deserialized_tx, tx_hash), ...]) given a
-        block and its height.'''
-
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
         if height > 0:
-            return super().block_full(block, height)
+            return super().block(raw_block, height)
         else:
-            return Block(cls.block_header(block, height), [])
+            return Block(raw_block, cls.block_header(raw_block, height), [])
 
     @classmethod
     def electrum_header(cls, header, height):

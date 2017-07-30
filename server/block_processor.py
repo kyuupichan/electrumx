@@ -225,21 +225,23 @@ class BlockProcessor(server.db.DB):
         self.open_dbs()
         self.caught_up_event.set()
 
-    async def check_and_advance_blocks(self, blocks, first):
-        '''Process the list of blocks passed.  Detects and handles reorgs.'''
-        self.prefetcher.processing_blocks(blocks)
+    async def check_and_advance_blocks(self, raw_blocks, first):
+        '''Process the list of raw blocks passed.  Detects and handles
+        reorgs.
+        '''
+        self.prefetcher.processing_blocks(raw_blocks)
         if first != self.height + 1:
             # If we prefetched two sets of blocks and the first caused
             # a reorg this will happen when we try to process the
             # second.  It should be very rare.
             self.logger.warning('ignoring {:,d} blocks starting height {:,d}, '
-                                'expected {:,d}'
-                                .format(len(blocks), first, self.height + 1))
+                                'expected {:,d}'.format(len(raw_blocks), first,
+                                                        self.height + 1))
             return
 
-        blocks = [self.coin.block_full(block, first + n)
-                         for n, block in enumerate(blocks)]
-        headers = [b.header for b in blocks]
+        blocks = [self.coin.block(raw_block, first + n)
+                  for n, raw_block in enumerate(raw_blocks)]
+        headers = [block.header for block in blocks]
         hprevs = [self.coin.header_prevhash(h) for h in headers]
         chain = [self.tip] + [self.coin.header_hash(h) for h in headers[:-1]]
 
@@ -562,26 +564,26 @@ class BlockProcessor(server.db.DB):
 
         return undo_info
 
-    def backup_blocks(self, blocks):
-        '''Backup the blocks and flush.
+    def backup_blocks(self, raw_blocks):
+        '''Backup the raw blocks and flush.
 
         The blocks should be in order of decreasing height, starting at.
         self.height.  A flush is performed once the blocks are backed up.
         '''
         self.assert_flushed()
-        assert self.height >= len(blocks)
+        assert self.height >= len(raw_blocks)
 
         coin = self.coin
-        for block in blocks:
+        for raw_block in raw_blocks:
             # Check and update self.tip
-            block_full = coin.block_full(block, self.height)
-            header_hash = coin.header_hash(block_full.header)
+            block = coin.block(raw_block, self.height)
+            header_hash = coin.header_hash(block.header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} not tip {} at height {:,d}'
                                  .format(hash_to_str(header_hash),
                                          hash_to_str(self.tip), self.height))
-            self.tip = coin.header_prevhash(block_full.header)
-            self.backup_txs(block_full.transactions)
+            self.tip = coin.header_prevhash(block.header)
+            self.backup_txs(block.transactions)
             self.height -= 1
             self.tx_counts.pop()
 
