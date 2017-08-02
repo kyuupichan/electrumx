@@ -815,7 +815,7 @@ class Blackcoin(Coin):
         if version > 6:
             return super().header_hash(header)
         else:
-            return cls.HEADER_HASH(header);
+            return cls.HEADER_HASH(header)
 
 
 class Peercoin(Coin):
