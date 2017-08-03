@@ -347,7 +347,11 @@ class Bitcoin(Coin):
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
-        'electrum_abc.criptolayer.net s50012',
+        'electroncash.cascharia.com s50002',
+        'electrum-abc.criptolayer.net s50012',
+        '35.185.209.69 s t',
+        '35.197.25.235 s t',
+        'bcc.arihanc.com t52001 s52002',
     ]
 
 
