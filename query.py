@@ -56,7 +56,6 @@ def main():
         print('Address: ', addr)
         hashX = coin.address_to_hashX(addr)
 
-        n = None
         for n, (tx_hash, height) in enumerate(bp.get_history(hashX, limit)):
             print('History #{:d}: hash: {} height: {:d}'
                   .format(n + 1, hash_to_str(tx_hash), height))

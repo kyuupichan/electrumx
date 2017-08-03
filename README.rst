@@ -133,6 +133,14 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.15
+--------------
+
+- split server networks faster if a fork is detected
+- minor speedup
+- add Vertcoin support (erasmospunk)
+- update Faircoin (thokon00)
+
 Version 1.0.14
 --------------
 
