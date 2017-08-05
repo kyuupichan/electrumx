@@ -79,6 +79,7 @@ class Deserializer(object):
     def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
         self.binary = binary
+        self.binary_length = len(binary)
         self.cursor = start
 
     def read_tx(self):
@@ -132,7 +133,7 @@ class Deserializer(object):
     def _read_nbytes(self, n):
         cursor = self.cursor
         self.cursor = end = cursor + n
-        assert len(self.binary) >= end
+        assert self.binary_length >= end
         return self.binary[cursor:end]
 
     def _read_varbytes(self):
