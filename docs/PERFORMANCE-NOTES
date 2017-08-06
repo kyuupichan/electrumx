@@ -1,4 +1,4 @@
-Just some notes on performance with Python 3.5.  I am taking this into
+Just some notes on performance with Python 3.5. We are taking these into
 account in the code.
 
 - 60% faster to create lists with [] list comprehensions than tuples
@@ -16,7 +16,14 @@ account in the code.
 
 - struct.pack, struct.unpack are over 60% faster than int.to_bytes and
   int.from_bytes.  They are faster little endian (presumably because
-  it matches the host) than big endian regardless of length.
+  it matches the host) than big endian regardless of length. Furthermore,
+  using stored packing and unpacking methods from Struct classes is faster
+  than using the flexible-format struct.[un]pack equivalents.
+
+  After storing the Struct('<Q').unpack_from function as unpack_uint64_from,
+   later calls to unpack_uint64_from(b, 0) are about 30% faster than calls to
+   unpack_from('<Q', b, 0).
+
 
 - single-item list and tuple unpacking.  Suppose b = (1, )
 
@@ -24,3 +31,6 @@ account in the code.
            and about 45% faster than a = b[0]
 
 - multiple assignment is faster using tuples only for 3 or more items
+
+- retrieving a previously stored length of a bytes object can be over 200%
+  faster than a new call to len(b)
