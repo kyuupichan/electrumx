@@ -1,13 +1,12 @@
 # Tests of server/env.py
-
 import os
 import random
+from asyncio import AbstractEventLoopPolicy
 
 import pytest
 
-from server.env import Env, NetIdentity
 import lib.coins as lib_coins
-
+from server.env import Env, NetIdentity
 
 BASE_DAEMON_URL = 'http://username:password@hostname:321/'
 BASE_DB_DIR = '/some/dir'
@@ -280,3 +279,29 @@ def test_tor_identity():
     assert ident.host == tor_host
     assert ident.tcp_port == 234
     assert ident.ssl_port == 432
+
+
+class _GoodEventLoopPolicy(AbstractEventLoopPolicy):
+    pass
+
+
+class _BadEventLoopPolicy:
+    pass
+
+
+def test_event_loop_policy():
+    os.environ['EVENT_LOOP_POLICY'] = "{}._BadEventLoopPolicy".format(__name__)
+    with pytest.raises(Env.Error):
+        e = Env()
+
+    os.environ['EVENT_LOOP_POLICY'] = "a.bogus.policy.that.doesnt.Exist"
+    with pytest.raises(Env.Error):
+        e = Env()
+
+    os.environ.pop('EVENT_LOOP_POLICY')
+    e = Env()
+    assert e.loop_policy is None
+
+    os.environ['EVENT_LOOP_POLICY'] = "{}._GoodEventLoopPolicy".format(__name__)
+    e = Env()
+    assert callable(e.loop_policy)
