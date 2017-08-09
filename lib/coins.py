@@ -907,7 +907,7 @@ class Monacoin(Coin):
     RPC_PORT = 9402
     REORG_LIMIT = 1000
 
-class Crown(CoinAuxPow):
+class Crown(AuxPowMixin, Coin):
     NAME = "Crown"
     SHORTNAME = "CRW"
     NET = "mainnet"
