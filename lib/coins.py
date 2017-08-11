@@ -906,3 +906,19 @@ class Monacoin(Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 9402
     REORG_LIMIT = 1000
+
+class Crown(AuxPowMixin, Coin):
+    NAME = "Crown"
+    SHORTNAME = "CRW"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("00")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('0000000085370d5e122f64f4ab19c686'
+                    '14ff3df78c8d13cb814fd7e69a1dc6da')
+    TX_COUNT = 13336629
+    TX_COUNT_HEIGHT = 1268206
+    TX_PER_BLOCK = 10
+    RPC_PORT = 9341
