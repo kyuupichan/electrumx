@@ -906,6 +906,11 @@ class Monacoin(Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 9402
     REORG_LIMIT = 1000
+    PEERS = [
+        'electrumx.tamami-foundation.org s t',
+        'electrumx1.movsign.info t',
+        'electrumx2.movsign.info t',
+    ]
 
 class Crown(AuxPowMixin, Coin):
     NAME = "Crown"
