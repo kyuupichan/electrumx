@@ -272,6 +272,15 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
+class FujiDaemon(Daemon):
+    async def estimatefee(self, params):
+        '''Return the fee estimate for the given parameters.'''
+        return 0.001
+
+    async def relayfee(self):
+        '''The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool.'''
+        return 0.001
 
 class LegacyRPCDaemon(Daemon):
     '''Handles connections to a daemon at the given URL.
