@@ -272,6 +272,18 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
+class FujiDaemon(Daemon):
+    '''This is a measure against coin daemon which does not have the 'estimatefee' command.
+    When the electrum is in 'Use dynamic fees' mode, the estimatefee does not return from electrum-X, so the user can not remit money.
+    See class Fujicoin() in lib/coins.py for usage.'''
+    async def estimatefee(self, params):
+        '''Return the fee estimate for the given parameters.'''
+        return 0.001
+
+    async def relayfee(self):
+        '''The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool.'''
+        return 0.001
 
 class LegacyRPCDaemon(Daemon):
     '''Handles connections to a daemon at the given URL.

@@ -42,7 +42,7 @@ from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
     DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
-from server.daemon import Daemon, DashDaemon, LegacyRPCDaemon
+from server.daemon import Daemon, DashDaemon, LegacyRPCDaemon, FujiDaemon
 from server.session import ElectrumX, DashElectrumX
 
 
@@ -927,3 +927,22 @@ class Crown(AuxPowMixin, Coin):
     TX_COUNT_HEIGHT = 1268206
     TX_PER_BLOCK = 10
     RPC_PORT = 9341
+
+class Fujicoin(Coin):
+    NAME = "Fujicoin"
+    SHORTNAME = "FJC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("24")
+    P2SH_VERBYTES = [bytes.fromhex("10")]
+    WIF_BYTE = bytes.fromhex("a4")
+    GENESIS_HASH = ('adb6d9cfd74075e7f91608add4bd2a2e'
+                    'a636f70856183086842667a1597714a0')
+#    DESERIALIZER = DeserializerSegWit
+    DAEMON = FujiDaemon
+    TX_COUNT = 170478
+    TX_COUNT_HEIGHT = 1521676
+    TX_PER_BLOCK = 1
+    RPC_PORT = 3776
+#    REORG_LIMIT = 1000
