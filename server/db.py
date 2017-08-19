@@ -315,7 +315,7 @@ class DB(util.LoggedClass):
                 genesis_hash = genesis_hash.decode()
             if genesis_hash != self.coin.GENESIS_HASH:
                 raise self.DBError('DB genesis hash {} does not match coin {}'
-                                   .format(state['genesis_hash'],
+                                   .format(genesis_hash,
                                            self.coin.GENESIS_HASH))
             self.db_height = state['height']
             self.db_tx_count = state['tx_count']
