@@ -560,9 +560,11 @@ class PeerManager(util.LoggedClass):
             create_connection = self.proxy.create_connection
         else:
             create_connection = self.loop.create_connection
+            
+        local_addr = (self.env.host, None) if self.env.host else None    
 
         protocol_factory = partial(PeerSession, peer, self, kind)
-        coro = create_connection(protocol_factory, peer.host, port, ssl=sslc)
+        coro = create_connection(protocol_factory, peer.host, port, ssl=sslc, local_addr=local_addr)
         callback = partial(self.connection_done, peer, port_pairs)
         self.ensure_future(coro, callback)
 
