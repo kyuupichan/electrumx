@@ -198,7 +198,8 @@ class Controller(util.LoggedClass):
     async def main_loop(self):
         '''Controller main loop.'''
         if self.env.rpc_port is not None:
-            await self.start_server('RPC', None, self.env.rpc_port)
+            await self.start_server('RPC', ('127.0.0.1', '::1'),
+                                    self.env.rpc_port)
         self.ensure_future(self.bp.main_loop())
         self.ensure_future(self.wait_for_bp_catchup())
 
