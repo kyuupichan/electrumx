@@ -224,7 +224,7 @@ class SocksProxy(util.LoggedClass):
         self.logger.info('detected proxy at {} ({})'
                          .format(util.address_string(paddress), self.ip_addr))
 
-    async def create_connection(self, protocol_factory, host, port, ssl=None):
+    async def create_connection(self, protocol_factory, host, port, **kwargs):
         '''All arguments are as to asyncio's create_connection method.'''
         try:
             sock = await self.connect_via_proxy(host, port)
@@ -236,6 +236,6 @@ class SocksProxy(util.LoggedClass):
                 self.set_lost()
             raise
 
-        hostname = host if ssl else None
+        hostname = host if kwargs.get('ssl') else None
         return await self.loop.create_connection(
-            protocol_factory, ssl=ssl, sock=sock, server_hostname=hostname)
+            protocol_factory, sock=sock, server_hostname=hostname, **kwargs)
