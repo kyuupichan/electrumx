@@ -333,6 +333,22 @@ class Bitcoin(Coin):
     TX_PER_BLOCK = 1800
     RPC_PORT = 8332
     PEERS = [
+        'electroncash.bitcoinplug.com s t',
+        'electrum-abc.criptolayer.net s50012',
+        'electroncash.cascharia.com s50002',
+        'bcc.arihanc.com t52001 s52002',
+        'mash.1209l.com s t',
+        'bch.kokx.org s t',
+        'abc.vom-stausee.de t52001 s52002',
+        'abc1.hsmiths.com t60001 s60002',
+    ]
+
+
+class BitcoinSegwit(Bitcoin):
+    NET = "bitcoin-segwit"
+    DESERIALIZER = DeserializerSegWit
+
+    PEERS = [
         'btc.smsys.me s995',
         'electrum.be s t',
         'ELECTRUM.not.fyi p1000 s t',
@@ -347,18 +363,7 @@ class Bitcoin(Coin):
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
-        'electroncash.cascharia.com s50002',
-        'electrum-abc.criptolayer.net s50012',
-        '35.185.209.69 s t',
-        '35.197.25.235 s t',
-        'bcc.arihanc.com t52001 s52002',
     ]
-
-
-class BitcoinSegwit(Bitcoin):
-    NET = "bitcoin-segwit"
-    DESERIALIZER = DeserializerSegWit
-
 
 class BitcoinTestnet(Bitcoin):
     SHORTNAME = "XTN"
