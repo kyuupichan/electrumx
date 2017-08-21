@@ -136,6 +136,9 @@ ChangeLog
 Version 1.0.16
 --------------
 
+- updated server lists for post-fork.  If you are on the Segwit chain
+  you should have NET be "bitcoin-segwit", and if on the Bitcoin Cash chain
+  continue to use "mainnet".
 - binding address fix for multi-homed machines (mmouse)
 - listen to IPv4 and IPv6 local interfaces
 - add Fujicoin (fujicoin), Crown (Extreemist), RegTest (RCasatta),

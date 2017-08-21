@@ -341,6 +341,8 @@ class Bitcoin(Coin):
         'bch.kokx.org s t',
         'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
+        'ELECTRUM.not.fyi p1000 s t',
+        'electrum.hsmiths.com s t',
     ]
 
 
