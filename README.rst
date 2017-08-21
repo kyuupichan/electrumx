@@ -133,6 +133,11 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.0.17
+--------------
+
+- fix #227 introduced in 1.0.16
+
 Version 1.0.16
 --------------
 
