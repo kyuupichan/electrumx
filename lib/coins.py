@@ -341,7 +341,7 @@ class Bitcoin(Coin):
         'bch.kokx.org s t',
         'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
-        'ELECTRUM.not.fyi p1000 s t',
+        'ELECTRUMX.not.fy s t',
         'electrum.hsmiths.com s t',
     ]
 
@@ -353,7 +353,7 @@ class BitcoinSegwit(Bitcoin):
     PEERS = [
         'btc.smsys.me s995',
         'electrum.be s t',
-        'ELECTRUM.not.fyi p1000 s t',
+        'ELECTRUMX.not.fyi s t',
         'electrum.vom-stausee.de s t',
         'electrum3.hachre.de p10000 s t',
         'electrum.hsmiths.com s t',
