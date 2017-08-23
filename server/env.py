@@ -32,7 +32,7 @@ class Env(lib_util.LoggedClass):
         self.db_dir = self.required('DB_DIRECTORY')
         self.daemon_url = self.required('DAEMON_URL')
         coin_name = self.default('COIN', 'Bitcoin')
-        network = self.default('NET', 'mainnet')
+        network = self.default('NET', 'bitcoin-cash')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.cache_MB = self.integer('CACHE_MB', 1200)
         self.host = self.default('HOST', 'localhost')
