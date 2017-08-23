@@ -65,7 +65,7 @@ class Coin(object):
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
-    DESERIALIZER = Deserializer
+    DESERIALIZER = DeserializerSegWit
     DAEMON = Daemon
     BLOCK_PROCESSOR = BlockProcessor
     XPUB_VERBYTES = bytes('????', 'utf-8')
@@ -320,7 +320,7 @@ class AuxPowMixin(object):
 class Bitcoin(Coin):
     NAME = "Bitcoin"
     SHORTNAME = "BTC"
-    NET = "mainnet"
+    NET = "bitcoin-segwit"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("00")
@@ -332,6 +332,12 @@ class Bitcoin(Coin):
     TX_COUNT_HEIGHT = 464000
     TX_PER_BLOCK = 1800
     RPC_PORT = 8332
+
+class BitcoinCash(Bitcoin):
+    SHORTNAME = "BCH"
+    NET = "bitcoin-cash"
+    DESERIALIZER = Deserializer
+
     PEERS = [
         'electroncash.bitcoinplug.com s t',
         'electrum-abc.criptolayer.net s50012',
@@ -345,11 +351,7 @@ class Bitcoin(Coin):
         'electrum.hsmiths.com s t',
     ]
 
-
 class BitcoinSegwit(Bitcoin):
-    NET = "bitcoin-segwit"
-    DESERIALIZER = DeserializerSegWit
-
     PEERS = [
         'btc.smsys.me s995',
         'electrum.be s t',
@@ -369,7 +371,6 @@ class BitcoinSegwit(Bitcoin):
 
 class BitcoinTestnet(Bitcoin):
     SHORTNAME = "XTN"
-    NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
@@ -392,6 +393,13 @@ class BitcoinTestnet(Bitcoin):
         'ELEX05.blackpole.online t52001 s52002',
     ]
 
+class BitcoinTestnetCash(BitcoinTestnet):
+    NET = "testnet-cash"
+    DESERIALIZER = Deserializer
+
+class BitcoinTestnetSegwit(BitcoinTestnet):
+    NET = "testnet-segwit"
+
 
 class BitcoinRegtest(BitcoinTestnet):
     NET = "regtest"
@@ -400,24 +408,12 @@ class BitcoinRegtest(BitcoinTestnet):
     PEERS= []
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
-    DESERIALIZER = DeserializerSegWit
-
-
-class BitcoinTestnetSegWit(BitcoinTestnet):
-    '''Bitcoin Testnet for Core bitcoind >= 0.13.1.
-
-    Unfortunately 0.13.1 broke backwards compatibility of the RPC
-    interface's TX serialization, SegWit transactions serialize
-    differently than with earlier versions.  If you are using such a
-    bitcoind on testnet, you must use this class as your "COIN".
-    '''
-    NET = "testnet-segwit"
-    DESERIALIZER = DeserializerSegWit
 
 
 class BitcoinNolnet(Bitcoin):
     '''Bitcoin Unlimited nolimit testnet.'''
 
+    COIN = "BitcoinNolnet"
     NET = "nolnet"
     GENESIS_HASH = ('0000000057e31bd2066c939a63b7b862'
                     '3bd0f10d8c001304bdfc1a7902ae6d35')

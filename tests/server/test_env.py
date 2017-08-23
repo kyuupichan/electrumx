@@ -77,11 +77,12 @@ def test_COIN_NET():
     '''Test COIN and NET defaults and redirection.'''
     setup_base_env()
     e = Env()
-    assert e.coin == lib_coins.Bitcoin
-    os.environ['NET'] = 'testnet'
+    assert e.coin == lib_coins.BitcoinCash
+    os.environ['NET'] = 'testnet-cash'
     e = Env()
-    assert e.coin == lib_coins.BitcoinTestnet
+    assert e.coin == lib_coins.BitcoinTestnetCash
     os.environ.pop('NET')
+    os.environ['NET'] = 'mainnet'
     os.environ['COIN'] = 'Litecoin'
     e = Env()
     assert e.coin == lib_coins.Litecoin
