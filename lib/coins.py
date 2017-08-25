@@ -918,6 +918,7 @@ class Monacoin(Coin):
         'electrumx2.movsign.info t',
     ]
 
+
 class Crown(AuxPowMixin, Coin):
     NAME = "Crown"
     SHORTNAME = "CRW"
@@ -925,7 +926,7 @@ class Crown(AuxPowMixin, Coin):
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("00")
-    P2SH_VERBYTES = [bytes.fromhex("05")]
+    P2SH_VERBYTES = [bytes.fromhex("1c")]
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('0000000085370d5e122f64f4ab19c686'
                     '14ff3df78c8d13cb814fd7e69a1dc6da')
@@ -933,6 +934,8 @@ class Crown(AuxPowMixin, Coin):
     TX_COUNT_HEIGHT = 1268206
     TX_PER_BLOCK = 10
     RPC_PORT = 9341
+    REORG_LIMIT = 1000
+
 
 class Fujicoin(Coin):
     NAME = "Fujicoin"
@@ -952,4 +955,4 @@ class Fujicoin(Coin):
     TX_COUNT_HEIGHT = 1521676
     TX_PER_BLOCK = 1
     RPC_PORT = 3776
-#    REORG_LIMIT = 1000
+    REORG_LIMIT = 1000
