@@ -42,7 +42,8 @@ from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
     DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
-from server.daemon import Daemon, DashDaemon, LegacyRPCDaemon, FujiDaemon
+from server.daemon import Daemon, DashDaemon, LegacyRPCDaemon,\
+    FakeEstimateFeeDaemon
 from server.session import ElectrumX, DashElectrumX
 
 
@@ -944,8 +945,9 @@ class Fujicoin(Coin):
     WIF_BYTE = bytes.fromhex("a4")
     GENESIS_HASH = ('adb6d9cfd74075e7f91608add4bd2a2e'
                     'a636f70856183086842667a1597714a0')
-#    DESERIALIZER = DeserializerSegWit
-    DAEMON = FujiDaemon
+    ESTIMATE_FEE = 0.001
+    RELAY_FEE = 0.001
+    DAEMON = FakeEstimateFeeDaemon
     TX_COUNT = 170478
     TX_COUNT_HEIGHT = 1521676
     TX_PER_BLOCK = 1

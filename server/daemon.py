@@ -34,8 +34,9 @@ class Daemon(util.LoggedClass):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, urls):
+    def __init__(self, coin, urls):
         super().__init__()
+        self.coin = coin
         self.set_urls(urls)
         self._height = None
         self._mempool_hashes = set()
@@ -272,18 +273,17 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
-class FujiDaemon(Daemon):
-    '''This is a measure against coin daemon which does not have the 'estimatefee' command.
-    When the electrum is in 'Use dynamic fees' mode, the estimatefee does not return from electrum-X, so the user can not remit money.
-    See class Fujicoin() in lib/coins.py for usage.'''
+class FakeEstimateFeeDaemon(Daemon):
+    '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that
+    wants to use this daemon must define ESTIMATE_FEE & RELAY_FEE'''
     async def estimatefee(self, params):
         '''Return the fee estimate for the given parameters.'''
-        return 0.001
+        return self.coin.ESTIMATE_FEE
 
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
-        return 0.001
+        return self.coin.RELAY_FEE
 
 class LegacyRPCDaemon(Daemon):
     '''Handles connections to a daemon at the given URL.
@@ -297,7 +297,7 @@ class LegacyRPCDaemon(Daemon):
 
     async def raw_blocks(self, hex_hashes):
         '''Return the raw binary blocks with the given hex hashes.'''
-        params_iterable = ((h, False) for h in hex_hashes)
+        params_iterable = ((h, ) for h in hex_hashes)
         block_info = await self._send_vector('getblock', params_iterable)
 
         blocks = []
