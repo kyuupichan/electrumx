@@ -2,11 +2,8 @@
 Electrum Protocol
 =================
 
-Until now there was no written specification of the Electrum protocol
-that I am aware of; this document is an attempt to fill that gap.  It
-is intended to be a reference for client and server authors alike.
-[Since writing this I learnt there has been a skeleton protocol
-description on docs.github.io].
+This is intended to be a reference for client and server authors
+alike.
 
 I have attempted to ensure what is written is correct for the three
 known server implementations: electrum-server, jelectrum and
@@ -633,7 +630,7 @@ server.version
 Identify the client and inform the server the range of understood
 protocol versions.
 
-  server.version(**client_name**, **protocol_version** = ["1.1", "1,1"])
+  server.version(**client_name**, **protocol_version** = ["1.1", "1.1"])
 
 **client_name**
 
@@ -641,7 +638,7 @@ protocol versions.
 
 **protocol_verion**
 
-  Optional with default value ["1.1", "1,1"].
+  Optional with default value ["1.1", "1.1"].
 
   It must be a pair [`protocol_min`, `protocol_max`], each of which is
   a string.
@@ -730,6 +727,13 @@ Get a list of features and services supported by the server.
   The hash of the genesis block.  This is used to detect if a peer is
   connected to one serving a different network.
 
+* **hash_function**
+
+  The hash function the server uses for script hashing.  The client
+  must use this function to hash scripts to produce script hashes to
+  send to the server.  The default is "sha256".  "sha256" is currently
+  the only acceptable value.
+
 * **server_version**
 
   A string that identifies the server software.  Should be the same as
@@ -758,7 +762,8 @@ Get a list of features and services supported by the server.
       "protocol_max": "1.0",
       "protocol_min": "1.0",
       "pruning": null,
-      "server_version": "ElectrumX 1.0.1"
+      "server_version": "ElectrumX 1.0.17",
+      "hash_function": "sha256"
   }
 
 .. _JSON RPC 1.0: http://json-rpc.org/wiki/specification

@@ -42,6 +42,7 @@ def peers_from_env(env):
         'protocol_min': version.PROTOCOL_MIN,
         'protocol_max': version.PROTOCOL_MAX,
         'genesis_hash': env.coin.GENESIS_HASH,
+        'hash_function': 'sha256',
     }
 
     return [Peer(ident.host, features, 'env') for ident in env.identities]
