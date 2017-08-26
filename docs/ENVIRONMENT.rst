@@ -105,6 +105,15 @@ These environment variables are optional:
   to blank.  The default is appropriate for **COIN** and **NET**
   (e.g., 8000 for Bitcoin mainnet) if not set.
 
+* **EVENT_LOOP_POLICY**
+
+  Python path to an asyncio event loop policy class. The policy determines
+  what event loop implementation will be used to initiate and respond to
+  networking events.
+
+  For example, this can be used to employ uvloop if it is installed by
+  setting it to `uvloop.EventLoopPolicy`
+
 * **DONATION_ADDRESS**
 
   The server donation address reported to Electrum clients.  Defaults

@@ -36,6 +36,13 @@ def main_loop():
         raise RuntimeError('DO NOT RUN AS ROOT! Create an unprivileged user '
                            'account and use that')
 
+    env = Env()
+
+    policy = env.loop_policy
+    if policy is not None:
+        logging.info("Using event loop policy {}.".format(policy))
+        asyncio.set_event_loop_policy(policy())
+
     loop = asyncio.get_event_loop()
     # loop.set_debug(True)
 
@@ -53,7 +60,7 @@ def main_loop():
                     'accept_connection2()' in repr(context.get('task'))):
                 loop.default_exception_handler(context)
 
-    controller = Controller(Env())
+    controller = Controller(env)
     future = asyncio.ensure_future(controller.main_loop())
 
     # Install signal handlers

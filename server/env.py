@@ -8,8 +8,10 @@
 '''Class for handling environment configuration and defaults.'''
 
 
+import asyncio
 import resource
 from collections import namedtuple
+from importlib import import_module
 from ipaddress import ip_address
 from os import environ
 
@@ -37,6 +39,7 @@ class Env(lib_util.LoggedClass):
         self.cache_MB = self.integer('CACHE_MB', 1200)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
+        self.loop_policy = self.lookup_loop_policy()
         # Server stuff
         self.tcp_port = self.integer('TCP_PORT', None)
         self.ssl_port = self.integer('SSL_PORT', None)
@@ -118,6 +121,40 @@ class Env(lib_util.LoggedClass):
         if bad:
             raise self.Error('remove obsolete environment variables {}'
                              .format(bad))
+
+    def lookup_loop_policy(self):
+        constructor_path = self.default('EVENT_LOOP_POLICY', None)
+        if constructor_path is None:
+            return None
+
+        module_path, constructor_name = constructor_path.rsplit(".", 1)
+        try:
+            policy_module = import_module(module_path)
+        except ImportError as e:
+            raise self.Error(
+                "Package or module path {} for EVENT_LOOP_POLICY not found or "
+                "not importable.".format(module_path)
+            ) from e
+        except TypeError as e:
+            raise self.Error(
+                "Path {} for EVENT_LOOP_POLICY not a module.".format(
+                    module_path
+                )
+            ) from e
+
+        policy_constructor = getattr(policy_module, constructor_name, None)
+        if policy_constructor is None:
+            raise self.Error(
+                "EVENT_LOOP_POLICY constructor {} not found in {}.".format(
+                    constructor_name, module_path
+                )
+            )
+        if not issubclass(policy_constructor, asyncio.AbstractEventLoopPolicy):
+            raise self.Error(
+                "EVENT_LOOP_POLICY {} doesn't implement "
+                "AbstractEventLoopPolicy.".format(constructor_name)
+            )
+        return policy_constructor
 
     def clearnet_identity(self):
         host = self.default('REPORT_HOST', None)
