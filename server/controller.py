@@ -47,7 +47,8 @@ class Controller(util.LoggedClass):
         self.loop.set_default_executor(self.executor)
         self.start_time = time.time()
         self.coin = env.coin
-        self.daemon = self.coin.DAEMON(env.coin.daemon_urls(env.daemon_url))
+        self.daemon = self.coin.DAEMON(self.coin,
+                                       env.coin.daemon_urls(env.daemon_url))
         self.bp = self.coin.BLOCK_PROCESSOR(env, self, self.daemon)
         self.mempool = MemPool(self.bp, self)
         self.peer_mgr = PeerManager(env, self)
