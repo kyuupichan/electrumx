@@ -8,7 +8,9 @@
 import asyncio
 import json
 import os
+import signal
 import ssl
+import sys
 import time
 import traceback
 from bisect import bisect_left
@@ -37,12 +39,29 @@ class Controller(util.LoggedClass):
 
     BANDS = 5
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
+    SUPPRESS_MESSAGES = [
+        'Fatal read error on socket transport',
+        'Fatal write error on socket transport',
+    ]
 
     def __init__(self, env):
         super().__init__()
+
+        # Sanity checks
+        if sys.version_info < (3, 5, 3):
+            raise RuntimeError('Python >= 3.5.3 is required to run ElectrumX')
+
+        if os.geteuid() == 0:
+            raise RuntimeError('DO NOT RUN AS ROOT! Create an unprivileged '
+                               'user account and use that')
+
+        # Set the event loop policy before doing anything asyncio
+        self.logger.info('event loop policy: {}'.format(env.loop_policy))
+        asyncio.set_event_loop_policy(env.loop_policy)
+        self.loop = asyncio.get_event_loop()
+
         # Set this event to cleanly shutdown
         self.shutdown_event = asyncio.Event()
-        self.loop = asyncio.get_event_loop()
         self.executor = ThreadPoolExecutor()
         self.loop.set_default_executor(self.executor)
         self.start_time = time.time()
@@ -872,3 +891,32 @@ class Controller(util.LoggedClass):
     def donation_address(self):
         '''Return the donation address as a string, empty if there is none.'''
         return self.env.donation_address
+
+    # Signal, exception handlers.
+
+    def on_signal(self, signame):
+        '''Call on receipt of a signal to cleanly shutdown.'''
+        self.logger.warning('received {} signal, initiating shutdown'
+                            .format(signame))
+        self.initiate_shutdown()
+
+    def on_exception(self, loop, context):
+        '''Suppress spurious messages it appears we cannot control.'''
+        message = context.get('message')
+        if message not in self.SUPPRESS_MESSAGES:
+            if not ('task' in context and
+                    'accept_connection2()' in repr(context.get('task'))):
+                loop.default_exception_handler(context)
+
+    def run(self):
+        # Install signal handlers and exception handler
+        loop = self.loop
+        for signame in ('SIGINT', 'SIGTERM'):
+            loop.add_signal_handler(getattr(signal, signame),
+                                    partial(self.on_signal, signame))
+        loop.set_exception_handler(self.on_exception)
+
+        # Run the main loop to completion
+        future = asyncio.ensure_future(self.main_loop())
+        loop.run_until_complete(future)
+        loop.close()

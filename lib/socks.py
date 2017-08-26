@@ -136,7 +136,7 @@ class Socks(util.LoggedClass):
 
 class SocksProxy(util.LoggedClass):
 
-    def __init__(self, host, port, loop=None):
+    def __init__(self, host, port, loop):
         '''Host can be an IPv4 address, IPv6 address, or a host name.
         Port can be None, in which case one is auto-detected.'''
         super().__init__()
@@ -147,7 +147,7 @@ class SocksProxy(util.LoggedClass):
         self.ip_addr = None
         self.lost_event = asyncio.Event()
         self.tried_event = asyncio.Event()
-        self.loop = loop or asyncio.get_event_loop()
+        self.loop = loop
         self.set_lost()
 
     async def auto_detect_loop(self):

@@ -105,6 +105,14 @@ These environment variables are optional:
   to blank.  The default is appropriate for **COIN** and **NET**
   (e.g., 8000 for Bitcoin mainnet) if not set.
 
+* **EVENT_LOOP_POLICY**
+
+  The name of an event loop policy to replace the default asyncio
+  policy, if any.  At present only `uvloop` is accepted, in which case
+  you must have installed the `uvloop`_ Python package.
+
+  If you are not sure what this means leave it unset.
+
 * **DONATION_ADDRESS**
 
   The server donation address reported to Electrum clients.  Defaults
@@ -372,3 +380,4 @@ your available physical RAM:
   variables is roughly equivalent.
 
 .. _lib/coins.py: https://github.com/kyuupichan/electrumx/blob/master/lib/coins.py
+.. _uvloop: https://pypi.python.org/pypi/uvloop

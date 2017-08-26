@@ -158,6 +158,19 @@ def test_BANNER_FILE():
     assert e.banner_file == 'banner_file'
     assert e.tor_banner_file == 'tor_banner_file'
 
+def test_EVENT_LOOP_POLICY():
+    e = Env()
+    assert e.loop_policy is None
+    os.environ['EVENT_LOOP_POLICY'] = 'foo'
+    with pytest.raises(Env.Error):
+        Env()
+    os.environ['EVENT_LOOP_POLICY'] = 'uvloop'
+    try:
+        Env()
+    except ImportError:
+        pass
+    del os.environ['EVENT_LOOP_POLICY']
+
 def test_ANON_LOGS():
     assert_boolean('ANON_LOGS', 'anon_logs', False)
 
