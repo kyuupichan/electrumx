@@ -42,8 +42,7 @@ from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
     DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
-from server.daemon import Daemon, DashDaemon, LegacyRPCDaemon,\
-    FakeEstimateFeeDaemon
+import server.daemon as daemon
 from server.session import ElectrumX, DashElectrumX
 
 
@@ -67,7 +66,7 @@ class Coin(object):
     STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
     DESERIALIZER = Deserializer
-    DAEMON = Daemon
+    DAEMON = daemon.Daemon
     BLOCK_PROCESSOR = BlockProcessor
     XPUB_VERBYTES = bytes('????', 'utf-8')
     XPRV_VERBYTES = bytes('????', 'utf-8')
@@ -612,7 +611,7 @@ class Dash(Coin):
         'wl4sfwq2hwxnodof.onion s t',
     ]
     SESSIONCLS = DashElectrumX
-    DAEMON = DashDaemon
+    DAEMON = daemon.DashDaemon
 
     @classmethod
     def header_hash(cls, header):
@@ -814,7 +813,7 @@ class Blackcoin(Coin):
     GENESIS_HASH = ('000001faef25dec4fbcf906e6242621d'
                     'f2c183bf232f263d0ba5b101911e4563')
     DESERIALIZER = DeserializerTxTime
-    DAEMON = LegacyRPCDaemon
+    DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 4594999
     TX_COUNT_HEIGHT = 1667070
     TX_PER_BLOCK = 3
@@ -848,7 +847,7 @@ class Peercoin(Coin):
     GENESIS_HASH = ('0000000032fe677166d54963b62a4677'
                     'd8957e87c508eaa4fd7eb1c880cd27e3')
     DESERIALIZER = DeserializerTxTime
-    DAEMON = LegacyRPCDaemon
+    DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 1207356
     TX_COUNT_HEIGHT = 306425
     TX_PER_BLOCK = 4
@@ -950,7 +949,7 @@ class Fujicoin(Coin):
                     'a636f70856183086842667a1597714a0')
     ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.001
-    DAEMON = FakeEstimateFeeDaemon
+    DAEMON = daemon.FakeEstimateFeeDaemon
     TX_COUNT = 170478
     TX_COUNT_HEIGHT = 1521676
     TX_PER_BLOCK = 1

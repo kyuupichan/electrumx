@@ -34,10 +34,10 @@ class Daemon(util.LoggedClass):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, coin, urls):
+    def __init__(self, env):
         super().__init__()
-        self.coin = coin
-        self.set_urls(urls)
+        self.coin = env.coin
+        self.set_urls(env.coin.daemon_urls(env.daemon_url))
         self._height = None
         self._mempool_hashes = set()
         self.mempool_refresh_event = asyncio.Event()
@@ -264,7 +264,9 @@ class Daemon(util.LoggedClass):
         If the daemon has not been queried yet this returns None.'''
         return self._height
 
+
 class DashDaemon(Daemon):
+
     async def masternode_broadcast(self, params):
         '''Broadcast a transaction to the network.'''
         return await self._send_single('masternodebroadcast', params)
@@ -273,9 +275,11 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
+
 class FakeEstimateFeeDaemon(Daemon):
     '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that
     wants to use this daemon must define ESTIMATE_FEE & RELAY_FEE'''
+
     async def estimatefee(self, params):
         '''Return the fee estimate for the given parameters.'''
         return self.coin.ESTIMATE_FEE
@@ -285,6 +289,7 @@ class FakeEstimateFeeDaemon(Daemon):
         to the daemon's memory pool.'''
         return self.coin.RELAY_FEE
 
+
 class LegacyRPCDaemon(Daemon):
     '''Handles connections to a daemon at the given URL.
 
@@ -293,7 +298,6 @@ class LegacyRPCDaemon(Daemon):
     recreate the block bytes. The recreated block bytes may not be the exact
     as in the underlying blockchain but it is good enough for our indexing
     purposes.'''
-
 
     async def raw_blocks(self, hex_hashes):
         '''Return the raw binary blocks with the given hex hashes.'''
@@ -340,4 +344,6 @@ class LegacyRPCDaemon(Daemon):
         return raw_block
 
     def timestamp_safe(self, t):
-        return t if isinstance(t, int) else timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
+        if isinstance(t, int):
+            return t
+        return timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
