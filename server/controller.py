@@ -99,6 +99,7 @@ class Controller(util.LoggedClass):
             ('blockchain',
              'address.get_balance address.get_history address.get_mempool '
              'address.get_proof address.listunspent '
+             'scripthash.get_history '
              'block.get_header estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
             ('server', 'donation_address'),
@@ -804,6 +805,11 @@ class Controller(util.LoggedClass):
     async def address_get_history(self, address):
         '''Return the confirmed and unconfirmed history of an address.'''
         hashX = self.address_to_hashX(address)
+        return await self.confirmed_and_unconfirmed_history(hashX)
+
+    async def scripthash_get_history(self, script_hash):
+        '''Return the confirmed and unconfirmed history of an address.'''
+        hashX = self.script_hash_to_hashX(script_hash)
         return await self.confirmed_and_unconfirmed_history(hashX)
 
     async def address_get_mempool(self, address):

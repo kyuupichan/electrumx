@@ -35,7 +35,7 @@ class SessionBase(JSONSession):
         self.daemon = self.bp.daemon
         self.client = 'unknown'
         self.client_version = (1, )
-        self.protocol_version = '1.0'
+        self.protocol_version = '1.1'
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
         self.txs_sent = 0
@@ -118,7 +118,7 @@ class ElectrumX(SessionBase):
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.numblocks.subscribe': self.numblocks_subscribe,
-            'blockchain.script_hash.subscribe': self.script_hash_subscribe,
+            'blockchain.scripthash.subscribe': self.script_hash_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
@@ -164,7 +164,7 @@ class ElectrumX(SessionBase):
 
         for alias_status in changed:
             if len(alias_status[0]) == 64:
-                method = 'blockchain.script_hash.subscribe'
+                method = 'blockchain.scripthash.subscribe'
             else:
                 method = 'blockchain.address.subscribe'
             pairs.append((method, alias_status))
