@@ -967,7 +967,6 @@ class Neblio(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('7286972be4dbc1463d256049b7471c25'
                     '2e6557e222cab9be73181d359cd28bcc')
-    DAEMON = daemon.LegacyRPCDaemon
     DESERIALIZER = DeserializerTxTime
     TX_COUNT = 23675
     TX_COUNT_HEIGHT = 22785
