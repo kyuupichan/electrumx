@@ -955,3 +955,35 @@ class Fujicoin(Coin):
     TX_PER_BLOCK = 1
     RPC_PORT = 3776
     REORG_LIMIT = 1000
+
+class Neblio(Coin):
+    NAME = "Neblio"
+    SHORTNAME = "NEBL"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("35")
+    P2SH_VERBYTES = [bytes.fromhex("70")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('7286972be4dbc1463d256049b7471c25'
+                    '2e6557e222cab9be73181d359cd28bcc')
+    DESERIALIZER = DeserializerTxTime
+    TX_COUNT = 23675
+    TX_COUNT_HEIGHT = 22785
+    TX_PER_BLOCK = 1
+    RPC_PORT = 6326
+    REORG_LIMIT = 1000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
