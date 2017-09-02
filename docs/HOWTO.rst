@@ -394,6 +394,19 @@ need to run your server with a different server name and a new
 certificate.  Therefore it's a good idea to make an offline backup
 copy of your certificate and key in case you need to restore them.
 
+Running on a privileged port
+============================
+
+You may choose to run electrumx on a different port than 50001 / 50002.
+If you choose a privileged port ( < 1024 ) it makes sense to make use of a iptables NAT rule.
+
+An example, which will forward Port 110 to the internal port 50002 follows:
+
+    iptables -t nat -A PREROUTING -p tcp --dport 110 -j DNAT --to-destination 127.0.0.1:50002
+
+You can then set the port as follows and advertise the service externally on the privileged port
+    REPORT_SSL_PORT=110
+
 
 .. _`ENVIRONMENT.rst`: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _`contrib/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/contrib/systemd/electrumx.service
