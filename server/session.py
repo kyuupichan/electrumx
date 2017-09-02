@@ -13,6 +13,7 @@ from functools import partial
 
 from lib.hash import sha256, hash_to_str
 from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2, JSONRPC
+import lib.util as util
 from server.daemon import DaemonError
 import server.version as version
 
@@ -35,7 +36,6 @@ class SessionBase(JSONSession):
         self.daemon = self.bp.daemon
         self.client = 'unknown'
         self.client_version = (1, )
-        self.protocol_version = '1.0'
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
         self.txs_sent = 0
@@ -113,19 +113,7 @@ class ElectrumX(SessionBase):
         self.hashX_subs = {}
         self.mempool_statuses = {}
         self.chunk_indices = []
-        self.electrumx_handlers = {
-            'blockchain.address.subscribe': self.address_subscribe,
-            'blockchain.block.get_chunk': self.block_get_chunk,
-            'blockchain.headers.subscribe': self.headers_subscribe,
-            'blockchain.numblocks.subscribe': self.numblocks_subscribe,
-            'blockchain.script_hash.subscribe': self.script_hash_subscribe,
-            'blockchain.transaction.broadcast': self.transaction_broadcast,
-            'server.add_peer': self.add_peer,
-            'server.banner': self.banner,
-            'server.features': self.server_features,
-            'server.peers.subscribe': self.peers_subscribe,
-            'server.version': self.server_version,
-        }
+        self.set_protocol_handlers(None)
 
     def sub_count(self):
         return len(self.hashX_subs)
@@ -164,7 +152,7 @@ class ElectrumX(SessionBase):
 
         for alias_status in changed:
             if len(alias_status[0]) == 64:
-                method = 'blockchain.script_hash.subscribe'
+                method = 'blockchain.scripthash.subscribe'
             else:
                 method = 'blockchain.address.subscribe'
             pairs.append((method, alias_status))
@@ -247,12 +235,12 @@ class ElectrumX(SessionBase):
         hashX = self.controller.address_to_hashX(address)
         return await self.hashX_subscribe(hashX, address)
 
-    async def script_hash_subscribe(self, script_hash):
+    async def scripthash_subscribe(self, scripthash):
         '''Subscribe to a script hash.
 
-        script_hash: the SHA256 hash of the script to subscribe to'''
-        hashX = self.controller.script_hash_to_hashX(script_hash)
-        return await self.hashX_subscribe(hashX, script_hash)
+        scripthash: the SHA256 hash of the script to subscribe to'''
+        hashX = self.controller.scripthash_to_hashX(scripthash)
+        return await self.hashX_subscribe(hashX, scripthash)
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
@@ -333,11 +321,32 @@ class ElectrumX(SessionBase):
                                             in self.client.split('.'))
             except Exception:
                 pass
-        if protocol_version is not None:
-            self.protocol_version = protocol_version
+
+        self.log_info('protocol version {} requested'.format(protocol_version))
+        self.set_protocol_handlers(protocol_version)
+
         return version.VERSION
 
     async def transaction_broadcast(self, raw_tx):
+        '''Broadcast a raw transaction to the network.
+
+        raw_tx: the raw transaction as a hexadecimal string'''
+        # This returns errors as JSON RPC errors, as is natural
+        try:
+            tx_hash = await self.daemon.sendrawtransaction([raw_tx])
+            self.txs_sent += 1
+            self.log_info('sent tx: {}'.format(tx_hash))
+            self.controller.sent_tx(tx_hash)
+            return tx_hash
+        except DaemonError as e:
+            error, = e.args
+            message = error['message']
+            self.log_info('sendrawtransaction: {}'.format(message),
+                          throttle=True)
+            raise RPCError('the transaction was rejected by network rules.'
+                           '\n\n{}\n[{}]'.format(message, raw_tx))
+
+    async def transaction_broadcast_1_0(self, raw_tx):
         '''Broadcast a raw transaction to the network.
 
         raw_tx: the raw transaction as a hexadecimal string'''
@@ -346,34 +355,64 @@ class ElectrumX(SessionBase):
         # the result field.  And the server shouldn't be doing the client's
         # user interface job here.
         try:
-            tx_hash = await self.daemon.sendrawtransaction([raw_tx])
-            self.txs_sent += 1
-            self.log_info('sent tx: {}'.format(tx_hash))
-            self.controller.sent_tx(tx_hash)
-            return tx_hash
-        except DaemonError as e:
-            error = e.args[0]
-            message = error['message']
-            self.log_info('sendrawtransaction: {}'.format(message),
-                          throttle=True)
+            return await self.transaction_broadcast(raw_tx)
+        except RPCError as e:
+            message, = e.args
             if 'non-mandatory-script-verify-flag' in message:
-                return (
+                message = (
                     'Your client produced a transaction that is not accepted '
                     'by the network any more.  Please upgrade to Electrum '
                     '2.5.1 or newer.'
                 )
 
-            return (
-                'The transaction was rejected by network rules.  ({})\n[{}]'
-                .format(message, raw_tx)
-            )
+            return message
+
+    def set_protocol_handlers(self, version_str):
+        controller = self.controller
+        if version_str is None:
+            version_str = version.PROTOCOL_MIN
+        ptuple = util.protocol_tuple(version_str)
+        # Disconnect if requested protocol version in unsupported
+        if (ptuple < util.protocol_tuple(version.PROTOCOL_MIN)
+                or ptuple > util.protocol_tuple(version.PROTOCOL_MAX)):
+            self.log_info('unsupported protocol version {}'
+                          .format(version_str))
+            raise RPCError('unsupported protocol version: {}'
+                           .format(version_str), JSONRPC.FATAL_ERROR)
+
+        handlers = {
+            'blockchain.address.subscribe': self.address_subscribe,
+            'blockchain.block.get_chunk': self.block_get_chunk,
+            'blockchain.headers.subscribe': self.headers_subscribe,
+            'blockchain.numblocks.subscribe': self.numblocks_subscribe,
+            'blockchain.transaction.broadcast': self.transaction_broadcast_1_0,
+            'blockchain.transaction.get': controller.transaction_get_1_0,
+            'server.add_peer': self.add_peer,
+            'server.banner': self.banner,
+            'server.features': self.server_features,
+            'server.peers.subscribe': self.peers_subscribe,
+            'server.version': self.server_version,
+        }
+
+        handlers.update(controller.electrumx_handlers)
+
+        if ptuple >= (1, 1):
+            # Remove deprecated methods
+            del handlers['blockchain.address.get_proof']
+            del handlers['blockchain.numblocks.subscribe']
+            del handlers['blockchain.utxo.get_address']
+            # Add new handlers
+            handlers.update({
+                'blockchain.scripthash.subscribe': self.scripthash_subscribe,
+                'blockchain.transaction.broadcast': self.transaction_broadcast,
+                'blockchain.transaction.get': controller.transaction_get,
+            })
+
+        self.electrumx_handlers = handlers
 
     def request_handler(self, method):
         '''Return the async handler for the given request method.'''
-        handler = self.electrumx_handlers.get(method)
-        if not handler:
-            handler = self.controller.electrumx_handlers.get(method)
-        return handler
+        return self.electrumx_handlers.get(method)
 
 
 class LocalRPC(SessionBase):

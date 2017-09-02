@@ -63,6 +63,7 @@ class JSONRPC(object):
     INVALID_RESPONSE = -100
     ERROR_CODE_UNAVAILABLE = -101
     REQUEST_TIMEOUT = -102
+    FATAL_ERROR = -103
 
     ID_TYPES = (type(None), str, numbers.Number)
     HAS_BATCHES = False
@@ -405,7 +406,8 @@ class JSONSessionBase(util.LoggedClass):
         self.error_count += 1
         if not self.close_after_send:
             fatal_log = None
-            if code in (version.PARSE_ERROR, version.INVALID_REQUEST):
+            if code in (version.PARSE_ERROR, version.INVALID_REQUEST,
+                        version.FATAL_ERROR):
                 fatal_log = message
             elif self.error_count >= 10:
                 fatal_log = 'too many errors, last: {}'.format(message)

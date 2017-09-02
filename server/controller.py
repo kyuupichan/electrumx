@@ -100,7 +100,7 @@ class Controller(util.LoggedClass):
              'address.get_balance address.get_history address.get_mempool '
              'address.get_proof address.listunspent '
              'block.get_header estimatefee relayfee '
-             'transaction.get transaction.get_merkle utxo.get_address'),
+             'transaction.get_merkle utxo.get_address'),
             ('server', 'donation_address'),
         ]
         self.electrumx_handlers = {'.'.join([prefix, suffix]):
@@ -672,14 +672,14 @@ class Controller(util.LoggedClass):
             pass
         raise RPCError('{} is not a valid address'.format(address))
 
-    def script_hash_to_hashX(self, script_hash):
+    def scripthash_to_hashX(self, scripthash):
         try:
-            bin_hash = hex_str_to_hash(script_hash)
+            bin_hash = hex_str_to_hash(scripthash)
             if len(bin_hash) == 32:
                 return bin_hash[:self.coin.HASHX_LEN]
         except Exception:
             pass
-        raise RPCError('{} is not a valid script hash'.format(script_hash))
+        raise RPCError('{} is not a valid script hash'.format(scripthash))
 
     def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction
@@ -844,16 +844,22 @@ class Controller(util.LoggedClass):
         to the daemon's memory pool.'''
         return await self.daemon_request('relayfee')
 
-    async def transaction_get(self, tx_hash, height=None):
+    async def transaction_get(self, tx_hash):
+        '''Return the serialized raw transaction given its hash
+
+        tx_hash: the transaction hash as a hexadecimal string
+        '''
+        self.assert_tx_hash(tx_hash)
+        return await self.daemon_request('getrawtransaction', tx_hash)
+
+    async def transaction_get_1_0(self, tx_hash, height=None):
         '''Return the serialized raw transaction given its hash
 
         tx_hash: the transaction hash as a hexadecimal string
         height: ignored, do not use
         '''
-        # For some reason Electrum passes a height.  We don't require
-        # it in anticipation it might be dropped in the future.
-        self.assert_tx_hash(tx_hash)
-        return await self.daemon_request('getrawtransaction', tx_hash)
+        # For some reason Electrum protocol 1.0 passes a height.
+        return await self.transaction_get(tx_hash)
 
     async def transaction_get_merkle(self, tx_hash, height):
         '''Return the markle tree to a confirmed transaction given its hash
