@@ -97,8 +97,14 @@ class Controller(util.LoggedClass):
         # Set up the ElectrumX request handlers
         rpcs = [
             ('blockchain',
-             'address.get_balance address.get_history address.get_mempool '
-             'address.get_proof address.listunspent '
+             'address.get_balance '
+             'address.get_history '
+             'address.get_mempool '
+             'address.listunspent '
+             'scripthash.get_balance '
+             'scripthash.get_history '
+             'scripthash.get_mempool '
+             'scripthash.listunspent '
              'block.get_header estimatefee relayfee '
              'transaction.get transaction.get_merkle utxo.get_address'),
             ('server', 'donation_address'),
@@ -801,9 +807,19 @@ class Controller(util.LoggedClass):
         hashX = self.address_to_hashX(address)
         return await self.get_balance(hashX)
 
+    async def scripthash_get_balance(self, script_hash):
+        '''Return the confirmed and unconfirmed balance of an address.'''
+        hashX = self.script_hash_to_hashX(script_hash)
+        return await self.get_balance(hashX)
+
     async def address_get_history(self, address):
         '''Return the confirmed and unconfirmed history of an address.'''
         hashX = self.address_to_hashX(address)
+        return await self.confirmed_and_unconfirmed_history(hashX)
+
+    async def scripthash_get_history(self, script_hash):
+        '''Return the confirmed and unconfirmed history of an address.'''
+        hashX = self.script_hash_to_hashX(script_hash)
         return await self.confirmed_and_unconfirmed_history(hashX)
 
     async def address_get_mempool(self, address):
@@ -811,14 +827,21 @@ class Controller(util.LoggedClass):
         hashX = self.address_to_hashX(address)
         return await self.unconfirmed_history(hashX)
 
-    async def address_get_proof(self, address):
-        '''Return the UTXO proof of an address.'''
-        hashX = self.address_to_hashX(address)
-        raise RPCError('address.get_proof is not yet implemented')
+    async def scripthash_get_mempool(self, script_hash):
+        '''Return the mempool transactions touching an address.'''
+        hashX = self.script_hash_to_hashX(script_hash)
+        return await self.unconfirmed_history(hashX)
 
     async def address_listunspent(self, address):
         '''Return the list of UTXOs of an address.'''
         hashX = self.address_to_hashX(address)
+        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in sorted(await self.get_utxos(hashX))]
+
+    async def scripthash_listunspent(self, script_hash):
+        '''Return the list of UTXOs of an address.'''
+        hashX = self.script_hash_to_hashX(script_hash)
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in sorted(await self.get_utxos(hashX))]
