@@ -807,7 +807,7 @@ class Controller(util.LoggedClass):
         hashX = self.address_to_hashX(address)
         return await self.get_balance(hashX)
 
-    async def scripthash_get_balance(self, address):
+    async def scripthash_get_balance(self, script_hash):
         '''Return the confirmed and unconfirmed balance of an address.'''
         hashX = self.script_hash_to_hashX(script_hash)
         return await self.get_balance(hashX)
@@ -827,7 +827,7 @@ class Controller(util.LoggedClass):
         hashX = self.address_to_hashX(address)
         return await self.unconfirmed_history(hashX)
 
-    async def scripthash_get_mempool(self, address):
+    async def scripthash_get_mempool(self, script_hash):
         '''Return the mempool transactions touching an address.'''
         hashX = self.script_hash_to_hashX(script_hash)
         return await self.unconfirmed_history(hashX)
@@ -839,7 +839,7 @@ class Controller(util.LoggedClass):
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in sorted(await self.get_utxos(hashX))]
 
-    async def scripthash_listunspent(self, address):
+    async def scripthash_listunspent(self, script_hash):
         '''Return the list of UTXOs of an address.'''
         hashX = self.script_hash_to_hashX(script_hash)
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
