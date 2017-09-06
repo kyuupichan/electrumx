@@ -113,7 +113,7 @@ class ElectrumX(SessionBase):
         self.hashX_subs = {}
         self.mempool_statuses = {}
         self.chunk_indices = []
-        self.set_protocol_handlers(None)
+        self.set_protocol_handlers((1, 0))
 
     def sub_count(self):
         return len(self.hashX_subs)
@@ -323,9 +323,23 @@ class ElectrumX(SessionBase):
                 pass
 
         self.log_info('protocol version {} requested'.format(protocol_version))
-        self.set_protocol_handlers(protocol_version)
 
-        return version.VERSION
+        # Find the highest common protocol version.  Disconnect if
+        # that protocol version in unsupported.
+        ptuple = util.protocol_version(protocol_version, version.PROTOCOL_MIN,
+                                       version.PROTOCOL_MAX)
+        if ptuple is None:
+            self.log_info('unsupported protocol version request {}'
+                          .format(protocol_version))
+            raise RPCError('unsupported protocol version: {}'
+                           .format(protocol_version), JSONRPC.FATAL_ERROR)
+
+        self.set_protocol_handlers(ptuple)
+
+        if ptuple < (1, 1):
+            return version.VERSION
+
+        return (version.VERSION, '.'.join(str(part) for part in ptuple))
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -367,17 +381,7 @@ class ElectrumX(SessionBase):
 
             return message
 
-    def set_protocol_handlers(self, version_req):
-        # Find the highest common protocol version.  Disconnect if
-        # that protocol version in unsupported.
-        ptuple = util.protocol_version(version_req, version.PROTOCOL_MIN,
-                                       version.PROTOCOL_MAX)
-        if ptuple is None:
-            self.log_info('unsupported protocol version request {}'
-                          .format(version_req))
-            raise RPCError('unsupported protocol version: {}'
-                           .format(version_req), JSONRPC.FATAL_ERROR)
-
+    def set_protocol_handlers(self, ptuple):
         controller = self.controller
         handlers = {
             'blockchain.address.get_balance': controller.address_get_balance,
