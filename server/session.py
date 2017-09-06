@@ -381,6 +381,11 @@ class ElectrumX(SessionBase):
                            .format(version_str), JSONRPC.FATAL_ERROR)
 
         handlers = {
+            'blockchain.address.get_balance': controller.address_get_balance,
+            'blockchain.address.get_history': controller.address_get_history,
+            'blockchain.address.get_mempool': controller.address_get_mempool,
+            'blockcahin.address.get_proof': controller.address_get_proof,
+            'blockchain.address.listunspent': controller.address_listunspent,
             'blockchain.address.subscribe': self.address_subscribe,
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.headers.subscribe': self.headers_subscribe,
@@ -403,6 +408,14 @@ class ElectrumX(SessionBase):
             del handlers['blockchain.utxo.get_address']
             # Add new handlers
             handlers.update({
+                'blockchain.scripthash.get_balance':
+                controller.scripthash_get_balance,
+                'blockchain.scripthash.get_history':
+                controller.scripthash_get_history,
+                'blockchain.scripthash.get_mempool':
+                controller.scripthash_get_mempool,
+                'blockchain.scripthash.listunspent':
+                controller.scripthash_listunspent,
                 'blockchain.scripthash.subscribe': self.scripthash_subscribe,
                 'blockchain.transaction.broadcast': self.transaction_broadcast,
                 'blockchain.transaction.get': controller.transaction_get,

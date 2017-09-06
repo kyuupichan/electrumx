@@ -801,14 +801,29 @@ class Controller(util.LoggedClass):
         hashX = self.address_to_hashX(address)
         return await self.get_balance(hashX)
 
+    async def scripthash_get_balance(self, scripthash):
+        '''Return the confirmed and unconfirmed balance of a scripthash.'''
+        hashX = self.scripthash_to_hashX(scripthash)
+        return await self.get_balance(hashX)
+
     async def address_get_history(self, address):
         '''Return the confirmed and unconfirmed history of an address.'''
         hashX = self.address_to_hashX(address)
         return await self.confirmed_and_unconfirmed_history(hashX)
 
+    async def scripthash_get_history(self, scripthash):
+        '''Return the confirmed and unconfirmed history of a scripthash.'''
+        hashX = self.scripthash_to_hashX(scripthash)
+        return await self.confirmed_and_unconfirmed_history(hashX)
+
     async def address_get_mempool(self, address):
         '''Return the mempool transactions touching an address.'''
         hashX = self.address_to_hashX(address)
+        return await self.unconfirmed_history(hashX)
+
+    async def scripthash_get_mempool(self, scripthash):
+        '''Return the mempool transactions touching a scripthash.'''
+        hashX = self.scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
 
     async def address_get_proof(self, address):
@@ -819,6 +834,13 @@ class Controller(util.LoggedClass):
     async def address_listunspent(self, address):
         '''Return the list of UTXOs of an address.'''
         hashX = self.address_to_hashX(address)
+        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in sorted(await self.get_utxos(hashX))]
+
+    async def scripthash_listunspent(self, scripthash):
+        '''Return the list of UTXOs of a scripthash.'''
+        hashX = self.scripthash_to_hashX(scripthash)
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in sorted(await self.get_utxos(hashX))]
