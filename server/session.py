@@ -113,6 +113,7 @@ class ElectrumX(SessionBase):
         self.hashX_subs = {}
         self.mempool_statuses = {}
         self.chunk_indices = []
+        self.protocol_version = None
         self.set_protocol_handlers((1, 0))
 
     def sub_count(self):
@@ -322,8 +323,6 @@ class ElectrumX(SessionBase):
             except Exception:
                 pass
 
-        self.log_info('protocol version {} requested'.format(protocol_version))
-
         # Find the highest common protocol version.  Disconnect if
         # that protocol version in unsupported.
         ptuple = util.protocol_version(protocol_version, version.PROTOCOL_MIN,
@@ -336,10 +335,11 @@ class ElectrumX(SessionBase):
 
         self.set_protocol_handlers(ptuple)
 
+        # The return value depends on the protocol version
         if ptuple < (1, 1):
             return version.VERSION
-
-        return (version.VERSION, '.'.join(str(part) for part in ptuple))
+        else:
+            return (version.VERSION, self.protocol_version)
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -382,6 +382,10 @@ class ElectrumX(SessionBase):
             return message
 
     def set_protocol_handlers(self, ptuple):
+        protocol_version = '.'.join(str(part) for part in ptuple)
+        if protocol_version == self.protocol_version:
+            return
+        self.protocol_version = protocol_version
         controller = self.controller
         handlers = {
             'blockchain.address.get_balance': controller.address_get_balance,
@@ -438,6 +442,7 @@ class LocalRPC(SessionBase):
         super().__init__(*args, **kwargs)
         self.client = 'RPC'
         self.max_send = 0
+        self.protocol_version = 'RPC'
 
     def request_handler(self, method):
         '''Return the async handler for the given request method.'''
