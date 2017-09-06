@@ -183,3 +183,12 @@ class Env(lib_util.LoggedClass):
             import uvloop
             return uvloop.EventLoopPolicy()
         raise self.Error('unknown event loop policy "{}"'.format(policy))
+
+    def cs_host(self):
+        '''Returns the 'host' argument to pass to asyncio's create_server
+        call.  The result can be a single host name string, a list of
+        host name strings, or an empty string to bind to all interfaces.'''
+        result = self.host.split(',')
+        if len(result) == 1:
+            result = result[0]
+        return result

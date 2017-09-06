@@ -85,8 +85,11 @@ These environment variables are optional:
 
 * **HOST**
 
-  The host that the TCP and SSL servers will use.  Defaults to
-  `localhost`.  Set to blank to listen on all addresses (IPv4 and IPv6).
+  The host or IP address that the TCP and SSL servers will use when
+  binding listening sockets.  Defaults to `localhost`.  To listen on
+  multiple specific addresses specify a comma-separated list.  Set to
+  an empty string to listen on all available interfaces (likely both
+  IPv4 and IPv6).
 
 * **TCP_PORT**
 

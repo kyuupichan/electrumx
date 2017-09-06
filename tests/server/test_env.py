@@ -94,6 +94,12 @@ def test_CACHE_MB():
 
 def test_HOST():
     assert_default('HOST', 'host', 'localhost')
+    os.environ['HOST'] = ''
+    e = Env()
+    assert e.cs_host() == ''
+    os.environ['HOST'] = '192.168.0.1,23.45.67.89'
+    e = Env()
+    assert e.cs_host() == ['192.168.0.1', '23.45.67.89']
 
 def test_REORG_LIMIT():
     assert_integer('REORG_LIMIT', 'reorg_limit', lib_coins.Bitcoin.REORG_LIMIT)

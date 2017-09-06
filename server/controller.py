@@ -305,12 +305,13 @@ class Controller(util.LoggedClass):
         self.state = self.LISTENING
 
         env = self.env
+        host = env.cs_host()
         if env.tcp_port is not None:
-            await self.start_server('TCP', env.host, env.tcp_port)
+            await self.start_server('TCP', host, env.tcp_port)
         if env.ssl_port is not None:
             sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
-            await self.start_server('SSL', env.host, env.ssl_port, ssl=sslc)
+            await self.start_server('SSL', host, env.ssl_port, ssl=sslc)
 
     async def notify(self):
         '''Notify sessions about height changes and touched addresses.'''
