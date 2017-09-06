@@ -289,6 +289,10 @@ class ElectrumX(SessionBase):
             banner = banner.replace(*pair)
         return banner
 
+    def donation_address(self):
+        '''Return the donation address as a string, empty if there is none.'''
+        return self.env.donation_address
+
     async def banner(self):
         '''Return the server banner text.'''
         banner = 'Welcome to Electrum!'
@@ -386,34 +390,42 @@ class ElectrumX(SessionBase):
         if protocol_version == self.protocol_version:
             return
         self.protocol_version = protocol_version
+
         controller = self.controller
         handlers = {
             'blockchain.address.get_balance': controller.address_get_balance,
             'blockchain.address.get_history': controller.address_get_history,
             'blockchain.address.get_mempool': controller.address_get_mempool,
-            'blockcahin.address.get_proof': controller.address_get_proof,
             'blockchain.address.listunspent': controller.address_listunspent,
             'blockchain.address.subscribe': self.address_subscribe,
             'blockchain.block.get_chunk': self.block_get_chunk,
+            'blockchain.block.get_header': controller.block_get_header,
+            'blockchain.estimatefee': controller.estimatefee,
             'blockchain.headers.subscribe': self.headers_subscribe,
-            'blockchain.numblocks.subscribe': self.numblocks_subscribe,
-            'blockchain.transaction.broadcast': self.transaction_broadcast_1_0,
-            'blockchain.transaction.get': controller.transaction_get_1_0,
+            'blockchain.relayfee': controller.relayfee,
+            'blockchain.transaction.get_merkle':
+            controller.transaction_get_merkle,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
+            'server.donation_address': self.donation_address,
             'server.features': self.server_features,
             'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
         }
 
-        handlers.update(controller.electrumx_handlers)
+        if ptuple < (1, 1):
+            # Methods or semantics unique to 1.0 and earlier protocols
+            handlers.update({
+                'blockcahin.address.get_proof': controller.address_get_proof,
+                'blockchain.numblocks.subscribe': self.numblocks_subscribe,
+                'blockchain.utxo.get_address': controller.utxo_get_address,
+                'blockchain.transaction.broadcast':
+                self.transaction_broadcast_1_0,
+                'blockchain.transaction.get': controller.transaction_get_1_0,
+            })
 
         if ptuple >= (1, 1):
-            # Remove deprecated methods
-            del handlers['blockchain.address.get_proof']
-            del handlers['blockchain.numblocks.subscribe']
-            del handlers['blockchain.utxo.get_address']
-            # Add new handlers
+            # New handlers as of 1.1, or different semantics
             handlers.update({
                 'blockchain.scripthash.get_balance':
                 controller.scripthash_get_balance,

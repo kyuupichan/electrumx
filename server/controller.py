@@ -94,19 +94,6 @@ class Controller(util.LoggedClass):
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers reorg '
                 'sessions stop'.split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
-        # Set up the ElectrumX request handlers
-        rpcs = [
-            ('blockchain',
-             'address.get_balance address.get_history address.get_mempool '
-             'address.get_proof address.listunspent '
-             'block.get_header estimatefee relayfee '
-             'transaction.get_merkle utxo.get_address'),
-            ('server', 'donation_address'),
-        ]
-        self.electrumx_handlers = {'.'.join([prefix, suffix]):
-                                   getattr(self, suffix.replace('.', '_'))
-                                   for prefix, suffixes in rpcs
-                                   for suffix in suffixes.split()}
 
     async def mempool_transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -916,12 +903,6 @@ class Controller(util.LoggedClass):
         if index >= len(tx.outputs):
             return None
         return self.coin.address_from_script(tx.outputs[index].pk_script)
-
-    # Client RPC "server" command handlers
-
-    def donation_address(self):
-        '''Return the donation address as a string, empty if there is none.'''
-        return self.env.donation_address
 
     # Signal, exception handlers.
 
