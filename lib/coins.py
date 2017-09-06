@@ -837,6 +837,41 @@ class Blackcoin(Coin):
             return cls.HEADER_HASH(header)
 
 
+class Bitbay(Coin):
+    NAME = "Bitbay"
+    SHORTNAME = "BAY"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('0000075685d3be1f253ce777174b1594'
+                    '354e79954d2a32a6f77fe9cba00e6467')
+    DESERIALIZER = DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 4594999
+    TX_COUNT_HEIGHT = 1667070
+    TX_PER_BLOCK = 3
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL = "#electrum-bay"
+    RPC_PORT = 19914
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+
 class Peercoin(Coin):
     NAME = "Peercoin"
     SHORTNAME = "PPC"
