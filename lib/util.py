@@ -278,3 +278,27 @@ def protocol_tuple(s):
         return tuple(int(part) for part in s.split('.'))
     except Exception:
         return (0, )
+
+def protocol_version(client_req, server_min, server_max):
+    '''Given a client protocol request, return the protocol version
+    to use as a tuple.
+
+    If a mutually acceptable protocol version does not exist, return None.
+    '''
+    if isinstance(client_req, list) and len(client_req) == 2:
+        client_min, client_max = client_req
+    elif client_req is None:
+        client_min = client_max = server_min
+    else:
+        client_min = client_max = client_req
+
+    client_min = protocol_tuple(client_min)
+    client_max = protocol_tuple(client_max)
+    server_min = protocol_tuple(server_min)
+    server_max = protocol_tuple(server_max)
+
+    result = min(client_max, server_max)
+    if result < max(client_min, server_min) or result == (0, ):
+        result = None
+
+    return result

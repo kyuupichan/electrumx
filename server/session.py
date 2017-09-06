@@ -367,19 +367,18 @@ class ElectrumX(SessionBase):
 
             return message
 
-    def set_protocol_handlers(self, version_str):
-        controller = self.controller
-        if version_str is None:
-            version_str = version.PROTOCOL_MIN
-        ptuple = util.protocol_tuple(version_str)
-        # Disconnect if requested protocol version in unsupported
-        if (ptuple < util.protocol_tuple(version.PROTOCOL_MIN)
-                or ptuple > util.protocol_tuple(version.PROTOCOL_MAX)):
-            self.log_info('unsupported protocol version {}'
-                          .format(version_str))
+    def set_protocol_handlers(self, version_req):
+        # Find the highest common protocol version.  Disconnect if
+        # that protocol version in unsupported.
+        ptuple = util.protocol_version(version_req, version.PROTOCOL_MIN,
+                                       version.PROTOCOL_MAX)
+        if ptuple is None:
+            self.log_info('unsupported protocol version request {}'
+                          .format(version_req))
             raise RPCError('unsupported protocol version: {}'
-                           .format(version_str), JSONRPC.FATAL_ERROR)
+                           .format(version_req), JSONRPC.FATAL_ERROR)
 
+        controller = self.controller
         handlers = {
             'blockchain.address.get_balance': controller.address_get_balance,
             'blockchain.address.get_history': controller.address_get_history,
