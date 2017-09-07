@@ -5,7 +5,7 @@
 import pytest
 
 import wallet.bip32 as bip32
-from lib.coins import Bitcoin, CoinError
+from lib.coins import BitcoinCash as Bitcoin, CoinError
 from lib.hash import Base58
 
 

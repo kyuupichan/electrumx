@@ -15,6 +15,7 @@ BASE_DB_DIR = '/some/dir'
 base_environ = {
     'DB_DIRECTORY': BASE_DB_DIR,
     'DAEMON_URL': BASE_DAEMON_URL,
+    'COIN': 'BitcoinCash',
 }
 
 def setup_base_env():
@@ -77,10 +78,10 @@ def test_COIN_NET():
     '''Test COIN and NET defaults and redirection.'''
     setup_base_env()
     e = Env()
-    assert e.coin == lib_coins.Bitcoin
+    assert e.coin == lib_coins.BitcoinCash
     os.environ['NET'] = 'testnet'
     e = Env()
-    assert e.coin == lib_coins.BitcoinTestnet
+    assert e.coin == lib_coins.BitcoinCashTestnet
     os.environ.pop('NET')
     os.environ['COIN'] = 'Litecoin'
     e = Env()
@@ -102,7 +103,8 @@ def test_HOST():
     assert e.cs_host() == ['192.168.0.1', '23.45.67.89']
 
 def test_REORG_LIMIT():
-    assert_integer('REORG_LIMIT', 'reorg_limit', lib_coins.Bitcoin.REORG_LIMIT)
+    assert_integer('REORG_LIMIT', 'reorg_limit',
+                   lib_coins.BitcoinCash.REORG_LIMIT)
 
 def test_TCP_PORT():
     assert_integer('TCP_PORT', 'tcp_port', None)

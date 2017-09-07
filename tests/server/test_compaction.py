@@ -115,6 +115,7 @@ def run_test(db_dir):
     environ.clear()
     environ['DB_DIRECTORY'] = db_dir
     environ['DAEMON_URL'] = ''
+    environ['COIN'] = 'BitcoinCash'
     env = Env()
     db = DB(env)
     # Test abstract compaction
