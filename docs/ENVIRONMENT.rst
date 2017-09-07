@@ -13,6 +13,11 @@ Required
 
 These environment variables are always required:
 
+* **COIN**
+
+  Must be a *NAME* from one of the **Coin** classes in
+  `lib/coins.py`_.
+
 * **DB_DIRECTORY**
 
   The path to the database directory.  Relative paths should be
@@ -52,11 +57,6 @@ Miscellaneous
 -------------
 
 These environment variables are optional:
-
-* **COIN**
-
-  Must be a *NAME* from one of the **Coin** classes in
-  `lib/coins.py`_.  Defaults to `Bitcoin`.
 
 * **NET**
 

@@ -31,7 +31,7 @@ class Env(lib_util.LoggedClass):
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
         self.db_dir = self.required('DB_DIRECTORY')
         self.daemon_url = self.required('DAEMON_URL')
-        coin_name = self.default('COIN', 'Bitcoin')
+        coin_name = self.required('COIN')
         network = self.default('NET', 'mainnet')
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.cache_MB = self.integer('CACHE_MB', 1200)
