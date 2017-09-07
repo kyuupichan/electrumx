@@ -331,7 +331,9 @@ class ElectrumX(SessionBase):
         # that protocol version in unsupported.
         ptuple = util.protocol_version(protocol_version, version.PROTOCOL_MIN,
                                        version.PROTOCOL_MAX)
-        if ptuple is None:
+
+        # From protocol version 1.1, protocol_version cannot be omitted
+        if ptuple is None or (ptuple >= (1, 1) and protocol_version is None):
             self.log_info('unsupported protocol version request {}'
                           .format(protocol_version))
             raise RPCError('unsupported protocol version: {}'
