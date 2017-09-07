@@ -176,9 +176,13 @@ class PeerSession(JSONSession):
         if error:
             self.failed = True
             self.log_error('server.version returned an error')
-        elif isinstance(result, str):
-            self.peer.server_version = result
-            self.peer.features['server_version'] = result
+        else:
+            # Protocol version 1.1 returns a pair with the version first
+            if isinstance(result, list) and len(result) == 2:
+                result = result[0]
+            if isinstance(result, str):
+                self.peer.server_version = result
+                self.peer.features['server_version'] = result
         self.close_if_done()
 
     def check_remote_peers(self):
