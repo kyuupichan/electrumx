@@ -122,10 +122,11 @@ and associated complications.
 Roadmap
 =======
 
-- Python 3.6, which has several performance improvements relevant to
-  ElectrumX
-- UTXO root logic and implementation
-- incremental history serving / pruning
+- Require Python 3.6, which has several performance improvements
+  relevant to ElectrumX
+- offloading more work to synchronize to the client
+- supporting better client privacy
+- wallet server engine
 - new features such as possibly adding label server functionality
 - potentially move some functionality to C or C++
 
@@ -141,8 +142,8 @@ which the next Electrum client release will use.
 
 *NOTE*: the **COIN** environment variable is now mandatory, and if you
 were running for any bitcoin flavour (Cash, Segwit, mainnet or
-testnet) you will need to update your environment variable settings as
-the old ones will no longer work.
+testnet) you will need to update your **COIN** and **NET** environment
+variable settings as the old ones will no longer work.
 
 - implement protocol version 1.1 and update protocol documentation
 - rework lib/coins.py for the various bitcoin flavours
@@ -337,6 +338,7 @@ Version 1.0
 .. _#162: https://github.com/kyuupichan/electrumx/issues/162
 .. _#163: https://github.com/kyuupichan/electrumx/issues/163
 .. _#180: https://github.com/kyuupichan/electrumx/issues/180
+.. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst

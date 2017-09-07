@@ -690,7 +690,7 @@ Return the confirmed and unconfirmed balances of a script hash.
 
   blockchain.scripthash.get_balance(**scripthash**)
 
-  **schripthash**
+  **scripthash**
 
     The script hash as a hexadecimal string.
 
@@ -706,7 +706,7 @@ Return the confirmed and unconfirmed history of a script hash.
 
   blockchain.scripthash.get_history(**scripthash**)
 
-  **schripthash**
+  **scripthash**
 
     The script hash as a hexadecimal string.
 
@@ -722,7 +722,7 @@ Return the unconfirmed transactions of a script hash.
 
   blockchain.scripthash.get_mempool(**scripthash**)
 
-  **schripthash**
+  **scripthash**
 
     The script hash as a hexadecimal string.
 
@@ -738,7 +738,7 @@ Return an ordered list of UTXOs sent to a script hash.
 
   blockchain.scripthash.listunspent(**scripthash**)
 
-  **schripthash**
+  **scripthash**
 
     The script hash as a hexadecimal string.
 
