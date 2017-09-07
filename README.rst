@@ -154,7 +154,7 @@ variable settings as the old ones will no longer work.
   of JustinTArthur)
 - misc configuration updates (SubPar)
 - add Neblio support (neblioteam) and Bitbay (anoxxxy)
-- HOWTO.rst update for running on priveleged port (EagleTM)
+- HOWTO.rst update for running on privileged port (EagleTM)
 - issues closed: exclude test dirs from installation (`#223`_).
 
 Version 1.0.17
