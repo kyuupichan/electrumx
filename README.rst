@@ -133,6 +133,29 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.1pre1
+---------------
+
+Many changes, mostly to prepare for support of Electrum protocol 1.1
+which the next Electrum client release will use.
+
+*NOTE*: the **COIN** environment variable is now mandatory, and if you
+were running for any bitcoin flavour (Cash, Segwit, mainnet or
+testnet) you will need to update your environment variable settings as
+the old ones will no longer work.
+
+- implement protocol version 1.1 and update protocol documentation
+- rework lib/coins.py for the various bitcoin flavours
+- show protocol version in "seessions" ElectrumX RPC call
+- permit **HOST** envvar to be a comma-separated list
+- daemon abstraction refactoring (erasmospunk)
+- permit alternative event loop policies (based on suggestion / work
+  of JustinTArthur)
+- misc configuration updates (SubPar)
+- add Neblio support (neblioteam) and Bitbay (anoxxxy)
+- HOTO.rst update for running on priveleged port (EagleTM)
+- issues closed: exclude test dirs from installation (`#223`_).
+
 Version 1.0.17
 --------------
 
