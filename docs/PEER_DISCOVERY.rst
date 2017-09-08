@@ -53,13 +53,8 @@ The server should craft its response in a way that reduces the
 effectiveness of sybil attacks and peer spamming.
 
 The response should only include peers it has successfully connected
-to recently.  If Tor routing is not available, so their existence
-cannot be verified, the response should include some hard-coded onion
-peers so that clients always have a choice of onion servers.
-
-Only reporting recent good peers ensures that those that have gone
-offline will not be passed around for long (ignoring for hard-coded
-onion peer exception).
+to recently.  Only reporting recent good peers ensures that those that
+have gone offline will not be passed around for long.
 
 In ElectrumX, "recently" is taken to be the last 24 hours.  Only one
 peer from each IPv4/16 netmask is returned, and the number of onion

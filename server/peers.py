@@ -259,7 +259,6 @@ class PeerManager(util.LoggedClass):
         # IP address that was connected to.  Adding a peer will evict
         # any other peers with the same host name or IP address.
         self.peers = set()
-        self.onion_peers = []
         self.permit_onion_peer_time = time.time()
         self.proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
                                 loop=self.loop)
@@ -417,7 +416,6 @@ class PeerManager(util.LoggedClass):
             peers.update(bucket_peers[:2])
 
         # Add up to 20% onion peers (but up to 10 is OK anyway)
-        onion_peers = onion_peers or self.onion_peers
         random.shuffle(onion_peers)
         max_onion = 50 if is_tor else max(10, len(peers) // 4)
 
@@ -460,8 +458,6 @@ class PeerManager(util.LoggedClass):
         '''Import hard-coded peers from a file or the coin defaults.'''
         self.add_peers(self.myselves)
         coin_peers = self.env.coin.PEERS
-        self.onion_peers = [Peer.from_real_name(rn, 'coins.py')
-                            for rn in coin_peers if '.onion ' in rn]
 
         # If we don't have many peers in the peers file, add
         # hard-coded ones
