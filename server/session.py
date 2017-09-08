@@ -377,7 +377,7 @@ class ElectrumX(SessionBase):
         try:
             return await self.transaction_broadcast(raw_tx)
         except RPCError as e:
-            message, = e.args
+            message = e.message
             if 'non-mandatory-script-verify-flag' in message:
                 message = (
                     'Your client produced a transaction that is not accepted '
