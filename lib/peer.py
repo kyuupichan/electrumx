@@ -90,7 +90,7 @@ class Peer(object):
         '''Convert a version string, such as "1.2", to a (major_version,
         minor_version) pair.
         '''
-        if isinstance(vstr, str) and VERSION_REGEX.match(vstr):
+        if isinstance(vstr, str) and cls.VERSION_REGEX.match(vstr):
             if '.' not in vstr:
                 vstr += '.0'
         else:
@@ -247,12 +247,12 @@ class Peer(object):
     @cachedproperty
     def protocol_min(self):
         '''Minimum protocol version as a string, e.g., 1.0'''
-        return self._version_string('protcol_min')
+        return self._version_string('protocol_min')
 
     @cachedproperty
     def protocol_max(self):
         '''Maximum protocol version as a string, e.g., 1.1'''
-        return self._version_string('protcol_max')
+        return self._version_string('protocol_max')
 
     def to_tuple(self):
         '''The tuple ((ip, host, details) expected in response
