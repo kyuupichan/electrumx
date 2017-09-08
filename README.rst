@@ -147,14 +147,14 @@ variable settings as the old ones will no longer work.
 
 - implement protocol version 1.1 and update protocol documentation
 - rework lib/coins.py for the various bitcoin flavours
-- show protocol version in "seessions" ElectrumX RPC call
+- show protocol version in "sessions" ElectrumX RPC call
 - permit **HOST** envvar to be a comma-separated list
 - daemon abstraction refactoring (erasmospunk)
 - permit alternative event loop policies (based on suggestion / work
   of JustinTArthur)
 - misc configuration updates (SubPar)
 - add Neblio support (neblioteam) and Bitbay (anoxxxy)
-- HOTO.rst update for running on priveleged port (EagleTM)
+- HOWTO.rst update for running on privileged port (EagleTM)
 - issues closed: exclude test dirs from installation (`#223`_).
 
 Version 1.0.17
