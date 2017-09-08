@@ -468,11 +468,16 @@ class DashElectrumX(ElectrumX):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.electrumx_handlers['masternode.announce.broadcast'] =\
-            self.masternode_announce_broadcast
-        self.electrumx_handlers['masternode.subscribe'] =\
-            self.masternode_subscribe
         self.mns = set()
+
+    def set_protocol_handlers(self, ptuple):
+        super().set_protocol_handlers(ptuple)
+        mna_broadcast = (self.masternode_announce_broadcast if ptuple >= (1, 1)
+                         else masternode_announce_broadcast_1_0)
+        self.electrumx_handlers.update({
+            'masternode.announce.broadcast': mna_broadcast,
+            'masternode.subscribe': self.masternode_subscribe,
+        })
 
     async def notify(self, height, touched):
         '''Notify the client about changes in masternode list.'''
@@ -503,17 +508,22 @@ class DashElectrumX(ElectrumX):
         '''Pass through the masternode announce message to be broadcast
         by the daemon.'''
         try:
-            mnb_info = await self.daemon.masternode_broadcast(
-                ['relay', signmnb])
-            return mnb_info
+            return await self.daemon.masternode_broadcast(['relay', signmnb])
         except DaemonError as e:
-            error = e.args[0]
+            error, = e.args
             message = error['message']
             self.log_info('masternode_broadcast: {}'.format(message))
-            return (
-                'The masternode broadcast was rejected.  ({})\n[{}]'
-                .format(message, signmnb)
-            )
+            raise RPCError('the masternode broadcast was rejected.'
+                           '\n\n{}\n[{}]'.format(message, signmnb))
+
+    async def masternode_announce_broadcast_1_0(self, signmnb):
+        '''Pass through the masternode announce message to be broadcast
+        by the daemon.'''
+        # An ugly API, like the old Electrum transaction broadcast API
+        try:
+            return await self.masternode_announce_broadcast(signmnb)
+        except RPCError as e:
+            return e.message
 
     async def masternode_subscribe(self, vin):
         '''Returns the status of masternode.'''
