@@ -28,7 +28,8 @@
 import re
 from ipaddress import ip_address
 
-from lib.util import cachedproperty, is_valid_hostname
+from lib.util import cachedproperty
+import lib.util as util
 
 
 class Peer(object):
@@ -84,18 +85,6 @@ class Peer(object):
     def deserialize(cls, item):
         '''Deserialize from a dictionary.'''
         return cls(**item)
-
-    @classmethod
-    def version_tuple(cls, vstr):
-        '''Convert a version string, such as "1.2", to a (major_version,
-        minor_version) pair.
-        '''
-        if isinstance(vstr, str) and VERSION_REGEX.match(vstr):
-            if '.' not in vstr:
-                vstr += '.0'
-        else:
-            vstr = '1.0'
-        return tuple(int(part) for part in vstr.split('.'))
 
     def matches(self, peers):
         '''Return peers whose host matches our hostname or IP address.
@@ -159,7 +148,7 @@ class Peer(object):
         if ip:
             return ((ip.is_global or ip.is_private)
                     and not (ip.is_multicast or ip.is_unspecified))
-        return is_valid_hostname(self.host)
+        return util.is_valid_hostname(self.host)
 
     @cachedproperty
     def is_public(self):
@@ -211,10 +200,6 @@ class Peer(object):
         result = self.features.get(key)
         return result if isinstance(result, str) else None
 
-    def _version_string(self, key):
-        version = self.features.get(key)
-        return '{:d}.{:d}'.format(*self.version_tuple(version))
-
     @cachedproperty
     def genesis_hash(self):
         '''Returns None if no SSL port, otherwise the port as an integer.'''
@@ -244,15 +229,20 @@ class Peer(object):
             return pruning
         return None
 
+    def _protocol_version_string(self, key):
+        version_str = self.features.get(key)
+        ptuple = util.protocol_tuple(version_str)
+        return util.protocol_version_string(ptuple)
+
     @cachedproperty
     def protocol_min(self):
         '''Minimum protocol version as a string, e.g., 1.0'''
-        return self._version_string('protcol_min')
+        return self._protocol_version_string('protocol_min')
 
     @cachedproperty
     def protocol_max(self):
         '''Maximum protocol version as a string, e.g., 1.1'''
-        return self._version_string('protcol_max')
+        return self._protocol_version_string('protocol_max')
 
     def to_tuple(self):
         '''The tuple ((ip, host, details) expected in response

@@ -279,6 +279,13 @@ def protocol_tuple(s):
     except Exception:
         return (0, )
 
+def protocol_version_string(ptuple):
+    '''Convert a version tuple such as (1, 2) to "1.2".
+    There is always at least one dot, so (1, ) becomes "1.0".'''
+    while len(ptuple) < 2:
+        ptuple += (0, )
+    return '.'.join(str(p) for p in ptuple)
+
 def protocol_version(client_req, server_min, server_max):
     '''Given a client protocol request, return the protocol version
     to use as a tuple.
