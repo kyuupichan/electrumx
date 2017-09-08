@@ -24,7 +24,6 @@ from server.irc import IRC
 import server.version as version
 
 
-PEERS_FILE = 'peers'
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
 STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
@@ -423,49 +422,15 @@ class PeerManager(util.LoggedClass):
 
         return [peer.to_tuple() for peer in peers]
 
-    def serialize(self):
-        serialized_peers = [peer.serialize() for peer in self.peers
-                            if not peer.bad]
-        data = (1, serialized_peers)  # version 1
-        return repr(data)
-
-    def write_peers_file(self):
-        with util.open_truncate(PEERS_FILE) as f:
-            f.write(self.serialize().encode())
-        self.logger.info('wrote out {:,d} peers'.format(len(self.peers)))
-
-    def read_peers_file(self):
-        try:
-            with util.open_file(PEERS_FILE, create=True) as f:
-                data = f.read(-1).decode()
-        except Exception as e:
-            self.logger.error('error reading peers file {}'.format(e))
-        else:
-            if data:
-                version, items = ast.literal_eval(data)
-                if version == 1:
-                    peers = []
-                    for item in items:
-                        if 'last_connect' in item:
-                            item['last_good'] = item.pop('last_connect')
-                        try:
-                            peers.append(Peer.deserialize(item))
-                        except Exception:
-                            pass
-                    self.add_peers(peers, source='peers file', limit=None)
-
     def import_peers(self):
         '''Import hard-coded peers from a file or the coin defaults.'''
         self.add_peers(self.myselves)
         coin_peers = self.env.coin.PEERS
 
-        # If we don't have many peers in the peers file, add
-        # hard-coded ones
-        self.read_peers_file()
-        if len(self.peers) < 5:
-            peers = [Peer.from_real_name(real_name, 'coins.py')
-                     for real_name in coin_peers]
-            self.add_peers(peers, limit=None)
+        # Add the hard-coded ones
+        peers = [Peer.from_real_name(real_name, 'coins.py')
+                 for real_name in coin_peers]
+        self.add_peers(peers, limit=None)
 
     def connect_to_irc(self):
         '''Connect to IRC if not disabled.'''
@@ -507,16 +472,12 @@ class PeerManager(util.LoggedClass):
         self.logger.info('beginning peer discovery; force use of proxy: {}'
                          .format(self.env.force_proxy))
 
-        try:
-            while True:
-                timeout = self.loop.call_later(WAKEUP_SECS,
-                                               self.retry_event.set)
-                await self.retry_event.wait()
-                self.retry_event.clear()
-                timeout.cancel()
-                await self.retry_peers()
-        finally:
-            self.write_peers_file()
+        while True:
+            timeout = self.loop.call_later(WAKEUP_SECS, self.retry_event.set)
+            await self.retry_event.wait()
+            self.retry_event.clear()
+            timeout.cancel()
+            await self.retry_peers()
 
     def is_coin_onion_peer(self, peer):
         '''Return true if this peer is a hard-coded onion peer.'''

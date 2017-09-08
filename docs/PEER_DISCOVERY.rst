@@ -11,10 +11,9 @@ onwards.
 Peer Database
 -------------
 
-A persistent store of peers with at least the following information
-about a peer so that state persists across server restarts.  This
-information is required for a response to the **server.peers.subscribe**
-RPC call:
+An in-memory store of peers with at least the following information
+about a peer, required for a response to the
+**server.peers.subscribe** RPC call:
 
 * host name
 * ip address
