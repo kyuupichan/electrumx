@@ -134,6 +134,19 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.1
+-----------
+
+See the changelogs below for recent changes.  The most important is
+that for mainnet bitcoin **NET** must now be *mainnet* and you must
+choose a **COIN** from *BitcoinCash* and *BitcoinSegwit*.  Similarly
+for testnets.  These coins will likely diverge further in future so
+it's best they become separate coins now.
+
+- no longer persist peers, rediscover on restart
+- onion peers only reported if can connect; hard-coded exception removed
+- small fix for blockchain.transaction.broadcast
+
 Version 1.1pre2
 ---------------
 
