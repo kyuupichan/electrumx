@@ -7,7 +7,6 @@
 
 '''Peer management.'''
 
-import ast
 import asyncio
 import random
 import socket

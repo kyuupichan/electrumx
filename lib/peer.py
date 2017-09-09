@@ -25,7 +25,6 @@
 
 '''Representation of a peer server.'''
 
-import re
 from ipaddress import ip_address
 
 from lib.util import cachedproperty
@@ -35,7 +34,6 @@ import lib.util as util
 class Peer(object):
 
     # Protocol version
-    VERSION_REGEX = re.compile('[0-9]+(\.[0-9]+)?$')
     ATTRS = ('host', 'features',
              # metadata
              'source', 'ip_addr', 'good_ports',
