@@ -29,10 +29,11 @@
 
 
 from collections import namedtuple
-from struct import unpack_from
 
-from lib.util import cachedproperty
 from lib.hash import double_sha256, hash_to_str
+from lib.util import (cachedproperty, unpack_int32_from, unpack_int64_from,
+                      unpack_uint16_from, unpack_uint32_from,
+                      unpack_uint64_from)
 
 
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
@@ -78,6 +79,7 @@ class Deserializer(object):
     def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
         self.binary = binary
+        self.binary_length = len(binary)
         self.cursor = start
 
     def read_tx(self):
@@ -131,7 +133,7 @@ class Deserializer(object):
     def _read_nbytes(self, n):
         cursor = self.cursor
         self.cursor = end = cursor + n
-        assert len(self.binary) >= end
+        assert self.binary_length >= end
         return self.binary[cursor:end]
 
     def _read_varbytes(self):
@@ -149,27 +151,27 @@ class Deserializer(object):
         return self._read_le_uint64()
 
     def _read_le_int32(self):
-        result, = unpack_from('<i', self.binary, self.cursor)
+        result, = unpack_int32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_int64(self):
-        result, = unpack_from('<q', self.binary, self.cursor)
+        result, = unpack_int64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
     def _read_le_uint16(self):
-        result, = unpack_from('<H', self.binary, self.cursor)
+        result, = unpack_uint16_from(self.binary, self.cursor)
         self.cursor += 2
         return result
 
     def _read_le_uint32(self):
-        result, = unpack_from('<I', self.binary, self.cursor)
+        result, = unpack_uint32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_uint64(self):
-        result, = unpack_from('<Q', self.binary, self.cursor)
+        result, = unpack_uint64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 

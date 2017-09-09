@@ -29,17 +29,22 @@
 import hashlib
 import hmac
 
-from lib.util import bytes_to_int, int_to_bytes
+from lib.util import bytes_to_int, int_to_bytes, hex_to_bytes
+
+_sha256 = hashlib.sha256
+_sha512 = hashlib.sha512
+_new_hash = hashlib.new
+_new_hmac = hmac.new
 
 
 def sha256(x):
     '''Simple wrapper of hashlib sha256.'''
-    return hashlib.sha256(x).digest()
+    return _sha256(x).digest()
 
 
 def ripemd160(x):
     '''Simple wrapper of hashlib ripemd160.'''
-    h = hashlib.new('ripemd160')
+    h = _new_hash('ripemd160')
     h.update(x)
     return h.digest()
 
@@ -51,7 +56,7 @@ def double_sha256(x):
 
 def hmac_sha512(key, msg):
     '''Use SHA-512 to provide an HMAC.'''
-    return hmac.new(key, msg, hashlib.sha512).digest()
+    return _new_hmac(key, msg, _sha512).digest()
 
 
 def hash160(x):
@@ -73,7 +78,7 @@ hash_to_str = hash_to_hex_str
 
 def hex_str_to_hash(x):
     '''Convert a displayed hex string to a binary hash.'''
-    return bytes(reversed(bytes.fromhex(x)))
+    return bytes(reversed(hex_to_bytes(x)))
 
 
 class Base58Error(Exception):

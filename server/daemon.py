@@ -18,7 +18,7 @@ from time import strptime
 
 import aiohttp
 
-import lib.util as util
+from lib.util import LoggedClass, int_to_varint, hex_to_bytes
 from lib.hash import hex_str_to_hash
 
 
@@ -26,7 +26,7 @@ class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
 
-class Daemon(util.LoggedClass):
+class Daemon(LoggedClass):
     '''Handles connections to a daemon at the given URL.'''
 
     WARMING_UP = -28
@@ -208,7 +208,7 @@ class Daemon(util.LoggedClass):
         params_iterable = ((h, False) for h in hex_hashes)
         blocks = await self._send_vector('getblock', params_iterable)
         # Convert hex string to bytes
-        return [bytes.fromhex(block) for block in blocks]
+        return [hex_to_bytes(block) for block in blocks]
 
     async def mempool_hashes(self):
         '''Update our record of the daemon's mempool hashes.'''
@@ -240,7 +240,7 @@ class Daemon(util.LoggedClass):
         txs = await self._send_vector('getrawtransaction', params_iterable,
                                       replace_errs=replace_errs)
         # Convert hex strings to bytes
-        return [bytes.fromhex(tx) if tx else None for tx in txs]
+        return [hex_to_bytes(tx) if tx else None for tx in txs]
 
     async def sendrawtransaction(self, params):
         '''Broadcast a transaction to the network.'''
@@ -336,7 +336,7 @@ class LegacyRPCDaemon(Daemon):
         raw_block = header
         num_txs = len(transactions)
         if num_txs > 0:
-            raw_block += util.int_to_varint(num_txs)
+            raw_block += int_to_varint(num_txs)
             raw_block += b''.join(transactions)
         else:
             raw_block += b'\x00'

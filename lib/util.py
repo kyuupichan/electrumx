@@ -34,7 +34,7 @@ import logging
 import re
 import sys
 from collections import Container, Mapping
-from struct import pack
+from struct import pack, Struct
 
 
 class LoggedClass(object):
@@ -309,3 +309,11 @@ def protocol_version(client_req, server_min, server_max):
         result = None
 
     return result
+
+unpack_int32_from = Struct('<i').unpack_from
+unpack_int64_from = Struct('<q').unpack_from
+unpack_uint16_from = Struct('<H').unpack_from
+unpack_uint32_from = Struct('<I').unpack_from
+unpack_uint64_from = Struct('<Q').unpack_from
+
+hex_to_bytes = bytes.fromhex

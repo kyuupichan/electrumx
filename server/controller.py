@@ -675,7 +675,7 @@ class Controller(util.LoggedClass):
         '''Raise an RPCError if the value is not a valid transaction
         hash.'''
         try:
-            if len(bytes.fromhex(value)) == 32:
+            if len(util.hex_to_bytes(value)) == 32:
                 return
         except Exception:
             pass
@@ -898,7 +898,7 @@ class Controller(util.LoggedClass):
         raw_tx = await self.daemon_request('getrawtransaction', tx_hash)
         if not raw_tx:
             return None
-        raw_tx = bytes.fromhex(raw_tx)
+        raw_tx = util.hex_to_bytes(raw_tx)
         tx, tx_hash = self.coin.DESERIALIZER(raw_tx).read_tx()
         if index >= len(tx.outputs):
             return None
