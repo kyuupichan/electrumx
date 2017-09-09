@@ -31,8 +31,8 @@ class Env(lib_util.LoggedClass):
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
         self.db_dir = self.required('DB_DIRECTORY')
         self.daemon_url = self.required('DAEMON_URL')
-        coin_name = self.required('COIN')
-        network = self.default('NET', 'mainnet')
+        coin_name = self.required('COIN').strip()
+        network = self.default('NET', 'mainnet').strip()
         self.coin = Coin.lookup_coin_class(coin_name, network)
         self.cache_MB = self.integer('CACHE_MB', 1200)
         self.host = self.default('HOST', 'localhost')
@@ -43,6 +43,7 @@ class Env(lib_util.LoggedClass):
         if self.ssl_port:
             self.ssl_certfile = self.required('SSL_CERTFILE')
             self.ssl_keyfile = self.required('SSL_KEYFILE')
+        self.rpc_host = self.default('RPC_HOST', 'localhost')
         self.rpc_port = self.integer('RPC_PORT', 8000)
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
@@ -184,11 +185,20 @@ class Env(lib_util.LoggedClass):
             return uvloop.EventLoopPolicy()
         raise self.Error('unknown event loop policy "{}"'.format(policy))
 
-    def cs_host(self):
+    def cs_host(self, *, for_rpc):
         '''Returns the 'host' argument to pass to asyncio's create_server
         call.  The result can be a single host name string, a list of
-        host name strings, or an empty string to bind to all interfaces.'''
-        result = self.host.split(',')
+        host name strings, or an empty string to bind to all interfaces.
+
+        If rpc is True the host to use for the RPC server is returned.
+        Otherwise the host to use for SSL/TCP servers is returned.
+        '''
+        host = self.rpc_host if for_rpc else self.host
+        result = [part.strip() for part in host.split(',')]
         if len(result) == 1:
             result = result[0]
+        # An empty result indicates all interfaces, which is not
+        # permitted for the RPC server.
+        if for_rpc and not result:
+            result = 'localhost'
         return result

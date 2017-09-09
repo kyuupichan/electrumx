@@ -82,8 +82,11 @@ def test_COIN_NET():
     os.environ['NET'] = 'testnet'
     e = Env()
     assert e.coin == lib_coins.BitcoinCashTestnet
+    os.environ['NET'] = ' testnet '
+    e = Env()
+    assert e.coin == lib_coins.BitcoinCashTestnet
     os.environ.pop('NET')
-    os.environ['COIN'] = 'Litecoin'
+    os.environ['COIN'] = ' Litecoin '
     e = Env()
     assert e.coin == lib_coins.Litecoin
     os.environ['NET'] = 'testnet'
@@ -97,10 +100,23 @@ def test_HOST():
     assert_default('HOST', 'host', 'localhost')
     os.environ['HOST'] = ''
     e = Env()
-    assert e.cs_host() == ''
+    assert e.cs_host(for_rpc=False) == ''
     os.environ['HOST'] = '192.168.0.1,23.45.67.89'
     e = Env()
-    assert e.cs_host() == ['192.168.0.1', '23.45.67.89']
+    assert e.cs_host(for_rpc=False) == ['192.168.0.1', '23.45.67.89']
+    os.environ['HOST'] = '192.168.0.1 , 23.45.67.89 '
+    e = Env()
+    assert e.cs_host(for_rpc=False) == ['192.168.0.1', '23.45.67.89']
+
+def test_RPC_HOST():
+    assert_default('RPC_HOST', 'rpc_host', 'localhost')
+    os.environ['RPC_HOST'] = ''
+    e = Env()
+    # Blank reverts to localhost
+    assert e.cs_host(for_rpc=True) == 'localhost'
+    os.environ['RPC_HOST'] = '127.0.0.1, ::1'
+    e = Env()
+    assert e.cs_host(for_rpc=True) == ['127.0.0.1', '::1']
 
 def test_REORG_LIMIT():
     assert_integer('REORG_LIMIT', 'reorg_limit',

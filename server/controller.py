@@ -204,7 +204,7 @@ class Controller(util.LoggedClass):
     async def main_loop(self):
         '''Controller main loop.'''
         if self.env.rpc_port is not None:
-            await self.start_server('RPC', ('127.0.0.1', '::1'),
+            await self.start_server('RPC', self.env.cs_host(for_rpc=True),
                                     self.env.rpc_port)
         self.ensure_future(self.bp.main_loop())
         self.ensure_future(self.wait_for_bp_catchup())
@@ -292,7 +292,7 @@ class Controller(util.LoggedClass):
         self.state = self.LISTENING
 
         env = self.env
-        host = env.cs_host()
+        host = env.cs_host(for_rpc=False)
         if env.tcp_port is not None:
             await self.start_server('TCP', host, env.tcp_port)
         if env.ssl_port is not None:
@@ -317,7 +317,8 @@ class Controller(util.LoggedClass):
                 self.header_cache.clear()
 
             # Make a copy; self.sessions can change whilst await-ing
-            sessions = [s for s in self.sessions if isinstance(s, self.coin.SESSIONCLS)]
+            sessions = [s for s in self.sessions
+                        if isinstance(s, self.coin.SESSIONCLS)]
             for session in sessions:
                 await session.notify(self.bp.db_height, touched)
 

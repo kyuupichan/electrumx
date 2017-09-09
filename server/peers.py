@@ -524,7 +524,7 @@ class PeerManager(util.LoggedClass):
 
         # Use our listening Host/IP for outgoing connections so our
         # peers see the correct source.
-        host = self.env.cs_host()
+        host = self.env.cs_host(for_rpc=False)
         if isinstance(host, list):
             host = host[0]
         local_addr = (host, None) if host else None

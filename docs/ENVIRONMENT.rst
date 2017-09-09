@@ -8,6 +8,11 @@ given, the rest will have sensible defaults if not specified.  Many of
 the defaults around resource usage are conservative; I encourage you
 to review them.
 
+Note: by default the server will only serve to connections from the
+same machine.  To be accessible to other users across the internet you
+must set **HOST** appropriately; see below.
+
+
 Required
 --------
 
@@ -53,6 +58,7 @@ The following are required if you use the `run` script:
 
   The username the server will run as.
 
+
 Miscellaneous
 -------------
 
@@ -63,25 +69,12 @@ These environment variables are optional:
   Must be a *NET* from one of the **Coin** classes in `lib/coins.py`_.
   Defaults to `mainnet`.
 
-  Note: if you are using Bitcoin Core post the August 1st fork, you
-  should have NET be `bitcoin-segwit`, and if on the Bitcoin Cash
-  chain NET should be `mainnet`.
-  Note Bitcoin Core >= 0.13.1 requires a special *NET* for testnet:
-  `testnet-segwit`.
-
 * **DB_ENGINE**
 
   Database engine for the UTXO and history database.  The default is
   `leveldb`.  The other alternative is `rocksdb`.  You will need to
   install the appropriate python package for your engine.  The value
   is not case sensitive.
-
-* **REORG_LIMIT**
-
-  The maximum number of blocks to be able to handle in a chain
-  reorganisation.  ElectrumX retains some fairly compact undo
-  information for this many blocks in levelDB.  The default is a
-  function of **COIN** and **NET**; for Bitcoin mainnet it is 200.
 
 * **HOST**
 
@@ -101,20 +94,25 @@ These environment variables are optional:
   If set then SSL_CERTFILE and SSL_KEYFILE must be defined and be
   filesystem paths to those SSL files.
 
+* **RPC_HOST**
+
+  The host or IP address that the RPC server will listen on and
+  defaults to `localhost`.  To listen on multiple specific addresses
+  specify a comma-separated list.  Servers with unusual networking
+  setups might want to specify e.g. `::1` or `127.0.0.1` explicitly
+  rather than defaulting to `localhost`.
+
+  An empty string (normally indicating all interfaces) is interpreted
+  as `localhost`, because allowing access to the server's RPC
+  interface to arbitrary connections aacross the internet is not a
+  good idea.
+
 * **RPC_PORT**
 
   ElectrumX will listen on this port for local RPC connections.
   ElectrumX listens for RPC connections unless this is explicitly set
-  to blank.  The default is appropriate for **COIN** and **NET**
-  (e.g., 8000 for Bitcoin mainnet) if not set.
-
-* **EVENT_LOOP_POLICY**
-
-  The name of an event loop policy to replace the default asyncio
-  policy, if any.  At present only `uvloop` is accepted, in which case
-  you must have installed the `uvloop`_ Python package.
-
-  If you are not sure what this means leave it unset.
+  to blank.  The default depends on **COIN** and **NET** (e.g., 8000
+  for Bitcoin mainnet) if not set, as indicated in `lib/coins.py`_.
 
 * **DONATION_ADDRESS**
 
@@ -158,6 +156,22 @@ These environment variables are optional:
   log.  The output is identical to the **sessions** RPC command except
   that **ANON_LOGS** is honoured.  Defaults to 3600.  Set to zero to
   suppress this logging.
+
+* **REORG_LIMIT**
+
+  The maximum number of blocks to be able to handle in a chain
+  reorganisation.  ElectrumX retains some fairly compact undo
+  information for this many blocks in levelDB.  The default is a
+  function of **COIN** and **NET**; for Bitcoin mainnet it is 200.
+
+* **EVENT_LOOP_POLICY**
+
+  The name of an event loop policy to replace the default asyncio
+  policy, if any.  At present only `uvloop` is accepted, in which case
+  you must have installed the `uvloop`_ Python package.
+
+  If you are not sure what this means leave it unset.
+
 
 Resource Usage Limits
 ---------------------
