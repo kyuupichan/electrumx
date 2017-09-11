@@ -987,3 +987,23 @@ class Neblio(Coin):
             return super().header_hash(header)
         else:
             return cls.HEADER_HASH(header)
+
+class Bitzeny(Coin):
+    NAME = "Bitzeny"
+    SHORTNAME = "ZNY"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("51")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('000009f7e55e9e3b4781e22bd87a7cfa'
+                    '4acada9e4340d43ca738bf4e9fb8f5ce')
+    ESTIMATE_FEE = 0.001
+    RELAY_FEE = 0.001
+    DAEMON = daemon.FakeEstimateFeeDaemon
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 10000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 3776
+    REORG_LIMIT = 1000
