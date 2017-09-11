@@ -997,8 +997,8 @@ class Bitzeny(Coin):
     P2PKH_VERBYTE = bytes.fromhex("51")
     P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("80")
-    GENESIS_HASH = ('f9c7d5863b1371cb924aeea29653ce64'
-                    'bbc70b445e7ff5f54d3ab4ece2d69c69')
+    GENESIS_HASH = ('000009f7e55e9e3b4781e22bd87a7cfa'
+                    '4acada9e4340d43ca738bf4e9fb8f5ce')
     ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.001
     DAEMON = daemon.FakeEstimateFeeDaemon
