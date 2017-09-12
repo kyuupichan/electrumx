@@ -327,15 +327,15 @@ class BitcoinMixin(object):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
-    TX_COUNT = 217380620
-    TX_COUNT_HEIGHT = 464000
-    TX_PER_BLOCK = 1800
     RPC_PORT = 8332
 
 
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
     SHORTNAME = "BCC"
+    TX_COUNT = 243631085
+    TX_COUNT_HEIGHT = 479636
+    TX_PER_BLOCK = 50
     PEERS = [
         'electroncash.bitcoinplug.com s t',
         'electrum-abc.criptolayer.net s50012',
@@ -351,6 +351,9 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = DeserializerSegWit
+    TX_COUNT = 217380620
+    TX_COUNT_HEIGHT = 464000
+    TX_PER_BLOCK = 1800
     PEERS = [
         'btc.smsys.me s995',
         'E-X.not.fyi s t',
