@@ -784,6 +784,46 @@ class FairCoin(Coin):
             'creatorId': creatorId,
         }
 
+class Hush(Coin):
+    NAME                 = "Hush"
+    SHORTNAME            = "HUSH"
+    NET                  = "mainnet"
+    P2PKH_VERBYTE        = bytes.fromhex("1CB8")
+    P2SH_VERBYTES        = [bytes.fromhex("1CBD")]
+    WIF_BYTE             = bytes.fromhex("80")
+    GENESIS_HASH         = ( '0003a67bc26fe564b75daf11186d3606'
+                             '52eb435a35ba3d9d3e7e5d5f8e62dc17')
+    STATIC_BLOCK_HEADERS = False
+    BASIC_HEADER_SIZE    = 140 # Excluding Equihash solution
+    DESERIALIZER         = DeserializerZcash
+    TX_COUNT             = 392409
+    TX_COUNT_HEIGHT      = 171777
+    TX_PER_BLOCK         = 5
+    IRC_PREFIX           = ""
+    IRC_CHANNEL          = ""
+    RPC_PORT             = 8888
+    REORG_LIMIT          = 800
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits = struct.unpack('<II', header[100:108])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': hash_to_str(header[108:140]),
+        }
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 class Zcash(Coin):
     NAME = "Zcash"
