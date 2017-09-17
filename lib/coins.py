@@ -760,7 +760,7 @@ class Hush(Coin):
     TX_PER_BLOCK         = 5
     IRC_PREFIX           = ""
     IRC_CHANNEL          = ""
-    RPC_PORT             = 8888
+    RPC_PORT             = 8822
     REORG_LIMIT          = 800
 
     @classmethod
