@@ -29,6 +29,7 @@ class Env(lib_util.LoggedClass):
     def __init__(self):
         super().__init__()
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
+        self.allow_root = self.boolean('ALLOW_ROOT', False)
         self.db_dir = self.required('DB_DIRECTORY')
         self.daemon_url = self.required('DAEMON_URL')
         coin_name = self.required('COIN').strip()

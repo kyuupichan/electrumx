@@ -51,9 +51,12 @@ class Controller(util.LoggedClass):
         if sys.version_info < (3, 5, 3):
             raise RuntimeError('Python >= 3.5.3 is required to run ElectrumX')
 
-        if os.geteuid() == 0:
-            raise RuntimeError('DO NOT RUN AS ROOT! Create an unprivileged '
-                               'user account and use that')
+        if os.geteuid() == 0 and not env.allow_root:
+            raise RuntimeError('RUNNING AS ROOT IS STRONGLY DISCOURAGED!\n'
+                               'You shoud create an unprivileged user account '
+                               'and use that.\n'
+                               'If you\'d like to continue as root, please run '
+                               'this again with ALLOW_ROOT=1')
 
         # Set the event loop policy before doing anything asyncio
         self.logger.info('event loop policy: {}'.format(env.loop_policy))
