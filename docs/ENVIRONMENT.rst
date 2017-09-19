@@ -64,6 +64,10 @@ Miscellaneous
 
 These environment variables are optional:
 
+* **ALLOW_ROOT**
+
+  Set this environment variable to "1" to allow running ElectrumX as root.
+
 * **NET**
 
   Must be a *NET* from one of the **Coin** classes in `lib/coins.py`_.
