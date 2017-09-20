@@ -55,8 +55,8 @@ class Controller(util.LoggedClass):
             raise RuntimeError('RUNNING AS ROOT IS STRONGLY DISCOURAGED!\n'
                                'You shoud create an unprivileged user account '
                                'and use that.\n'
-                               'If you\'d like to continue as root, please run '
-                               'this again with ALLOW_ROOT=1')
+                               'To continue as root anyway, restart with '
+                               'environment variable ALLOW_ROOT non-empty')
 
         # Set the event loop policy before doing anything asyncio
         self.logger.info('event loop policy: {}'.format(env.loop_policy))
