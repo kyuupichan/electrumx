@@ -66,7 +66,7 @@ These environment variables are optional:
 
 * **ALLOW_ROOT**
 
-  Set this environment variable to "1" to allow running ElectrumX as root.
+  Set this environment variable to anything non-empty to allow running ElectrumX as root.
 
 * **NET**
 
