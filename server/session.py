@@ -473,7 +473,7 @@ class DashElectrumX(ElectrumX):
     def set_protocol_handlers(self, ptuple):
         super().set_protocol_handlers(ptuple)
         mna_broadcast = (self.masternode_announce_broadcast if ptuple >= (1, 1)
-                         else masternode_announce_broadcast_1_0)
+                         else self.masternode_announce_broadcast_1_0)
         self.electrumx_handlers.update({
             'masternode.announce.broadcast': mna_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
