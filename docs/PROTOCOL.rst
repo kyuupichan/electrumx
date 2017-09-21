@@ -143,7 +143,9 @@ Return the confirmed and unconfirmed history of a bitcoin address.
     output of *blockchain.address.get_mempool* appended to the list.
     Each transaction is a dictionary with keys *height* and *tx_hash*.
     *height* is the integer height of the block the transaction was
-    confirmed in, and *tx_hash* the transaction hash in hexadecimal.
+    confirmed in; if unconfirmed then *height* is 0 if all inputs are
+    confirmed, and -1 otherwise.  *tx_hash* the transaction hash in
+    hexadecimal.
 
 **Response Examples**
 
@@ -232,10 +234,12 @@ Return an ordered list of UTXOs sent to a bitcoin address.
     A list of unspent outputs in blockchain order.  Each transaction
     is a dictionary with keys *height* , *tx_pos*, *tx_height* and
     *value* keys.  *height* is the integer height of the block the
-    transaction was confirmed in, *tx_hash* the transaction hash in
-    hexadecimal, *tx_pos* the zero-based index of the output in the
-    transaction's list of outputs, and *value* its integer value in
-    minimum coin units (satoshis in the case of Bitcoin).
+    transaction was confirmed in; if unconfirmed then *height* is 0 if
+    all inputs are confirmed, and -1 otherwise.  *tx_hash* the
+    transaction hash in hexadecimal, *tx_pos* the zero-based index of
+    the output in the transaction's list of outputs, and *value* its
+    integer value in minimum coin units (satoshis in the case of
+    Bitcoin).
 
 **Response Example**
 
