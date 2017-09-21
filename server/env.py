@@ -11,26 +11,23 @@
 import resource
 from collections import namedtuple
 from ipaddress import ip_address
-from os import environ
 
 from lib.coins import Coin
+from lib.env import EnvBase
 import lib.util as lib_util
 
 
 NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
-class Env(lib_util.LoggedClass):
+class Env(EnvBase):
     '''Wraps environment configuration.'''
-
-    class Error(Exception):
-        pass
 
     def __init__(self):
         super().__init__()
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
-        self.allow_root = self.boolean('ALLOW_ROOT', False)
         self.db_dir = self.required('DB_DIRECTORY')
+        self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
         coin_name = self.required('COIN').strip()
         network = self.default('NET', 'mainnet').strip()
@@ -44,7 +41,6 @@ class Env(lib_util.LoggedClass):
         if self.ssl_port:
             self.ssl_certfile = self.required('SSL_CERTFILE')
             self.ssl_keyfile = self.required('SSL_KEYFILE')
-        self.rpc_host = self.default('RPC_HOST', 'localhost')
         self.rpc_port = self.integer('RPC_PORT', 8000)
         self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
@@ -60,7 +56,6 @@ class Env(lib_util.LoggedClass):
         self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
-        self.db_engine = self.default('DB_ENGINE', 'leveldb')
         # Server limits to help prevent DoS
         self.max_send = self.integer('MAX_SEND', 1000000)
         self.max_subs = self.integer('MAX_SUBS', 250000)
@@ -68,7 +63,7 @@ class Env(lib_util.LoggedClass):
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
-        self.loop_policy = self.event_loop_policy()
+
         # IRC
         self.irc = self.boolean('IRC', False)
         self.irc_nick = self.default('IRC_NICK', None)
@@ -79,28 +74,6 @@ class Env(lib_util.LoggedClass):
         self.identities = [identity
                            for identity in (clearnet_identity, tor_identity)
                            if identity is not None]
-
-    def default(self, envvar, default):
-        return environ.get(envvar, default)
-
-    def boolean(self, envvar, default):
-        return bool(self.default(envvar, default))
-
-    def required(self, envvar):
-        value = environ.get(envvar)
-        if value is None:
-            raise self.Error('required envvar {} not set'.format(envvar))
-        return value
-
-    def integer(self, envvar, default):
-        value = environ.get(envvar)
-        if value is None:
-            return default
-        try:
-            return int(value)
-        except Exception:
-            raise self.Error('cannot convert envvar {} value {} to an integer'
-                             .format(envvar, value))
 
     def sane_max_sessions(self):
         '''Return the maximum number of sessions to permit.  Normally this
@@ -115,12 +88,6 @@ class Env(lib_util.LoggedClass):
                              'because your open file limit is {:,d}'
                              .format(env_value, value, nofile_limit))
         return value
-
-    def obsolete(self, envvars):
-        bad = [envvar for envvar in envvars if environ.get(envvar)]
-        if bad:
-            raise self.Error('remove obsolete environment variables {}'
-                             .format(bad))
 
     def clearnet_identity(self):
         host = self.default('REPORT_HOST', None)
@@ -176,30 +143,3 @@ class Env(lib_util.LoggedClass):
             ssl_port,
             '_tor',
         )
-
-    def event_loop_policy(self):
-        policy = self.default('EVENT_LOOP_POLICY', None)
-        if policy is None:
-            return None
-        if policy == 'uvloop':
-            import uvloop
-            return uvloop.EventLoopPolicy()
-        raise self.Error('unknown event loop policy "{}"'.format(policy))
-
-    def cs_host(self, *, for_rpc):
-        '''Returns the 'host' argument to pass to asyncio's create_server
-        call.  The result can be a single host name string, a list of
-        host name strings, or an empty string to bind to all interfaces.
-
-        If rpc is True the host to use for the RPC server is returned.
-        Otherwise the host to use for SSL/TCP servers is returned.
-        '''
-        host = self.rpc_host if for_rpc else self.host
-        result = [part.strip() for part in host.split(',')]
-        if len(result) == 1:
-            result = result[0]
-        # An empty result indicates all interfaces, which is not
-        # permitted for the RPC server.
-        if for_rpc and not result:
-            result = 'localhost'
-        return result
