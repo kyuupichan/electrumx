@@ -8,6 +8,10 @@ given, the rest will have sensible defaults if not specified.  Many of
 the defaults around resource usage are conservative; I encourage you
 to review them.
 
+With daemontools to set an environment variable to empty use
+`echo '' > VARIABLE` e.g. `echo '' > PEER_DISCOVERY` as with some
+text editors saving an empty file might not do the job.
+
 Note: by default the server will only serve to connections from the
 same machine.  To be accessible to other users across the internet you
 must set **HOST** appropriately; see below.
