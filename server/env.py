@@ -13,7 +13,7 @@ from collections import namedtuple
 from ipaddress import ip_address
 
 from lib.coins import Coin
-from lib.env import EnvBase
+from lib.env_base import EnvBase
 import lib.util as lib_util
 
 
