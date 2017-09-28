@@ -134,6 +134,16 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.1.1
+-------------
+
+- various refactorings, improvement of env var handling
+- update docs to match
+- various optimizations mainly affecting initial sync (Justin Arthur)
+- Dash fixes (cipig)
+- Add ALLOW_ROOT option (Luke Childs)
+- Add BitZeny support, update Monacoin (cryptocoin-junkey)
+
 Version 1.1
 -----------
 
@@ -243,126 +253,15 @@ Version 1.0.11
 - fix diagnostic typo (anduck)
 - Issues fixed: `#180`_
 
-Version 1.0.10
---------------
-
-- add bauerj's installer docs
-- segwit has activated on Litecoin.  Make segwit deserialization the
-  default.  Also as the first Segwit block probably will break old
-  electrum-server implementation servers, disable IRC and make
-  Litecoin mainnet and testnet use the peer-discovery protocol.  If
-  you previously used "testnet-segwit" as your NET you should instead
-  use "testnet".
-
-Version 1.0.9
--------------
-
-- ignore peers not appearing in their features list
-- validate hostnames in Env object
-- added tests for env.py
-- Einsteinium support and contrib script shebang fix (erasmospunk)
-- set last_good only if successfully verified
-
-Version 1.0.8
--------------
-
-Minor peer-discovery tweaks:
-
-* I intended that if a host and its IP address were both registered as
-  peers, that the real hostname replace the IP address.  That wasn't
-  working properly and is fixed now.
-* 1.0.6 no longer required a clearnet identity but part of the peer
-  discovery logic assumed one existed.  That is now fixed.
-
-Version 1.0.7
--------------
-
-Improvements to proxy handling and peer discovery
-
-* background async proxy detection loop.  Removes responsibility for
-  proxy detection and maintenance from the peer manager.
-* peer discovery waits for an initial proxy detection attempt to complete
-  before starting
-* new feature: flag to force peer discovery to happen via the proxy.
-  This might be useful for someone exlusively running a Tor service
-  that doesn't want to reveal its IP address.  See **FORCE_PROXY** in
-  `docs/ENVIRONMENT.rst`_ for details and caveats.
-* other minor fixes and tweaks
-
-Version 1.0.6
--------------
-
-* updated to handle incompatibilities between aiohttp 1.0 and 2.0.
-  ElexctrumX should work with either for now; I will drop support for
-  1.0 in a few months.  Fixes `#163`_.
-* relax get_chunk restrictions for clients 1.8.3 and higher.  Closes
-  `#162`_.
-* **REPORT_HOST** no longer defaults to **HOST**.  If not set, no
-  clearnet identity will be advertised.
-* Add Viacoin support (romanornr)
-
-Version 1.0.5
--------------
-
-* the peer looping was actually just looping of logging output, not
-  connections.  Hopefully fixed for good in this release.  Closes `#160`_.
-
-Version 1.0.4
--------------
-
-* fix another unwanted loop in peer discovery, tweak diagnostics
-
-Version 1.0.3
--------------
-
-* fix a verification loop that happened occasionally with bad peers
-
-Version 1.0.2
--------------
-
-* stricter acceptance of add_peer requests: rate-limit onion peers,
-  and require incoming requests to resolve to the requesting IP address
-* validate peer hostnames (closes `#157`_)
-* verify height for all peers (closes `#152`_)
-* various improvements to peer handling
-* various documentation tweaks
-* limit the maximum number of sessions based on the process's
-  open file soft limit (closes `#158`_)
-* improved altcoin support for variable-length block headers and AuxPoW
-  (erasmospunk) (closes `#128`_ and `#83`_)
-
-Version 1.0.1
--------------
-
-* Rate-limit add_peer calls in a random way
-* Fix discovery of base height in reorgs
-* Don't permit common but invalid REPORT_HOST values
-* Set reorg limit to 8000 blocks on testnet
-* dogecoin / litecoin parameter fixes (erasmospunk, pooler)
-* minor doc tweaks
-
-Version 1.0
------------
-
-* Minor doc tweaks only
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 
-.. _#83: https://github.com/kyuupichan/electrumx/issues/83
-.. _#128: https://github.com/kyuupichan/electrumx/issues/128
-.. _#152: https://github.com/kyuupichan/electrumx/issues/152
-.. _#157: https://github.com/kyuupichan/electrumx/issues/157
-.. _#158: https://github.com/kyuupichan/electrumx/issues/158
-.. _#160: https://github.com/kyuupichan/electrumx/issues/160
-.. _#162: https://github.com/kyuupichan/electrumx/issues/162
-.. _#163: https://github.com/kyuupichan/electrumx/issues/163
 .. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _#251: https://github.com/kyuupichan/electrumx/issues/251
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
-.. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst
+.. _docs/PROTOCOL.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PROTOCOL.rst
