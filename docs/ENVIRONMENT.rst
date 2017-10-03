@@ -108,7 +108,7 @@ These environment variables are optional:
 
   An empty string (normally indicating all interfaces) is interpreted
   as `localhost`, because allowing access to the server's RPC
-  interface to arbitrary connections aacross the internet is not a
+  interface to arbitrary connections across the internet is not a
   good idea.
 
 * **RPC_PORT**
@@ -133,7 +133,7 @@ These environment variables are optional:
   replaced before serving to a client.
 
   + **$SERVER_VERSION** is replaced with the ElectrumX version you are
-    runnning, such as *1.0.10*.
+    running, such as *1.0.10*.
   + **$SERVER_SUBVERSION** is replaced with the ElectrumX user agent
     string.  For example, `ElectrumX 1.0.10`.
   + **$DAEMON_VERSION** is replaced with the daemon's version as a
@@ -204,7 +204,7 @@ raise them.
   The Electrum protocol has a flaw in that address histories must be
   served all at once or not at all, an obvious avenue for abuse.
   **MAX_SEND** is a stop-gap until the protocol is improved to admit
-  incremental history requests.  Each history entry is appoximately
+  incremental history requests.  Each history entry is approximately
   100 bytes so the default is equivalent to a history limit of around
   10,000 entries, which should be ample for most legitimate users.  If
   you use a higher default bear in mind one client can request history
@@ -226,7 +226,7 @@ raise them.
 
 * **BANDWIDTH_LIMIT**
 
-  Per-session periodic bandwith usage limit in bytes.  This is a soft,
+  Per-session periodic bandwidth usage limit in bytes.  This is a soft,
   not hard, limit.  Currently the period is hard-coded to be one hour.
   The default limit value is 2 million bytes.
 
@@ -254,7 +254,7 @@ Peer Discovery
 --------------
 
 In response to the `server.peers.subscribe` RPC call, ElectrumX will
-only return peer servers that is has recently connected to and
+only return peer servers that it has recently connected to and
 verified basic functionality.
 
 If you are not running a Tor proxy ElectrumX will be unable to connect
