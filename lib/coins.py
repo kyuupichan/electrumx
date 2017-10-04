@@ -792,9 +792,10 @@ class Einsteinium(Coin):
     NET = "mainnet"
     P2PKH_VERBYTE = bytes.fromhex("21")
     P2SH_VERBYTES = [bytes.fromhex("05")]
-    WIF_BYTE = bytes.fromhex("a1")
+    WIF_BYTE = bytes.fromhex("b0")
     GENESIS_HASH = ('4e56204bb7b8ac06f860ff1c845f03f9'
                     '84303b5b97eb7b42868f714611aed94b')
+    DESERIALIZER = DeserializerSegWit
     TX_COUNT = 2087559
     TX_COUNT_HEIGHT = 1358517
     TX_PER_BLOCK = 2
