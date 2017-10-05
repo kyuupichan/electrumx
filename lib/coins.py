@@ -952,6 +952,7 @@ class Monacoin(Coin):
         'electrumx.tamami-foundation.org s t',
         'electrumx1.movsign.info t',
         'electrumx2.movsign.info t',
+        'electrum-mona.bitbank.cc s t',
     ]
 
 
