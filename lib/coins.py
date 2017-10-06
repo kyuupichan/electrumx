@@ -1047,3 +1047,25 @@ class Bitzeny(Coin):
     TX_PER_BLOCK = 1
     RPC_PORT = 9252
     REORG_LIMIT = 1000
+
+class CanadaeCoin(AuxPowMixin, Coin):
+    NAME = "CanadaeCoin"
+    SHORTNAME = "CDN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1C")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("9c")
+    GENESIS_HASH = ('863626dadaef221e2e2f30ff3dacae44'
+                    'cabdae9e0028058072181b3fb675d94a')
+    ESTIMATE_FEE = 0.0001
+    RELAY_FEE = 0.0001
+    DAEMON = daemon.FakeEstimateFeeDaemon
+    TX_COUNT = 3455905
+    TX_COUNT_HEIGHT = 3645419
+    TX_PER_BLOCK = 1
+    IRC_PREFIX = "E_"
+    IRC_CHANNEL="#electrum-cdn"
+    RPC_PORT = 34330
+    REORG_LIMIT = 1000
