@@ -393,12 +393,7 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Bitcoin Cash daemons.'''
     NAME = "BitcoinCash"
     PEERS = [
-        'electrum.akinbo.org s t',
-        'he36kyperp3kbuxu.onion s t',
-        'electrum-btc-testnet.petrkr.net s t',
-        'testnet.hsmiths.com t53011',
-        'hsmithsxurybd7uh.onion t53011 s53012',
-        'ELEX05.blackpole.online t52001 s52002',
+        'electrum-testnet-abc.criptolayer.net s50112',
     ]
 
 
@@ -406,6 +401,13 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.'''
     NAME = "BitcoinSegwit"
     DESERIALIZER = DeserializerSegWit
+    PEERS = [
+        'electrum.akinbo.org s t',
+        'he36kyperp3kbuxu.onion s t',
+        'testnet.hsmiths.com t53011 s53012',
+        'hsmithsxurybd7uh.onion t53011 s53012',
+        'testnetnode.arihanc.com s t',
+    ]
 
 
 class BitcoinSegwitRegtest(BitcoinSegwitTestnet):
