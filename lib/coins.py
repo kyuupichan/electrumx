@@ -40,7 +40,8 @@ import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
 from lib.script import ScriptPubKey
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
-    DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
+    DeserializerZcash, DeserializerTxTime, DeserializerReddcoin, \
+    DeserializerTxTimeAuxPow
 from server.block_processor import BlockProcessor
 import server.daemon as daemon
 from server.session import ElectrumX, DashElectrumX
@@ -366,6 +367,54 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
     ]
+
+class Emercoin(Coin):
+    NAME = "Emercoin"
+    SHORTNAME = "EMC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("21")
+    P2SH_VERBYTES = [bytes.fromhex("5c")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00000000bcccd459d036a588d1008fce'
+                    '8da3754b205736f32ddfd35350e84c2d')
+    TX_COUNT = 217380620
+    TX_COUNT_HEIGHT = 464000
+    TX_PER_BLOCK = 1700
+    VALUE_PER_COIN = 1000000
+    RPC_PORT = 6662
+
+    DESERIALIZER = DeserializerTxTimeAuxPow
+
+    PEERS = []
+
+    @classmethod
+    def sanitize_url(cls, url):
+        # Remove surrounding ws and trailing /s
+        url = url.strip().rstrip('/')
+        match = cls.RPC_URL_REGEX.match(url)
+        if not match:
+            raise CoinError('invalid daemon URL: "{}"'.format(url))
+        if match.groups()[1] is None:
+            url += ':{:d}'.format(cls.RPC_PORT)
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = 'http://' + url
+        return url + '/'
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Returns the block header given a block and its height.'''
+        deserializer = cls.DESERIALIZER(block)
+
+        if deserializer.is_merged_block():
+            return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
+        return block[:cls.static_header_len(height)]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        return double_sha256(header[:cls.BASIC_HEADER_SIZE])
 
 
 class BitcoinTestnetMixin(object):
