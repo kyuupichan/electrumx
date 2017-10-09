@@ -108,7 +108,7 @@ class Coin(object):
             raise CoinError('invalid daemon URL: "{}"'.format(url))
         if match.groups()[1] is None:
             url += ':{:d}'.format(cls.RPC_PORT)
-        if not url.startswith('http://'):
+        if not url.startswith('http://') and not url.startswith('https://'):
             url = 'http://' + url
         return url + '/'
 
@@ -368,6 +368,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'ELEX01.blackpole.online s t',
     ]
 
+
 class Emercoin(Coin):
     NAME = "Emercoin"
     SHORTNAME = "EMC"
@@ -388,19 +389,6 @@ class Emercoin(Coin):
     DESERIALIZER = DeserializerTxTimeAuxPow
 
     PEERS = []
-
-    @classmethod
-    def sanitize_url(cls, url):
-        # Remove surrounding ws and trailing /s
-        url = url.strip().rstrip('/')
-        match = cls.RPC_URL_REGEX.match(url)
-        if not match:
-            raise CoinError('invalid daemon URL: "{}"'.format(url))
-        if match.groups()[1] is None:
-            url += ':{:d}'.format(cls.RPC_PORT)
-        if not url.startswith('http://') and not url.startswith('https://'):
-            url = 'http://' + url
-        return url + '/'
 
     @classmethod
     def block_header(cls, block, height):
