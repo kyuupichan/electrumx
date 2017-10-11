@@ -23,6 +23,9 @@ NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 class Env(EnvBase):
     '''Wraps environment configuration.'''
 
+    # Peer discovery
+    PD_OFF, PD_SELF, PD_ON = range(3)
+
     def __init__(self):
         super().__init__()
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
@@ -49,7 +52,7 @@ class Env(EnvBase):
         self.anon_logs = self.boolean('ANON_LOGS', False)
         self.log_sessions = self.integer('LOG_SESSIONS', 3600)
         # Peer discovery
-        self.peer_discovery = self.boolean('PEER_DISCOVERY', True)
+        self.peer_discovery = self.peer_discovery_enum()
         self.peer_announce = self.boolean('PEER_ANNOUNCE', True)
         self.force_proxy = self.boolean('FORCE_PROXY', False)
         self.tor_proxy_host = self.default('TOR_PROXY_HOST', 'localhost')
@@ -143,3 +146,12 @@ class Env(EnvBase):
             ssl_port,
             '_tor',
         )
+
+    def peer_discovery_enum(self):
+        pd = self.default('PEER_DISCOVERY', 'on').strip().lower()
+        if pd in ('off', ''):
+            return self.PD_OFF
+        elif pd == 'self':
+            return self.PD_SELF
+        else:
+            return self.PD_ON

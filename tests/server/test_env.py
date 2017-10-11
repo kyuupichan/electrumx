@@ -199,7 +199,17 @@ def test_ANON_LOGS():
     assert_boolean('ANON_LOGS', 'anon_logs', False)
 
 def test_PEER_DISCOVERY():
-    assert_boolean('PEER_DISCOVERY', 'peer_discovery', True)
+    e = Env()
+    assert e.peer_discovery == Env.PD_ON
+    os.environ['PEER_DISCOVERY'] = ' '
+    e = Env()
+    assert e.peer_discovery == Env.PD_OFF
+    os.environ['PEER_DISCOVERY'] = 'ON'
+    e = Env()
+    assert e.peer_discovery == Env.PD_ON
+    os.environ['PEER_DISCOVERY'] = 'self'
+    e = Env()
+    assert e.peer_discovery == Env.PD_SELF
 
 def test_PEER_ANNOUNCE():
     assert_boolean('PEER_ANNOUNCE', 'peer_announce', True)

@@ -424,12 +424,13 @@ class PeerManager(util.LoggedClass):
     def import_peers(self):
         '''Import hard-coded peers from a file or the coin defaults.'''
         self.add_peers(self.myselves)
-        coin_peers = self.env.coin.PEERS
 
-        # Add the hard-coded ones
-        peers = [Peer.from_real_name(real_name, 'coins.py')
-                 for real_name in coin_peers]
-        self.add_peers(peers, limit=None)
+        # Add the hard-coded ones unless only returning self
+        if self.env.peer_discovery != self.env.PD_SELF:
+            coin_peers = self.env.coin.PEERS
+            peers = [Peer.from_real_name(real_name, 'coins.py')
+                     for real_name in coin_peers]
+            self.add_peers(peers, limit=None)
 
     def connect_to_irc(self):
         '''Connect to IRC if not disabled.'''
@@ -459,7 +460,7 @@ class PeerManager(util.LoggedClass):
           3) Retrying old peers at regular intervals.
         '''
         self.connect_to_irc()
-        if not self.env.peer_discovery:
+        if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
             return
 
