@@ -260,21 +260,30 @@ class MemPool(util.LoggedClass):
 
         return result, deferred
 
+    async def raw_transactions(self, hashX):
+        '''Returns an iterable of (hex_hash, raw_tx) pairs for all
+        transactions in the mempool that touch hashX.
+
+        raw_tx can be None if the transaction has left the mempool.
+        '''
+        # hashXs is a defaultdict
+        if hashX not in self.hashXs:
+            return []
+
+        hex_hashes = self.hashXs[hashX]
+        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
+        return zip(hex_hashes, raw_txs)
+
     async def transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
         entries for the hashX.
 
         unconfirmed is True if any txin is unconfirmed.
         '''
-        # hashXs is a defaultdict
-        if hashX not in self.hashXs:
-            return []
-
         deserializer = self.coin.DESERIALIZER
-        hex_hashes = self.hashXs[hashX]
-        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
+        pairs = await self.raw_transactions(hashX)
         result = []
-        for hex_hash, raw_tx in zip(hex_hashes, raw_txs):
+        for hex_hash, raw_tx in pairs:
             item = self.txs.get(hex_hash)
             if not item or not raw_tx:
                 continue
@@ -286,6 +295,23 @@ class MemPool(util.LoggedClass):
                               for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result
+
+    async def spends(self, hashX):
+        '''Return a set of (prev_hash, prev_idx) pairs from mempool
+        transactions that touch hashX.
+
+        None, some or all of these may be spends of the hashX.
+        '''
+        deserializer = self.coin.DESERIALIZER
+        pairs = await self.raw_transactions(hashX)
+        spends = set()
+        for hex_hash, raw_tx in pairs:
+            if not raw_tx:
+                continue
+            tx, tx_hash = deserializer(raw_tx).read_tx()
+            for txin in tx.inputs:
+                spends.add((txin.prev_hash, txin.prev_idx))
+        return spends
 
     def value(self, hashX):
         '''Return the unconfirmed amount in the mempool for hashX.
