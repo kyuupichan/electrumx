@@ -38,7 +38,7 @@ from hashlib import sha256
 
 import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
-from lib.script import ScriptPubKey
+from lib.script import ScriptPubKey, OpCodes
 from lib.tx import Deserializer, DeserializerSegWit, DeserializerAuxPow, \
     DeserializerZcash, DeserializerTxTime, DeserializerReddcoin
 from server.block_processor import BlockProcessor
@@ -47,6 +47,7 @@ from server.session import ElectrumX, DashElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
+OP_RETURN = OpCodes.OP_RETURN
 
 
 class CoinError(Exception):
@@ -131,9 +132,10 @@ class Coin(object):
 
     @classmethod
     def hashX_from_script(cls, script):
-        '''Returns a hashX from a script.'''
-        script = ScriptPubKey.hashX_script(script)
-        if script is None:
+        '''Returns a hashX from a script, or None if the script is provably
+        unspendable so the output can be dropped.
+        '''
+        if script and script[0] == OP_RETURN:
             return None
         return sha256(script).digest()[:cls.HASHX_LEN]
 

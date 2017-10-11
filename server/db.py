@@ -32,7 +32,7 @@ class DB(util.LoggedClass):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [5]
+    DB_VERSIONS = [6]
 
     class MissingUTXOError(Exception):
         '''Raised if a mempool tx input UTXO couldn't be found.'''
