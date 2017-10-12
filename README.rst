@@ -134,6 +134,16 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.1.2
+-------------
+
+- fix listunspent protocol methods to remove in-mempool spends (fixes `#277`_).
+- PEER_DISCOVERY environment variable is now tri-state (fixes `#287`_).
+- improved environment variable handling
+- EMC2 update (cipig), Monacoin update (cryptocoin-junkey),
+  Canada Ecoin (koad)
+- typo fixes, Bitcoin testnet peers updates (SomberNight)
+
 Version 1.1.1
 -------------
 
@@ -262,6 +272,8 @@ Version 1.0.11
 .. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _#251: https://github.com/kyuupichan/electrumx/issues/251
+.. _#251: https://github.com/kyuupichan/electrumx/issues/277
+.. _#251: https://github.com/kyuupichan/electrumx/issues/287
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PROTOCOL.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PROTOCOL.rst
