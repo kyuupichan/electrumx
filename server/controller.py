@@ -476,8 +476,8 @@ class Controller(ServerBase):
             return util.formatted_time(now - t)
 
         now = time.time()
-        fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>3} '
-               '{:>3} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
+        fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>4} '
+               '{:>4} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
         yield fmt.format('Host', 'Status', 'TCP', 'SSL', 'Server', 'Min',
                          'Max', 'Pruning', 'Last Good', 'Last Try',
                          'Tries', 'Source', 'IP Address')
