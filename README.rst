@@ -291,8 +291,8 @@ Version 1.0.11
 .. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _#251: https://github.com/kyuupichan/electrumx/issues/251
-.. _#251: https://github.com/kyuupichan/electrumx/issues/277
-.. _#251: https://github.com/kyuupichan/electrumx/issues/287
+.. _#277: https://github.com/kyuupichan/electrumx/issues/277
+.. _#287: https://github.com/kyuupichan/electrumx/issues/287
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PROTOCOL.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PROTOCOL.rst
