@@ -134,11 +134,30 @@ Roadmap
 ChangeLog
 =========
 
+Version 1.2
+-----------
+
+IMPORTANT: this release changes script hash indexing in the database,
+so you will need to rebuild your databases from scratch.  Running this
+version will refuse to open the DB and not corrupt it, so you can
+revert to 1.1.x if you wish.  The initial synchronisation process
+should be around 10-15% faster than 1.1, owing to this change and
+Justin Arthur's optimisations from 1.1.1.
+
+- separate P2PKH from P2PK entries in the history and UTXO databases.
+  These were previously amalgamated by address as that is what
+  electrum-server used to do.  However Electrum didn't handle P2PK
+  spends correctly and now the protocol admits subscriptions by script
+  hash there is no need to have these merged any more.
+
 Version 1.1.2
 -------------
 
-- fix listunspent protocol methods to remove in-mempool spends (fixes `#277`_).
-- PEER_DISCOVERY environment variable is now tri-state (fixes `#287`_).
+- PEER_DISCOVERY environment variable is now tri-state (fixes
+  `#287`_).  Please check your setting as its meaning has changed
+  slightly.
+- fix listunspent protocol methods to remove in-mempool spends (fixes
+  `#277`_).
 - improved environment variable handling
 - EMC2 update (cipig), Monacoin update (cryptocoin-junkey),
   Canada Ecoin (koad)
