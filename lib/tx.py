@@ -257,6 +257,10 @@ class DeserializerAuxPow(Deserializer):
         return self._read_nbytes(header_end)
 
 
+class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
+    pass
+
+
 class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a JoinSplit transaction.'''
 
