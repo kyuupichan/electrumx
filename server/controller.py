@@ -36,7 +36,6 @@ class Controller(ServerBase):
     up with the daemon.
     '''
 
-    PYTHON_MIN_VERSION = (3, 5, 3)
     BANDS = 5
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 

@@ -10,7 +10,7 @@ ElectrumX - Reimplementation of electrum-server
 For a future network with bigger blocks.
 
   :Licence: MIT
-  :Language: Python (>= 3.5.3)
+  :Language: Python (>= 3.6)
   :Author: Neil Booth
 
 Getting Started
@@ -53,35 +53,6 @@ Features
 - Peer discovery protocol removes need for IRC
 - Coin abstraction makes compatible altcoin and testnet support easy.
 
-Motivation
-==========
-
-Mainly for privacy reasons, I have long wanted to run my own Electrum
-server, but I struggled to set it up or get it to work on my
-DragonFlyBSD system and lost interest for over a year.
-
-In September 2016 I heard that electrum-server databases were getting
-large (35-45GB when gzipped), and it would take several weeks to sync
-from Genesis (and was sufficiently painful that no one seems to have
-done it for about a year).  This made me curious about improvements
-and after taking a look at the code I decided to try a different
-approach.
-
-I prefer Python3 over Python2, and the fact that Electrum is stuck on
-Python2 has been frustrating for a while.  It's easier to change the
-server to Python3 than the client, so I decided to write my effort in
-Python3.
-
-It also seemed like a good opportunity to learn about asyncio, a
-wonderful and powerful feature introduced in Python 3.4.
-Incidentally, asyncio would also make a much better way to implement
-the Electrum client.
-
-Finally though no fan of most altcoins I wanted to write a codebase
-that could easily be reused for those alts that are reasonably
-compatible with Bitcoin.  Such an abstraction is also useful for
-testnets.
-
 Implementation
 ==============
 
@@ -122,9 +93,7 @@ and associated complications.
 Roadmap
 =======
 
-- Require Python 3.6, which has several performance improvements
-  relevant to ElectrumX
-- offloading more work to synchronize to the client
+- offloading more work of wallet synchronization to the client
 - supporting better client privacy
 - wallet server engine
 - new features such as possibly adding label server functionality
