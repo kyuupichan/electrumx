@@ -418,7 +418,6 @@ class ElectrumX(SessionBase):
         if ptuple < (1, 1):
             # Methods or semantics unique to 1.0 and earlier protocols
             handlers.update({
-                'blockcahin.address.get_proof': controller.address_get_proof,
                 'blockchain.numblocks.subscribe': self.numblocks_subscribe,
                 'blockchain.utxo.get_address': controller.utxo_get_address,
                 'blockchain.transaction.broadcast':

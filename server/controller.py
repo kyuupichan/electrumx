@@ -789,11 +789,6 @@ class Controller(ServerBase):
         hashX = self.scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
 
-    async def address_get_proof(self, address):
-        '''Return the UTXO proof of an address.'''
-        hashX = self.address_to_hashX(address)
-        raise RPCError('address.get_proof is not yet implemented')
-
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash.
 
