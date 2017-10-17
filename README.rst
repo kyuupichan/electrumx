@@ -119,6 +119,10 @@ Justin Arthur's optimisations from 1.1.1.
   spends correctly and now the protocol admits subscriptions by script
   hash there is no need to have these merged any more.
 
+For Bitcoin (BitcoinSegwit/mainnet) you can download a leveldb database
+synced up to block 490153 using this bittorrent magnet link (~24GB):
+    magnet:?xt=urn:btih:caa804f48a319b061be3884ac011656c27121a6f&dn=electrumx_1.2_btc_leveldb_490153
+
 Version 1.1.2
 -------------
 
