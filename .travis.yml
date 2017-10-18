@@ -5,6 +5,8 @@ group: stable
 os: linux
 python:
   - "3.6"
+services:
+  - riak
 addons:
   apt:
     packages:
