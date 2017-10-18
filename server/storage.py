@@ -1,11 +1,10 @@
-# Copyright (c) 2016-2017, the ElectrumX authors
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Backend database abstraction.'''
+"""Backend database abstraction."""
 
 import os
 from functools import partial
@@ -14,7 +13,7 @@ import lib.util as util
 
 
 def db_class(name):
-    '''Returns a DB engine class.'''
+    """Returns a DB engine class."""
     for db_class in util.subclasses(Storage):
         if db_class.__name__.lower() == name.lower():
             db_class.import_module()
@@ -23,7 +22,7 @@ def db_class(name):
 
 
 class Storage(object):
-    '''Abstract base class of the DB backend abstraction.'''
+    """Abstract base class of the DB backend abstraction."""
 
     def __init__(self, name, for_sync):
         self.is_new = not os.path.exists(name)
@@ -32,15 +31,15 @@ class Storage(object):
 
     @classmethod
     def import_module(cls):
-        '''Import the DB engine module.'''
+        """Import the DB engine module."""
         raise NotImplementedError
 
     def open(self, name, create):
-        '''Open an existing database or create a new one.'''
+        """Open an existing database or create a new one."""
         raise NotImplementedError
 
     def close(self):
-        '''Close an existing database.'''
+        """Close an existing database."""
         raise NotImplementedError
 
     def get(self, key):
@@ -50,26 +49,26 @@ class Storage(object):
         raise NotImplementedError
 
     def write_batch(self):
-        '''Return a context manager that provides `put` and `delete`.
+        """Return a context manager that provides `put` and `delete`.
 
         Changes should only be committed when the context manager
         closes without an exception.
-        '''
+        """
         raise NotImplementedError
 
     def iterator(self, prefix=b'', reverse=False):
-        '''Return an iterator that yields (key, value) pairs from the
+        """Return an iterator that yields (key, value) pairs from the
         database sorted by key.
 
         If `prefix` is set, only keys starting with `prefix` will be
         included.  If `reverse` is True the items are returned in
         reverse order.
-        '''
+        """
         raise NotImplementedError
 
 
 class LevelDB(Storage):
-    '''LevelDB database engine.'''
+    """LevelDB database engine."""
 
     @classmethod
     def import_module(cls):
@@ -90,7 +89,7 @@ class LevelDB(Storage):
 
 
 class RocksDB(Storage):
-    '''RocksDB database engine.'''
+    """RocksDB database engine."""
 
     @classmethod
     def import_module(cls):
@@ -122,7 +121,7 @@ class RocksDB(Storage):
 
 
 class RocksDBWriteBatch(object):
-    '''A write batch for RocksDB.'''
+    """A write batch for RocksDB."""
 
     def __init__(self, db):
         self.batch = RocksDB.module.WriteBatch()
@@ -137,7 +136,7 @@ class RocksDBWriteBatch(object):
 
 
 class RocksDBIterator(object):
-    '''An iterator for RocksDB.'''
+    """An iterator for RocksDB."""
 
     def __init__(self, db, prefix, reverse):
         self.prefix = prefix

@@ -1,11 +1,10 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Peer management.'''
+"""Peer management."""
 
 import asyncio
 import random
@@ -15,13 +14,12 @@ import time
 from collections import defaultdict, Counter
 from functools import partial
 
+import lib.util as util
+import server.version as version
 from lib.jsonrpc import JSONSession
 from lib.peer import Peer
 from lib.socks import SocksProxy
-import lib.util as util
 from server.irc import IRC
-import server.version as version
-
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
 STALE_SECS = 24 * 3600
@@ -29,7 +27,7 @@ WAKEUP_SECS = 300
 
 
 def peers_from_env(env):
-    '''Return a list of peers from the environment settings.'''
+    """Return a list of peers from the environment settings."""
     hosts = {identity.host: {'tcp_port': identity.tcp_port,
                              'ssl_port': identity.ssl_port}
              for identity in env.identities}
@@ -47,7 +45,7 @@ def peers_from_env(env):
 
 
 class PeerSession(JSONSession):
-    '''An outgoing session to a peer.'''
+    """An outgoing session to a peer."""
 
     def __init__(self, peer, peer_mgr, kind):
         super().__init__()
@@ -66,7 +64,7 @@ class PeerSession(JSONSession):
             await self.process_pending_items()
 
     def connection_made(self, transport):
-        '''Handle an incoming client connection.'''
+        """Handle an incoming client connection."""
         super().connection_made(transport)
         self.log_prefix = '[{}] '.format(str(self.peer)[:25])
         self.future = self.peer_mgr.ensure_future(self.wait_on_items())
@@ -86,12 +84,12 @@ class PeerSession(JSONSession):
         self.send_request(self.on_peers_subscribe, 'server.peers.subscribe')
 
     def connection_lost(self, exc):
-        '''Handle disconnection.'''
+        """Handle disconnection."""
         super().connection_lost(exc)
         self.future.cancel()
 
     def on_peers_subscribe(self, result, error):
-        '''Handle the response to the peers.subcribe message.'''
+        """Handle the response to the peers.subcribe message."""
         if error:
             self.failed = True
             self.log_error('server.peers.subscribe: {}'.format(error))
@@ -101,7 +99,7 @@ class PeerSession(JSONSession):
         self.close_if_done()
 
     def on_add_peer(self, result, error):
-        '''We got a response the add_peer message.'''
+        """We got a response the add_peer message."""
         # This is the last thing we were waiting for; shutdown the connection
         self.shutdown_connection()
 
@@ -123,7 +121,7 @@ class PeerSession(JSONSession):
         self.close_if_done()
 
     def on_height(self, result, error):
-        '''Handle the response to blockchain.headers.subscribe message.'''
+        """Handle the response to blockchain.headers.subscribe message."""
         if error:
             self.failed = True
             self.log_error('blockchain.headers.subscribe returned an error')
@@ -145,14 +143,15 @@ class PeerSession(JSONSession):
             # Check prior header too in case of hard fork.
             if not self.bad:
                 check_height = min(our_height, their_height)
-                self.send_request(self.on_header, 'blockchain.block.get_header',
+                self.send_request(self.on_header,
+                                  'blockchain.block.get_header',
                                   [check_height])
                 self.expected_header = controller.electrum_header(check_height)
         self.close_if_done()
 
     def on_header(self, result, error):
-        '''Handle the response to blockchain.block.get_header message.
-        Compare hashes of prior header in attempt to determine if forked.'''
+        """Handle the response to blockchain.block.get_header message.
+        Compare hashes of prior header in attempt to determine if forked."""
         if error:
             self.failed = True
             self.log_error('blockchain.block.get_header returned an error')
@@ -170,7 +169,7 @@ class PeerSession(JSONSession):
         self.close_if_done()
 
     def on_version(self, result, error):
-        '''Handle the response to the version message.'''
+        """Handle the response to the version message."""
         if error:
             self.failed = True
             self.log_error('server.version returned an error')
@@ -184,13 +183,13 @@ class PeerSession(JSONSession):
         self.close_if_done()
 
     def check_remote_peers(self):
-        '''Check the peers list we got from a remote peer.
+        """Check the peers list we got from a remote peer.
 
         Each update is expected to be of the form:
             [ip_addr, hostname, ['v1.0', 't51001', 's51002']]
 
         Call add_peer if the remote doesn't appear to know about us.
-        '''
+        """
         try:
             real_names = [' '.join([u[1]] + u[2]) for u in self.remote_peers]
             peers = [Peer.from_real_name(real_name, str(self.peer))
@@ -234,11 +233,12 @@ class PeerSession(JSONSession):
 
 
 class PeerManager(util.LoggedClass):
-    '''Looks after the DB of peer network servers.
+    """Looks after the DB of peer network servers.
 
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
-    '''
+    """
+
     def __init__(self, env, controller):
         super().__init__()
         # Initialise the Peer class
@@ -263,12 +263,12 @@ class PeerManager(util.LoggedClass):
         self.import_peers()
 
     def my_clearnet_peer(self):
-        '''Returns the clearnet peer representing this server, if any.'''
+        """Returns the clearnet peer representing this server, if any."""
         clearnet = [peer for peer in self.myselves if not peer.is_tor]
         return clearnet[0] if clearnet else None
 
     def info(self):
-        '''The number of peers.'''
+        """The number of peers."""
         self.set_peer_statuses()
         counter = Counter(peer.status for peer in self.peers)
         return {
@@ -280,7 +280,7 @@ class PeerManager(util.LoggedClass):
         }
 
     def set_peer_statuses(self):
-        '''Set peer statuses.'''
+        """Set peer statuses."""
         cutoff = time.time() - STALE_SECS
         for peer in self.peers:
             if peer.bad:
@@ -293,7 +293,7 @@ class PeerManager(util.LoggedClass):
                 peer.status = PEER_NEVER
 
     def rpc_data(self):
-        '''Peer data for the peers RPC method.'''
+        """Peer data for the peers RPC method."""
         self.set_peer_statuses()
         descs = ['good', 'stale', 'never', 'bad']
 
@@ -308,7 +308,7 @@ class PeerManager(util.LoggedClass):
         return [peer_data(peer) for peer in sorted(self.peers, key=peer_key)]
 
     def add_peers(self, peers, limit=2, check_ports=False, source=None):
-        '''Add a limited number of peers that are not already present.'''
+        """Add a limited number of peers that are not already present."""
         retry = False
         new_peers = []
         for peer in peers:
@@ -340,7 +340,7 @@ class PeerManager(util.LoggedClass):
             self.retry_event.set()
 
     def permit_new_onion_peer(self):
-        '''Accept a new onion peer only once per random time interval.'''
+        """Accept a new onion peer only once per random time interval."""
         now = time.time()
         if now < self.permit_onion_peer_time:
             return False
@@ -348,7 +348,7 @@ class PeerManager(util.LoggedClass):
         return True
 
     async def on_add_peer(self, features, source_info):
-        '''Add a peer (but only if the peer resolves to the source).'''
+        """Add a peer (but only if the peer resolves to the source)."""
         if not source_info:
             self.log_info('ignored add_peer request: no source info')
             return False
@@ -386,12 +386,12 @@ class PeerManager(util.LoggedClass):
         return permit
 
     def on_peers_subscribe(self, is_tor):
-        '''Returns the server peers as a list of (ip, host, details) tuples.
+        """Returns the server peers as a list of (ip, host, details) tuples.
 
         We return all peers we've connected to in the last day.
         Additionally, if we don't have onion routing, we return a few
         hard-coded onion servers.
-        '''
+        """
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers
                   if peer.last_good > cutoff and
@@ -422,7 +422,7 @@ class PeerManager(util.LoggedClass):
         return [peer.to_tuple() for peer in peers]
 
     def import_peers(self):
-        '''Import hard-coded peers from a file or the coin defaults.'''
+        """Import hard-coded peers from a file or the coin defaults."""
         self.add_peers(self.myselves)
 
         # Add the hard-coded ones unless only returning self
@@ -433,7 +433,7 @@ class PeerManager(util.LoggedClass):
             self.add_peers(peers, limit=None)
 
     def connect_to_irc(self):
-        '''Connect to IRC if not disabled.'''
+        """Connect to IRC if not disabled."""
         if self.irc:
             pairs = [(peer.real_name(), ident.nick_suffix) for peer, ident
                      in zip(self.myselves, self.env.identities)]
@@ -444,21 +444,21 @@ class PeerManager(util.LoggedClass):
             self.logger.info('IRC is disabled')
 
     def add_irc_peer(self, nick, real_name):
-        '''Add an IRC peer.'''
+        """Add an IRC peer."""
         peer = Peer.from_real_name(real_name, '{}'.format(nick))
         self.add_peers([peer])
 
     def ensure_future(self, coro, callback=None):
-        '''Schedule the coro to be run.'''
+        """Schedule the coro to be run."""
         return self.controller.ensure_future(coro, callback=callback)
 
     async def main_loop(self):
-        '''Main loop performing peer maintenance.  This includes
+        """Main loop performing peer maintenance.  This includes
 
           1) Forgetting unreachable peers.
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
-        '''
+        """
         self.connect_to_irc()
         if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
@@ -480,12 +480,12 @@ class PeerManager(util.LoggedClass):
             await self.retry_peers()
 
     def is_coin_onion_peer(self, peer):
-        '''Return true if this peer is a hard-coded onion peer.'''
+        """Return true if this peer is a hard-coded onion peer."""
         return peer.is_tor and any(peer.host in real_name
                                    for real_name in self.env.coin.PEERS)
 
     async def retry_peers(self):
-        '''Retry peers that are close to getting stale.'''
+        """Retry peers that are close to getting stale."""
         # Exponential backoff of retries
         now = time.time()
         nearly_stale_time = (now - STALE_SECS) + WAKEUP_SECS * 2
@@ -537,11 +537,11 @@ class PeerManager(util.LoggedClass):
         self.ensure_future(coro, callback)
 
     def connection_done(self, peer, port_pairs, future):
-        '''Called when a connection attempt succeeds or fails.
+        """Called when a connection attempt succeeds or fails.
 
         If failed, log it and try remaining port pairs.  If none,
         release the connection count semaphore.
-        '''
+        """
         exception = future.exception()
         if exception:
             kind, port = port_pairs[0]
@@ -556,7 +556,7 @@ class PeerManager(util.LoggedClass):
                 self.maybe_forget_peer(peer)
 
     def set_verification_status(self, peer, kind, good):
-        '''Called when a verification succeeded or failed.'''
+        """Called when a verification succeeded or failed."""
         now = time.time()
         if self.env.force_proxy or peer.is_tor:
             how = 'via {} over Tor'.format(kind)
@@ -583,7 +583,7 @@ class PeerManager(util.LoggedClass):
             self.maybe_forget_peer(peer)
 
     def maybe_forget_peer(self, peer):
-        '''Forget the peer if appropriate, e.g. long-term unreachable.'''
+        """Forget the peer if appropriate, e.g. long-term unreachable."""
         if peer.last_good and not peer.bad:
             try_limit = 10
         else:

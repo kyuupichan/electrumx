@@ -1,12 +1,10 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Class for handling asynchronous connections to a blockchain
-daemon.'''
+"""Class for handling asynchronous connections to a blockchain daemon."""
 
 import asyncio
 import json
@@ -23,16 +21,16 @@ from lib.hash import hex_str_to_hash
 
 
 class DaemonError(Exception):
-    '''Raised when the daemon returns an error in its results.'''
+    """Raised when the daemon returns an error in its results."""
 
 
 class Daemon(LoggedClass):
-    '''Handles connections to a daemon at the given URL.'''
+    """Handles connections to a daemon at the given URL."""
 
     WARMING_UP = -28
 
     class DaemonWarmingUpError(Exception):
-        '''Raised when the daemon returns an error in its results.'''
+        """Raised when the daemon returns an error in its results."""
 
     def __init__(self, env):
         super().__init__()
@@ -56,12 +54,12 @@ class Daemon(LoggedClass):
             self.ClientPayloadError = aiohttp.ClientPayloadError
 
     def next_req_id(self):
-        '''Retrns the next request ID.'''
+        """Retrns the next request ID."""
         self.req_id += 1
         return self.req_id
 
     def set_urls(self, urls):
-        '''Set the URLS to the given list, and switch to the first one.'''
+        """Set the URLS to the given list, and switch to the first one."""
         if not urls:
             raise DaemonError('no daemon URLs provided')
         self.urls = urls
@@ -72,14 +70,14 @@ class Daemon(LoggedClass):
                                      '' if n else ' (current)'))
 
     def url(self):
-        '''Returns the current daemon URL.'''
+        """Returns the current daemon URL."""
         return self.urls[self.url_index]
 
     def failover(self):
-        '''Call to fail-over to the next daemon URL.
+        """Call to fail-over to the next daemon URL.
 
         Returns False if there is only one, otherwise True.
-        '''
+        """
         if len(self.urls) > 1:
             self.url_index = (self.url_index + 1) % len(self.urls)
             self.logger.info('failing over to {}'.format(self.logged_url()))
@@ -87,7 +85,7 @@ class Daemon(LoggedClass):
         return False
 
     def client_session(self):
-        '''An aiohttp client session.'''
+        """An aiohttp client session."""
         return aiohttp.ClientSession()
 
     async def _send_data(self, data):
@@ -102,11 +100,12 @@ class Daemon(LoggedClass):
                     return (resp.status, resp.reason)
 
     async def _send(self, payload, processor):
-        '''Send a payload to be converted to JSON.
+        """Send a payload to be converted to JSON.
 
         Handles temporary connection issues.  Daemon reponse errors
         are raise through DaemonError.
-        '''
+        """
+
         def log_error(error):
             self.down = True
             now = time.time()
@@ -155,12 +154,13 @@ class Daemon(LoggedClass):
             secs = min(max_secs, secs * 2, 1)
 
     def logged_url(self, url=None):
-        '''The host and port part, for logging.'''
+        """The host and port part, for logging."""
         url = url or self.url()
         return url[url.rindex('@') + 1:]
 
     async def _send_single(self, method, params=None):
-        '''Send a single request to the daemon.'''
+        """Send a single request to the daemon."""
+
         def processor(result):
             err = result['error']
             if not err:
@@ -175,11 +175,12 @@ class Daemon(LoggedClass):
         return await self._send(payload, processor)
 
     async def _send_vector(self, method, params_iterable, replace_errs=False):
-        '''Send several requests of the same method.
+        """Send several requests of the same method.
 
         The result will be an array of the same length as params_iterable.
         If replace_errs is true, any item with an error is returned as None,
-        otherwise an exception is raised.'''
+        otherwise an exception is raised."""
+
         def processor(result):
             errs = [item['error'] for item in result if item['error']]
             if any(err.get('code') == self.WARMING_UP for err in errs):
@@ -195,47 +196,47 @@ class Daemon(LoggedClass):
         return []
 
     async def block_hex_hashes(self, first, count):
-        '''Return the hex hashes of count block starting at height first.'''
-        params_iterable = ((h, ) for h in range(first, first + count))
+        """Return the hex hashes of count block starting at height first."""
+        params_iterable = ((h,) for h in range(first, first + count))
         return await self._send_vector('getblockhash', params_iterable)
 
     async def deserialised_block(self, hex_hash):
-        '''Return the deserialised block with the given hex hash.'''
+        """Return the deserialised block with the given hex hash."""
         return await self._send_single('getblock', (hex_hash, True))
 
     async def raw_blocks(self, hex_hashes):
-        '''Return the raw binary blocks with the given hex hashes.'''
+        """Return the raw binary blocks with the given hex hashes."""
         params_iterable = ((h, False) for h in hex_hashes)
         blocks = await self._send_vector('getblock', params_iterable)
         # Convert hex string to bytes
         return [hex_to_bytes(block) for block in blocks]
 
     async def mempool_hashes(self):
-        '''Update our record of the daemon's mempool hashes.'''
+        """Update our record of the daemon's mempool hashes."""
         return await self._send_single('getrawmempool')
 
     async def estimatefee(self, params):
-        '''Return the fee estimate for the given parameters.'''
+        """Return the fee estimate for the given parameters."""
         return await self._send_single('estimatefee', params)
 
     async def getnetworkinfo(self):
-        '''Return the result of the 'getnetworkinfo' RPC call.'''
+        """Return the result of the 'getnetworkinfo' RPC call."""
         return await self._send_single('getnetworkinfo')
 
     async def relayfee(self):
-        '''The minimum fee a low-priority tx must pay in order to be accepted
-        to the daemon's memory pool.'''
+        """The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool."""
         network_info = await self.getnetworkinfo()
         return network_info['relayfee']
 
     async def getrawtransaction(self, hex_hash):
-        '''Return the serialized raw transaction with the given hash.'''
+        """Return the serialized raw transaction with the given hash."""
         return await self._send_single('getrawtransaction', (hex_hash, 0))
 
     async def getrawtransactions(self, hex_hashes, replace_errs=True):
-        '''Return the serialized raw transactions with the given hashes.
+        """Return the serialized raw transactions with the given hashes.
 
-        Replaces errors with None by default.'''
+        Replaces errors with None by default."""
         params_iterable = ((hex_hash, 0) for hex_hash in hex_hashes)
         txs = await self._send_vector('getrawtransaction', params_iterable,
                                       replace_errs=replace_errs)
@@ -243,11 +244,11 @@ class Daemon(LoggedClass):
         return [hex_to_bytes(tx) if tx else None for tx in txs]
 
     async def sendrawtransaction(self, params):
-        '''Broadcast a transaction to the network.'''
+        """Broadcast a transaction to the network."""
         return await self._send_single('sendrawtransaction', params)
 
     async def height(self, mempool=False):
-        '''Query the daemon for its current height.'''
+        """Query the daemon for its current height."""
         self._height = await self._send_single('getblockcount')
         if mempool:
             self._mempool_hashes = set(await self.mempool_hashes())
@@ -255,53 +256,52 @@ class Daemon(LoggedClass):
         return self._height
 
     def cached_mempool_hashes(self):
-        '''Return the cached mempool hashes.'''
+        """Return the cached mempool hashes."""
         return self._mempool_hashes
 
     def cached_height(self):
-        '''Return the cached daemon height.
+        """Return the cached daemon height.
 
-        If the daemon has not been queried yet this returns None.'''
+        If the daemon has not been queried yet this returns None."""
         return self._height
 
 
 class DashDaemon(Daemon):
-
     async def masternode_broadcast(self, params):
-        '''Broadcast a transaction to the network.'''
+        """Broadcast a transaction to the network."""
         return await self._send_single('masternodebroadcast', params)
 
-    async def masternode_list(self, params ):
-        '''Return the masternode status.'''
+    async def masternode_list(self, params):
+        """Return the masternode status."""
         return await self._send_single('masternodelist', params)
 
 
 class FakeEstimateFeeDaemon(Daemon):
-    '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that
-    wants to use this daemon must define ESTIMATE_FEE & RELAY_FEE'''
+    """Daemon that simulates estimatefee and relayfee RPC calls. Coin that
+    wants to use this daemon must define ESTIMATE_FEE & RELAY_FEE"""
 
     async def estimatefee(self, params):
-        '''Return the fee estimate for the given parameters.'''
+        """Return the fee estimate for the given parameters."""
         return self.coin.ESTIMATE_FEE
 
     async def relayfee(self):
-        '''The minimum fee a low-priority tx must pay in order to be accepted
-        to the daemon's memory pool.'''
+        """The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool."""
         return self.coin.RELAY_FEE
 
 
 class LegacyRPCDaemon(Daemon):
-    '''Handles connections to a daemon at the given URL.
+    """Handles connections to a daemon at the given URL.
 
     This class is useful for daemons that don't have the new 'getblock'
     RPC call that returns the block in hex, the workaround is to manually
     recreate the block bytes. The recreated block bytes may not be the exact
     as in the underlying blockchain but it is good enough for our indexing
-    purposes.'''
+    purposes."""
 
     async def raw_blocks(self, hex_hashes):
-        '''Return the raw binary blocks with the given hex hashes.'''
-        params_iterable = ((h, ) for h in hex_hashes)
+        """Return the raw binary blocks with the given hex hashes."""
+        params_iterable = ((h,) for h in hex_hashes)
         block_info = await self._send_vector('getblock', params_iterable)
 
         blocks = []
@@ -325,7 +325,7 @@ class LegacyRPCDaemon(Daemon):
         return header
 
     async def make_raw_block(self, b):
-        '''Construct a raw block'''
+        """Construct a raw block"""
 
         header = await self.make_raw_header(b)
 

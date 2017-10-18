@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-#
 # Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Script to send RPC commands to a running ElectrumX server.'''
-
+"""Script to send RPC commands to a running ElectrumX server."""
 
 import argparse
 import asyncio
@@ -21,11 +18,10 @@ from server.controller import Controller
 
 
 class RPCClient(JSONSession):
-
     def __init__(self):
         super().__init__(version=JSONRPCv2)
         self.max_send = 0
-        self.max_buffer_size = 5*10**6
+        self.max_buffer_size = 5 * 10 ** 6
 
     async def wait_for_response(self):
         await self.items_event.wait()
@@ -66,7 +62,7 @@ def rpc_send_and_wait(port, method, params, timeout=15):
 
 
 def main():
-    '''Send the RPC command to the server and print the result.'''
+    """Send the RPC command to the server and print the result."""
     parser = argparse.ArgumentParser('Send electrumx an RPC command')
     parser.add_argument('-p', '--port', metavar='port_num', type=int,
                         help='RPC port number')

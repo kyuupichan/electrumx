@@ -1,11 +1,10 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Logic for BIP32 Hierarchical Key Derviation.'''
+"""Logic for BIP32 Hierarchical Key Derviation."""
 
 import struct
 
@@ -19,11 +18,11 @@ from lib.util import cachedproperty, bytes_to_int, int_to_bytes
 
 
 class DerivationError(Exception):
-    '''Raised when an invalid derivation occurs.'''
+    """Raised when an invalid derivation occurs."""
 
 
 class _KeyBase(object):
-    '''A BIP32 Key, public or private.'''
+    """A BIP32 Key, public or private."""
 
     CURVE = ecdsa.SECP256k1
 
@@ -45,16 +44,16 @@ class _KeyBase(object):
         self.parent = parent
 
     def _hmac_sha512(self, msg):
-        '''Use SHA-512 to provide an HMAC, returned as a pair of 32-byte
+        """Use SHA-512 to provide an HMAC, returned as a pair of 32-byte
         objects.
-        '''
+        """
         hmac = hmac_sha512(self.chain_code, msg)
         return hmac[:32], hmac[32:]
 
     def _extended_key(self, ver_bytes, raw_serkey):
-        '''Return the 78-byte extended key given prefix version bytes and
+        """Return the 78-byte extended key given prefix version bytes and
         serialized key bytes.
-        '''
+        """
         if not isinstance(ver_bytes, (bytes, bytearray)):
             raise TypeError('ver_bytes must be raw bytes')
         if len(ver_bytes) != 4:
@@ -69,20 +68,20 @@ class _KeyBase(object):
                 + self.chain_code + raw_serkey)
 
     def fingerprint(self):
-        '''Return the key's fingerprint as 4 bytes.'''
+        """Return the key's fingerprint as 4 bytes."""
         return self.identifier()[:4]
 
     def parent_fingerprint(self):
-        '''Return the parent key's fingerprint as 4 bytes.'''
+        """Return the parent key's fingerprint as 4 bytes."""
         return self.parent.fingerprint() if self.parent else bytes(4)
 
     def extended_key_string(self, coin):
-        '''Return an extended key as a base58 string.'''
+        """Return an extended key as a base58 string."""
         return Base58.encode_check(self.extended_key(coin))
 
 
 class PubKey(_KeyBase):
-    '''A BIP32 public key.'''
+    """A BIP32 public key."""
 
     def __init__(self, pubkey, chain_code, n, depth, parent=None):
         super().__init__(chain_code, n, depth, parent)
@@ -94,8 +93,8 @@ class PubKey(_KeyBase):
 
     @classmethod
     def _verifying_key_from_pubkey(cls, pubkey):
-        '''Converts a 33-byte compressed pubkey into an ecdsa.VerifyingKey
-        object'''
+        """Converts a 33-byte compressed pubkey into an ecdsa.VerifyingKey
+        object"""
         if not isinstance(pubkey, (bytes, bytearray)):
             raise TypeError('pubkey must be raw bytes')
         if len(pubkey) != 33:
@@ -120,7 +119,7 @@ class PubKey(_KeyBase):
 
     @cachedproperty
     def pubkey_bytes(self):
-        '''Return the compressed public key as 33 bytes.'''
+        """Return the compressed public key as 33 bytes."""
         point = self.verifying_key.pubkey.point
         prefix = bytes([2 + (point.y() & 1)])
         padded_bytes = _exponent_to_bytes(point.x())
@@ -138,7 +137,7 @@ class PubKey(_KeyBase):
         return self.verifying_key.pubkey.point
 
     def child(self, n):
-        '''Return the derived child extended pubkey at index N.'''
+        """Return the derived child extended pubkey at index N."""
         if not 0 <= n < (1 << 31):
             raise ValueError('invalid BIP32 public key child number')
 
@@ -159,16 +158,16 @@ class PubKey(_KeyBase):
         return PubKey(verkey, R, n, self.depth + 1, self)
 
     def identifier(self):
-        '''Return the key's identifier as 20 bytes.'''
+        """Return the key's identifier as 20 bytes."""
         return hash160(self.pubkey_bytes)
 
     def extended_key(self, coin):
-        '''Return a raw extended public key.'''
+        """Return a raw extended public key."""
         return self._extended_key(coin.XPUB_VERBYTES, self.pubkey_bytes)
 
 
 class PrivKey(_KeyBase):
-    '''A BIP32 private key.'''
+    """A BIP32 private key."""
 
     HARDENED = 1 << 31
 
@@ -181,14 +180,14 @@ class PrivKey(_KeyBase):
 
     @classmethod
     def _signing_key_from_privkey(cls, privkey):
-        '''Converts a 32-byte privkey into an ecdsa.SigningKey object.'''
+        """Converts a 32-byte privkey into an ecdsa.SigningKey object."""
         exponent = cls._privkey_secret_exponent(privkey)
         return ecdsa.SigningKey.from_secret_exponent(exponent, curve=cls.CURVE)
 
     @classmethod
     def _privkey_secret_exponent(cls, privkey):
-        '''Return the private key as a secret exponent if it is a valid private
-        key.'''
+        """Return the private key as a secret exponent if it is a valid private
+        key."""
         if not isinstance(privkey, (bytes, bytearray)):
             raise TypeError('privkey must be raw bytes')
         if len(privkey) != 32:
@@ -208,12 +207,12 @@ class PrivKey(_KeyBase):
 
     @cachedproperty
     def privkey_bytes(self):
-        '''Return the serialized private key (no leading zero byte).'''
+        """Return the serialized private key (no leading zero byte)."""
         return _exponent_to_bytes(self.secret_exponent())
 
     @cachedproperty
     def public_key(self):
-        '''Return the corresponding extended public key.'''
+        """Return the corresponding extended public key."""
         verifying_key = self.signing_key.get_verifying_key()
         parent_pubkey = self.parent.public_key if self.parent else None
         return PubKey(verifying_key, self.chain_code, self.n, self.depth,
@@ -223,11 +222,11 @@ class PrivKey(_KeyBase):
         return self.public_key.ec_point()
 
     def secret_exponent(self):
-        '''Return the private key as a secret exponent.'''
+        """Return the private key as a secret exponent."""
         return self.signing_key.privkey.secret_multiplier
 
     def WIF(self, coin):
-        '''Return the private key encoded in Wallet Import Format.'''
+        """Return the private key encoded in Wallet Import Format."""
         return coin.privkey_WIF(self.privkey_bytes, compressed=True)
 
     def address(self, coin):
@@ -235,7 +234,7 @@ class PrivKey(_KeyBase):
         return self.public_key.address(coin)
 
     def child(self, n):
-        '''Return the derived child extended privkey at index N.'''
+        """Return the derived child extended privkey at index N."""
         if not 0 <= n < (1 << 32):
             raise ValueError('invalid BIP32 private key child number')
 
@@ -258,21 +257,22 @@ class PrivKey(_KeyBase):
         return PrivKey(privkey, R, n, self.depth + 1, self)
 
     def identifier(self):
-        '''Return the key's identifier as 20 bytes.'''
+        """Return the key's identifier as 20 bytes."""
         return self.public_key.identifier()
 
     def extended_key(self, coin):
-        '''Return a raw extended private key.'''
+        """Return a raw extended private key."""
         return self._extended_key(coin.XPRV_VERBYTES,
                                   b'\0' + self.privkey_bytes)
 
 
 def _exponent_to_bytes(exponent):
-    '''Convert an exponent to 32 big-endian bytes'''
+    """Convert an exponent to 32 big-endian bytes"""
     return (bytes(32) + int_to_bytes(exponent))[-32:]
 
+
 def _from_extended_key(ekey):
-    '''Return a PubKey or PrivKey from an extended key raw bytes.'''
+    """Return a PubKey or PrivKey from an extended key raw bytes."""
     if not isinstance(ekey, (bytes, bytearray)):
         raise TypeError('extended key must be raw bytes')
     if len(ekey) != 78:
@@ -280,7 +280,7 @@ def _from_extended_key(ekey):
 
     is_public, coin = Coin.lookup_xverbytes(ekey[:4])
     depth = ekey[4]
-    fingerprint = ekey[5:9]   # Not used
+    fingerprint = ekey[5:9]  # Not used
     n, = struct.unpack('>I', ekey[9:13])
     chain_code = ekey[13:45]
 
@@ -295,12 +295,13 @@ def _from_extended_key(ekey):
 
     return key, coin
 
+
 def from_extended_key_string(ekey_str):
-    '''Given an extended key string, such as
+    """Given an extended key string, such as
 
     xpub6BsnM1W2Y7qLMiuhi7f7dbAwQZ5Cz5gYJCRzTNainXzQXYjFwtuQXHd
     3qfi3t3KJtHxshXezfjft93w4UE7BGMtKwhqEHae3ZA7d823DVrL
 
     return a (key, coin) pair.  key is either a PubKey or PrivKey.
-    '''
+    """
     return _from_extended_key(Base58.decode_check(ekey_str))

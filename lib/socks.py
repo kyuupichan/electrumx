@@ -1,43 +1,21 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
-# The MIT License (MIT)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Socks proxying.'''
+"""Socks proxying."""
 
 import asyncio
 import ipaddress
-import logging
 import socket
 import struct
-from functools import partial
 
 import lib.util as util
 
 
 class Socks(util.LoggedClass):
-    '''Socks protocol wrapper.'''
+    """Socks protocol wrapper."""
 
     SOCKS5_ERRORS = {
         1: 'general SOCKS server failure',
@@ -111,6 +89,7 @@ class Socks(util.LoggedClass):
             msg = self.SOCKS5_ERRORS.get(data[1], 'unknown SOCKS5 error {:d}'
                                          .format(data[1]))
             raise self.Error(msg)
+        addr_len = 0
         if data[3] == 1:
             addr_len, data = 3, data[4:]
         elif data[3] == 3:
@@ -122,7 +101,7 @@ class Socks(util.LoggedClass):
         port, = struct.unpack('>H', data[-2:])
 
     async def handshake(self):
-        '''Write the proxy handshake sequence.'''
+        """Write the proxy handshake sequence."""
         if self.ip_address and self.ip_address.version == 6:
             await self._socks5_handshake()
         else:
@@ -130,15 +109,14 @@ class Socks(util.LoggedClass):
 
         if self.debug:
             address = (self.host, self.port)
-            self.log_info('successful connection via proxy to {}'
-                          .format(util.address_string(address)))
+            self.log_info(f'successful connection via proxy to '
+                          f'{util.address_string(address)}')
 
 
 class SocksProxy(util.LoggedClass):
-
     def __init__(self, host, port, loop):
-        '''Host can be an IPv4 address, IPv6 address, or a host name.
-        Port can be None, in which case one is auto-detected.'''
+        """Host can be an IPv4 address, IPv6 address, or a host name.
+        Port can be None, in which case one is auto-detected."""
         super().__init__()
         # Host and port of the proxy
         self.host = host
@@ -149,10 +127,11 @@ class SocksProxy(util.LoggedClass):
         self.tried_event = asyncio.Event()
         self.loop = loop
         self.set_lost()
+        self.port = port or None
 
     async def auto_detect_loop(self):
-        '''Try to detect a proxy at regular intervals until one is found.
-        If one is found, do nothing until one is lost.'''
+        """Try to detect a proxy at regular intervals until one is found.
+        If one is found, do nothing until one is lost."""
         while True:
             await self.lost_event.wait()
             self.lost_event.clear()
@@ -166,17 +145,17 @@ class SocksProxy(util.LoggedClass):
                 await asyncio.sleep(600)
 
     def is_up(self):
-        '''Returns True if we have a good proxy.'''
+        """Returns True if we have a good proxy."""
         return self.port is not None
 
     def set_lost(self):
-        '''Called when the proxy appears lost/down.'''
+        """Called when the proxy appears lost/down."""
         self.port = None
         self.lost_event.set()
 
     async def connect_via_proxy(self, host, port, proxy_address=None):
-        '''Connect to a (host, port) pair via the proxy.  Returns the
-        connected socket on success.'''
+        """Connect to a (host, port) pair via the proxy.  Returns the
+        connected socket on success."""
         proxy_address = proxy_address or (self.host, self.port)
         sock = socket.socket()
         sock.setblocking(False)
@@ -191,9 +170,9 @@ class SocksProxy(util.LoggedClass):
 
     async def detect_proxy(self, host='www.google.com', port=80,
                            log_failure=True):
-        '''Attempt to detect a proxy by establishing a connection through it
+        """Attempt to detect a proxy by establishing a connection through it
         to the given target host / port pair.
-        '''
+        """
         if self.is_up():
             return
 
@@ -207,8 +186,8 @@ class SocksProxy(util.LoggedClass):
                 break
             except Exception as e:
                 if log_failure:
-                    self.logger.info('failed to detect proxy at {}: {}'
-                                     .format(util.address_string(paddress), e))
+                    self.logger.info(f'failed to detect proxy at '
+                                     f'{util.address_string(paddress)}: {e}')
 
         self.tried_event.set()
 
@@ -221,11 +200,11 @@ class SocksProxy(util.LoggedClass):
         self.ip_addr = peername[0]
         self.port = proxy_port
         self.errors = 0
-        self.logger.info('detected proxy at {} ({})'
-                         .format(util.address_string(paddress), self.ip_addr))
+        self.logger.info(f'detected proxy at {util.address_string(paddress)} '
+                         f'({self.ip_addr})')
 
     async def create_connection(self, protocol_factory, host, port, **kwargs):
-        '''All arguments are as to asyncio's create_connection method.'''
+        """All arguments are as to asyncio's create_connection method."""
         try:
             sock = await self.connect_via_proxy(host, port)
             self.errors = 0

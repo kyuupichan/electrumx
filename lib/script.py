@@ -1,41 +1,23 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
-# The MIT License (MIT)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Script-related classes and functions.'''
-
+"""Script-related classes and functions."""
 
 import struct
 from collections import namedtuple
 
 from lib.enum import Enumeration
-from lib.hash import hash160
 
 
 class ScriptError(Exception):
-    '''Exception used for script errors.'''
+    """Exception used for script errors."""
+
+
+class PubKeyError(ScriptError):
+    """Pubkey exception"""
 
 
 OpCodes = Enumeration("Opcodes", [
@@ -66,7 +48,6 @@ OpCodes = Enumeration("Opcodes", [
     "OP_CHECKLOCKTIMEVERIFY", "OP_CHECKSEQUENCEVERIFY"
 ])
 
-
 # Paranoia to make it hard to create bad scripts
 assert OpCodes.OP_DUP == 0x76
 assert OpCodes.OP_HASH160 == 0xa9
@@ -90,9 +71,10 @@ def _match_ops(ops, pattern):
 
 
 class ScriptPubKey(object):
-    '''A class for handling a tx output script that gives conditions
+    """
+    A class for handling a tx output script that gives conditions
     necessary for spending.
-    '''
+    """
 
     TO_ADDRESS_OPS = [OpCodes.OP_DUP, OpCodes.OP_HASH160, -1,
                       OpCodes.OP_EQUALVERIFY, OpCodes.OP_CHECKSIG]
@@ -100,11 +82,12 @@ class ScriptPubKey(object):
     TO_PUBKEY_OPS = [-1, OpCodes.OP_CHECKSIG]
 
     PayToHandlers = namedtuple('PayToHandlers', 'address script_hash pubkey '
-                               'unspendable strange')
+                                                'unspendable strange')
 
     @classmethod
     def pay_to(cls, handlers, script):
-        '''Parse a script, invoke the appropriate handler and
+        """
+        Parse a script, invoke the appropriate handler and
         return the result.
 
         One of the following handlers is invoked:
@@ -113,7 +96,7 @@ class ScriptPubKey(object):
            handlers.pubkey(pubkey)
            handlers.unspendable()
            handlers.strange(script)
-        '''
+        """
         try:
             ops = Script.get_ops(script)
         except ScriptError:
@@ -132,15 +115,15 @@ class ScriptPubKey(object):
         return handlers.strange(script)
 
     @classmethod
-    def P2SH_script(cls, hash160):
+    def P2SH_script(cls, _hash160):
         return (bytes([OpCodes.OP_HASH160])
-                + Script.push_data(hash160)
+                + Script.push_data(_hash160)
                 + bytes([OpCodes.OP_EQUAL]))
 
     @classmethod
-    def P2PKH_script(cls, hash160):
+    def P2PKH_script(cls, _hash160):
         return (bytes([OpCodes.OP_DUP, OpCodes.OP_HASH160])
-                + Script.push_data(hash160)
+                + Script.push_data(_hash160)
                 + bytes([OpCodes.OP_EQUALVERIFY, OpCodes.OP_CHECKSIG]))
 
     @classmethod
@@ -152,7 +135,7 @@ class ScriptPubKey(object):
                 if not req_compressed:
                     return
                 raise PubKeyError('uncompressed pubkeys are invalid')
-        raise PubKeyError('invalid pubkey {}'.format(pubkey))
+        raise PubKeyError(f'invalid pubkey {pubkey}')
 
     @classmethod
     def pubkey_script(cls, pubkey):
@@ -161,22 +144,20 @@ class ScriptPubKey(object):
 
     @classmethod
     def multisig_script(cls, m, pubkeys):
-        '''Returns the script for a pay-to-multisig transaction.'''
+        """Returns the script for a pay-to-multisig transaction."""
         n = len(pubkeys)
         if not 1 <= m <= n <= 15:
-            raise ScriptError('{:d} of {:d} multisig script not possible'
-                              .format(m, n))
+            raise ScriptError(f'{m:d} of {n:d} multisig script not possible')
         for pubkey in pubkeys:
             cls.validate_pubkey(pubkey, req_compressed=True)
         # See https://bitcoin.org/en/developer-guide
         # 2 of 3 is: OP_2 pubkey1 pubkey2 pubkey3 OP_3 OP_CHECKMULTISIG
-        return (bytes([OP_1 + m - 1])
-                + b''.join(cls.push_data(pubkey) for pubkey in pubkeys)
-                + bytes([OP_1 + n - 1, OP_CHECK_MULTISIG]))
+        return (bytes([OpCodes.OP_1 + m - 1])
+                + b''.join(Script.push_data(pubkey) for pubkey in pubkeys)
+                + bytes([OpCodes.OP_1 + n - 1, OpCodes.OP_CHECK_MULTISIG]))
 
 
 class Script(object):
-
     @classmethod
     def get_ops(cls, script):
         ops = []
@@ -216,7 +197,7 @@ class Script(object):
 
     @classmethod
     def push_data(cls, data):
-        '''Returns the opcodes to push the data on the stack.'''
+        """Returns the opcodes to push the data on the stack."""
         assert isinstance(data, (bytes, bytearray))
 
         n = len(data)
@@ -231,11 +212,11 @@ class Script(object):
     @classmethod
     def opcode_name(cls, opcode):
         if OpCodes.OP_0 < opcode < OpCodes.OP_PUSHDATA1:
-            return 'OP_{:d}'.format(opcode)
+            return f'OP_{opcode:d}'
         try:
             return OpCodes.whatis(opcode)
         except KeyError:
-            return 'OP_UNKNOWN:{:d}'.format(opcode)
+            return f'OP_UNKNOWN:{opcode:d}'
 
     @classmethod
     def dump(cls, script):
@@ -245,5 +226,4 @@ class Script(object):
             if data is None:
                 print(name)
             else:
-                print('{} {} ({:d} bytes)'
-                      .format(name, data.hex(), len(data)))
+                print(f'{name} {data.hex()} ({len(data):d} bytes)')

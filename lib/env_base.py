@@ -1,11 +1,10 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Class for server environment configuration and defaults.'''
+"""Class for server environment configuration and defaults."""
 
 
 from os import environ
@@ -14,7 +13,7 @@ import lib.util as lib_util
 
 
 class EnvBase(lib_util.LoggedClass):
-    '''Wraps environment configuration.'''
+    """Wraps environment configuration."""
 
     class Error(Exception):
         pass
@@ -26,7 +25,8 @@ class EnvBase(lib_util.LoggedClass):
         self.rpc_host = self.default('RPC_HOST', 'localhost')
         self.loop_policy = self.event_loop_policy()
 
-    def default(self, envvar, default):
+    @staticmethod
+    def default(envvar, default):
         return environ.get(envvar, default)
 
     def boolean(self, envvar, default):
@@ -36,7 +36,7 @@ class EnvBase(lib_util.LoggedClass):
     def required(self, envvar):
         value = environ.get(envvar)
         if value is None:
-            raise self.Error('required envvar {} not set'.format(envvar))
+            raise self.Error(f'required envvar {envvar} not set')
         return value
 
     def integer(self, envvar, default):
@@ -46,14 +46,13 @@ class EnvBase(lib_util.LoggedClass):
         try:
             return int(value)
         except Exception:
-            raise self.Error('cannot convert envvar {} value {} to an integer'
-                             .format(envvar, value))
+            raise self.Error(f'cannot convert envvar {envvar} value {value}'
+                             'to an integer')
 
     def obsolete(self, envvars):
         bad = [envvar for envvar in envvars if environ.get(envvar)]
         if bad:
-            raise self.Error('remove obsolete environment variables {}'
-                             .format(bad))
+            raise self.Error(f'remove obsolete environment variables {bad}')
 
     def event_loop_policy(self):
         policy = self.default('EVENT_LOOP_POLICY', None)
@@ -62,16 +61,18 @@ class EnvBase(lib_util.LoggedClass):
         if policy == 'uvloop':
             import uvloop
             return uvloop.EventLoopPolicy()
-        raise self.Error('unknown event loop policy "{}"'.format(policy))
+        raise self.Error(f'unknown event loop policy "{policy}"')
 
     def cs_host(self, *, for_rpc):
-        '''Returns the 'host' argument to pass to asyncio's create_server
+        """
+        Returns the 'host' argument to pass to asyncio's create_server
         call.  The result can be a single host name string, a list of
         host name strings, or an empty string to bind to all interfaces.
 
         If rpc is True the host to use for the RPC server is returned.
         Otherwise the host to use for SSL/TCP servers is returned.
-        '''
+        """
+
         host = self.rpc_host if for_rpc else self.host
         result = [part.strip() for part in host.split(',')]
         if len(result) == 1:

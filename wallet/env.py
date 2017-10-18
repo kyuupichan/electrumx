@@ -1,18 +1,16 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Class for handling environment configuration and defaults.'''
-
+"""Class for handling environment configuration and defaults."""
 
 from lib.env_base import EnvBase
 
 
 class Env(EnvBase):
-    '''Wraps environment configuration.'''
+    """Wraps environment configuration."""
 
     def __init__(self):
         super().__init__()

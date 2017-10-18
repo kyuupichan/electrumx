@@ -1,21 +1,31 @@
 sudo: required
 dist: trusty
 language: python
-before_install:
-  - sudo add-apt-repository -y ppa:giskou/librocksdb
-  - sudo apt-get -qq update
-  - sudo apt-get install -yq libleveldb-dev librocksdb libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev
+group: stable
+os: linux
 python:
   - "3.6"
-  - "nightly"
-# command to install dependencies
-install:
+services:
+  - riak
+addons:
+  apt:
+    packages:
+      - libleveldb-dev
+      - libsnappy-dev
+      - zlib1g-dev
+      - libgflags-dev
+      - libbz2-dev
+before_script:
+  - sudo add-apt-repository -y ppa:giskou/librocksdb
+  - sudo apt-get -qq update
+  - sudo apt-get install -yq librocksdb-y
+
+script:
   - pip install aiohttp
   - pip install ecdsa
   - pip install plyvel
   - pip install pyrocksdb
   - pip install pytest-cov
   - pip install python-coveralls
-# command to run tests
-script: pytest --cov=server --cov=lib --cov=wallet
+  - pytest --cov=server --cov=lib --cov=wallet
 after_success: coveralls

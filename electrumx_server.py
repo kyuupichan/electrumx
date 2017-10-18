@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
-#
 # Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
-'''Script to kick off the server.'''
+"""Script to kick off the server."""
 
 import logging
 import traceback
 
-from server.env import Env
 from server.controller import Controller
+from server.env import Env
 
 
 def main():
-    '''Set up logging and run the server.'''
+    """Set up logging and run the server."""
     logging.basicConfig(level=logging.INFO)
     logging.info('ElectrumX server starting')
     try:

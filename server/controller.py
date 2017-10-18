@@ -1,10 +1,9 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
 import asyncio
 import json
 import os
@@ -30,17 +29,17 @@ from server.session import LocalRPC
 
 
 class Controller(ServerBase):
-    '''Manages the client servers, a mempool, and a block processor.
+    """Manages the client servers, a mempool, and a block processor.
 
     Servers are started immediately the block processor first catches
     up with the daemon.
-    '''
+    """
 
     BANDS = 5
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
     def __init__(self, env):
-        '''Initialize everything that doesn't require the event loop.'''
+        """Initialize everything that doesn't require the event loop."""
         super().__init__(env)
 
         self.coin = env.coin
@@ -64,8 +63,9 @@ class Controller(ServerBase):
         env.max_send = max(350000, env.max_send)
         self.setup_bands()
         # Set up the RPC request handlers
-        cmds = ('add_peer daemon_url disconnect getinfo groups log peers reorg '
-                'sessions stop'.split())
+        cmds = (
+            'add_peer daemon_url disconnect getinfo groups log peers reorg '
+            'sessions stop'.split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
 
         self.loop = asyncio.get_event_loop()
@@ -77,11 +77,12 @@ class Controller(ServerBase):
         self.bp = self.coin.BLOCK_PROCESSOR(env, self, self.daemon)
         self.mempool = MemPool(self.bp, self)
         self.peer_mgr = PeerManager(env, self)
+        self.bands = list()
 
     async def start_servers(self):
-        '''Start the RPC server and schedule the external servers to be
+        """Start the RPC server and schedule the external servers to be
         started once the block processor has caught up.
-        '''
+        """
         if self.env.rpc_port is not None:
             await self.start_server('RPC', self.env.cs_host(for_rpc=True),
                                     self.env.rpc_port)
@@ -90,7 +91,7 @@ class Controller(ServerBase):
         self.ensure_future(self.wait_for_bp_catchup())
 
     async def shutdown(self):
-        '''Perform the shutdown sequence.'''
+        """Perform the shutdown sequence."""
         self.state = self.SHUTTING_DOWN
 
         # Close servers and sessions
@@ -109,23 +110,23 @@ class Controller(ServerBase):
         # Finally shut down the block processor and executor
         self.bp.shutdown(self.executor)
 
-    async def mempool_transactions(self, hashX):
-        '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hashX.
+    async def mempool_transactions(self, hash_x):
+        """Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
+        entries for the hash_x.
 
         unconfirmed is True if any txin is unconfirmed.
-        '''
-        return await self.mempool.transactions(hashX)
+        """
+        return await self.mempool.transactions(hash_x)
 
-    def mempool_value(self, hashX):
-        '''Return the unconfirmed amount in the mempool for hashX.
+    def mempool_value(self, hash_x):
+        """Return the unconfirmed amount in the mempool for hash_x.
 
         Can be positive or negative.
-        '''
-        return self.mempool.value(hashX)
+        """
+        return self.mempool.value(hash_x)
 
     def sent_tx(self, tx_hash):
-        '''Call when a TX is sent.  Tells mempool to prioritize it.'''
+        """Call when a TX is sent.  Tells mempool to prioritize it."""
         self.txs_sent += 1
         self.mempool.prioritize(tx_hash)
 
@@ -153,22 +154,22 @@ class Controller(ServerBase):
         return self.session_priority(session) > self.BANDS
 
     async def run_in_executor(self, func, *args):
-        '''Wait whilst running func in the executor.'''
+        """Wait whilst running func in the executor."""
         return await self.loop.run_in_executor(None, func, *args)
 
     def schedule_executor(self, func, *args):
-        '''Schedule running func in the executor, return a task.'''
+        """Schedule running func in the executor, return a task."""
         return self.ensure_future(self.run_in_executor(func, *args))
 
     def ensure_future(self, coro, callback=None):
-        '''Schedule the coro to be run.'''
+        """Schedule the coro to be run."""
         future = asyncio.ensure_future(coro)
         future.add_done_callback(self.on_future_done)
         self.futures[future] = callback
         return future
 
     def on_future_done(self, future):
-        '''Collect the result of a future after removing it from our set.'''
+        """Collect the result of a future after removing it from our set."""
         callback = self.futures.pop(future)
         try:
             if callback:
@@ -181,7 +182,7 @@ class Controller(ServerBase):
             self.log_error(traceback.format_exc())
 
     async def housekeeping(self):
-        '''Regular housekeeping checks.'''
+        """Regular housekeeping checks."""
         n = 0
         while True:
             n += 1
@@ -192,8 +193,8 @@ class Controller(ServerBase):
 
             # Start listening for incoming connections if paused and
             # session count has fallen
-            if (self.state == self.PAUSED and
-                    len(self.sessions) <= self.low_watermark):
+            condition = len(self.sessions) <= self.low_watermark
+            if self.state == self.PAUSED and condition:
                 await self.start_external_servers()
 
             # Periodically log sessions
@@ -206,8 +207,8 @@ class Controller(ServerBase):
                 self.next_log_sessions = time.time() + self.env.log_sessions
 
     async def wait_for_bp_catchup(self):
-        '''Wait for the block processor to catch up, then kick off server
-        background processes.'''
+        """Wait for the block processor to catch up, then kick off server
+        background processes."""
         await self.bp.caught_up_event.wait()
         self.logger.info('block processor has caught up')
         self.ensure_future(self.peer_mgr.main_loop())
@@ -217,10 +218,10 @@ class Controller(ServerBase):
         self.ensure_future(self.notify())
 
     def close_servers(self, kinds):
-        '''Close the servers of the given kinds (TCP etc.).'''
+        """Close the servers of the given kinds (TCP etc.)."""
         if kinds:
-            self.logger.info('closing down {} listening servers'
-                             .format(', '.join(kinds)))
+            self.logger.info(f"closing down {', '.join(kinds)} "
+                             f"listening servers")
         for kind in kinds:
             server = self.servers.pop(kind, None)
             if server:
@@ -235,32 +236,30 @@ class Controller(ServerBase):
         try:
             self.servers[kind] = await server
         except Exception as e:
-            self.logger.error('{} server failed to listen on {}:{:d} :{}'
-                              .format(kind, host, port, e))
+            self.logger.error(f'{kind} server failed to '
+                              f'listen on {host}:{port:d} :{e}')
         else:
-            self.logger.info('{} server listening on {}:{:d}'
-                             .format(kind, host, port))
+            self.logger.info(f'{kind} server listening on {host}:{port:d}')
 
     async def log_start_external_servers(self):
-        '''Start TCP and SSL servers.'''
-        self.logger.info('max session count: {:,d}'.format(self.max_sessions))
-        self.logger.info('session timeout: {:,d} seconds'
-                         .format(self.env.session_timeout))
-        self.logger.info('session bandwidth limit {:,d} bytes'
-                         .format(self.env.bandwidth_limit))
-        self.logger.info('max response size {:,d} bytes'
-                         .format(self.env.max_send))
-        self.logger.info('max subscriptions across all sessions: {:,d}'
-                         .format(self.max_subs))
-        self.logger.info('max subscriptions per session: {:,d}'
-                         .format(self.env.max_session_subs))
-        self.logger.info('bands: {}'.format(self.bands))
+        """Start TCP and SSL servers."""
+        self.logger.info(f'max session count: {self.max_sessions):,d}')
+        self.logger.info(f'session timeout: '
+                         f'{self.env.session_timeout:,d} seconds')
+        self.logger.info(f'session bandwidth limit '
+                         f'{self.env.bandwidth_limit:,d} bytes')
+        self.logger.info(f'max response size {self.env.max_send:,d} bytes')
+        self.logger.info(f'max subscriptions across all sessions: '
+                         f'{self.max_subs:,d}')
+        self.logger.info(f'max subscriptions per session: '
+                         f'{self.env.max_session_subs:,d}')
+        self.logger.info(f'bands: {self.bands}')
         await self.start_external_servers()
 
     async def start_external_servers(self):
-        '''Start listening on TCP and SSL ports, but only if the respective
+        """Start listening on TCP and SSL ports, but only if the respective
         port was given in the environment.
-        '''
+        """
         self.state = self.LISTENING
 
         env = self.env
@@ -273,7 +272,7 @@ class Controller(ServerBase):
             await self.start_server('SSL', host, env.ssl_port, ssl=sslc)
 
     async def notify(self):
-        '''Notify sessions about height changes and touched addresses.'''
+        """Notify sessions about height changes and touched addresses."""
         while True:
             await self.mempool.touched_event.wait()
             touched = self.mempool.touched.copy()
@@ -282,8 +281,8 @@ class Controller(ServerBase):
 
             # Invalidate caches
             hc = self.history_cache
-            for hashX in set(hc).intersection(touched):
-                del hc[hashX]
+            for hash_x in set(hc).intersection(touched):
+                del hc[hash_x]
             if self.bp.db_height != self.cache_height:
                 self.cache_height = self.bp.db_height
                 self.header_cache.clear()
@@ -295,14 +294,14 @@ class Controller(ServerBase):
                 await session.notify(self.bp.db_height, touched)
 
     def notify_peers(self, updates):
-        '''Notify of peer updates.'''
+        """Notify of peer updates."""
         for session in self.sessions:
             session.notify_peers(updates)
 
     def electrum_header(self, height):
-        '''Return the binary header at the given height.'''
+        """Return the binary header at the given height."""
         if not 0 <= height <= self.bp.db_height:
-            raise RPCError('height {:,d} out of range'.format(height))
+            raise RPCError(f'height {height:,d} out of range')
         if height in self.header_cache:
             return self.header_cache[height]
         header = self.bp.read_headers(height, 1)
@@ -316,14 +315,14 @@ class Controller(ServerBase):
         if excess != session.last_delay:
             session.last_delay = excess
             if excess:
-                session.log_info('high bandwidth use, deprioritizing by '
-                                 'delaying responses {:d}s'.format(excess))
+                session.log_info(f'high bandwidth use, deprioritizing by '
+                                 f'delaying responses {excess:d}s')
             else:
                 session.log_info('stopped delaying responses')
         return max(int(session.pause), excess)
 
     async def process_items(self, session):
-        '''Waits for incoming session items and processes them.'''
+        """Waits for incoming session items and processes them."""
         while True:
             await session.items_event.wait()
             await asyncio.sleep(self.session_delay(session))
@@ -335,40 +334,41 @@ class Controller(ServerBase):
         gid = int(session.start_time - self.start_time) // 900
         self.groups[gid].append(session)
         self.sessions[session] = gid
-        session.log_info('{} {}, {:,d} total'
-                         .format(session.kind, session.peername(),
-                                 len(self.sessions)))
-        if (len(self.sessions) >= self.max_sessions
-                and self.state == self.LISTENING):
+        session.log_info(f'{session.kind} {session.peername()}, '
+                         f'{len(self.sessions):,d} total')
+        condition = len(self.sessions) >= self.max_sessions
+        if condition and self.state == self.LISTENING:
             self.state = self.PAUSED
-            session.log_info('maximum sessions {:,d} reached, stopping new '
-                             'connections until count drops to {:,d}'
-                             .format(self.max_sessions, self.low_watermark))
+            session.log_info(f'maximum sessions {self.max_sessions:,d} '
+                             f'reached, stopping new connections until count '
+                             f'drops to {self.low_watermark:,d}')
             self.close_servers(['TCP', 'SSL'])
 
     def remove_session(self, session):
-        '''Remove a session from our sessions list if there.'''
+        """Remove a session from our sessions list if there."""
         session.items_future.cancel()
         if session in self.sessions:
             gid = self.sessions.pop(session)
             assert gid in self.groups
             self.groups[gid].remove(session)
 
-    def close_session(self, session):
-        '''Close the session's transport and cancel its future.'''
+    @staticmethod
+    def close_session(session):
+        """Close the session's transport and cancel its future."""
         session.close_connection()
-        return 'disconnected {:d}'.format(session.session_id)
+        return f'disconnected {session.session_id:d}'
 
-    def toggle_logging(self, session):
-        '''Toggle logging of the session.'''
+    @staticmethod
+    def toggle_logging(session):
+        """Toggle logging of the session."""
         session.log_me = not session.log_me
-        return 'log {:d}: {}'.format(session.session_id, session.log_me)
+        return f'log {session.session_id:d}: {session.log_me}'
 
     def clear_stale_sessions(self, grace=15):
-        '''Cut off sessions that haven't done anything for 10 minutes.  Force
+        """Cut off sessions that haven't done anything for 10 minutes.  Force
         close stubborn connections that won't close cleanly after a
         short grace period.
-        '''
+        """
         now = time.time()
         shutdown_cutoff = now - grace
         stale_cutoff = now - self.env.session_timeout
@@ -382,7 +382,7 @@ class Controller(ServerBase):
                 self.close_session(session)
                 stale.append(session.session_id)
         if stale:
-            self.logger.info('closing stale connections {}'.format(stale))
+            self.logger.info(f'closing stale connections {stale}')
 
         # Consolidate small groups
         gids = [gid for gid, l in self.groups.items() if len(l) <= 4
@@ -397,11 +397,11 @@ class Controller(ServerBase):
             self.groups[new_gid] = sessions
 
     def session_count(self):
-        '''The number of connections that we've sent something to.'''
+        """The number of connections that we've sent something to."""
         return len(self.sessions)
 
     def getinfo(self):
-        '''A one-line summary of server state.'''
+        """A one-line summary of server state."""
         return {
             'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
@@ -425,9 +425,9 @@ class Controller(ServerBase):
 
     @staticmethod
     def groups_text_lines(data):
-        '''A generator returning lines for a list of groups.
+        """A generator returning lines for a list of groups.
 
-        data is the return value of rpc_groups().'''
+        data is the return value of rpc_groups()."""
 
         fmt = ('{:<6} {:>9} {:>9} {:>6} {:>6} {:>8}'
                '{:>7} {:>9} {:>7} {:>9}')
@@ -436,18 +436,18 @@ class Controller(ServerBase):
         for (id_, session_count, bandwidth, reqs, txs_sent, subs,
              recv_count, recv_size, send_count, send_size) in data:
             yield fmt.format(id_,
-                             '{:,d}'.format(session_count),
-                             '{:,d}'.format(bandwidth // 1024),
-                             '{:,d}'.format(reqs),
-                             '{:,d}'.format(txs_sent),
-                             '{:,d}'.format(subs),
-                             '{:,d}'.format(recv_count),
-                             '{:,d}'.format(recv_size // 1024),
-                             '{:,d}'.format(send_count),
-                             '{:,d}'.format(send_size // 1024))
+                             f'{session_count:,d}',
+                             f'{bandwidth // 1024:,d}',
+                             f'{reqs:,d}',
+                             f'{txs_sent:,d}',
+                             f'{subs:,d}',
+                             f'{recv_count:,d}',
+                             f'{recv_size // 1024:,d}',
+                             f'{send_count:,d}',
+                             f'{send_size // 1024:,d}')
 
     def group_data(self):
-        '''Returned to the RPC 'groups' call.'''
+        """Returned to the RPC 'groups' call."""
         result = []
         for gid in sorted(self.groups.keys()):
             sessions = self.groups[gid]
@@ -466,9 +466,10 @@ class Controller(ServerBase):
 
     @staticmethod
     def peers_text_lines(data):
-        '''A generator returning lines for a list of peers.
+        """A generator returning lines for a list of peers.
 
-        data is the return value of rpc_peers().'''
+        data is the return value of rpc_peers()."""
+
         def time_fmt(t):
             if not t:
                 return 'Never'
@@ -500,16 +501,16 @@ class Controller(ServerBase):
 
     @staticmethod
     def sessions_text_lines(data):
-        '''A generator returning lines for a list of sessions.
+        """A generator returning lines for a list of sessions.
 
-        data is the return value of rpc_sessions().'''
+        data is the return value of rpc_sessions()."""
         fmt = ('{:<6} {:<5} {:>17} {:>5} {:>5} {:>5} '
                '{:>7} {:>7} {:>7} {:>7} {:>7} {:>9} {:>21}')
         yield fmt.format('ID', 'Flags', 'Client', 'Proto',
                          'Reqs', 'Txs', 'Subs',
                          'Recv', 'Recv KB', 'Sent', 'Sent KB', 'Time', 'Peer')
         for (id_, flags, peer, client, proto, reqs, txs_sent, subs,
-             recv_count, recv_size, send_count, send_size, time) in data:
+             recv_count, recv_size, send_count, send_size, _time) in data:
             yield fmt.format(id_, flags, client, proto,
                              '{:,d}'.format(reqs),
                              '{:,d}'.format(txs_sent),
@@ -518,10 +519,10 @@ class Controller(ServerBase):
                              '{:,d}'.format(recv_size // 1024),
                              '{:,d}'.format(send_count),
                              '{:,d}'.format(send_size // 1024),
-                             util.formatted_time(time, sep=''), peer)
+                             util.formatted_time(_time, sep=''), peer)
 
     def session_data(self, for_log):
-        '''Returned to the RPC 'sessions' call.'''
+        """Returned to the RPC 'sessions' call."""
         now = time.time()
         sessions = sorted(self.sessions, key=lambda s: s.start_time)
         return [(session.session_id,
@@ -564,30 +565,30 @@ class Controller(ServerBase):
     # Local RPC command handlers
 
     def rpc_add_peer(self, real_name):
-        '''Add a peer.
+        """Add a peer.
 
         real_name: a real name, as would appear on IRC
-        '''
+        """
         peer = Peer.from_real_name(real_name, 'RPC')
         self.peer_mgr.add_peers([peer])
         return "peer '{}' added".format(real_name)
 
     def rpc_disconnect(self, session_ids):
-        '''Disconnect sesssions.
+        """Disconnect sesssions.
 
         session_ids: array of session IDs
-        '''
+        """
         return self.for_each_session(session_ids, self.close_session)
 
     def rpc_log(self, session_ids):
-        '''Toggle logging of sesssions.
+        """Toggle logging of sesssions.
 
         session_ids: array of session IDs
-        '''
+        """
         return self.for_each_session(session_ids, self.toggle_logging)
 
     def rpc_daemon_url(self, daemon_url=None):
-        '''Replace the daemon URL.'''
+        """Replace the daemon URL."""
         daemon_url = daemon_url or self.env.daemon_url
         try:
             self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
@@ -596,31 +597,31 @@ class Controller(ServerBase):
         return 'now using daemon at {}'.format(self.daemon.logged_url())
 
     def rpc_stop(self):
-        '''Shut down the server cleanly.'''
+        """Shut down the server cleanly."""
         self.shutdown_event.set()
         return 'stopping'
 
     def rpc_getinfo(self):
-        '''Return summary information about the server process.'''
+        """Return summary information about the server process."""
         return self.getinfo()
 
     def rpc_groups(self):
-        '''Return statistics about the session groups.'''
+        """Return statistics about the session groups."""
         return self.group_data()
 
     def rpc_peers(self):
-        '''Return a list of data about server peers.'''
+        """Return a list of data about server peers."""
         return self.peer_mgr.rpc_data()
 
     def rpc_sessions(self):
-        '''Return statistics about connected sessions.'''
+        """Return statistics about connected sessions."""
         return self.session_data(for_log=False)
 
     def rpc_reorg(self, count=3):
-        '''Force a reorg of the given number of blocks.
+        """Force a reorg of the given number of blocks.
 
         count: number of blocks to reorg (default 3)
-        '''
+        """
         count = self.non_negative_integer(count)
         if not self.bp.force_chain_reorg(count):
             raise RPCError('still catching up with daemon')
@@ -628,45 +629,47 @@ class Controller(ServerBase):
 
     # Helpers for RPC "blockchain" command handlers
 
-    def address_to_hashX(self, address):
+    def address_to_hash_x(self, address):
         try:
-            return self.coin.address_to_hashX(address)
+            return self.coin.address_to_hash_x(address)
         except Exception:
             pass
         raise RPCError('{} is not a valid address'.format(address))
 
-    def scripthash_to_hashX(self, scripthash):
+    def scripthash_to_hash_x(self, scripthash):
         try:
             bin_hash = hex_str_to_hash(scripthash)
             if len(bin_hash) == 32:
                 return bin_hash[:self.coin.HASHX_LEN]
         except Exception:
             pass
-        raise RPCError('{} is not a valid script hash'.format(scripthash))
+        raise RPCError(f'{scripthash} is not a valid script hash')
 
-    def assert_tx_hash(self, value):
-        '''Raise an RPCError if the value is not a valid transaction
-        hash.'''
+    @staticmethod
+    def assert_tx_hash(value):
+        """Raise an RPCError if the value is not a valid transaction
+        hash."""
         try:
             if len(util.hex_to_bytes(value)) == 32:
                 return
         except Exception:
             pass
-        raise RPCError('{} should be a transaction hash'.format(value))
+        raise RPCError(f'{value} should be a transaction hash')
 
-    def non_negative_integer(self, value):
-        '''Return param value it is or can be converted to a non-negative
-        integer, otherwise raise an RPCError.'''
+    @staticmethod
+    def non_negative_integer(value):
+        """Return param value it is or can be converted to a non-negative
+        integer, otherwise raise an RPCError."""
         try:
             value = int(value)
             if value >= 0:
                 return value
         except ValueError:
             pass
-        raise RPCError('{} should be a non-negative integer'.format(value))
+        raise RPCError(f'{value} should be a non-negative integer')
 
     async def daemon_request(self, method, *args):
-        '''Catch a DaemonError and convert it to an RPCError.'''
+        """Catch a DaemonError and convert it to an RPCError."""
         try:
             return await getattr(self.daemon, method)(*args)
         except DaemonError as e:
@@ -681,7 +684,7 @@ class Controller(ServerBase):
         self.subs_room -= 1
 
     async def tx_merkle(self, tx_hash, height):
-        '''tx_hash is a hex string.'''
+        """tx_hash is a hex string."""
         hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
         block = await self.daemon_request('deserialised_block', hex_hashes[0])
         tx_hashes = block['tx']
@@ -705,23 +708,23 @@ class Controller(ServerBase):
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
 
-    async def get_balance(self, hashX):
-        utxos = await self.get_utxos(hashX)
+    async def get_balance(self, hash_x):
+        utxos = await self.get_utxos(hash_x)
         confirmed = sum(utxo.value for utxo in utxos)
-        unconfirmed = self.mempool_value(hashX)
+        unconfirmed = self.mempool_value(hash_x)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
-    async def unconfirmed_history(self, hashX):
+    async def unconfirmed_history(self, hash_x):
         # Note unconfirmed history is unordered in electrum-server
         # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = await self.mempool_transactions(hashX)
+        mempool = await self.mempool_transactions(hash_x)
         return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
                 for tx_hash, fee, unconfirmed in mempool]
 
-    async def get_history(self, hashX):
-        '''Get history asynchronously to reduce latency.'''
-        if hashX in self.history_cache:
-            return self.history_cache[hashX]
+    async def get_history(self, hash_x):
+        """Get history asynchronously to reduce latency."""
+        if hash_x in self.history_cache:
+            return self.history_cache[hash_x]
 
         def job():
             # History DoS limit.  Each element of history is about 99
@@ -729,28 +732,29 @@ class Controller(ServerBase):
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
             limit = self.env.max_send // 97
-            return list(self.bp.get_history(hashX, limit=limit))
+            return list(self.bp.get_history(hash_x, limit=limit))
 
         history = await self.run_in_executor(job)
-        self.history_cache[hashX] = history
+        self.history_cache[hash_x] = history
         return history
 
-    async def confirmed_and_unconfirmed_history(self, hashX):
+    async def confirmed_and_unconfirmed_history(self, hash_x):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.get_history(hashX)
+        history = await self.get_history(hash_x)
         conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
-        return conf + await self.unconfirmed_history(hashX)
+        return conf + await self.unconfirmed_history(hash_x)
 
-    async def get_utxos(self, hashX):
-        '''Get UTXOs asynchronously to reduce latency.'''
+    async def get_utxos(self, hash_x):
+        """Get UTXOs asynchronously to reduce latency."""
+
         def job():
-            return list(self.bp.get_utxos(hashX, limit=None))
+            return list(self.bp.get_utxos(hash_x, limit=None))
 
         return await self.run_in_executor(job)
 
     def get_chunk(self, index):
-        '''Return header chunk as hex.  Index is a non-negative integer.'''
+        """Return header chunk as hex.  Index is a non-negative integer."""
         chunk_size = self.coin.CHUNK_SIZE
         next_height = self.bp.db_height + 1
         start_height = min(index * chunk_size, next_height)
@@ -760,41 +764,41 @@ class Controller(ServerBase):
     # Client RPC "blockchain" command handlers
 
     async def address_get_balance(self, address):
-        '''Return the confirmed and unconfirmed balance of an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.get_balance(hashX)
+        """Return the confirmed and unconfirmed balance of an address."""
+        hash_x = self.address_to_hash_x(address)
+        return await self.get_balance(hash_x)
 
     async def scripthash_get_balance(self, scripthash):
-        '''Return the confirmed and unconfirmed balance of a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
-        return await self.get_balance(hashX)
+        """Return the confirmed and unconfirmed balance of a scripthash."""
+        hash_x = self.scripthash_to_hash_x(scripthash)
+        return await self.get_balance(hash_x)
 
     async def address_get_history(self, address):
-        '''Return the confirmed and unconfirmed history of an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.confirmed_and_unconfirmed_history(hashX)
+        """Return the confirmed and unconfirmed history of an address."""
+        hash_x = self.address_to_hash_x(address)
+        return await self.confirmed_and_unconfirmed_history(hash_x)
 
     async def scripthash_get_history(self, scripthash):
-        '''Return the confirmed and unconfirmed history of a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
-        return await self.confirmed_and_unconfirmed_history(hashX)
+        """Return the confirmed and unconfirmed history of a scripthash."""
+        hash_x = self.scripthash_to_hash_x(scripthash)
+        return await self.confirmed_and_unconfirmed_history(hash_x)
 
     async def address_get_mempool(self, address):
-        '''Return the mempool transactions touching an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.unconfirmed_history(hashX)
+        """Return the mempool transactions touching an address."""
+        hash_x = self.address_to_hash_x(address)
+        return await self.unconfirmed_history(hash_x)
 
     async def scripthash_get_mempool(self, scripthash):
-        '''Return the mempool transactions touching a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
-        return await self.unconfirmed_history(hashX)
+        """Return the mempool transactions touching a scripthash."""
+        hash_x = self.scripthash_to_hash_x(scripthash)
+        return await self.unconfirmed_history(hash_x)
 
-    async def hashX_listunspent(self, hashX):
-        '''Return the list of UTXOs of a script hash.
+    async def hash_x_listunspent(self, hash_x):
+        """Return the list of UTXOs of a script hash.
 
-        We should remove mempool spends from the in-DB UTXOs.'''
-        utxos = await self.get_utxos(hashX)
-        spends = await self.mempool.spends(hashX)
+        We should remove mempool spends from the in-DB UTXOs."""
+        utxos = await self.get_utxos(hash_x)
+        spends = await self.mempool.spends(hash_x)
 
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
@@ -802,70 +806,70 @@ class Controller(ServerBase):
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
     async def address_listunspent(self, address):
-        '''Return the list of UTXOs of an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.hashX_listunspent(hashX)
+        """Return the list of UTXOs of an address."""
+        hash_x = self.address_to_hash_x(address)
+        return await self.hash_x_listunspent(hash_x)
 
     async def scripthash_listunspent(self, scripthash):
-        '''Return the list of UTXOs of a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
-        return await self.hashX_listunspent(hashX)
+        """Return the list of UTXOs of a scripthash."""
+        hash_x = self.scripthash_to_hash_x(scripthash)
+        return await self.hash_x_listunspent(hash_x)
 
     def block_get_header(self, height):
-        '''The deserialized header at a given height.
+        """The deserialized header at a given height.
 
-        height: the header's height'''
+        height: the header's height"""
         height = self.non_negative_integer(height)
         return self.electrum_header(height)
 
     async def estimatefee(self, number):
-        '''The estimated transaction fee per kilobyte to be paid for a
+        """The estimated transaction fee per kilobyte to be paid for a
         transaction to be included within a certain number of blocks.
 
         number: the number of blocks
-        '''
+        """
         number = self.non_negative_integer(number)
         return await self.daemon_request('estimatefee', [number])
 
     async def relayfee(self):
-        '''The minimum fee a low-priority tx must pay in order to be accepted
-        to the daemon's memory pool.'''
+        """The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool."""
         return await self.daemon_request('relayfee')
 
     async def transaction_get(self, tx_hash):
-        '''Return the serialized raw transaction given its hash
+        """Return the serialized raw transaction given its hash
 
         tx_hash: the transaction hash as a hexadecimal string
-        '''
+        """
         self.assert_tx_hash(tx_hash)
         return await self.daemon_request('getrawtransaction', tx_hash)
 
     async def transaction_get_1_0(self, tx_hash, height=None):
-        '''Return the serialized raw transaction given its hash
+        """Return the serialized raw transaction given its hash
 
         tx_hash: the transaction hash as a hexadecimal string
         height: ignored, do not use
-        '''
+        """
         # For some reason Electrum protocol 1.0 passes a height.
         return await self.transaction_get(tx_hash)
 
     async def transaction_get_merkle(self, tx_hash, height):
-        '''Return the markle tree to a confirmed transaction given its hash
+        """Return the markle tree to a confirmed transaction given its hash
         and height.
 
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
-        '''
+        """
         self.assert_tx_hash(tx_hash)
         height = self.non_negative_integer(height)
         return await self.tx_merkle(tx_hash, height)
 
     async def utxo_get_address(self, tx_hash, index):
-        '''Returns the address sent to in a UTXO, or null if the UTXO
+        """Returns the address sent to in a UTXO, or null if the UTXO
         cannot be found.
 
         tx_hash: the transaction hash of the UTXO
-        index: the index of the UTXO in the transaction'''
+        index: the index of the UTXO in the transaction"""
         # Used only for electrum client command-line requests.  We no
         # longer index by address, so need to request the raw
         # transaction.  So it works for any TXO not just UTXOs.

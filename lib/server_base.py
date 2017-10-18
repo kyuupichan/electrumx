@@ -1,10 +1,9 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2016, Neil Booth
 #
 # All rights reserved.
 #
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
-
 import asyncio
 import os
 import signal
@@ -16,7 +15,7 @@ import lib.util as util
 
 
 class ServerBase(util.LoggedClass):
-    '''Base class server implementation.
+    """Base class server implementation.
 
     Derived classes are expected to:
 
@@ -24,7 +23,7 @@ class ServerBase(util.LoggedClass):
     - implement the start_servers() coroutine, called from the run() method.
       Upon return the event loop runs until the shutdown signal is received.
     - implement the shutdown() coroutine
-    '''
+    """
 
     SUPPRESS_MESSAGES = [
         'Fatal read error on socket transport',
@@ -34,16 +33,16 @@ class ServerBase(util.LoggedClass):
     PYTHON_MIN_VERSION = (3, 6)
 
     def __init__(self, env):
-        '''Save the environment, perform basic sanity checks, and set the
+        """Save the environment, perform basic sanity checks, and set the
         event loop policy.
-        '''
+        """
         super().__init__()
         self.env = env
 
         # Sanity checks
         if sys.version_info < self.PYTHON_MIN_VERSION:
             mvs = '.'.join(str(part) for part in self.PYTHON_MIN_VERSION)
-            raise RuntimeError('Python version >= {} is required'.format(mvs))
+            raise RuntimeError(f'Python version >= {mvs} is required')
 
         if os.geteuid() == 0 and not env.allow_root:
             raise RuntimeError('RUNNING AS ROOT IS STRONGLY DISCOURAGED!\n'
@@ -61,18 +60,18 @@ class ServerBase(util.LoggedClass):
         self.shutdown_event = asyncio.Event()
 
     async def start_servers(self):
-        '''Override to perform initialization that requires the event loop,
-        and start servers.'''
+        """Override to perform initialization that requires the event loop,
+        and start servers."""
         pass
 
     async def shutdown(self):
-        '''Override to perform the shutdown sequence, if any.'''
+        """Override to perform the shutdown sequence, if any."""
         pass
 
     async def _wait_for_shutdown_event(self):
-        '''Wait for shutdown to be signalled, and log it.
+        """Wait for shutdown to be signalled, and log it.
 
-        Derived classes may want to provide a shutdown() coroutine.'''
+        Derived classes may want to provide a shutdown() coroutine."""
         # Shut down cleanly after waiting for shutdown to be signalled
         await self.shutdown_event.wait()
         self.logger.info('shutting down')
@@ -90,13 +89,12 @@ class ServerBase(util.LoggedClass):
         self.logger.info('shutdown complete')
 
     def on_signal(self, signame):
-        '''Call on receipt of a signal to cleanly shutdown.'''
-        self.logger.warning('received {} signal, initiating shutdown'
-                            .format(signame))
+        """Call on receipt of a signal to cleanly shutdown."""
+        self.logger.warning(f'received {signame} signal, initiating shutdown')
         self.shutdown_event.set()
 
     def on_exception(self, loop, context):
-        '''Suppress spurious messages it appears we cannot control.'''
+        """Suppress spurious messages it appears we cannot control."""
         message = context.get('message')
         if message in self.SUPPRESS_MESSAGES:
             return
@@ -105,7 +103,7 @@ class ServerBase(util.LoggedClass):
         loop.default_exception_handler(context)
 
     def run(self):
-        '''Run the server application:
+        """Run the server application:
 
         - record start time
         - set the event loop policy as specified by the environment
@@ -113,7 +111,7 @@ class ServerBase(util.LoggedClass):
         - set loop's exception handler to suppress unwanted messages
         - run the event loop until start_servers() completes
         - run the event loop until shutdown is signalled
-        '''
+        """
         self.start_time = time.time()
 
         loop = asyncio.get_event_loop()

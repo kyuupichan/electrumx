@@ -1,29 +1,3 @@
-# Copyright (c) 2017, the ElectrumX authors
-#
-# All rights reserved.
-#
-# The MIT License (MIT)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-# and warranty status of this software.
-
 import json
 import os
 from binascii import unhexlify
@@ -60,9 +34,9 @@ def test_block(block_details):
 
     raw_block = unhexlify(block_info['block'])
     block = coin.block(raw_block, block_info['height'])
-
-    assert coin.header_hash(block.header) == hex_str_to_hash(block_info['hash'])
-    assert (coin.header_prevhash(block.header)
-            == hex_str_to_hash(block_info['previousblockhash']))
+    bih = block_info['hash']
+    pbh = block_info['previousblockhash']
+    assert coin.header_hash(block.header) == hex_str_to_hash(bih)
+    assert coin.header_prevhash(block.header) == hex_str_to_hash(pbh)
     for n, (tx, txid) in enumerate(block.transactions):
         assert txid == hex_str_to_hash(block_info['tx'][n])

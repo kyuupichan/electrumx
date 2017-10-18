@@ -6,7 +6,6 @@ from lib import util
 
 
 class LoggedClassTest(util.LoggedClass):
-
     def __init__(self):
         super().__init__()
         self.logger.info = self.note_info
@@ -52,7 +51,6 @@ def test_LoggedClass():
 
 def test_cachedproperty():
     class Target:
-
         CALL_COUNT = 0
 
         def __init__(self):
@@ -72,15 +70,17 @@ def test_cachedproperty():
     assert t.prop == t.prop == 1
     assert Target.cls_prop == Target.cls_prop == 1
 
+
 def test_formatted_time():
     assert util.formatted_time(0) == '00s'
     assert util.formatted_time(59) == '59s'
     assert util.formatted_time(60) == '01m 00s'
     assert util.formatted_time(3599) == '59m 59s'
     assert util.formatted_time(3600) == '01h 00m 00s'
-    assert util.formatted_time(3600*24) == '1d 00h 00m'
-    assert util.formatted_time(3600*24*367) == '367d 00h 00m'
-    assert util.formatted_time(3600*24, ':') == '1d:00h:00m'
+    assert util.formatted_time(3600 * 24) == '1d 00h 00m'
+    assert util.formatted_time(3600 * 24 * 367) == '367d 00h 00m'
+    assert util.formatted_time(3600 * 24, ':') == '1d:00h:00m'
+
 
 def test_deep_getsizeof():
     int_t = util.deep_getsizeof(1)
@@ -116,11 +116,14 @@ def test_increment_byte_string():
     assert util.increment_byte_string(b'\x01\x01') == b'\x01\x02'
     assert util.increment_byte_string(b'\xff\xff') is None
 
+
 def test_bytes_to_int():
     assert util.bytes_to_int(b'\x07[\xcd\x15') == 123456789
 
+
 def test_int_to_bytes():
     assert util.int_to_bytes(456789) == b'\x06\xf8U'
+
 
 def test_int_to_varint():
     with pytest.raises(ValueError):
@@ -131,10 +134,11 @@ def test_int_to_varint():
     assert util.int_to_varint(253) == b'\xfd\xfd\0'
     assert util.int_to_varint(65535) == b'\xfd\xff\xff'
     assert util.int_to_varint(65536) == b'\xfe\0\0\1\0'
-    assert util.int_to_varint(2**32-1) == b'\xfe\xff\xff\xff\xff'
-    assert util.int_to_varint(2**32) == b'\xff\0\0\0\0\1\0\0\0'
-    assert util.int_to_varint(2**64-1) \
-        == b'\xff\xff\xff\xff\xff\xff\xff\xff\xff'
+    assert util.int_to_varint(2 ** 32 - 1) == b'\xfe\xff\xff\xff\xff'
+    assert util.int_to_varint(2 ** 32) == b'\xff\0\0\0\0\1\0\0\0'
+    b_int = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff'
+    assert util.int_to_varint(2 ** 64 - 1) == b_int
+
 
 def test_LogicalFile(tmpdir):
     prefix = os.path.join(tmpdir, 'log')
@@ -163,6 +167,7 @@ def test_LogicalFile(tmpdir):
     L.write(0, b'957' * 6)
     assert L.read(0, -1) == b'957' * 6
 
+
 def test_open_fns(tmpdir):
     tmpfile = os.path.join(tmpdir, 'file1')
     with pytest.raises(FileNotFoundError):
@@ -179,10 +184,12 @@ def test_open_fns(tmpdir):
     with util.open_truncate(tmpfile) as f:
         assert f.read(3) == b''
 
+
 def test_address_string():
     assert util.address_string(('foo.bar', 84)) == 'foo.bar:84'
     assert util.address_string(('1.2.3.4', 84)) == '1.2.3.4:84'
     assert util.address_string(('0a::23', 84)) == '[a::23]:84'
+
 
 def test_is_valid_hostname():
     is_valid_hostname = util.is_valid_hostname
@@ -213,19 +220,21 @@ def test_is_valid_hostname():
 
 
 def test_protocol_tuple():
-    assert util.protocol_tuple(None) == (0, )
-    assert util.protocol_tuple("foo") == (0, )
-    assert util.protocol_tuple(1) == (0, )
-    assert util.protocol_tuple("1") == (1, )
+    assert util.protocol_tuple(None) == (0,)
+    assert util.protocol_tuple("foo") == (0,)
+    assert util.protocol_tuple(1) == (0,)
+    assert util.protocol_tuple("1") == (1,)
     assert util.protocol_tuple("0.1") == (0, 1)
     assert util.protocol_tuple("0.10") == (0, 10)
     assert util.protocol_tuple("2.5.3") == (2, 5, 3)
 
+
 def test_protocol_version_string():
     assert util.protocol_version_string(()) == "0.0"
-    assert util.protocol_version_string((1, )) == "1.0"
+    assert util.protocol_version_string((1,)) == "1.0"
     assert util.protocol_version_string((1, 2)) == "1.2"
     assert util.protocol_version_string((1, 3, 2)) == "1.3.2"
+
 
 def test_protocol_version():
     assert util.protocol_version(None, "1.0", "1.0") == (1, 0)
@@ -258,6 +267,7 @@ def test_unpackers():
     assert util.unpack_uint32_from(b, 42) == (757869354,)
     assert util.unpack_uint64_from(b, 0) == (506097522914230528,)
     assert util.unpack_uint64_from(b, 42) == (3544384782113450794,)
+
 
 def test_hex_transforms():
     h = "AABBCCDDEEFF"
