@@ -2,7 +2,6 @@ aiohttp==2.3.0
 async-timeout==2.0.0
 chardet==3.0.4
 ecdsa==0.13
-electrumx==1.2
 inflect==0.2.5
 irc==16.0
 jaraco.classes==1.4.1
