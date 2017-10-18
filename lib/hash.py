@@ -1,30 +1,4 @@
-# Copyright (c) 2016-2017, Neil Booth
-#
-# All rights reserved.
-#
-# The MIT License (MIT)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-'''Cryptograph hash functions and related classes.'''
-
+"""Cryptograph hash functions and related classes."""
 
 import hashlib
 import hmac
@@ -38,55 +12,57 @@ _new_hmac = hmac.new
 
 
 def sha256(x):
-    '''Simple wrapper of hashlib sha256.'''
+    """Simple wrapper of hashlib sha256."""
     return _sha256(x).digest()
 
 
 def ripemd160(x):
-    '''Simple wrapper of hashlib ripemd160.'''
+    """Simple wrapper of hashlib ripemd160."""
     h = _new_hash('ripemd160')
     h.update(x)
     return h.digest()
 
 
 def double_sha256(x):
-    '''SHA-256 of SHA-256, as used extensively in bitcoin.'''
+    """SHA-256 of SHA-256, as used extensively in bitcoin."""
     return sha256(sha256(x))
 
 
 def hmac_sha512(key, msg):
-    '''Use SHA-512 to provide an HMAC.'''
+    """Use SHA-512 to provide an HMAC."""
     return _new_hmac(key, msg, _sha512).digest()
 
 
 def hash160(x):
-    '''RIPEMD-160 of SHA-256.
+    """RIPEMD-160 of SHA-256.
 
-    Used to make bitcoin addresses from pubkeys.'''
+    Used to make bitcoin addresses from pubkeys."""
     return ripemd160(sha256(x))
 
 
 def hash_to_hex_str(x):
-    '''Convert a big-endian binary hash to displayed hex string.
+    """Convert a big-endian binary hash to displayed hex string.
 
     Display form of a binary hash is reversed and converted to hex.
-    '''
+    """
     return bytes(reversed(x)).hex()
+
 
 # Temporary
 hash_to_str = hash_to_hex_str
 
+
 def hex_str_to_hash(x):
-    '''Convert a displayed hex string to a binary hash.'''
+    """Convert a displayed hex string to a binary hash."""
     return bytes(reversed(hex_to_bytes(x)))
 
 
 class Base58Error(Exception):
-    '''Exception used for Base58 errors.'''
+    """Exception used for Base58 errors."""
 
 
 class Base58(object):
-    '''Class providing base 58 functionality.'''
+    """Class providing base 58 functionality."""
 
     chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
     assert len(chars) == 58
@@ -144,8 +120,8 @@ class Base58(object):
 
     @staticmethod
     def decode_check(txt):
-        '''Decodes a Base58Check-encoded string to a payload.  The version
-        prefixes it.'''
+        """Decodes a Base58Check-encoded string to a payload.  The version
+        prefixes it."""
         be_bytes = Base58.decode(txt)
         result, check = be_bytes[:-4], be_bytes[-4:]
         if check != double_sha256(result)[:4]:
