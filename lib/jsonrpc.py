@@ -1,4 +1,9 @@
-
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
+# and warranty status of this software.
 """Classes for acting as a peer over a transport and speaking the JSON
 RPC versions 1.0 and 2.0.
 

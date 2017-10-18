@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 2016, Neil Booth
+#
+# All rights reserved.
+#
+# See the file "LICENCE" for information about the copyright
+# and warranty status of this software.
 """Script to kick off the server."""
 
 import logging
