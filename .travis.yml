@@ -13,13 +13,10 @@ addons:
       - zlib1g-dev
       - libgflags-dev
       - libbz2-dev
-
-#  - sudo add-apt-repository -y ppa:giskou/librocksdb
-#  - sudo apt-get -qq update
-#  - sudo apt-get install -yq librocksdb
 before_script:
-  - sudo add-apt-repository ppa:giskou/librocksdb -y
-  - sudo apt-get update -y && sudo apt-get install librocksdb -y
+  - sudo add-apt-repository -y ppa:giskou/librocksdb
+  - sudo apt-get -qq update
+  - sudo apt-get install -yq librocksdb-y
 
 script:
   - pip install aiohttp
