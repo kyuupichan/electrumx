@@ -5,9 +5,8 @@ import random
 
 import pytest
 
-from server.env import Env, NetIdentity
 import lib.coins as lib_coins
-
+from server.env import Env
 
 BASE_DAEMON_URL = 'http://username:password@hostname:321/'
 BASE_DB_DIR = '/some/dir'
@@ -18,15 +17,18 @@ base_environ = {
     'COIN': 'BitcoinCash',
 }
 
+
 def setup_base_env():
     os.environ.clear()
     os.environ.update(base_environ)
+
 
 def assert_required(env_var):
     setup_base_env()
     os.environ.pop(env_var, None)
     with pytest.raises(Env.Error):
         Env()
+
 
 def assert_default(env_var, attr, default):
     setup_base_env()
@@ -35,6 +37,7 @@ def assert_default(env_var, attr, default):
     os.environ[env_var] = 'foo'
     e = Env()
     assert getattr(e, attr) == 'foo'
+
 
 def assert_integer(env_var, attr, default=''):
     if default != '':
@@ -48,6 +51,7 @@ def assert_integer(env_var, attr, default=''):
     e = Env()
     assert getattr(e, attr) == value
 
+
 def assert_boolean(env_var, attr, default):
     e = Env()
     assert getattr(e, attr) == default
@@ -58,9 +62,11 @@ def assert_boolean(env_var, attr, default):
     e = Env()
     assert getattr(e, attr) == False
 
+
 def test_minimal():
     setup_base_env()
     Env()
+
 
 def test_DB_DIRECTORY():
     assert_required('DB_DIRECTORY')
@@ -68,14 +74,16 @@ def test_DB_DIRECTORY():
     e = Env()
     assert e.db_dir == BASE_DB_DIR
 
+
 def test_DAEMON_URL():
     assert_required('DAEMON_URL')
     setup_base_env()
     e = Env()
     assert e.daemon_url == BASE_DAEMON_URL
 
+
 def test_COIN_NET():
-    '''Test COIN and NET defaults and redirection.'''
+    """Test COIN and NET defaults and redirection."""
     setup_base_env()
     e = Env()
     assert e.coin == lib_coins.BitcoinCash
@@ -93,8 +101,10 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.LitecoinTestnet
 
+
 def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)
+
 
 def test_HOST():
     assert_default('HOST', 'host', 'localhost')
@@ -108,6 +118,7 @@ def test_HOST():
     e = Env()
     assert e.cs_host(for_rpc=False) == ['192.168.0.1', '23.45.67.89']
 
+
 def test_RPC_HOST():
     assert_default('RPC_HOST', 'rpc_host', 'localhost')
     os.environ['RPC_HOST'] = ''
@@ -118,12 +129,15 @@ def test_RPC_HOST():
     e = Env()
     assert e.cs_host(for_rpc=True) == ['127.0.0.1', '::1']
 
+
 def test_REORG_LIMIT():
     assert_integer('REORG_LIMIT', 'reorg_limit',
                    lib_coins.BitcoinCash.REORG_LIMIT)
 
+
 def test_TCP_PORT():
     assert_integer('TCP_PORT', 'tcp_port', None)
+
 
 def test_SSL_PORT():
     # Requires both SSL_CERTFILE and SSL_KEYFILE to be set
@@ -140,26 +154,34 @@ def test_SSL_PORT():
     os.environ.pop('SSL_PORT')
     assert_integer('SSL_PORT', 'ssl_port', None)
 
+
 def test_RPC_PORT():
     assert_integer('RPC_PORT', 'rpc_port', 8000)
+
 
 def test_MAX_SUBSCRIPTIONS():
     assert_integer('MAX_SUBSCRIPTIONS', 'max_subscriptions', 10000)
 
+
 def test_LOG_SESSIONS():
     assert_integer('LOG_SESSIONS', 'log_sessions', 3600)
+
 
 def test_DONATION_ADDRESS():
     assert_default('DONATION_ADDRESS', 'donation_address', '')
 
+
 def test_DB_ENGINE():
     assert_default('DB_ENGINE', 'db_engine', 'leveldb')
+
 
 def test_MAX_SEND():
     assert_integer('MAX_SEND', 'max_send', 1000000)
 
+
 def test_MAX_SUBS():
     assert_integer('MAX_SUBS', 'max_subs', 250000)
+
 
 def test_MAX_SESSIONS():
     too_big = 1000000
@@ -168,14 +190,18 @@ def test_MAX_SESSIONS():
     assert e.max_sessions < too_big
     # Cannot test default as it may be lowered by the open file limit cap
 
+
 def test_MAX_SESSION_SUBS():
     assert_integer('MAX_SESSION_SUBS', 'max_session_subs', 50000)
+
 
 def test_BANDWIDTH_LIMIT():
     assert_integer('BANDWIDTH_LIMIT', 'bandwidth_limit', 2000000)
 
+
 def test_SESSION_TIMEOUT():
     assert_integer('SESSION_TIMEOUT', 'session_timeout', 600)
+
 
 def test_BANNER_FILE():
     e = Env()
@@ -190,6 +216,7 @@ def test_BANNER_FILE():
     assert e.banner_file == 'banner_file'
     assert e.tor_banner_file == 'tor_banner_file'
 
+
 def test_EVENT_LOOP_POLICY():
     e = Env()
     assert e.loop_policy is None
@@ -203,8 +230,10 @@ def test_EVENT_LOOP_POLICY():
         pass
     del os.environ['EVENT_LOOP_POLICY']
 
+
 def test_ANON_LOGS():
     assert_boolean('ANON_LOGS', 'anon_logs', False)
+
 
 def test_PEER_DISCOVERY():
     e = Env()
@@ -219,23 +248,30 @@ def test_PEER_DISCOVERY():
     e = Env()
     assert e.peer_discovery == Env.PD_SELF
 
+
 def test_PEER_ANNOUNCE():
     assert_boolean('PEER_ANNOUNCE', 'peer_announce', True)
+
 
 def test_FORCE_PROXY():
     assert_boolean('FORCE_PROXY', 'force_proxy', False)
 
+
 def test_TOR_PROXY_HOST():
     assert_default('TOR_PROXY_HOST', 'tor_proxy_host', 'localhost')
+
 
 def test_TOR_PROXY_PORT():
     assert_integer('TOR_PROXY_PORT', 'tor_proxy_port', None)
 
+
 def test_IRC():
     assert_boolean('IRC', 'irc', False)
 
+
 def test_IRC_NICK():
     assert_default('IRC_NICK', 'irc_nick', None)
+
 
 def test_clearnet_identity():
     os.environ['REPORT_TCP_PORT'] = '456'
@@ -296,6 +332,7 @@ def test_clearnet_identity():
     assert ident.tcp_port == 456
     assert ident.ssl_port == 457
     assert ident.nick_suffix == ''
+
 
 def test_tor_identity():
     tor_host = 'something.onion'

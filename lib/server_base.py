@@ -84,8 +84,7 @@ class ServerBase(util.LoggedClass):
 
     def on_signal(self, signame):
         """Call on receipt of a signal to cleanly shutdown."""
-        self.logger.warning('received {} signal, initiating shutdown'
-                            .format(signame))
+        self.logger.warning(f'received {signame} signal, initiating shutdown')
         self.shutdown_event.set()
 
     def on_exception(self, loop, context):

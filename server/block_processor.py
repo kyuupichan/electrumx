@@ -419,7 +419,7 @@ class BlockProcessor(server.db.DB):
     def backup_flush(self):
         """Like flush() but when backing up.  All UTXOs are flushed.
 
-        hashXs - sequence of hashXs which were touched by backing
+        hash_xs - sequence of hash_xs which were touched by backing
         up.  Searched for history entries to remove after the backup
         height.
         """
@@ -510,7 +510,7 @@ class BlockProcessor(server.db.DB):
         history = self.history
         history_size = self.history_size
         tx_num = self.tx_count
-        script_hashX = self.coin.hashX_from_script
+        script_hash_x = self.coin.hash_x_from_script
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
@@ -518,8 +518,8 @@ class BlockProcessor(server.db.DB):
         touched = self.touched
 
         for tx, tx_hash in txs:
-            hashXs = set()
-            add_hashX = hashXs.add
+            hash_xs = set()
+            add_hash_x = hash_xs.add
             tx_numb = s_pack('<I', tx_num)
 
             # Spend the inputs
@@ -527,21 +527,21 @@ class BlockProcessor(server.db.DB):
                 for txin in tx.inputs:
                     cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                     undo_info_append(cache_value)
-                    add_hashX(cache_value[:-12])
+                    add_hash_x(cache_value[:-12])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
-                # Get the hashX.  Ignore unspendable outputs
-                hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    add_hashX(hashX)
+                # Get the hash_x.  Ignore unspendable outputs
+                hash_x = script_hash_x(txout.pk_script)
+                if hash_x:
+                    add_hash_x(hash_x)
                     put_utxo(tx_hash + s_pack('<H', idx),
-                             hashX + tx_numb + s_pack('<Q', txout.value))
+                             hash_x + tx_numb + s_pack('<Q', txout.value))
 
-            for hashX in hashXs:
-                history[hashX].append(tx_num)
-            history_size += len(hashXs)
-            touched.update(hashXs)
+            for hash_x in hash_xs:
+                history[hash_x].append(tx_num)
+            history_size += len(hash_xs)
+            touched.update(hash_xs)
             tx_num += 1
 
         self.tx_count = tx_num
@@ -589,7 +589,7 @@ class BlockProcessor(server.db.DB):
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
-        script_hashX = self.coin.hashX_from_script
+        script_hash_x = self.coin.hash_x_from_script
         touched = self.touched
         undo_entry_len = 12 + self.coin.HASHX_LEN
 
@@ -597,8 +597,8 @@ class BlockProcessor(server.db.DB):
             for idx, txout in enumerate(tx.outputs):
                 # Spend the TX outputs.  Be careful with unspendable
                 # outputs - we didn't save those in the first place.
-                hashX = script_hashX(txout.pk_script)
-                if hashX:
+                hash_x = script_hash_x(txout.pk_script)
+                if hash_x:
                     cache_value = spend_utxo(tx_hash, idx)
                     touched.add(cache_value[:-12])
 
@@ -654,11 +654,11 @@ class BlockProcessor(server.db.DB):
 
     To this end we maintain two "tables", one for each point above:
 
-      1.  Key: b'u' + address_hashX + tx_idx + tx_num
+      1.  Key: b'u' + address_hash_x + tx_idx + tx_num
           Value: the UTXO value as a 64-bit unsigned integer
 
       2.  Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-          Value: hashX
+          Value: hash_x
 
     The compressed tx hash is just the first few bytes of the hash of
     the tx in which the UTXO was created.  As this is not unique there
@@ -684,12 +684,12 @@ class BlockProcessor(server.db.DB):
         # Spend it from the DB.
 
         # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-        # Value: hashX
+        # Value: hash_x
         prefix = b'h' + tx_hash[:4] + idx_packed
-        candidates = {db_key: hashX for db_key, hashX
+        candidates = {db_key: hash_x for db_key, hash_x
                       in self.utxo_db.iterator(prefix=prefix)}
 
-        for hdb_key, hashX in candidates.items():
+        for hdb_key, hash_x in candidates.items():
             tx_num_packed = hdb_key[-4:]
 
             if len(candidates) > 1:
@@ -699,15 +699,15 @@ class BlockProcessor(server.db.DB):
                     assert _hash is not None  # Should always be found
                     continue
 
-            # Key: b'u' + address_hashX + tx_idx + tx_num
+            # Key: b'u' + address_hash_x + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
-            udb_key = b'u' + hashX + hdb_key[-6:]
+            udb_key = b'u' + hash_x + hdb_key[-6:]
             utxo_value_packed = self.utxo_db.get(udb_key)
             if utxo_value_packed:
                 # Remove both entries for this UTXO
                 self.db_deletes.append(hdb_key)
                 self.db_deletes.append(udb_key)
-                return hashX + tx_num_packed + utxo_value_packed
+                return hash_x + tx_num_packed + utxo_value_packed
 
         raise ChainError(f'UTXO {hash_to_str(tx_hash)} / '
                          f'{tx_idx:,d} not found in "h" table')
@@ -731,10 +731,10 @@ class BlockProcessor(server.db.DB):
         batch_put = batch.put
         for cache_key, cache_value in self.utxo_cache.items():
             # suffix = tx_idx + tx_num
-            hashX = cache_value[:-12]
+            hash_x = cache_value[:-12]
             suffix = cache_key[-2:] + cache_value[-12:-8]
-            batch_put(b'h' + cache_key[:4] + suffix, hashX)
-            batch_put(b'u' + hashX + suffix, cache_value[-8:])
+            batch_put(b'h' + cache_key[:4] + suffix, hash_x)
+            batch_put(b'u' + hash_x + suffix, cache_value[-8:])
         self.utxo_cache = {}
 
         # New undo information

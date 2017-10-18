@@ -121,6 +121,7 @@ class SocksProxy(util.LoggedClass):
         self.tried_event = asyncio.Event()
         self.loop = loop
         self.set_lost()
+        self.port = port or None
 
     async def auto_detect_loop(self):
         """Try to detect a proxy at regular intervals until one is found.
@@ -193,8 +194,8 @@ class SocksProxy(util.LoggedClass):
         self.ip_addr = peername[0]
         self.port = proxy_port
         self.errors = 0
-        self.logger.info('detected proxy at {} ({})'
-                         .format(util.address_string(paddress), self.ip_addr))
+        self.logger.info(f'detected proxy at {util.address_string(paddress)} '
+                         f'({self.ip_addr})')
 
     async def create_connection(self, protocol_factory, host, port, **kwargs):
         """All arguments are as to asyncio's create_connection method."""

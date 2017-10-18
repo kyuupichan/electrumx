@@ -1,29 +1,21 @@
-# Copyright (c) 2016-2017, Neil Booth
-#
-# All rights reserved.
-#
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
-
-'''Classes for local RPC server and remote client TCP/SSL servers.'''
+"""Classes for local RPC server and remote client TCP/SSL servers."""
 
 import codecs
 import time
-from functools import partial
 
+import lib.util as util
+import server.version as version
 from lib.hash import sha256, hash_to_str
 from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2, JSONRPC
-import lib.util as util
 from server.daemon import DaemonError
-import server.version as version
 
 
 class SessionBase(JSONSession):
-    '''Base class of ElectrumX JSON sessions.
+    """Base class of ElectrumX JSON sessions.
 
     Each session runs its tasks in asynchronous parallelism with other
     sessions.
-    '''
+    """
 
     def __init__(self, controller, kind):
         # Force v2 as a temporary hack for old Coinomi wallets
@@ -35,7 +27,7 @@ class SessionBase(JSONSession):
         self.env = controller.env
         self.daemon = self.bp.daemon
         self.client = 'unknown'
-        self.client_version = (1, )
+        self.client_version = (1,)
         self.anon_logs = self.env.anon_logs
         self.last_delay = 0
         self.txs_sent = 0
@@ -48,16 +40,16 @@ class SessionBase(JSONSession):
         self.bw_used = 0
 
     def close_connection(self):
-        '''Call this to close the connection.'''
+        """Call this to close the connection."""
         self.close_time = time.time()
         super().close_connection()
 
     def peername(self, *, for_log=True):
-        '''Return the peer address and port.'''
+        """Return the peer address and port."""
         return self.peer_addr(anon=for_log and self.anon_logs)
 
     def flags(self):
-        '''Status flags.'''
+        """Status flags."""
         status = self.kind[0]
         if self.is_closing():
             status += 'C'
@@ -67,19 +59,19 @@ class SessionBase(JSONSession):
         return status
 
     def connection_made(self, transport):
-        '''Handle an incoming client connection.'''
+        """Handle an incoming client connection."""
         super().connection_made(transport)
         self.controller.add_session(self)
 
     def connection_lost(self, exc):
-        '''Handle client disconnection.'''
+        """Handle client disconnection."""
         super().connection_lost(exc)
         msg = ''
         if self.pause:
             msg += ' whilst paused'
         if self.controller.is_deprioritized(self):
             msg += ' whilst deprioritized'
-        if self.send_size >= 1024*1024:
+        if self.send_size >= 1024 * 1024:
             msg += ('.  Sent {:,d} bytes in {:,d} messages'
                     .format(self.send_size, self.send_count))
         if msg:
@@ -101,7 +93,7 @@ class SessionBase(JSONSession):
 
 
 class ElectrumX(SessionBase):
-    '''A TCP server that handles incoming Electrum connections.'''
+    """A TCP server that handles incoming Electrum connections."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -110,45 +102,45 @@ class ElectrumX(SessionBase):
         self.notified_height = None
         self.max_send = self.env.max_send
         self.max_subs = self.env.max_session_subs
-        self.hashX_subs = {}
+        self.hash_x_subs = {}
         self.mempool_statuses = {}
         self.chunk_indices = []
         self.protocol_version = None
         self.set_protocol_handlers((1, 0))
 
     def sub_count(self):
-        return len(self.hashX_subs)
+        return len(self.hash_x_subs)
 
     async def notify(self, height, touched):
-        '''Notify the client about changes in height and touched addresses.
+        """Notify the client about changes in height and touched addresses.
 
         Cache is a shared cache for this update.
-        '''
+        """
         pairs = []
         changed = []
 
-        matches = touched.intersection(self.hashX_subs)
-        for hashX in matches:
-            alias = self.hashX_subs[hashX]
-            status = await self.address_status(hashX)
+        matches = touched.intersection(self.hash_x_subs)
+        for hash_x in matches:
+            alias = self.hash_x_subs[hash_x]
+            status = await self.address_status(hash_x)
             changed.append((alias, status))
 
         if height != self.notified_height:
             self.notified_height = height
             if self.subscribe_headers:
-                args = (self.controller.electrum_header(height), )
+                args = (self.controller.electrum_header(height),)
                 pairs.append(('blockchain.headers.subscribe', args))
 
             if self.subscribe_height:
-                pairs.append(('blockchain.numblocks.subscribe', (height, )))
+                pairs.append(('blockchain.numblocks.subscribe', (height,)))
 
-            # Check mempool hashXs - the status is a function of the
+            # Check mempool hash_xs - the status is a function of the
             # confirmed state of other transactions
-            for hashX in set(self.mempool_statuses).difference(matches):
-                old_status = self.mempool_statuses[hashX]
-                status = await self.address_status(hashX)
+            for hash_x in set(self.mempool_statuses).difference(matches):
+                old_status = self.mempool_statuses[hash_x]
+                status = await self.address_status(hash_x)
                 if status != old_status:
-                    alias = self.hashX_subs[hashX]
+                    alias = self.hash_x_subs[hash_x]
                     changed.append((alias, status))
 
         for alias_status in changed:
@@ -166,41 +158,41 @@ class ElectrumX(SessionBase):
                               .format(len(changed), es))
 
     def height(self):
-        '''Return the current flushed database height.'''
+        """Return the current flushed database height."""
         return self.bp.db_height
 
     def current_electrum_header(self):
-        '''Used as response to a headers subscription request.'''
+        """Used as response to a headers subscription request."""
         return self.controller.electrum_header(self.height())
 
     def headers_subscribe(self):
-        '''Subscribe to get headers of new blocks.'''
+        """Subscribe to get headers of new blocks."""
         self.subscribe_headers = True
         return self.current_electrum_header()
 
     def numblocks_subscribe(self):
-        '''Subscribe to get height of new blocks.'''
+        """Subscribe to get height of new blocks."""
         self.subscribe_height = True
         return self.height()
 
     async def add_peer(self, features):
-        '''Add a peer (but only if the peer resolves to the source).'''
+        """Add a peer (but only if the peer resolves to the source)."""
         peer_mgr = self.controller.peer_mgr
         return await peer_mgr.on_add_peer(features, self.peer_info())
 
     def peers_subscribe(self):
-        '''Return the server peers as a list of (ip, host, details) tuples.'''
+        """Return the server peers as a list of (ip, host, details) tuples."""
         return self.controller.peer_mgr.on_peers_subscribe(self.is_tor())
 
-    async def address_status(self, hashX):
-        '''Returns an address status.
+    async def address_status(self, hash_x):
+        """Returns an address status.
 
         Status is a hex string, but must be None if there is no history.
-        '''
+        """
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.controller.get_history(hashX)
-        mempool = await self.controller.mempool_transactions(hashX)
+        history = await self.controller.get_history(hash_x)
+        mempool = await self.controller.mempool_transactions(hash_x)
 
         status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
                          for tx_hash, height in history)
@@ -212,45 +204,45 @@ class ElectrumX(SessionBase):
             status = None
 
         if mempool:
-            self.mempool_statuses[hashX] = status
+            self.mempool_statuses[hash_x] = status
         else:
-            self.mempool_statuses.pop(hashX, None)
+            self.mempool_statuses.pop(hash_x, None)
 
         return status
 
-    async def hashX_subscribe(self, hashX, alias):
+    async def hash_x_subscribe(self, hash_x, alias):
         # First check our limit.
-        if len(self.hashX_subs) >= self.max_subs:
+        if len(self.hash_x_subs) >= self.max_subs:
             raise RPCError('your address subscription limit {:,d} reached'
                            .format(self.max_subs))
 
         # Now let the controller check its limit
         self.controller.new_subscription()
-        self.hashX_subs[hashX] = alias
-        return await self.address_status(hashX)
+        self.hash_x_subs[hash_x] = alias
+        return await self.address_status(hash_x)
 
     async def address_subscribe(self, address):
-        '''Subscribe to an address.
+        """Subscribe to an address.
 
-        address: the address to subscribe to'''
-        hashX = self.controller.address_to_hashX(address)
-        return await self.hashX_subscribe(hashX, address)
+        address: the address to subscribe to"""
+        hash_x = self.controller.address_to_hash_x(address)
+        return await self.hash_x_subscribe(hash_x, address)
 
     async def scripthash_subscribe(self, scripthash):
-        '''Subscribe to a script hash.
+        """Subscribe to a script hash.
 
-        scripthash: the SHA256 hash of the script to subscribe to'''
-        hashX = self.controller.scripthash_to_hashX(scripthash)
-        return await self.hashX_subscribe(hashX, scripthash)
+        scripthash: the SHA256 hash of the script to subscribe to"""
+        hash_x = self.controller.scripthash_to_hash_x(scripthash)
+        return await self.hash_x_subscribe(hash_x, scripthash)
 
     def server_features(self):
-        '''Returns a dictionary of server features.'''
+        """Returns a dictionary of server features."""
         return self.controller.peer_mgr.my_clearnet_peer().features
 
     def block_get_chunk(self, index):
-        '''Return a chunk of block headers as a hexadecimal string.
+        """Return a chunk of block headers as a hexadecimal string.
 
-        index: the chunk index'''
+        index: the chunk index"""
         index = self.controller.non_negative_integer(index)
         if self.client_version < (2, 8, 3):
             self.chunk_indices.append(index)
@@ -264,8 +256,8 @@ class ElectrumX(SessionBase):
         return self.controller.get_chunk(index)
 
     def is_tor(self):
-        '''Try to detect if the connection is to a tor hidden service we are
-        running.'''
+        """Try to detect if the connection is to a tor hidden service we are
+        running."""
         proxy = self.controller.peer_mgr.proxy
         peer_info = self.peer_info()
         return peer_info and peer_info[0] == proxy.ip_addr
@@ -279,22 +271,22 @@ class ElectrumX(SessionBase):
         daemon_version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
         server_version = version.VERSION.split()[-1]
         for pair in [
-                ('$VERSION', version.VERSION), # legacy
-                ('$SERVER_VERSION', server_version),
-                ('$SERVER_SUBVERSION', version.VERSION),
-                ('$DAEMON_VERSION', daemon_version),
-                ('$DAEMON_SUBVERSION', network_info['subversion']),
-                ('$DONATION_ADDRESS', self.env.donation_address),
+            ('$VERSION', version.VERSION),  # legacy
+            ('$SERVER_VERSION', server_version),
+            ('$SERVER_SUBVERSION', version.VERSION),
+            ('$DAEMON_VERSION', daemon_version),
+            ('$DAEMON_SUBVERSION', network_info['subversion']),
+            ('$DONATION_ADDRESS', self.env.donation_address),
         ]:
             banner = banner.replace(*pair)
         return banner
 
     def donation_address(self):
-        '''Return the donation address as a string, empty if there is none.'''
+        """Return the donation address as a string, empty if there is none."""
         return self.env.donation_address
 
     async def banner(self):
-        '''Return the server banner text.'''
+        """Return the server banner text."""
         banner = 'Welcome to Electrum!'
 
         if self.is_tor():
@@ -314,11 +306,11 @@ class ElectrumX(SessionBase):
         return banner
 
     def server_version(self, client_name=None, protocol_version=None):
-        '''Returns the server version as a string.
+        """Returns the server version as a string.
 
         client_name: a string identifying the client
         protocol_version: the protocol version spoken by the client
-        '''
+        """
         if client_name:
             self.client = str(client_name)[:17]
             try:
@@ -348,9 +340,9 @@ class ElectrumX(SessionBase):
             return (version.VERSION, self.protocol_version)
 
     async def transaction_broadcast(self, raw_tx):
-        '''Broadcast a raw transaction to the network.
+        """Broadcast a raw transaction to the network.
 
-        raw_tx: the raw transaction as a hexadecimal string'''
+        raw_tx: the raw transaction as a hexadecimal string"""
         # This returns errors as JSON RPC errors, as is natural
         try:
             tx_hash = await self.daemon.sendrawtransaction([raw_tx])
@@ -367,9 +359,9 @@ class ElectrumX(SessionBase):
                            '\n\n{}\n[{}]'.format(message, raw_tx))
 
     async def transaction_broadcast_1_0(self, raw_tx):
-        '''Broadcast a raw transaction to the network.
+        """Broadcast a raw transaction to the network.
 
-        raw_tx: the raw transaction as a hexadecimal string'''
+        raw_tx: the raw transaction as a hexadecimal string"""
         # An ugly API: current Electrum clients only pass the raw
         # transaction in hex and expect error messages to be returned in
         # the result field.  And the server shouldn't be doing the client's
@@ -406,7 +398,7 @@ class ElectrumX(SessionBase):
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.relayfee': controller.relayfee,
             'blockchain.transaction.get_merkle':
-            controller.transaction_get_merkle,
+                controller.transaction_get_merkle,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
@@ -421,7 +413,7 @@ class ElectrumX(SessionBase):
                 'blockchain.numblocks.subscribe': self.numblocks_subscribe,
                 'blockchain.utxo.get_address': controller.utxo_get_address,
                 'blockchain.transaction.broadcast':
-                self.transaction_broadcast_1_0,
+                    self.transaction_broadcast_1_0,
                 'blockchain.transaction.get': controller.transaction_get_1_0,
             })
 
@@ -429,13 +421,13 @@ class ElectrumX(SessionBase):
             # New handlers as of 1.1, or different semantics
             handlers.update({
                 'blockchain.scripthash.get_balance':
-                controller.scripthash_get_balance,
+                    controller.scripthash_get_balance,
                 'blockchain.scripthash.get_history':
-                controller.scripthash_get_history,
+                    controller.scripthash_get_history,
                 'blockchain.scripthash.get_mempool':
-                controller.scripthash_get_mempool,
+                    controller.scripthash_get_mempool,
                 'blockchain.scripthash.listunspent':
-                controller.scripthash_listunspent,
+                    controller.scripthash_listunspent,
                 'blockchain.scripthash.subscribe': self.scripthash_subscribe,
                 'blockchain.transaction.broadcast': self.transaction_broadcast,
                 'blockchain.transaction.get': controller.transaction_get,
@@ -444,12 +436,12 @@ class ElectrumX(SessionBase):
         self.electrumx_handlers = handlers
 
     def request_handler(self, method):
-        '''Return the async handler for the given request method.'''
+        """Return the async handler for the given request method."""
         return self.electrumx_handlers.get(method)
 
 
 class LocalRPC(SessionBase):
-    '''A local TCP RPC server session.'''
+    """A local TCP RPC server session."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -458,12 +450,12 @@ class LocalRPC(SessionBase):
         self.protocol_version = 'RPC'
 
     def request_handler(self, method):
-        '''Return the async handler for the given request method.'''
+        """Return the async handler for the given request method."""
         return self.controller.rpc_handlers.get(method)
 
 
 class DashElectrumX(ElectrumX):
-    '''A TCP server that handles incoming Electrum Dash connections.'''
+    """A TCP server that handles incoming Electrum Dash connections."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -479,7 +471,7 @@ class DashElectrumX(ElectrumX):
         })
 
     async def notify(self, height, touched):
-        '''Notify the client about changes in masternode list.'''
+        """Notify the client about changes in masternode list."""
         await super().notify(height, touched)
 
         for masternode in self.mns:
@@ -493,10 +485,10 @@ class DashElectrumX(ElectrumX):
             self.send_binary(self.encode_payload(payload))
 
     def server_version(self, client_name=None, protocol_version=None):
-        '''Returns the server version as a string.
+        """Returns the server version as a string.
         Force version string response for Electrum-Dash 2.6.4 client caused by
         https://github.com/dashpay/electrum-dash/commit/638cf6c0aeb7be14a85ad98f873791cb7b49ee29
-        '''
+        """
         default_return = super().server_version(client_name, protocol_version)
         if self.client == '2.6.4':
             return '1.0'
@@ -504,8 +496,8 @@ class DashElectrumX(ElectrumX):
 
     # Masternode command handlers
     async def masternode_announce_broadcast(self, signmnb):
-        '''Pass through the masternode announce message to be broadcast
-        by the daemon.'''
+        """Pass through the masternode announce message to be broadcast
+        by the daemon."""
         try:
             return await self.daemon.masternode_broadcast(['relay', signmnb])
         except DaemonError as e:
@@ -516,8 +508,8 @@ class DashElectrumX(ElectrumX):
                            '\n\n{}\n[{}]'.format(message, signmnb))
 
     async def masternode_announce_broadcast_1_0(self, signmnb):
-        '''Pass through the masternode announce message to be broadcast
-        by the daemon.'''
+        """Pass through the masternode announce message to be broadcast
+        by the daemon."""
         # An ugly API, like the old Electrum transaction broadcast API
         try:
             return await self.masternode_announce_broadcast(signmnb)
@@ -525,7 +517,7 @@ class DashElectrumX(ElectrumX):
             return e.msg
 
     async def masternode_subscribe(self, vin):
-        '''Returns the status of masternode.'''
+        """Returns the status of masternode."""
         result = await self.daemon.masternode_list(['status', vin])
         if result is not None:
             self.mns.add(vin)

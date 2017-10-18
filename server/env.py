@@ -1,11 +1,4 @@
-# Copyright (c) 2016, Neil Booth
-#
-# All rights reserved.
-#
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
-
-'''Class for handling environment configuration and defaults.'''
+"""Class for handling environment configuration and defaults."""
 
 
 import resource
@@ -21,7 +14,7 @@ NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
 class Env(EnvBase):
-    '''Wraps environment configuration.'''
+    """Wraps environment configuration."""
 
     # Peer discovery
     PD_OFF, PD_SELF, PD_ON = range(3)
@@ -79,9 +72,9 @@ class Env(EnvBase):
                            if identity is not None]
 
     def sane_max_sessions(self):
-        '''Return the maximum number of sessions to permit.  Normally this
+        """Return the maximum number of sessions to permit.  Normally this
         is MAX_SESSIONS.  However, to prevent open file exhaustion, ajdust
-        downwards if running with a small open file rlimit.'''
+        downwards if running with a small open file rlimit."""
         env_value = self.integer('MAX_SESSIONS', 1000)
         nofile_limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
         # We give the DB 250 files; allow ElectrumX 100 for itself
@@ -127,8 +120,8 @@ class Env(EnvBase):
                              .format(host))
 
         def port(port_kind):
-            '''Returns the clearnet identity port, if any and not zero,
-            otherwise the listening port.'''
+            """Returns the clearnet identity port, if any and not zero,
+            otherwise the listening port."""
             result = 0
             if clearnet:
                 result = getattr(clearnet, port_kind)

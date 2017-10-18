@@ -4,8 +4,8 @@
 import logging
 import traceback
 
-from server.env import Env
 from server.controller import Controller
+from server.env import Env
 
 
 def main():

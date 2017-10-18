@@ -1,24 +1,17 @@
-# Copyright (c) 2016, Neil Booth
-#
-# All rights reserved.
-#
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
-
-'''Mempool handling.'''
+"""Mempool handling."""
 
 import asyncio
 import itertools
 import time
 from collections import defaultdict
 
-from lib.hash import hash_to_str, hex_str_to_hash
 import lib.util as util
+from lib.hash import hash_to_str, hex_str_to_hash
 from server.daemon import DaemonError
 
 
 class MemPool(util.LoggedClass):
-    '''Representation of the daemon's mempool.
+    """Representation of the daemon's mempool.
 
     Updated regularly in caught-up state.  Goal is to enable efficient
     response to the value() and transactions() calls.
@@ -26,10 +19,10 @@ class MemPool(util.LoggedClass):
     To that end we maintain the following maps:
 
        tx_hash -> (txin_pairs, txout_pairs)
-       hashX   -> set of all tx hashes in which the hashX appears
+       hash_x   -> set of all tx hashes in which the hash_x appears
 
-    A pair is a (hashX, value) tuple.  tx hashes are hex strings.
-    '''
+    A pair is a (hash_x, value) tuple.  tx hashes are hex strings.
+    """
 
     def __init__(self, bp, controller):
         super().__init__()
@@ -42,21 +35,21 @@ class MemPool(util.LoggedClass):
         self.prioritized = set()
         self.stop = False
         self.txs = {}
-        self.hashXs = defaultdict(set)  # None can be a key
+        self.hash_xs = defaultdict(set)  # None can be a key
 
     def prioritize(self, tx_hash):
-        '''Prioritize processing the given hash.  This is important during
-        initial mempool sync.'''
+        """Prioritize processing the given hash.  This is important during
+        initial mempool sync."""
         self.prioritized.add(tx_hash)
 
     def resync_daemon_hashes(self, unprocessed, unfetched):
-        '''Re-sync self.txs with the list of hashes in the daemon's mempool.
+        """Re-sync self.txs with the list of hashes in the daemon's mempool.
 
         Additionally, remove gone hashes from unprocessed and
         unfetched.  Add new ones to unprocessed.
-        '''
+        """
         txs = self.txs
-        hashXs = self.hashXs
+        hash_xs = self.hash_xs
         touched = self.touched
 
         hashes = self.daemon.cached_mempool_hashes()
@@ -67,13 +60,13 @@ class MemPool(util.LoggedClass):
             item = txs.pop(hex_hash)
             if item:
                 txin_pairs, txout_pairs = item
-                tx_hashXs = set(hashX for hashX, value in txin_pairs)
-                tx_hashXs.update(hashX for hashX, value in txout_pairs)
-                for hashX in tx_hashXs:
-                    hashXs[hashX].remove(hex_hash)
-                    if not hashXs[hashX]:
-                        del hashXs[hashX]
-                touched.update(tx_hashXs)
+                tx_hash_xs = set(hash_x for hash_x, value in txin_pairs)
+                tx_hash_xs.update(hash_x for hash_x, value in txout_pairs)
+                for hash_x in tx_hash_xs:
+                    hash_xs[hash_x].remove(hex_hash)
+                    if not hash_xs[hash_x]:
+                        del hash_xs[hash_x]
+                touched.update(tx_hash_xs)
 
         new = hashes.difference(txs)
         unfetched.update(new)
@@ -81,11 +74,11 @@ class MemPool(util.LoggedClass):
             txs[hex_hash] = None
 
     async def main_loop(self):
-        '''Asynchronously maintain mempool status with daemon.
+        """Asynchronously maintain mempool status with daemon.
 
         Processes the mempool each time the daemon's mempool refresh
         event is signalled.
-        '''
+        """
         unprocessed = {}
         unfetched = set()
         txs = self.txs
@@ -114,7 +107,7 @@ class MemPool(util.LoggedClass):
                 now = time.time()
                 if now >= next_log and loops:
                     self.logger.info('{:,d} txs touching {:,d} addresses'
-                                     .format(len(txs), len(self.hashXs)))
+                                     .format(len(txs), len(self.hash_xs)))
                     next_log = now + 150
 
             try:
@@ -166,23 +159,23 @@ class MemPool(util.LoggedClass):
                 self.process_raw_txs, raw_txs, deferred)
 
             pending.extend(deferred)
-            hashXs = self.hashXs
+            hash_xs = self.hash_xs
             touched = self.touched
             for hex_hash, in_out_pairs in result.items():
                 if hex_hash in txs:
                     txs[hex_hash] = in_out_pairs
-                    for hashX, value in itertools.chain(*in_out_pairs):
-                        touched.add(hashX)
-                        hashXs[hashX].add(hex_hash)
+                    for hash_x, value in itertools.chain(*in_out_pairs):
+                        touched.add(hash_x)
+                        hash_xs[hash_x].add(hex_hash)
 
         return process
 
     def processing_new_block(self):
-        '''Return True if we're processing a new block.'''
+        """Return True if we're processing a new block."""
         return self.daemon.cached_height() > self.db.db_height
 
     async def fetch_raw_txs(self, hex_hashes):
-        '''Fetch a list of mempool transactions.'''
+        """Fetch a list of mempool transactions."""
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
 
         # Skip hashes the daemon has dropped.  Either they were
@@ -190,14 +183,14 @@ class MemPool(util.LoggedClass):
         return {hh: raw for hh, raw in zip(hex_hashes, raw_txs) if raw}
 
     def process_raw_txs(self, raw_tx_map, pending):
-        '''Process the dictionary of raw transactions and return a dictionary
+        """Process the dictionary of raw transactions and return a dictionary
         of updates to apply to self.txs.
 
         This runs in the executor so should not update any member
         variables it doesn't own.  Atomic reads of self.txs that do
         not depend on the result remaining the same are fine.
-        '''
-        script_hashX = self.coin.hashX_from_script
+        """
+        script_hash_x = self.coin.hash_x_from_script
         deserializer = self.coin.DESERIALIZER
         db_utxo_lookup = self.db.db_utxo_lookup
         txs = self.txs
@@ -208,8 +201,8 @@ class MemPool(util.LoggedClass):
                 continue
             tx, _tx_hash = deserializer(raw_tx).read_tx()
 
-            # Convert the tx outputs into (hashX, value) pairs
-            txout_pairs = [(script_hashX(txout.pk_script), txout.value)
+            # Convert the tx outputs into (hash_x, value) pairs
+            txout_pairs = [(script_hash_x(txout.pk_script), txout.value)
                            for txout in tx.outputs]
 
             # Convert the tx inputs to ([prev_hex_hash, prev_idx) pairs
@@ -260,50 +253,50 @@ class MemPool(util.LoggedClass):
 
         return result, deferred
 
-    async def raw_transactions(self, hashX):
-        '''Returns an iterable of (hex_hash, raw_tx) pairs for all
-        transactions in the mempool that touch hashX.
+    async def raw_transactions(self, hash_x):
+        """Returns an iterable of (hex_hash, raw_tx) pairs for all
+        transactions in the mempool that touch hash_x.
 
         raw_tx can be None if the transaction has left the mempool.
-        '''
-        # hashXs is a defaultdict
-        if hashX not in self.hashXs:
+        """
+        # hash_xs is a defaultdict
+        if hash_x not in self.hash_xs:
             return []
 
-        hex_hashes = self.hashXs[hashX]
+        hex_hashes = self.hash_xs[hash_x]
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         return zip(hex_hashes, raw_txs)
 
-    async def transactions(self, hashX):
-        '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hashX.
+    async def transactions(self, hash_x):
+        """Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
+        entries for the hash_x.
 
         unconfirmed is True if any txin is unconfirmed.
-        '''
+        """
         deserializer = self.coin.DESERIALIZER
-        pairs = await self.raw_transactions(hashX)
+        pairs = await self.raw_transactions(hash_x)
         result = []
         for hex_hash, raw_tx in pairs:
             item = self.txs.get(hex_hash)
             if not item or not raw_tx:
                 continue
             txin_pairs, txout_pairs = item
-            tx_fee = (sum(v for hashX, v in txin_pairs) -
-                      sum(v for hashX, v in txout_pairs))
+            tx_fee = (sum(v for hash_x, v in txin_pairs) -
+                      sum(v for hash_x, v in txout_pairs))
             tx, tx_hash = deserializer(raw_tx).read_tx()
             unconfirmed = any(hash_to_str(txin.prev_hash) in self.txs
                               for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result
 
-    async def spends(self, hashX):
-        '''Return a set of (prev_hash, prev_idx) pairs from mempool
-        transactions that touch hashX.
+    async def spends(self, hash_x):
+        """Return a set of (prev_hash, prev_idx) pairs from mempool
+        transactions that touch hash_x.
 
-        None, some or all of these may be spends of the hashX.
-        '''
+        None, some or all of these may be spends of the hash_x.
+        """
         deserializer = self.coin.DESERIALIZER
-        pairs = await self.raw_transactions(hashX)
+        pairs = await self.raw_transactions(hash_x)
         spends = set()
         for hex_hash, raw_tx in pairs:
             if not raw_tx:
@@ -313,16 +306,16 @@ class MemPool(util.LoggedClass):
                 spends.add((txin.prev_hash, txin.prev_idx))
         return spends
 
-    def value(self, hashX):
-        '''Return the unconfirmed amount in the mempool for hashX.
+    def value(self, hash_x):
+        """Return the unconfirmed amount in the mempool for hash_x.
 
         Can be positive or negative.
-        '''
+        """
         value = 0
-        # hashXs is a defaultdict
-        if hashX in self.hashXs:
-            for hex_hash in self.hashXs[hashX]:
+        # hash_xs is a defaultdict
+        if hash_x in self.hash_xs:
+            for hex_hash in self.hash_xs[hash_x]:
                 txin_pairs, txout_pairs = self.txs[hex_hash]
-                value -= sum(v for h168, v in txin_pairs if h168 == hashX)
-                value += sum(v for h168, v in txout_pairs if h168 == hashX)
+                value -= sum(v for h168, v in txin_pairs if h168 == hash_x)
+                value += sum(v for h168, v in txout_pairs if h168 == hash_x)
         return value

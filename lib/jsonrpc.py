@@ -450,7 +450,7 @@ class JSONSessionBase(util.LoggedClass):
         and returns None.  Otherwise returns the binary batch result."""
         results = self.batch_results
         self.batch_results = []
-
+        item = None
         for n in range(count):
             item = batch.pop()
             result = await self.process_single_item(item)
@@ -573,7 +573,7 @@ class JSONSessionBase(util.LoggedClass):
             kw_args = {name: arg for name, arg in zip(names, args)}
         else:
             kw_args = args
-            bad_names = ['<{}>'.format(name) for name in args
+            bad_names = [f'<{name}>' for name in args
                          if name not in names]
             if bad_names:
                 raise RPCError(f'invalid parameter '

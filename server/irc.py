@@ -1,26 +1,16 @@
-# Copyright (c) 2016-2017, Neil Booth
-#
-# All rights reserved.
-#
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
-
-'''IRC connectivity to discover peers.
-
+"""
+IRC connectivity to discover peers.
 Only calling start() requires the IRC Python module.
-'''
+"""
 
 import asyncio
 import re
-
-from collections import namedtuple
 
 from lib.hash import double_sha256
 from lib.util import LoggedClass
 
 
 class IRC(LoggedClass):
-
     class DisconnectedError(Exception):
         pass
 
@@ -40,7 +30,7 @@ class IRC(LoggedClass):
         self.peer_regexp = re.compile('({}[^!]*)!'.format(self.prefix))
 
     async def start(self, name_pairs):
-        '''Start IRC connections if enabled in environment.'''
+        """Start IRC connections if enabled in environment."""
         import irc.client as irc_client
         from jaraco.stream import buffer
 
@@ -76,16 +66,16 @@ class IRC(LoggedClass):
                          .format(event.type, event.source, event.arguments))
 
     def on_welcome(self, connection, event):
-        '''Called when we connect to irc server.'''
+        """Called when we connect to irc server."""
         connection.join(self.channel)
 
     def on_disconnect(self, connection, event):
-        '''Called if we are disconnected.'''
+        """Called if we are disconnected."""
         self.log_event(event)
         raise self.DisconnectedError
 
     def on_join(self, connection, event):
-        '''Called when someone new connects to our channel, including us.'''
+        """Called when someone new connects to our channel, including us."""
         # /who the channel when we join.  We used to /who on each
         # namreply event, but the IRC server would frequently kick us
         # for flooding.  This requests only once including the tor case.
@@ -97,11 +87,11 @@ class IRC(LoggedClass):
                 connection.who(match.group(1))
 
     def on_whoreply(self, connection, event):
-        '''Called when a response to our who requests arrives.
+        """Called when a response to our who requests arrives.
 
         The nick is the 4th argument, and real name is in the 6th
         argument preceeded by '0 ' for some reason.
-        '''
+        """
         nick = event.arguments[4]
         if nick.startswith(self.prefix):
             line = event.arguments[6].split()
@@ -110,7 +100,6 @@ class IRC(LoggedClass):
 
 
 class IrcClient(object):
-
     def __init__(self, coin, real_name, nick, server):
         self.irc_host = coin.IRC_SERVER
         self.irc_port = coin.IRC_PORT
@@ -119,7 +108,7 @@ class IrcClient(object):
         self.server = server
 
     def connect(self, irc):
-        '''Connect this client to its IRC server'''
+        """Connect this client to its IRC server"""
         irc.logger.info('joining {} as "{}" with real name "{}"'
                         .format(irc.channel, self.nick, self.real_name))
         self.server.connect(self.irc_host, self.irc_port, self.nick,

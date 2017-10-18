@@ -129,7 +129,7 @@ class ScriptPubKey(object):
                 if not req_compressed:
                     return
                 raise PubKeyError('uncompressed pubkeys are invalid')
-        raise PubKeyError('invalid pubkey {}'.format(pubkey))
+        raise PubKeyError(f'invalid pubkey {pubkey}')
 
     @classmethod
     def pubkey_script(cls, pubkey):
@@ -206,11 +206,11 @@ class Script(object):
     @classmethod
     def opcode_name(cls, opcode):
         if OpCodes.OP_0 < opcode < OpCodes.OP_PUSHDATA1:
-            return 'OP_{:d}'.format(opcode)
+            return f'OP_{opcode:d}'
         try:
             return OpCodes.whatis(opcode)
         except KeyError:
-            return 'OP_UNKNOWN:{:d}'.format(opcode)
+            return f'OP_UNKNOWN:{opcode:d}'
 
     @classmethod
     def dump(cls, script):
@@ -220,5 +220,4 @@ class Script(object):
             if data is None:
                 print(name)
             else:
-                print('{} {} ({:d} bytes)'
-                      .format(name, data.hex(), len(data)))
+                print(f'{name} {data.hex()} ({len(data):d} bytes)')

@@ -1,13 +1,4 @@
-# Copyright (c) 2016, Neil Booth
-# Copyright (c) 2017, the ElectrumX authors
-#
-# All rights reserved.
-#
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
-
-'''Interface to the blockchain database.'''
-
+"""Interface to the blockchain database."""
 
 import array
 import ast
@@ -21,24 +12,23 @@ from lib.hash import hash_to_str
 from server.storage import db_class
 from server.version import VERSION
 
-
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
 
 class DB(util.LoggedClass):
-    '''Simple wrapper of the backend database for querying.
+    """Simple wrapper of the backend database for querying.
 
     Performs no DB update, though the DB will be cleaned on opening if
     it was shutdown uncleanly.
-    '''
+    """
 
     DB_VERSIONS = [6]
 
     class MissingUTXOError(Exception):
-        '''Raised if a mempool tx input UTXO couldn't be found.'''
+        """Raised if a mempool tx input UTXO couldn't be found."""
 
     class DBError(Exception):
-        '''Raised on general DB errors generally indicating corruption.'''
+        """Raised on general DB errors generally indicating corruption."""
 
     def __init__(self, env):
         super().__init__()
@@ -92,12 +82,13 @@ class DB(util.LoggedClass):
             assert self.db_tx_count == 0
 
     def open_dbs(self):
-        '''Open the databases.  If already open they are closed and re-opened.
+        """Open the databases.  If already open they are closed and re-opened.
 
         When syncing we want to reserve a lot of open files for the
         synchtonization.  When serving clients we want the open files for
         serving network connections.
-        '''
+        """
+
         def log_reason(message, is_for_sync):
             reason = 'sync' if is_for_sync else 'serving'
             self.logger.info('{} for {}'.format(message, reason))
@@ -143,12 +134,12 @@ class DB(util.LoggedClass):
                              .format(util.formatted_time(self.wall_time)))
 
     def clean_db(self):
-        '''Clean out stale DB items.
+        """Clean out stale DB items.
 
         Stale DB items are excess history flushed since the most
         recent UTXO flush (only happens on unclean shutdown), and aged
         undo information.
-        '''
+        """
         if self.flush_count < self.utxo_flush_count:
             # Might happen at end of compaction as both DBs cannot be
             # updated atomically
@@ -176,16 +167,16 @@ class DB(util.LoggedClass):
         return offset
 
     def dynamic_header_len(self, height):
-        return self.dynamic_header_offset(height + 1)\
+        return self.dynamic_header_offset(height + 1) \
                - self.dynamic_header_offset(height)
 
     def fs_update(self, fs_height, headers, block_tx_hashes):
-        '''Write headers, the tx_count array and block tx hashes to disk.
+        """Write headers, the tx_count array and block tx hashes to disk.
 
         Their first height is fs_height.  No recorded DB state is
         updated.  These arrays are all append only, so in a crash we
         just pick up again from the DB height.
-        '''
+        """
         blocks_done = len(headers)
         height_start = fs_height + 1
         new_height = fs_height + blocks_done
@@ -210,7 +201,7 @@ class DB(util.LoggedClass):
         self.hashes_file.write(offset, hashes)
 
     def read_headers(self, start, count):
-        '''Requires count >= 0.'''
+        """Requires count >= 0."""
         # Read some from disk
         disk_count = min(count, self.db_height + 1 - start)
         if start < 0 or count < 0 or disk_count != count:
@@ -223,9 +214,9 @@ class DB(util.LoggedClass):
         return b''
 
     def fs_tx_hash(self, tx_num):
-        '''Return a par (tx_hash, tx_height) for the given tx number.
+        """Return a par (tx_hash, tx_height) for the given tx number.
 
-        If the tx_height is not on disk, returns (None, tx_height).'''
+        If the tx_height is not on disk, returns (None, tx_height)."""
         tx_height = bisect_right(self.tx_counts, tx_num)
         if tx_height > self.db_height:
             tx_hash = None
@@ -254,24 +245,24 @@ class DB(util.LoggedClass):
     # -- Undo information
 
     def min_undo_height(self, max_height):
-        '''Returns a height from which we should store undo info.'''
+        """Returns a height from which we should store undo info."""
         return max_height - self.env.reorg_limit + 1
 
     def undo_key(self, height):
-        '''DB key for undo information at the given height.'''
+        """DB key for undo information at the given height."""
         return b'U' + pack('>I', height)
 
     def read_undo_info(self, height):
-        '''Read undo information from a file for the current height.'''
+        """Read undo information from a file for the current height."""
         return self.utxo_db.get(self.undo_key(height))
 
     def flush_undo_infos(self, batch_put, undo_infos):
-        '''undo_infos is a list of (undo_info, height) pairs.'''
+        """undo_infos is a list of (undo_info, height) pairs."""
         for undo_info, height in undo_infos:
             batch_put(self.undo_key(height), b''.join(undo_info))
 
     def clear_excess_undo_info(self):
-        '''Clear excess undo info.  Only most recent N are kept.'''
+        """Clear excess undo info.  Only most recent N are kept."""
         prefix = b'U'
         min_height = self.min_undo_height(self.db_height)
         keys = []
@@ -325,7 +316,7 @@ class DB(util.LoggedClass):
             self.first_sync = state['first_sync']
 
     def write_utxo_state(self, batch):
-        '''Write (UTXO) state to the batch.'''
+        """Write (UTXO) state to the batch."""
         state = {
             'genesis': self.coin.GENESIS_HASH,
             'height': self.db_height,
@@ -338,20 +329,20 @@ class DB(util.LoggedClass):
         }
         batch.put(b'state', repr(state).encode())
 
-    def get_balance(self, hashX):
-        '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
+    def get_balance(self, hash_x):
+        """Returns the confirmed balance of an address."""
+        return sum(utxo.value for utxo in self.get_utxos(hash_x, limit=None))
 
-    def get_utxos(self, hashX, limit=1000):
-        '''Generator that yields all UTXOs for an address sorted in no
+    def get_utxos(self, hash_x, limit=1000):
+        """Generator that yields all UTXOs for an address sorted in no
         particular order.  By default yields at most 1000 entries.
         Set limit to None to get them all.
-        '''
+        """
         limit = self._resolve_limit(limit)
         s_unpack = unpack
-        # Key: b'u' + address_hashX + tx_idx + tx_num
+        # Key: b'u' + address_hash_x + tx_idx + tx_num
         # Value: the UTXO value as a 64-bit unsigned integer
-        prefix = b'u' + hashX
+        prefix = b'u' + hash_x
         for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
             if limit == 0:
                 return
@@ -362,43 +353,43 @@ class DB(util.LoggedClass):
             yield UTXO(tx_num, tx_pos, tx_hash, height, value)
 
     def db_utxo_lookup(self, tx_hash, tx_idx):
-        '''Given a prevout return a (hashX, value) pair.
+        """Given a prevout return a (hash_x, value) pair.
 
         Raises MissingUTXOError if the UTXO is not found.  Used by the
         mempool code.
-        '''
+        """
         idx_packed = pack('<H', tx_idx)
-        hashX, tx_num_packed = self._db_hashX(tx_hash, idx_packed)
-        if not hashX:
+        hash_x, tx_num_packed = self._db_hash_x(tx_hash, idx_packed)
+        if not hash_x:
             # This can happen when the daemon is a block ahead of us
             # and has mempool txs spending outputs from that new block
             raise self.MissingUTXOError
 
-        # Key: b'u' + address_hashX + tx_idx + tx_num
+        # Key: b'u' + address_hash_x + tx_idx + tx_num
         # Value: the UTXO value as a 64-bit unsigned integer
-        key = b'u' + hashX + idx_packed + tx_num_packed
+        key = b'u' + hash_x + idx_packed + tx_num_packed
         db_value = self.utxo_db.get(key)
         if not db_value:
             raise self.DBError('UTXO {} / {:,d} in one table only'
                                .format(hash_to_str(tx_hash), tx_idx))
         value, = unpack('<Q', db_value)
-        return hashX, value
+        return hash_x, value
 
-    def _db_hashX(self, tx_hash, idx_packed):
-        '''Return (hashX, tx_num_packed) for the given TXO.
+    def _db_hash_x(self, tx_hash, idx_packed):
+        """Return (hash_x, tx_num_packed) for the given TXO.
 
-        Both are None if not found.'''
+        Both are None if not found."""
         # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-        # Value: hashX
+        # Value: hash_x
         prefix = b'h' + tx_hash[:4] + idx_packed
 
         # Find which entry, if any, the TX_HASH matches.
-        for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
+        for db_key, hash_x in self.utxo_db.iterator(prefix=prefix):
             tx_num_packed = db_key[-4:]
             tx_num, = unpack('<I', tx_num_packed)
             hash, height = self.fs_tx_hash(tx_num)
             if hash == tx_hash:
-                return hashX, tx_num_packed
+                return hash_x, tx_num_packed
 
         return None, None
 
@@ -425,7 +416,7 @@ class DB(util.LoggedClass):
         self.logger.info('deleted excess history entries')
 
     def write_history_state(self, batch):
-        '''Write state to hist_db.'''
+        """Write state to hist_db."""
         state = {
             'flush_count': self.flush_count,
             'comp_flush_count': self.comp_flush_count,
@@ -454,21 +445,21 @@ class DB(util.LoggedClass):
         flush_id = pack('>H', self.flush_count)
 
         with self.hist_db.write_batch() as batch:
-            for hashX in sorted(history):
-                key = hashX + flush_id
-                batch.put(key, history[hashX].tobytes())
+            for hash_x in sorted(history):
+                key = hash_x + flush_id
+                batch.put(key, history[hash_x].tobytes())
             self.write_history_state(batch)
 
-    def backup_history(self, hashXs):
+    def backup_history(self, hash_xs):
         # Not certain this is needed, but it doesn't hurt
         self.flush_count += 1
         nremoves = 0
 
         with self.hist_db.write_batch() as batch:
-            for hashX in sorted(hashXs):
+            for hash_x in sorted(hash_xs):
                 deletes = []
                 puts = {}
-                for key, hist in self.hist_db.iterator(prefix=hashX,
+                for key, hist in self.hist_db.iterator(prefix=hash_x,
                                                        reverse=True):
                     a = array.array('I')
                     a.frombytes(hist)
@@ -488,13 +479,13 @@ class DB(util.LoggedClass):
 
         return nremoves
 
-    def get_history_txnums(self, hashX, limit=1000):
-        '''Generator that returns an unpruned, sorted list of tx_nums in the
-        history of a hashX.  Includes both spending and receiving
+    def get_history_txnums(self, hash_x, limit=1000):
+        """Generator that returns an unpruned, sorted list of tx_nums in the
+        history of a hash_x.  Includes both spending and receiving
         transactions.  By default yields at most 1000 entries.  Set
-        limit to None to get them all.  '''
+        limit to None to get them all.  """
         limit = self._resolve_limit(limit)
-        for key, hist in self.hist_db.iterator(prefix=hashX):
+        for key, hist in self.hist_db.iterator(prefix=hash_x):
             a = array.array('I')
             a.frombytes(hist)
             for tx_num in a:
@@ -503,14 +494,14 @@ class DB(util.LoggedClass):
                 yield tx_num
                 limit -= 1
 
-    def get_history(self, hashX, limit=1000):
-        '''Generator that returns an unpruned, sorted list of (tx_hash,
+    def get_history(self, hash_x, limit=1000):
+        """Generator that returns an unpruned, sorted list of (tx_hash,
         height) tuples of confirmed transactions that touched the address,
         earliest in the blockchain first.  Includes both spending and
         receiving transactions.  By default yields at most 1000 entries.
         Set limit to None to get them all.
-        '''
-        for tx_num in self.get_history_txnums(hashX, limit):
+        """
+        for tx_num in self.get_history_txnums(hash_x, limit):
             yield self.fs_tx_hash(tx_num)
 
     #
@@ -533,7 +524,7 @@ class DB(util.LoggedClass):
     # flush_count is reset to comp_flush_count, and comp_flush_count to -1
 
     def _flush_compaction(self, cursor, write_items, keys_to_delete):
-        '''Flush a single compaction pass as a batch.'''
+        """Flush a single compaction pass as a batch."""
         # Update compaction state
         if cursor == 65536:
             self.flush_count = self.comp_flush_count
@@ -557,10 +548,10 @@ class DB(util.LoggedClass):
             with self.utxo_db.write_batch() as batch:
                 self.write_utxo_state(batch)
 
-    def _compact_hashX(self, hashX, hist_map, hist_list,
-                       write_items, keys_to_delete):
-        '''Compres history for a hashX.  hist_list is an ordered list of
-        the histories to be compressed.'''
+    def _compact_hash_x(self, hash_x, hist_map, hist_list,
+                        write_items, keys_to_delete):
+        """Compres history for a hash_x.  hist_list is an ordered list of
+        the histories to be compressed."""
         # History entries (tx numbers) are 4 bytes each.  Distribute
         # over rows of up to 50KB in size.  A fixed row size means
         # future compactions will not need to update the first N - 1
@@ -569,8 +560,8 @@ class DB(util.LoggedClass):
         full_hist = b''.join(hist_list)
         nrows = (len(full_hist) + max_row_size - 1) // max_row_size
         if nrows > 4:
-            self.log_info('hashX {} is large: {:,d} entries across {:,d} rows'
-                          .format(hash_to_str(hashX), len(full_hist) // 4,
+            self.log_info('hash_x {} is large: {:,d} entries across {:,d} rows'
+                          .format(hash_to_str(hash_x), len(full_hist) // 4,
                                   nrows))
 
         # Find what history needs to be written, and what keys need to
@@ -580,7 +571,7 @@ class DB(util.LoggedClass):
         write_size = 0
         keys_to_delete.update(hist_map)
         for n, chunk in enumerate(util.chunks(full_hist, max_row_size)):
-            key = hashX + pack('>H', n)
+            key = hash_x + pack('>H', n)
             if hist_map.get(key) == chunk:
                 keys_to_delete.remove(key)
             else:
@@ -593,9 +584,9 @@ class DB(util.LoggedClass):
         return write_size
 
     def _compact_prefix(self, prefix, write_items, keys_to_delete):
-        '''Compact all history entries for hashXs beginning with the
-        given prefix.  Update keys_to_delete and write.'''
-        prior_hashX = None
+        """Compact all history entries for hash_xs beginning with the
+        given prefix.  Update keys_to_delete and write."""
+        prior_hash_x = None
         hist_map = {}
         hist_list = []
 
@@ -605,28 +596,29 @@ class DB(util.LoggedClass):
             # Ignore non-history entries
             if len(key) != key_len:
                 continue
-            hashX = key[:-2]
-            if hashX != prior_hashX and prior_hashX:
-                write_size += self._compact_hashX(prior_hashX, hist_map,
-                                                  hist_list, write_items,
-                                                  keys_to_delete)
+            hash_x = key[:-2]
+            if hash_x != prior_hash_x and prior_hash_x:
+                write_size += self._compact_hash_x(prior_hash_x, hist_map,
+                                                   hist_list, write_items,
+                                                   keys_to_delete)
                 hist_map.clear()
                 hist_list.clear()
-            prior_hashX = hashX
+            prior_hash_x = hash_x
             hist_map[key] = hist
             hist_list.append(hist)
 
-        if prior_hashX:
-            write_size += self._compact_hashX(prior_hashX, hist_map, hist_list,
-                                              write_items, keys_to_delete)
+        if prior_hash_x:
+            write_size += self._compact_hash_x(prior_hash_x, hist_map,
+                                               hist_list,
+                                               write_items, keys_to_delete)
         return write_size
 
     def _compact_history(self, limit):
-        '''Inner loop of history compaction.  Loops until limit bytes have
+        """Inner loop of history compaction.  Loops until limit bytes have
         been processed.
-        '''
+        """
         keys_to_delete = set()
-        write_items = []   # A list of (key, value) pairs
+        write_items = []  # A list of (key, value) pairs
         write_size = 0
 
         # Loop over 2-byte prefixes
@@ -648,9 +640,9 @@ class DB(util.LoggedClass):
         return write_size
 
     async def compact_history(self, loop):
-        '''Start a background history compaction and reset the flush count if
+        """Start a background history compaction and reset the flush count if
         its getting high.
-        '''
+        """
         # Do nothing if during initial sync or if a compaction hasn't
         # been initiated
         if self.first_sync or self.comp_cursor == -1:

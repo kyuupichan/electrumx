@@ -72,7 +72,7 @@ class Base58(object):
     def char_value(c):
         val = Base58.cmap.get(c)
         if val is None:
-            raise Base58Error('invalid base 58 character "{}"'.format(c))
+            raise Base58Error(f'invalid base 58 character "{c}"')
         return val
 
     @staticmethod
@@ -125,7 +125,7 @@ class Base58(object):
         be_bytes = Base58.decode(txt)
         result, check = be_bytes[:-4], be_bytes[-4:]
         if check != double_sha256(result)[:4]:
-            raise Base58Error('invalid base 58 checksum for {}'.format(txt))
+            raise Base58Error(f'invalid base 58 checksum for {txt}')
         return result
 
     @staticmethod

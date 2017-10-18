@@ -1,13 +1,5 @@
-#!/usr/bin/env python3
-#
-# Copyright (c) 2017, Neil Booth
-#
-# All rights reserved.
-#
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
-
-'''Script to compact the history database.  This should save space and
+"""
+Script to compact the history database.  This should save space and
 will reset the flush counter to a low number, avoiding overflow when
 the flush count reaches 65,536.
 
@@ -29,22 +21,22 @@ Compaction can be interrupted and restarted harmlessly and will pick
 up where it left off.  However, if you restart ElectrumX without
 running the compaction to completion, it will not benefit and
 subsequent compactions will restart from the beginning.
-'''
+"""
 
 import logging
 import sys
 import traceback
 from os import environ
 
-from server.env import Env
 from server.db import DB
+from server.env import Env
 
 
 def compact_history():
     if sys.version_info < (3, 6):
         raise RuntimeError('Python >= 3.6 is required to run ElectrumX')
 
-    environ['DAEMON_URL'] = ''   # Avoid Env erroring out
+    environ['DAEMON_URL'] = ''  # Avoid Env erroring out
     env = Env()
     db = DB(env)
 

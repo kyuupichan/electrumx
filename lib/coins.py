@@ -113,9 +113,9 @@ class Coin(object):
         return header + bytes(1)
 
     @classmethod
-    def hashX_from_script(cls, script):
+    def hash_x_from_script(cls, script):
         """
-        Returns a hashX from a script, or None if the script is provably
+        Returns a hash_x from a script, or None if the script is provably
         unspendable so the output can be dropped.
         """
 
@@ -150,9 +150,9 @@ class Coin(object):
         raise CoinError('version bytes unrecognised')
 
     @classmethod
-    def address_to_hashX(cls, address):
-        """Return a hashX given a coin address."""
-        return cls.hashX_from_script(cls.pay_to_address_script(address))
+    def address_to_hash_x(cls, address):
+        """Return a hash_x given a coin address."""
+        return cls.hash_x_from_script(cls.pay_to_address_script(address))
 
     @classmethod
     def P2PKH_address_from_hash160(cls, hash160):
