@@ -758,8 +758,6 @@ class Hush(Coin):
     TX_COUNT             = 392409
     TX_COUNT_HEIGHT      = 171777
     TX_PER_BLOCK         = 5
-    IRC_PREFIX           = ""
-    IRC_CHANNEL          = ""
     RPC_PORT             = 8822
     REORG_LIMIT          = 800
 
