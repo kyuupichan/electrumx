@@ -462,6 +462,17 @@ class LocalRPC(SessionBase):
         return self.controller.rpc_handlers.get(method)
 
 
+class BitcoinElectrumX(ElectrumX):
+    '''A TCP server that handles incoming Electrum connections.'''
+
+    def set_protocol_handlers(self, ptuple):
+        super().set_protocol_handlers(ptuple)
+        controller = self.controller
+        self.electrumx_handlers.update({
+            'blockchain.estimatefee': controller.estimatesmartfee,
+        })
+
+
 class DashElectrumX(ElectrumX):
     '''A TCP server that handles incoming Electrum Dash connections.'''
 

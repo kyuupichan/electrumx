@@ -218,6 +218,10 @@ class Daemon(LoggedClass):
         '''Return the fee estimate for the given parameters.'''
         return await self._send_single('estimatefee', params)
 
+    async def estimatesmartfee(self, params):
+        '''Return the fee estimate for the given parameters.'''
+        return await self._send_single('estimatesmartfee', params)
+
     async def getnetworkinfo(self):
         '''Return the result of the 'getnetworkinfo' RPC call.'''
         return await self._send_single('getnetworkinfo')

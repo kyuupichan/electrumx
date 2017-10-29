@@ -42,7 +42,7 @@ from lib.script import ScriptPubKey, OpCodes
 import lib.tx as lib_tx
 from server.block_processor import BlockProcessor
 import server.daemon as daemon
-from server.session import ElectrumX, DashElectrumX
+from server.session import ElectrumX, DashElectrumX, BitcoinElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -370,6 +370,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
     ]
+    SESSIONCLS = BitcoinElectrumX
 
 
 class Emercoin(Coin):
@@ -445,6 +446,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
     ]
+    SESSIONCLS = BitcoinElectrumX
 
 
 class BitcoinSegwitRegtest(BitcoinSegwitTestnet):
