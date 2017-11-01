@@ -31,6 +31,8 @@ class Daemon(LoggedClass):
 
     WARMING_UP = -28
 
+    HTTP_NOT_FOUND = 404
+
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
@@ -54,6 +56,7 @@ class Daemon(LoggedClass):
         else:
             self.ClientHttpProcessingError = asyncio.TimeoutError
             self.ClientPayloadError = aiohttp.ClientPayloadError
+        self._available_rpcs = {}  # caches results for _is_rpc_available()
 
     def next_req_id(self):
         '''Retrns the next request ID.'''
@@ -194,6 +197,24 @@ class Daemon(LoggedClass):
             return await self._send(payload, processor)
         return []
 
+    async def _is_rpc_available(self, method):
+        available = self._available_rpcs.get(method, None)
+        if available is None:
+            payload = {'method': method, 'id': self.next_req_id()}
+            data = json.dumps(payload)
+            result = await self._send_data(data)
+            if not isinstance(result, tuple):
+                available = True
+            else:
+                error_code = result[0]
+                if error_code != self.HTTP_NOT_FOUND:
+                    self.logger.warning('unexpected HTTP error (code {:d}: {}) '
+                                        'when testing RPC availability'
+                                        .format(error_code, result[1]))
+                available = False
+            self._available_rpcs[method] = available
+        return available
+
     async def block_hex_hashes(self, first, count):
         '''Return the hex hashes of count block starting at height first.'''
         params_iterable = ((h, ) for h in range(first, first + count))
@@ -216,11 +237,10 @@ class Daemon(LoggedClass):
 
     async def estimatefee(self, params):
         '''Return the fee estimate for the given parameters.'''
+        if await self._is_rpc_available('estimatesmartfee'):
+            estimate = await self._send_single('estimatesmartfee', params)
+            return estimate['feerate']
         return await self._send_single('estimatefee', params)
-
-    async def estimatesmartfee(self, params):
-        '''Return the fee estimate for the given parameters.'''
-        return await self._send_single('estimatesmartfee', params)
 
     async def getnetworkinfo(self):
         '''Return the result of the 'getnetworkinfo' RPC call.'''

@@ -827,16 +827,6 @@ class Controller(ServerBase):
         number = self.non_negative_integer(number)
         return await self.daemon_request('estimatefee', [number])
 
-    async def estimatesmartfee(self, number):
-        '''The estimated transaction fee per kilobyte to be paid for a
-        transaction to be included within a certain number of blocks.
-
-        number: the number of blocks
-        '''
-        number = self.non_negative_integer(number)
-        estimate = await self.daemon_request('estimatesmartfee', [number])
-        return estimate['feerate']
-
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
