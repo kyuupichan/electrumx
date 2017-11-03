@@ -249,7 +249,7 @@ class Daemon(LoggedClass):
         '''Return the fee estimate for the given parameters.'''
         if await self._is_rpc_available('estimatesmartfee'):
             estimate = await self._send_single('estimatesmartfee', params)
-            return estimate['feerate']
+            return estimate.get('feerate', -1)
         return await self._send_single('estimatefee', params)
 
     async def getnetworkinfo(self):
