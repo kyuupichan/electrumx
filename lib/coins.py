@@ -341,7 +341,7 @@ class BitcoinCash(BitcoinMixin, Coin):
         'electroncash.bitcoinplug.com s t',
         'electrum-abc.criptolayer.net s50012',
         'electroncash.cascharia.com s50002',
-        'bcc.arihanc.com t52001 s52002',
+        'bch.arihanc.com t52001 s52002',
         'mash.1209k.com s t',
         'bch.kokx.org s t',
         'abc.vom-stausee.de t52001 s52002',
