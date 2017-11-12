@@ -795,7 +795,7 @@ class Hush(Coin):
                              '52eb435a35ba3d9d3e7e5d5f8e62dc17')
     STATIC_BLOCK_HEADERS = False
     BASIC_HEADER_SIZE    = 140 # Excluding Equihash solution
-    DESERIALIZER         = DeserializerZcash
+    DESERIALIZER         = lib_tx.DeserializerZcash
     TX_COUNT             = 392409
     TX_COUNT_HEIGHT      = 171777
     TX_PER_BLOCK         = 5
