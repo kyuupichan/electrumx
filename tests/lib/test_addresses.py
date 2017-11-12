@@ -26,7 +26,7 @@
 
 import pytest
 
-from lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin
+from lib.coins import Litecoin, BitcoinCash, Zcash, Hush, Emercoin
 from lib.hash import Base58
 
 addresses = [
@@ -43,6 +43,11 @@ addresses = [
     (Zcash, "t1LppKe1sfPNDMysGSGuTjxoAsBcvvSYv5j",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
     (Zcash, "t3Zq2ZrASszCg7oBbio7oXqnfR6dnSWqo76",
+     "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
+    # Hush addresses look exactly the same as Zcash addresses
+    (Hush, "t1LppKe1sfPNDMysGSGuTjxoAsBcvvSYv5j",
+     "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
+    (Hush, "t3Zq2ZrASszCg7oBbio7oXqnfR6dnSWqo76",
      "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
 ]
 
