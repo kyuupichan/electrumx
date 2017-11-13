@@ -616,6 +616,7 @@ class ViacoinTestnet(Viacoin):
         'vialectrum.bysh.me s t',
     ]
 
+
 class ViacoinTestnetSegWit(ViacoinTestnet):
     NET = "testnet-segwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
@@ -946,7 +947,6 @@ class Bitbay(Coin):
             return cls.HEADER_HASH(header)
 
 
-
 class Peercoin(Coin):
     NAME = "Peercoin"
     SHORTNAME = "PPC"
@@ -1067,6 +1067,7 @@ class Fujicoin(Coin):
     RPC_PORT = 3776
     REORG_LIMIT = 1000
 
+
 class Neblio(Coin):
     NAME = "Neblio"
     SHORTNAME = "NEBL"
@@ -1099,6 +1100,7 @@ class Neblio(Coin):
         else:
             return cls.HEADER_HASH(header)
 
+
 class Bitzeny(Coin):
     NAME = "Bitzeny"
     SHORTNAME = "ZNY"
@@ -1118,6 +1120,7 @@ class Bitzeny(Coin):
     TX_PER_BLOCK = 1
     RPC_PORT = 9252
     REORG_LIMIT = 1000
+
 
 class CanadaeCoin(AuxPowMixin, Coin):
     NAME = "CanadaeCoin"

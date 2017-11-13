@@ -67,6 +67,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
     pass
 
+
 class Deserializer(object):
     '''Deserializes blocks into transactions.
 
