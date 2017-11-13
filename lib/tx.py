@@ -261,15 +261,7 @@ class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
     pass
 
 
-class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
-    '''Class representing a JoinSplit transaction.'''
-
-    @cachedproperty
-    def is_coinbase(self):
-        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
-
-
-class DeserializerZcash(Deserializer):
+class DeserializerEquihash(Deserializer):
     def read_header(self, height, static_header_size):
         '''Return the block header bytes'''
         start = self.cursor
@@ -281,6 +273,16 @@ class DeserializerZcash(Deserializer):
         self.cursor = start
         return self._read_nbytes(header_end)
 
+
+class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a JoinSplit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+
+
+class DeserializerZcash(DeserializerEquihash):
     def read_tx(self):
         start = self.cursor
         base_tx =  TxJoinSplit(

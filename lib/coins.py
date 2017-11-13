@@ -318,6 +318,33 @@ class AuxPowMixin(object):
         return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
+class EquihashMixin(object):
+    STATIC_BLOCK_HEADERS = False
+    BASIC_HEADER_SIZE = 140 # Excluding Equihash solution
+    DESERIALIZER = lib_tx.DeserializerEquihash
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits = struct.unpack('<II', header[100:108])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': hash_to_str(header[108:140]),
+        }
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
+
+
 class BitcoinMixin(object):
     SHORTNAME = "BTC"
     NET = "mainnet"
@@ -785,7 +812,7 @@ class FairCoin(Coin):
         }
 
 
-class Zcash(Coin):
+class Zcash(EquihashMixin, Coin):
     NAME = "Zcash"
     SHORTNAME = "ZEC"
     NET = "mainnet"
@@ -794,8 +821,6 @@ class Zcash(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('00040fe8ec8471911baa1db1266ea15d'
                     'd06b4a8a5c453883c000b031973dce08')
-    STATIC_BLOCK_HEADERS = False
-    BASIC_HEADER_SIZE = 140 # Excluding Equihash solution
     DESERIALIZER = lib_tx.DeserializerZcash
     TX_COUNT = 329196
     TX_COUNT_HEIGHT = 68379
@@ -804,27 +829,6 @@ class Zcash(Coin):
     IRC_CHANNEL = "#electrum-zcash"
     RPC_PORT = 8232
     REORG_LIMIT = 800
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits = struct.unpack('<II', header[100:108])
-
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': hash_to_str(header[108:140]),
-        }
-
-    @classmethod
-    def block_header(cls, block, height):
-        '''Return the block header bytes'''
-        deserializer = cls.DESERIALIZER(block)
-        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
 class Einsteinium(Coin):
