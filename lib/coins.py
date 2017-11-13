@@ -399,6 +399,29 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     ]
 
 
+class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
+    NAME = "BitcoinGold"
+    SHORTNAME = "BTG"
+    FORK_HEIGHT = 491407
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("17")]
+    DESERIALIZER = lib_tx.DeserializerEquihashSegWit
+    TX_COUNT = 265026255
+    TX_COUNT_HEIGHT = 499923
+    TX_PER_BLOCK = 50
+    REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        height, = struct.unpack('<I', header[68:72])
+
+        if height >= cls.FORK_HEIGHT:
+            return double_sha256(header)
+        else:
+            return double_sha256(header[:68] + header[100:112])
+
+
 class Emercoin(Coin):
     NAME = "Emercoin"
     SHORTNAME = "EMC"
@@ -472,6 +495,11 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
     ]
+
+
+class BitcoinGoldTestnet(BitcoinTestnetMixin, BitcoinGold):
+    NAME = "BitcoinGold"
+    FORK_HEIGHT = 1210320
 
 
 class BitcoinSegwitRegtest(BitcoinSegwitTestnet):

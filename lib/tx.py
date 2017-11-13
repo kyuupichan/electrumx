@@ -274,6 +274,10 @@ class DeserializerEquihash(Deserializer):
         return self._read_nbytes(header_end)
 
 
+class DeserializerEquihashSegWit(DeserializerSegWit, DeserializerEquihash):
+    pass
+
+
 class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a JoinSplit transaction.'''
 
