@@ -1023,9 +1023,36 @@ class Monacoin(Coin):
     REORG_LIMIT = 1000
     PEERS = [
         'electrumx.tamami-foundation.org s t',
+        'electrumx2.tamami-foundation.org s t',
+        'electrumx3.tamami-foundation.org s t',
+        'electrumx1.monacoin.nl s t',
+        'electrumx2.monacoin.nl s t',
+        'electrumx1.monacoin.ninja s t',
+        'electrumx2.monacoin.ninja s t',
         'electrumx1.movsign.info t',
         'electrumx2.movsign.info t',
         'electrum-mona.bitbank.cc s t',
+    ]
+
+class MonacoinTestnet(Monacoin):
+    SHORTNAME = "XMN"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTES = [bytes.fromhex("75"), bytes.fromhex("C4")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH = ('a2b106ceba3be0c6d097b2a6a6aacf9d'
+                    '638ba8258ae478158f449c321061e0b2')
+    TX_COUNT = 83602
+    TX_COUNT_HEIGHT = 83252
+    TX_PER_BLOCK = 1
+    RPC_PORT = 19402
+    REORG_LIMIT = 1000
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
+    PEERS = [
+        'electrumx1.testnet.monacoin.ninja s t',
+        'electrumx1.testnet.monacoin.nl s t',
     ]
 
 
