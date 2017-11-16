@@ -28,24 +28,6 @@ STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
 
 
-def peers_from_env(env):
-    '''Return a list of peers from the environment settings.'''
-    hosts = {identity.host: {'tcp_port': identity.tcp_port,
-                             'ssl_port': identity.ssl_port}
-             for identity in env.identities}
-    features = {
-        'hosts': hosts,
-        'pruning': None,
-        'server_version': version.VERSION,
-        'protocol_min': version.PROTOCOL_MIN,
-        'protocol_max': version.PROTOCOL_MAX,
-        'genesis_hash': env.coin.GENESIS_HASH,
-        'hash_function': 'sha256',
-    }
-
-    return [Peer(ident.host, features, 'env') for ident in env.identities]
-
-
 class PeerSession(JSONSession):
     '''An outgoing session to a peer.'''
 
@@ -250,7 +232,10 @@ class PeerManager(util.LoggedClass):
             self.irc = IRC(env, self)
         else:
             self.irc = None
-        self.myselves = peers_from_env(env)
+
+        # Our clearnet and Tor Peers, if any
+        self.myselves =  [Peer(ident.host, env.server_features(), 'env')
+                          for ident in env.identities]
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the

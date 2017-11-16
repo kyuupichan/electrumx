@@ -245,7 +245,7 @@ class ElectrumX(SessionBase):
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
-        return self.controller.peer_mgr.my_clearnet_peer().features
+        return self.env.server_features()
 
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.

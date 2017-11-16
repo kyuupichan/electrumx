@@ -15,6 +15,7 @@ from ipaddress import ip_address
 from lib.coins import Coin
 from lib.env_base import EnvBase
 import lib.util as lib_util
+import server.version as version
 
 
 NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
@@ -146,6 +147,22 @@ class Env(EnvBase):
             ssl_port,
             '_tor',
         )
+
+    def server_features(self):
+        '''Return the server features dictionary.'''
+        hosts = {identity.host: {'tcp_port': identity.tcp_port,
+                                 'ssl_port': identity.ssl_port}
+                 for identity in self.identities}
+
+        return {
+            'hosts': hosts,
+            'pruning': None,
+            'server_version': version.VERSION,
+            'protocol_min': version.PROTOCOL_MIN,
+            'protocol_max': version.PROTOCOL_MAX,
+            'genesis_hash': self.coin.GENESIS_HASH,
+            'hash_function': 'sha256',
+        }
 
     def peer_discovery_enum(self):
         pd = self.default('PEER_DISCOVERY', 'on').strip().lower()
