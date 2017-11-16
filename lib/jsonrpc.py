@@ -438,16 +438,12 @@ class JSONSessionBase(util.LoggedClass):
 
         Messages that cannot be decoded are logged and dropped.
         '''
-        encodings = ["utf-8", "iso-8859-1", 'cp-1251']
-        for encoding in encodings:
-            try:
-                payload = payload.decode(encoding)
-            except (ValueError, AttributeError):
-                pass
-            except UnicodeDecodeError as e:
-                msg = 'cannot decode message: {}'.format(e)
-                self.send_error(msg, JSONRPC.PARSE_ERROR)
-                return
+        try:
+            payload = payload.decode()
+        except UnicodeDecodeError as e:
+            msg = 'cannot decode message: {}'.format(e)
+            self.send_error(msg, JSONRPC.PARSE_ERROR)
+            return
 
         try:
             payload = json.loads(payload)
