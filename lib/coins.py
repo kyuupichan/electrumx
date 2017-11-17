@@ -1189,6 +1189,7 @@ class Sibcoin(Dash):
     TX_PER_BLOCK = 1
     RPC_PORT = 1944
     REORG_LIMIT = 1000
+    PEERS = []
 
     @classmethod
     def header_hash(cls, header):
