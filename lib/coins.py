@@ -1170,3 +1170,32 @@ class CanadaeCoin(AuxPowMixin, Coin):
     IRC_CHANNEL="#electrum-cdn"
     RPC_PORT = 34330
     REORG_LIMIT = 1000
+
+
+class Sibcoin(Dash):
+    NAME = "Sibcoin"
+    SHORTNAME = "SIB"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("3F")
+    P2SH_VERBYTES = [bytes.fromhex("28")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00000c492bf73490420868bc577680bf'
+                    'c4c60116e7e85343bc624787c21efa4c')
+    DAEMON = daemon.DashDaemon
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 10000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 1944
+    REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''
+        Given a header return the hash for sibcoin.
+        Need to download `x11_gost_hash` module
+        Source code: https://github.com/ivansib/x11_gost_hash
+        '''
+        import x11_gost_hash
+        return x11_gost_hash.getPoWHash(header)
