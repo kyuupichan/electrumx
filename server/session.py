@@ -245,7 +245,7 @@ class ElectrumX(SessionBase):
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
-        return self.controller.peer_mgr.my_clearnet_peer().features
+        return self.env.server_features()
 
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.
@@ -418,7 +418,6 @@ class ElectrumX(SessionBase):
         if ptuple < (1, 1):
             # Methods or semantics unique to 1.0 and earlier protocols
             handlers.update({
-                'blockcahin.address.get_proof': controller.address_get_proof,
                 'blockchain.numblocks.subscribe': self.numblocks_subscribe,
                 'blockchain.utxo.get_address': controller.utxo_get_address,
                 'blockchain.transaction.broadcast':

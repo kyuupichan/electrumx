@@ -3,7 +3,7 @@
 # install electrumx
 ###################
 
-# upgrade raspbian to 'stretch' distribution for python 3.5 support
+# upgrade raspbian to 'stretch' distribution
 sudo echo 'deb http://mirrordirector.raspbian.org/raspbian/ testing main contrib non-free rpi' > /etc/apt/sources.list.d/stretch.list
 sudo apt-get update
 sudo apt-get dist-upgrade
@@ -23,4 +23,3 @@ sudo pip3 install irc
 git clone https://github.com/kyuupichan/electrumx.git
 cd electrumx
 sudo python3 setup.py install
-

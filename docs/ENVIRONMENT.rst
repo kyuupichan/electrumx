@@ -270,9 +270,15 @@ some of this.
 
 * **PEER_DISCOVERY**
 
-  If not defined, or non-empty, ElectrumX will occasionally connect to
-  and verify its network of peer servers.  Set to empty to disable
-  peer discovery.
+  This environment variable is case-insensitive and defaults to `on`.
+
+  If `on`, ElectrumX will occasionally connect to and verify its
+  network of peer servers.
+
+  If `off`, peer discovery is disabled and a hard-coded default list
+  of servers will be read in and served.  If set to `self` then peer
+  discovery is disabled and the server will only return itself in the
+  peers list.
 
 * **PEER_ANNOUNCE**
 

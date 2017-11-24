@@ -160,7 +160,7 @@ def int_to_bytes(value):
 def int_to_varint(value):
     '''Converts an integer to a Bitcoin-like varint bytes'''
     if value < 0:
-        raise Exception("attempt to write size < 0")
+        raise ValueError("attempt to write size < 0")
     elif value < 253:
         return pack('<B', value)
     elif value < 2**16:

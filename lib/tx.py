@@ -67,6 +67,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
     pass
 
+
 class Deserializer(object):
     '''Deserializes blocks into transactions.
 
@@ -257,15 +258,11 @@ class DeserializerAuxPow(Deserializer):
         return self._read_nbytes(header_end)
 
 
-class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
-    '''Class representing a JoinSplit transaction.'''
-
-    @cachedproperty
-    def is_coinbase(self):
-        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
+    pass
 
 
-class DeserializerZcash(Deserializer):
+class DeserializerEquihash(Deserializer):
     def read_header(self, height, static_header_size):
         '''Return the block header bytes'''
         start = self.cursor
@@ -277,6 +274,20 @@ class DeserializerZcash(Deserializer):
         self.cursor = start
         return self._read_nbytes(header_end)
 
+
+class DeserializerEquihashSegWit(DeserializerSegWit, DeserializerEquihash):
+    pass
+
+
+class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a JoinSplit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase if len(self.inputs) > 0 else False
+
+
+class DeserializerZcash(DeserializerEquihash):
     def read_tx(self):
         start = self.cursor
         base_tx =  TxJoinSplit(
@@ -335,3 +346,39 @@ class DeserializerReddcoin(Deserializer):
             outputs,
             locktime,
         ), double_sha256(self.binary[start:self.cursor])
+
+
+class DeserializerTxTimeAuxPow(DeserializerTxTime):
+    VERSION_AUXPOW = (1 << 8)
+
+    def is_merged_block(self):
+        start = self.cursor
+        self.cursor = 0
+        version = self._read_le_uint32()
+        self.cursor = start
+        if version & self.VERSION_AUXPOW:
+            return True
+        return False
+
+    def read_header(self, height, static_header_size):
+        '''Return the AuxPow block header bytes'''
+        start = self.cursor
+        version = self._read_le_uint32()
+        if version & self.VERSION_AUXPOW:
+            # We are going to calculate the block size then read it as bytes
+            self.cursor = start
+            self.cursor += static_header_size  # Block normal header
+            self.read_tx()  # AuxPow transaction
+            self.cursor += 32  # Parent block hash
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size  # Merkle branch
+            self.cursor += 4  # Index
+            merkle_size = self._read_varint()
+            self.cursor += 32 * merkle_size  # Chain merkle branch
+            self.cursor += 4  # Chain index
+            self.cursor += 80  # Parent block header
+            header_end = self.cursor
+        else:
+            header_end = static_header_size
+        self.cursor = start
+        return self._read_nbytes(header_end)
