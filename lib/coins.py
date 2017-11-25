@@ -1072,6 +1072,16 @@ class Crown(AuxPowMixin, Coin):
     TX_PER_BLOCK = 10
     RPC_PORT = 9341
     REORG_LIMIT = 1000
+    PEERS = [
+        'sgp-crwseed.crowndns.info s t',
+        'blr-crwseed.crowndns.info s t',
+        'sfo-crwseed.crowndns.info s t',
+        'nyc-crwseed.crowndns.info s t',
+        'ams-crwseed.crowndns.info s t',
+        'tor-crwseed.crowndns.info s t',
+        'lon-crwseed.crowndns.info s t',
+        'fra-crwseed.crowndns.info s t',
+    ]        
 
 
 class Fujicoin(Coin):
