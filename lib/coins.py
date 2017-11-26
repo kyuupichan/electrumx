@@ -869,7 +869,7 @@ class Zcash(EquihashMixin, Coin):
     REORG_LIMIT = 800
 
 
-class Komodo(EquihashMixin, KomodoMixin, Coin):
+class Komodo(KomodoMixin, EquihashMixin, Coin):
     NAME = "Komodo"
     SHORTNAME = "KMD"
     NET = "mainnet"
@@ -880,7 +880,7 @@ class Komodo(EquihashMixin, KomodoMixin, Coin):
     REORG_LIMIT = 800
     PEERS = []
 
-class Monaize(EquihashMixin, KomodoMixin, Coin):
+class Monaize(KomodoMixin, EquihashMixin, Coin):
     NAME = "Monaize"
     SHORTNAME = "MNZ"
     NET = "mainnet"
