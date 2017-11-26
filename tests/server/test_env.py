@@ -136,6 +136,7 @@ def test_SSL_PORT():
     with pytest.raises(Env.Error):
         Env()
     os.environ['SSL_CERTFILE'] = 'certfile'
+    Env()
     os.environ.pop('SSL_PORT')
     assert_integer('SSL_PORT', 'ssl_port', None)
 
@@ -159,6 +160,13 @@ def test_MAX_SEND():
 
 def test_MAX_SUBS():
     assert_integer('MAX_SUBS', 'max_subs', 250000)
+
+def test_MAX_SESSIONS():
+    too_big = 1000000
+    os.environ['MAX_SESSIONS'] = str(too_big)
+    e = Env()
+    assert e.max_sessions < too_big
+    # Cannot test default as it may be lowered by the open file limit cap
 
 def test_MAX_SESSION_SUBS():
     assert_integer('MAX_SESSION_SUBS', 'max_session_subs', 50000)
@@ -199,7 +207,17 @@ def test_ANON_LOGS():
     assert_boolean('ANON_LOGS', 'anon_logs', False)
 
 def test_PEER_DISCOVERY():
-    assert_boolean('PEER_DISCOVERY', 'peer_discovery', True)
+    e = Env()
+    assert e.peer_discovery == Env.PD_ON
+    os.environ['PEER_DISCOVERY'] = ' '
+    e = Env()
+    assert e.peer_discovery == Env.PD_OFF
+    os.environ['PEER_DISCOVERY'] = 'ON'
+    e = Env()
+    assert e.peer_discovery == Env.PD_ON
+    os.environ['PEER_DISCOVERY'] = 'self'
+    e = Env()
+    assert e.peer_discovery == Env.PD_SELF
 
 def test_PEER_ANNOUNCE():
     assert_boolean('PEER_ANNOUNCE', 'peer_announce', True)
@@ -253,15 +271,22 @@ def test_clearnet_identity():
     os.environ['SSL_KEYFILE'] = 'keyfile'
     Env()
     os.environ['IRC'] = 'OK'
-    with pytest.raises(Env.Error):
+    with pytest.raises(Env.Error) as err:
         Env()
+    assert 'not a valid REPORT_HOST' in str(err)
     os.environ.pop('IRC', None)
     os.environ['PEER_ANNOUNCE'] = 'OK'
-    with pytest.raises(Env.Error):
+    with pytest.raises(Env.Error) as err:
         Env()
+    os.environ.pop('PEER_ANNOUNCE', None)
+    assert 'not a valid REPORT_HOST' in str(err)
+
+    os.environ['REPORT_HOST'] = '1.2.3.4'
     os.environ['REPORT_SSL_PORT'] = os.environ['REPORT_TCP_PORT']
-    with pytest.raises(Env.Error):
+    with pytest.raises(Env.Error) as err:
         Env()
+    assert 'both resolve' in str(err)
+
     os.environ['REPORT_SSL_PORT'] = '457'
     os.environ['REPORT_HOST'] = 'foo.com'
     e = Env()

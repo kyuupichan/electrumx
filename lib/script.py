@@ -103,27 +103,6 @@ class ScriptPubKey(object):
                                'unspendable strange')
 
     @classmethod
-    def hashX_script(cls, script):
-        '''Return None if the script is provably unspendable.  Return a
-        pay-to-pubkey-hash script if it is pay-to-pubkey, otherwise
-        return script.
-        '''
-        if script:
-            op = script[0]
-            if op == OpCodes.OP_RETURN:
-                return None
-            if op <= OpCodes.OP_PUSHDATA4:
-                try:
-                    ops = Script.get_ops(script)
-                except ScriptError:
-                    pass
-                else:
-                    if _match_ops(ops, cls.TO_PUBKEY_OPS):
-                        pubkey = ops[0][1]
-                        script = ScriptPubKey.P2PKH_script(hash160(pubkey))
-        return script
-
-    @classmethod
     def pay_to(cls, handlers, script):
         '''Parse a script, invoke the appropriate handler and
         return the result.

@@ -10,7 +10,7 @@ ElectrumX - Reimplementation of electrum-server
 For a future network with bigger blocks.
 
   :Licence: MIT
-  :Language: Python (>= 3.5.3)
+  :Language: Python (>= 3.6)
   :Author: Neil Booth
 
 Getting Started
@@ -53,35 +53,6 @@ Features
 - Peer discovery protocol removes need for IRC
 - Coin abstraction makes compatible altcoin and testnet support easy.
 
-Motivation
-==========
-
-Mainly for privacy reasons, I have long wanted to run my own Electrum
-server, but I struggled to set it up or get it to work on my
-DragonFlyBSD system and lost interest for over a year.
-
-In September 2016 I heard that electrum-server databases were getting
-large (35-45GB when gzipped), and it would take several weeks to sync
-from Genesis (and was sufficiently painful that no one seems to have
-done it for about a year).  This made me curious about improvements
-and after taking a look at the code I decided to try a different
-approach.
-
-I prefer Python3 over Python2, and the fact that Electrum is stuck on
-Python2 has been frustrating for a while.  It's easier to change the
-server to Python3 than the client, so I decided to write my effort in
-Python3.
-
-It also seemed like a good opportunity to learn about asyncio, a
-wonderful and powerful feature introduced in Python 3.4.
-Incidentally, asyncio would also make a much better way to implement
-the Electrum client.
-
-Finally though no fan of most altcoins I wanted to write a codebase
-that could easily be reused for those alts that are reasonably
-compatible with Bitcoin.  Such an abstraction is also useful for
-testnets.
-
 Implementation
 ==============
 
@@ -122,9 +93,7 @@ and associated complications.
 Roadmap
 =======
 
-- Require Python 3.6, which has several performance improvements
-  relevant to ElectrumX
-- offloading more work to synchronize to the client
+- offloading more work of wallet synchronization to the client
 - supporting better client privacy
 - wallet server engine
 - new features such as possibly adding label server functionality
@@ -133,6 +102,39 @@ Roadmap
 
 ChangeLog
 =========
+
+Version 1.2
+-----------
+
+IMPORTANT: this release changes script hash indexing in the database,
+so you will need to rebuild your databases from scratch.  Running this
+version will refuse to open the DB and not corrupt it, so you can
+revert to 1.1.x if you wish.  The initial synchronisation process
+should be around 10-15% faster than 1.1, owing to this change and
+Justin Arthur's optimisations from 1.1.1.
+
+- separate P2PKH from P2PK entries in the history and UTXO databases.
+  These were previously amalgamated by address as that is what
+  electrum-server used to do.  However Electrum didn't handle P2PK
+  spends correctly and now the protocol admits subscriptions by script
+  hash there is no need to have these merged any more.
+
+For Bitcoin (BitcoinSegwit/mainnet) you can download a leveldb database
+synced up to block 490153 using this bittorrent magnet link (~24GB):
+    magnet:?xt=urn:btih:caa804f48a319b061be3884ac011656c27121a6f&dn=electrumx_1.2_btc_leveldb_490153
+
+Version 1.1.2
+-------------
+
+- PEER_DISCOVERY environment variable is now tri-state (fixes
+  `#287`_).  Please check your setting as its meaning has changed
+  slightly.
+- fix listunspent protocol methods to remove in-mempool spends (fixes
+  `#277`_).
+- improved environment variable handling
+- EMC2 update (cipig), Monacoin update (cryptocoin-junkey),
+  Canada Ecoin (koad)
+- typo fixes, Bitcoin testnet peers updates (SomberNight)
 
 Version 1.1.1
 -------------
@@ -262,6 +264,8 @@ Version 1.0.11
 .. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _#251: https://github.com/kyuupichan/electrumx/issues/251
+.. _#277: https://github.com/kyuupichan/electrumx/issues/277
+.. _#287: https://github.com/kyuupichan/electrumx/issues/287
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PROTOCOL.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PROTOCOL.rst

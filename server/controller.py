@@ -36,7 +36,6 @@ class Controller(ServerBase):
     up with the daemon.
     '''
 
-    PYTHON_MIN_VERSION = (3, 5, 3)
     BANDS = 5
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
@@ -476,8 +475,8 @@ class Controller(ServerBase):
             return util.formatted_time(now - t)
 
         now = time.time()
-        fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>3} '
-               '{:>3} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
+        fmt = ('{:<30} {:<6} {:>5} {:>5} {:<17} {:>4} '
+               '{:>4} {:>8} {:>11} {:>11} {:>5} {:>20} {:<15}')
         yield fmt.format('Host', 'Status', 'TCP', 'SSL', 'Server', 'Min',
                          'Max', 'Pruning', 'Last Good', 'Last Try',
                          'Tries', 'Source', 'IP Address')
@@ -790,24 +789,27 @@ class Controller(ServerBase):
         hashX = self.scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
 
-    async def address_get_proof(self, address):
-        '''Return the UTXO proof of an address.'''
-        hashX = self.address_to_hashX(address)
-        raise RPCError('address.get_proof is not yet implemented')
+    async def hashX_listunspent(self, hashX):
+        '''Return the list of UTXOs of a script hash.
+
+        We should remove mempool spends from the in-DB UTXOs.'''
+        utxos = await self.get_utxos(hashX)
+        spends = await self.mempool.spends(hashX)
+
+        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in sorted(utxos)
+                if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
     async def address_listunspent(self, address):
         '''Return the list of UTXOs of an address.'''
         hashX = self.address_to_hashX(address)
-        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
-                 'height': utxo.height, 'value': utxo.value}
-                for utxo in sorted(await self.get_utxos(hashX))]
+        return await self.hashX_listunspent(hashX)
 
     async def scripthash_listunspent(self, scripthash):
         '''Return the list of UTXOs of a scripthash.'''
         hashX = self.scripthash_to_hashX(scripthash)
-        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
-                 'height': utxo.height, 'value': utxo.value}
-                for utxo in sorted(await self.get_utxos(hashX))]
+        return await self.hashX_listunspent(hashX)
 
     def block_get_header(self, height):
         '''The deserialized header at a given height.
