@@ -345,6 +345,15 @@ class EquihashMixin(object):
         return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
+class KomodoMixin(object):
+    P2PKH_VERBYTE = bytes.fromhex("3C")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("BC")
+    GENESIS_HASH = ('027e3758c3a65b12aa1046462b486d0a'
+                    '63bfa1beae327897f56c5cfb7daaae71')
+    DESERIALIZER = lib_tx.DeserializerZcash
+
+
 class BitcoinMixin(object):
     SHORTNAME = "BTC"
     NET = "mainnet"
@@ -857,6 +866,17 @@ class Zcash(EquihashMixin, Coin):
     IRC_PREFIX = "E_"
     IRC_CHANNEL = "#electrum-zcash"
     RPC_PORT = 8232
+    REORG_LIMIT = 800
+
+
+class Komodo(EquihashMixin, KomodoMixin, Coin):
+    NAME = "Komodo"
+    SHORTNAME = "KMD"
+    NET = "mainnet"
+    TX_COUNT = 693629
+    TX_COUNT_HEIGHT = 491777
+    TX_PER_BLOCK = 2
+    RPC_PORT = 7771
     REORG_LIMIT = 800
 
 
