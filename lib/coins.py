@@ -880,6 +880,17 @@ class Komodo(EquihashMixin, KomodoMixin, Coin):
     REORG_LIMIT = 800
     PEERS = []
 
+class Monaize(EquihashMixin, KomodoMixin, Coin):
+    NAME = "Monaize"
+    SHORTNAME = "MNZ"
+    NET = "mainnet"
+    TX_COUNT = 256
+    TX_COUNT_HEIGHT = 128
+    TX_PER_BLOCK = 2
+    RPC_PORT = 14337
+    REORG_LIMIT = 800
+    PEERS = []
+
 
 class Einsteinium(Coin):
     NAME = "Einsteinium"
