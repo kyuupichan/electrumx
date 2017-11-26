@@ -878,6 +878,7 @@ class Komodo(EquihashMixin, KomodoMixin, Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 7771
     REORG_LIMIT = 800
+    PEERS = []
 
 
 class Einsteinium(Coin):
