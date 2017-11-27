@@ -868,6 +868,21 @@ class Zcash(EquihashMixin, Coin):
     RPC_PORT = 8232
     REORG_LIMIT = 800
 
+class Hush(EquihashMixin, Coin):
+    NAME = "Hush"
+    SHORTNAME = "HUSH"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1CB8")
+    P2SH_VERBYTES = [bytes.fromhex("1CBD")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH         = ( '0003a67bc26fe564b75daf11186d3606'
+                          '52eb435a35ba3d9d3e7e5d5f8e62dc17')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 329196
+    TX_COUNT_HEIGHT = 68379
+    TX_PER_BLOCK = 5
+    RPC_PORT = 8822
+    REORG_LIMIT = 800
 
 class Komodo(KomodoMixin, EquihashMixin, Coin):
     NAME = "Komodo"
