@@ -393,7 +393,7 @@ class BitcoinCash(BitcoinMixin, Coin):
         'electroncash.cascharia.com s50002',
         'bch.arihanc.com t52001 s52002',
         'mash.1209k.com s t',
-        'bch.kokx.org s t',
+        'h.1209k.com s t',
         'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
     ]
