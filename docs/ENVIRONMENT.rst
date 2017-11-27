@@ -143,6 +143,10 @@ These environment variables are optional:
   + **$DONATION_ADDRESS** is replaced with the address from the
     **DONATION_ADDRESS** environment variable.
 
+  See https://github.com/shsmith/electrumx-banner-updater for a script
+  that updates a banner file periodically with useful statistics about
+  fees, last block time and height, etc.
+
 * **TOR_BANNER_FILE**
 
   As for **BANNER_FILE** (which is also the default) but shown to
