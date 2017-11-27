@@ -103,15 +103,27 @@ Roadmap
 ChangeLog
 =========
 
-Version 1.2
------------
-
-IMPORTANT: this release changes script hash indexing in the database,
+IMPORTANT: version 1.2 changes script hash indexing in the database,
 so you will need to rebuild your databases from scratch.  Running this
 version will refuse to open the DB and not corrupt it, so you can
 revert to 1.1.x if you wish.  The initial synchronisation process
 should be around 10-15% faster than 1.1, owing to this change and
 Justin Arthur's optimisations from 1.1.1.
+
+Version 1.2.1
+-------------
+
+- remove IRC support.  Most coins had empty IRC channels.  Those that
+  don't have peers populated.
+- use estimatesmartfee RPC call if available (SomberNight)
+- new/updated coins: Emercoin (Sergii Vakula), Bitcoin Gold (erasmospunk),
+  Monacoin testnet (Wakiyama P), sibcoin (53r63rn4r), Komodo and Monaize
+  (cipig), Hush (Duke Leto)
+- doc updates (fr3aker)
+- issues fixed: `#302`_
+
+Version 1.2
+-----------
 
 - separate P2PKH from P2PK entries in the history and UTXO databases.
   These were previously amalgamated by address as that is what
@@ -218,54 +230,17 @@ Version 1.0.15
 - add Vertcoin support (erasmospunk)
 - update Faircoin (thokon00)
 
-Version 1.0.14
---------------
-
-- revert the changes to mempool handling of 1.0.13; I think they introduced
-  a notification bug
-
-Version 1.0.13
---------------
-
-- improve mempool handling and height notifications
-- add bitcoin-segwit as a new COIN
-
-Version 1.0.12
---------------
-
-- handle legacy daemons, add support for Blackcoin and Peercoin (erasmospunk)
-- implement history compression; can currently only be done from a script
-  with the server down
-- Add dockerfile reference (followtheart)
-- doc, runfile fixes (Henry, emilrus)
-- add bip32 implementation, currently unused
-- daemon compatibility improvements (erasmospunk)
-- permit underscores in hostnames, updated Bitcoin server list
-
-Version 1.0.11
---------------
-
-- disable IRC for bitcoin mainnet
-- remove dead code, allow custom Daemon & BlockProcessor classes (erasmospunk)
-- add SERVER_(SUB)VERSION to banner metavariables (LaoDC)
-- masternode methods for Dash (TheLazier)
-- allow multiple P2SH address versions, implement for Litecoin (pooler)
-- update Bitcoin's TX_COUNT and block height (JWU42)
-- update BU nolnet parameters
-- fix diagnostic typo (anduck)
-- Issues fixed: `#180`_
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 
-.. _#180: https://github.com/kyuupichan/electrumx/issues/180
 .. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _#251: https://github.com/kyuupichan/electrumx/issues/251
 .. _#277: https://github.com/kyuupichan/electrumx/issues/277
 .. _#287: https://github.com/kyuupichan/electrumx/issues/287
+.. _#302: https://github.com/kyuupichan/electrumx/issues/287
 .. _docs/HOWTO.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/HOWTO.rst
 .. _docs/ENVIRONMENT.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _docs/PROTOCOL.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PROTOCOL.rst
