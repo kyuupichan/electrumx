@@ -231,12 +231,6 @@ def test_TOR_PROXY_HOST():
 def test_TOR_PROXY_PORT():
     assert_integer('TOR_PROXY_PORT', 'tor_proxy_port', None)
 
-def test_IRC():
-    assert_boolean('IRC', 'irc', False)
-
-def test_IRC_NICK():
-    assert_default('IRC_NICK', 'irc_nick', None)
-
 def test_clearnet_identity():
     os.environ['REPORT_TCP_PORT'] = '456'
     e = Env()
@@ -263,18 +257,12 @@ def test_clearnet_identity():
     os.environ['REPORT_HOST'] = '$HOST'
     with pytest.raises(Env.Error):
         Env()
-    # Accept private IP, unless IRC or PEER_ANNOUNCE
-    os.environ.pop('IRC', None)
+    # Accept private IP, unless PEER_ANNOUNCE
     os.environ['PEER_ANNOUNCE'] = ''
     os.environ['REPORT_HOST'] = '192.168.0.1'
     os.environ['SSL_CERTFILE'] = 'certfile'
     os.environ['SSL_KEYFILE'] = 'keyfile'
     Env()
-    os.environ['IRC'] = 'OK'
-    with pytest.raises(Env.Error) as err:
-        Env()
-    assert 'not a valid REPORT_HOST' in str(err)
-    os.environ.pop('IRC', None)
     os.environ['PEER_ANNOUNCE'] = 'OK'
     with pytest.raises(Env.Error) as err:
         Env()

@@ -81,8 +81,3 @@ Database
 
 The underlying data store, made up of the DB backend (such as
 `leveldb`) and the host filesystem.
-
-IRC
----
-
-Handles advertising of ElectrumX services via IRC.

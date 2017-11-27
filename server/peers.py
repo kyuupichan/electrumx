@@ -19,7 +19,6 @@ from lib.jsonrpc import JSONSession
 from lib.peer import Peer
 from lib.socks import SocksProxy
 import lib.util as util
-from server.irc import IRC
 import server.version as version
 
 
@@ -228,10 +227,6 @@ class PeerManager(util.LoggedClass):
         self.env = env
         self.controller = controller
         self.loop = controller.loop
-        if env.irc and env.coin.IRC_PREFIX:
-            self.irc = IRC(env, self)
-        else:
-            self.irc = None
 
         # Our clearnet and Tor Peers, if any
         self.myselves =  [Peer(ident.host, env.server_features(), 'env')
@@ -417,22 +412,6 @@ class PeerManager(util.LoggedClass):
                      for real_name in coin_peers]
             self.add_peers(peers, limit=None)
 
-    def connect_to_irc(self):
-        '''Connect to IRC if not disabled.'''
-        if self.irc:
-            pairs = [(peer.real_name(), ident.nick_suffix) for peer, ident
-                     in zip(self.myselves, self.env.identities)]
-            self.ensure_future(self.irc.start(pairs))
-        elif self.env.irc:
-            self.logger.info('IRC is disabled for this coin')
-        else:
-            self.logger.info('IRC is disabled')
-
-    def add_irc_peer(self, nick, real_name):
-        '''Add an IRC peer.'''
-        peer = Peer.from_real_name(real_name, '{}'.format(nick))
-        self.add_peers([peer])
-
     def ensure_future(self, coro, callback=None):
         '''Schedule the coro to be run.'''
         return self.controller.ensure_future(coro, callback=callback)
@@ -444,7 +423,6 @@ class PeerManager(util.LoggedClass):
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
         '''
-        self.connect_to_irc()
         if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
             return

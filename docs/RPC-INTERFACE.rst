@@ -38,7 +38,7 @@ The following commands are available:
          "groups": 2,               # The number of session groups
          "logged": 0,               # The number of sessions being logged
          "paused": 0,               # The number of paused sessions.
-         "peers": 62,               # Number of peer servers (from IRC)
+         "peers": 62,               # Number of peer servers
          "pid": 126275,             # The server's process ID
          "requests": 0,             # Number of unprocessed requests
          "sessions": 85,            # Number of current sessions (connections)
@@ -153,14 +153,14 @@ The following commands are available:
 
   Returns a list of peer electrum servers.  This command takes no arguments.
 
-  Currently peer data is obtained via a peer discovery protocol; it
-  used to be taken from IRC.
+  Peer data is obtained via a peer discovery protocol documented in
+  `docs/PEER_DISCOVERY.rst`_.
 
 * **add_peer**
 
   Add a peer to the peers list.  ElectrumX will schdule an immediate
   connection attempt.  This command takes a single argument: the
-  peer's "real name" as it would advertise itself on IRC.
+  peer's "real name" as it used to advertise itself on IRC.
 
   .. code::
 
@@ -186,3 +186,5 @@ The following commands are available:
 
   Force a block chain reorg.  This command takes an optional
   argument - the number of blocks to reorg - which defaults to 3.
+
+.. _docs/PEER_DISCOVERY.rst: https://github.com/kyuupichan/electrumx/blob/master/docs/PEER_DISCOVERY.rst

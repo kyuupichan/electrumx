@@ -846,8 +846,7 @@ Get a list of features and services supported by the server.
 * **protocol_min**
 
   Strings that are the minimum and maximum Electrum protocol versions
-  this server speaks.  The maximum value should be the same as what
-  would suffix the letter **v** in the IRC real name.  Example: "1.1".
+  this server speaks.  Example: "1.1".
 
 * **pruning**
 

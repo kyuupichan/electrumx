@@ -68,10 +68,6 @@ class Env(EnvBase):
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
 
-        # IRC
-        self.irc = self.boolean('IRC', False)
-        self.irc_nick = self.default('IRC_NICK', None)
-
         # Identities
         clearnet_identity = self.clearnet_identity()
         tor_identity = self.tor_identity(clearnet_identity)
@@ -104,7 +100,7 @@ class Env(EnvBase):
                    or host.lower() == 'localhost')
         else:
             bad = (ip.is_multicast or ip.is_unspecified
-                   or (ip.is_private and (self.irc or self.peer_announce)))
+                   or (ip.is_private and self.peer_announce))
         if bad:
             raise self.Error('"{}" is not a valid REPORT_HOST'.format(host))
         tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port) or None
