@@ -345,6 +345,25 @@ class EquihashMixin(object):
         return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
+class ScryptMixin(object):
+
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
 class KomodoMixin(object):
     P2PKH_VERBYTE = bytes.fromhex("3C")
     P2SH_VERBYTES = [bytes.fromhex("55")]
@@ -926,7 +945,7 @@ class Einsteinium(Coin):
     REORG_LIMIT = 2000
 
 
-class Blackcoin(Coin):
+class Blackcoin(ScryptMixin, Coin):
     NAME = "Blackcoin"
     SHORTNAME = "BLK"
     NET = "mainnet"
@@ -935,7 +954,6 @@ class Blackcoin(Coin):
     WIF_BYTE = bytes.fromhex("99")
     GENESIS_HASH = ('000001faef25dec4fbcf906e6242621d'
                     'f2c183bf232f263d0ba5b101911e4563')
-    DESERIALIZER = lib_tx.DeserializerTxTime
     DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 4594999
     TX_COUNT_HEIGHT = 1667070
@@ -944,23 +962,9 @@ class Blackcoin(Coin):
     IRC_CHANNEL = "#electrum-blk"
     RPC_PORT = 15715
     REORG_LIMIT = 5000
-    HEADER_HASH = None
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        if cls.HEADER_HASH is None:
-            import scrypt
-            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
-
-        version, = struct.unpack('<I', header[:4])
-        if version > 6:
-            return super().header_hash(header)
-        else:
-            return cls.HEADER_HASH(header)
 
 
-class Bitbay(Coin):
+class Bitbay(ScryptMixin, Coin):
     NAME = "Bitbay"
     SHORTNAME = "BAY"
     NET = "mainnet"
@@ -969,7 +973,6 @@ class Bitbay(Coin):
     WIF_BYTE = bytes.fromhex("99")
     GENESIS_HASH = ('0000075685d3be1f253ce777174b1594'
                     '354e79954d2a32a6f77fe9cba00e6467')
-    DESERIALIZER = lib_tx.DeserializerTxTime
     DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 4594999
     TX_COUNT_HEIGHT = 1667070
@@ -978,20 +981,6 @@ class Bitbay(Coin):
     IRC_CHANNEL = "#electrum-bay"
     RPC_PORT = 19914
     REORG_LIMIT = 5000
-    HEADER_HASH = None
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        if cls.HEADER_HASH is None:
-            import scrypt
-            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
-
-        version, = struct.unpack('<I', header[:4])
-        if version > 6:
-            return super().header_hash(header)
-        else:
-            return cls.HEADER_HASH(header)
 
 
 class Peercoin(Coin):
@@ -1128,7 +1117,7 @@ class Crown(AuxPowMixin, Coin):
         'tor-crwseed.crowndns.info s t',
         'lon-crwseed.crowndns.info s t',
         'fra-crwseed.crowndns.info s t',
-    ]        
+    ]
 
 
 class Fujicoin(Coin):
@@ -1152,7 +1141,7 @@ class Fujicoin(Coin):
     REORG_LIMIT = 1000
 
 
-class Neblio(Coin):
+class Neblio(ScryptMixin, Coin):
     NAME = "Neblio"
     SHORTNAME = "NEBL"
     NET = "mainnet"
@@ -1163,26 +1152,11 @@ class Neblio(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('7286972be4dbc1463d256049b7471c25'
                     '2e6557e222cab9be73181d359cd28bcc')
-    DESERIALIZER = lib_tx.DeserializerTxTime
     TX_COUNT = 23675
     TX_COUNT_HEIGHT = 22785
     TX_PER_BLOCK = 1
     RPC_PORT = 6326
     REORG_LIMIT = 1000
-    HEADER_HASH = None
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        if cls.HEADER_HASH is None:
-            import scrypt
-            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
-
-        version, = struct.unpack('<I', header[:4])
-        if version > 6:
-            return super().header_hash(header)
-        else:
-            return cls.HEADER_HASH(header)
 
 
 class Bitzeny(Coin):
