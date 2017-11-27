@@ -253,6 +253,8 @@ class BlockProcessor(server.db.DB):
                 self.logger.info('processed {:,d} block{} in {:.1f}s'
                                  .format(len(blocks), s,
                                          time.time() - start))
+                self.controller.mempool.on_new_block(self.touched)
+            self.touched.clear()
         elif hprevs[0] != chain[0]:
             await self.reorg_chain()
         else:
@@ -511,7 +513,6 @@ class BlockProcessor(server.db.DB):
         if self.caught_up_event.is_set():
             self.flush(True)
         else:
-            self.touched.clear()
             if time.time() > self.next_cache_check:
                 self.check_cache_size()
                 self.next_cache_check = time.time() + 30

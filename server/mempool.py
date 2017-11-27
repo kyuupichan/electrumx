@@ -37,8 +37,7 @@ class MemPool(util.LoggedClass):
         self.controller = controller
         self.coin = bp.coin
         self.db = bp
-        self.touched = bp.touched
-        self.touched_event = asyncio.Event()
+        self.touched = set()
         self.prioritized = set()
         self.stop = False
         self.txs = {}
@@ -101,7 +100,8 @@ class MemPool(util.LoggedClass):
         while True:
             # Avoid double notifications if processing a block
             if self.touched and not self.processing_new_block():
-                self.touched_event.set()
+                self.controller.notify_sessions(self.touched)
+                self.touched.clear()
 
             # Log progress / state
             todo = len(unfetched) + len(unprocessed)
@@ -176,6 +176,17 @@ class MemPool(util.LoggedClass):
                         hashXs[hashX].add(hex_hash)
 
         return process
+
+    def on_new_block(self, touched):
+        '''Called after processing one or more new blocks.
+
+        Touched is a set of hashXs touched by the transactions in the
+        block.  Caller must be aware it is modified by this function.
+        '''
+        # Minor race condition here with mempool processor thread
+        touched.update(self.touched)
+        self.touched.clear()
+        self.controller.notify_sessions(touched)
 
     def processing_new_block(self):
         '''Return True if we're processing a new block.'''

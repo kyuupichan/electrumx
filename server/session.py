@@ -119,64 +119,70 @@ class ElectrumX(SessionBase):
     def sub_count(self):
         return len(self.hashX_subs)
 
-    async def notify(self, height, touched):
-        '''Notify the client about changes in height and touched addresses.
+    async def notify_async(self, our_touched):
+        changed = {}
 
-        Cache is a shared cache for this update.
-        '''
-        pairs = []
-        changed = []
-
-        matches = touched.intersection(self.hashX_subs)
-        for hashX in matches:
+        for hashX in our_touched:
             alias = self.hashX_subs[hashX]
             status = await self.address_status(hashX)
-            changed.append((alias, status))
+            changed[alias] = status
 
-        if height != self.notified_height:
-            self.notified_height = height
-            if self.subscribe_headers:
-                args = (self.controller.electrum_header(height), )
-                pairs.append(('blockchain.headers.subscribe', args))
+        # Check mempool hashXs - the status is a function of the
+        # confirmed state of other transactions
+        for hashX, old_status in self.mempool_statuses.items():
+            status = await self.address_status(hashX)
+            if status != old_status:
+                alias = self.hashX_subs[hashX]
+                changed[alias] = status
 
-            if self.subscribe_height:
-                pairs.append(('blockchain.numblocks.subscribe', (height, )))
-
-            # Check mempool hashXs - the status is a function of the
-            # confirmed state of other transactions
-            for hashX in set(self.mempool_statuses).difference(matches):
-                old_status = self.mempool_statuses[hashX]
-                status = await self.address_status(hashX)
-                if status != old_status:
-                    alias = self.hashX_subs[hashX]
-                    changed.append((alias, status))
-
-        for alias_status in changed:
-            if len(alias_status[0]) == 64:
+        for alias, status in changed.items():
+            if len(alias) == 64:
                 method = 'blockchain.scripthash.subscribe'
             else:
                 method = 'blockchain.address.subscribe'
-            pairs.append((method, alias_status))
+            self.send_notification(method, (alias, status))
 
-        if pairs:
-            self.send_notifications(pairs)
-            if changed:
-                es = '' if len(changed) == 1 else 'es'
-                self.log_info('notified of {:,d} address{}'
-                              .format(len(changed), es))
+        if changed:
+            es = '' if len(changed) == 1 else 'es'
+            self.log_info('notified of {:,d} address{}'
+                          .format(len(changed), es))
+
+    def notify(self, height, touched):
+        '''Notify the client about changes to touched addresses (from mempool
+        updates or new blocks) and height.
+
+        Return the set of addresses the session needs to be
+        asyncronously notified about.  This can be empty if there are
+        possible mempool status updates.
+
+        Returns None if nothing needs to be notified asynchronously.
+        '''
+        height_changed = height != self.notified_height
+        if height_changed:
+            self.notified_height = height
+            if self.subscribe_headers:
+                args = (self.controller.electrum_header(height), )
+                self.send_notification('blockchain.headers.subscribe', args)
+            if self.subscribe_height:
+                args = (height, )
+                self.send_notification('blockchain.numblocks.subscribe', args)
+
+        our_touched = touched.intersection(self.hashX_subs)
+        if our_touched or (height_changed and self.mempool_statuses):
+            return our_touched
+
+        return None
 
     def height(self):
         '''Return the current flushed database height.'''
         return self.bp.db_height
 
-    def current_electrum_header(self):
-        '''Used as response to a headers subscription request.'''
-        return self.controller.electrum_header(self.height())
-
     def headers_subscribe(self):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
-        return self.current_electrum_header()
+        height = self.height()
+        self.notified_height = height
+        return self.controller.electrum_header(height)
 
     def numblocks_subscribe(self):
         '''Subscribe to get height of new blocks.'''

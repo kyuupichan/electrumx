@@ -214,7 +214,6 @@ class Controller(ServerBase):
         self.ensure_future(self.log_start_external_servers())
         self.ensure_future(self.housekeeping())
         self.ensure_future(self.mempool.main_loop())
-        self.ensure_future(self.notify())
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
@@ -272,27 +271,24 @@ class Controller(ServerBase):
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', host, env.ssl_port, ssl=sslc)
 
-    async def notify(self):
+    def notify_sessions(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        while True:
-            await self.mempool.touched_event.wait()
-            touched = self.mempool.touched.copy()
-            self.mempool.touched.clear()
-            self.mempool.touched_event.clear()
+        # Invalidate caches
+        hc = self.history_cache
+        for hashX in set(hc).intersection(touched):
+            del hc[hashX]
 
-            # Invalidate caches
-            hc = self.history_cache
-            for hashX in set(hc).intersection(touched):
-                del hc[hashX]
-            if self.bp.db_height != self.cache_height:
-                self.cache_height = self.bp.db_height
-                self.header_cache.clear()
+        height = self.bp.db_height
+        if height != self.cache_height:
+            self.cache_height = height
+            self.header_cache.clear()
 
-            # Make a copy; self.sessions can change whilst await-ing
-            sessions = [s for s in self.sessions
-                        if isinstance(s, self.coin.SESSIONCLS)]
-            for session in sessions:
-                await session.notify(self.bp.db_height, touched)
+        # Height notifications are synchronous.  Those sessions with
+        # touched addresses are scheduled for asynchronous completion
+        for session in self.sessions:
+            session_touched = session.notify(height, touched)
+            if session_touched is not None:
+                self.ensure_future(session.notify_async(session_touched))
 
     def notify_peers(self, updates):
         '''Notify of peer updates.'''
