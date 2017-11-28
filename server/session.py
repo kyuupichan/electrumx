@@ -128,8 +128,10 @@ class ElectrumX(SessionBase):
             changed[alias] = status
 
         # Check mempool hashXs - the status is a function of the
-        # confirmed state of other transactions
-        for hashX, old_status in self.mempool_statuses.items():
+        # confirmed state of other transactions.  Note: we cannot
+        # iterate over mempool_statuses as it changes size.
+        for hashX in set(self.mempool_statuses):
+            old_status = self.mempool_statuses[hashX]
             status = await self.address_status(hashX)
             if status != old_status:
                 alias = self.hashX_subs[hashX]
