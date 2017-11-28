@@ -286,6 +286,8 @@ class Controller(ServerBase):
         # Height notifications are synchronous.  Those sessions with
         # touched addresses are scheduled for asynchronous completion
         for session in self.sessions:
+            if isinstance(session, LocalRPC):
+                continue
             session_touched = session.notify(height, touched)
             if session_touched is not None:
                 self.ensure_future(session.notify_async(session_touched))
