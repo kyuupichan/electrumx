@@ -882,6 +882,7 @@ class Hush(EquihashMixin, Coin):
     RPC_PORT = 8822
     REORG_LIMIT = 800
 
+
 class Komodo(KomodoMixin, EquihashMixin, Coin):
     NAME = "Komodo"
     SHORTNAME = "KMD"
@@ -901,6 +902,50 @@ class Monaize(KomodoMixin, EquihashMixin, Coin):
     TX_COUNT_HEIGHT = 128
     TX_PER_BLOCK = 2
     RPC_PORT = 14337
+    REORG_LIMIT = 800
+    PEERS = []
+
+class Revs(KomodoMixin, EquihashMixin, Coin):
+    NAME = "Revs"
+    SHORTNAME = "REVS"
+    NET = "mainnet"
+    TX_COUNT = 10000
+    TX_COUNT_HEIGHT = 4800
+    TX_PER_BLOCK = 2
+    RPC_PORT = 10196
+    REORG_LIMIT = 800
+    PEERS = []
+
+class Jumblr(KomodoMixin, EquihashMixin, Coin):
+    NAME = "Jumblr"
+    SHORTNAME = "JUMBLR"
+    NET = "mainnet"
+    TX_COUNT = 10000
+    TX_COUNT_HEIGHT = 5000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 15106
+    REORG_LIMIT = 800
+    PEERS = []
+
+class WirelessCoin(KomodoMixin, EquihashMixin, Coin):
+    NAME = "WirelessCoin"
+    SHORTNAME = "WLC"
+    NET = "mainnet"
+    TX_COUNT = 52000
+    TX_COUNT_HEIGHT = 26000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 12167
+    REORG_LIMIT = 800
+    PEERS = []
+
+class Coqui(KomodoMixin, EquihashMixin, Coin):
+    NAME = "Coqui"
+    SHORTNAME = "COQUI"
+    NET = "mainnet"
+    TX_COUNT = 2000
+    TX_COUNT_HEIGHT = 1000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 14276
     REORG_LIMIT = 800
     PEERS = []
 
