@@ -256,6 +256,11 @@ machine.  **DB_CACHE** set to 1,800.  LevelDB.
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
 
+**Notice**: You will not be able to connect to your electrumx server
+until the server has completely finished catching up with your node.
+After the server has caught up fully at least once, then you will be
+able to make connections to your electrumx server.
+
 
 Terminating ElectrumX
 =====================
