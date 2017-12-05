@@ -256,6 +256,10 @@ machine.  **DB_CACHE** set to 1,800.  LevelDB.
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
 
+**Note**: ElectrumX will not serve normal client connections until it
+has fully synchronized and caught up with your daemon.  However
+LocalRPC connections are served at all times.
+
 
 Terminating ElectrumX
 =====================

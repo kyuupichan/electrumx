@@ -92,11 +92,17 @@ These environment variables are optional:
 
   If set ElectrumX will serve TCP clients on **HOST**:**TCP_PORT**.
 
+  **Note**: ElectrumX will not serve TCP connections until it has
+  fully caught up with your daemon.
+
 * **SSL_PORT**
 
   If set ElectrumX will serve SSL clients on **HOST**:**SSL_PORT**.
   If set then SSL_CERTFILE and SSL_KEYFILE must be defined and be
   filesystem paths to those SSL files.
+
+  **Note**: ElectrumX will not serve SSL connections until it has
+  fully caught up with your daemon.
 
 * **RPC_HOST**
 
