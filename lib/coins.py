@@ -1198,3 +1198,22 @@ class Sibcoin(Dash):
         '''
         import x11_gost_hash
         return x11_gost_hash.getPoWHash(header)
+
+
+class Chips(Coin):
+    NAME = "Chips"
+    SHORTNAME = "CHIPS"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3c")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("bc")
+    GENESIS_HASH = ('0000006e75f6aa0efdbf7db03132aa4e'
+                    '4d0c84951537a6f5a7c39a0a9d30e1e7')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 145290
+    TX_COUNT_HEIGHT = 318637
+    TX_PER_BLOCK = 2
+    RPC_PORT = 57776
+    REORG_LIMIT = 800
+
+
