@@ -449,6 +449,12 @@ class ElectrumX(SessionBase):
                 'blockchain.transaction.get': controller.transaction_get,
             })
 
+        if ptuple >= (1, 2):
+            # New handler as of 1.2
+            handlers.update({
+                'mempool.get_fee_histogram': controller.mempool_get_fee_histogram,
+            })
+
         self.electrumx_handlers = handlers
 
     def request_handler(self, method):
