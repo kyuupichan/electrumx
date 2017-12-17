@@ -235,6 +235,7 @@ Version 1.0.15
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
+LKaFk4KkVpw9pYoUpbckQSKKgCVC4oj78b
 
 .. _#223: https://github.com/kyuupichan/electrumx/issues/223
 .. _#251: https://github.com/kyuupichan/electrumx/issues/251
