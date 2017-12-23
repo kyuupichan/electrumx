@@ -22,7 +22,7 @@ There is also an `Dockerfile`_ available .
 
 .. _installer: https://github.com/bauerj/electrumx-installer
 
-.. _Dockerfile: https://github.com/followtheart/electrumx-docker
+.. _Dockerfile: https://github.com/lukechilds/docker-electrumx
 
 Features
 ========
