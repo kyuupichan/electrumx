@@ -1216,4 +1216,36 @@ class Chips(Coin):
     RPC_PORT = 57776
     REORG_LIMIT = 800
 
+class Rubycoin(Coin):
+    NAME = "Rubycoin"
+    SHORTNAME = "RBY"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3c")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("bc")
+    GENESIS_HASH = ('00000760e24f1ad47f7a6e912bc9ed2b'
+                    '9ce013fc85ba217da8b079762f6b0058')
+    DAEMON = daemon.RubyCoinDaemon
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    ESTIMATE_FEE = 0.0001
+    RELAY_FEE = 0.0001
+    TX_COUNT_HEIGHT = 926252
+    TX_COUNT = 3847239
+    TX_PER_BLOCK = 2
+    RPC_PORT = 5938
+    HEADER_HASH = None
+    REORG_LIMIT = 500
 
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+RubyCoin
