@@ -381,3 +381,9 @@ class LegacyRPCDaemon(Daemon):
         if isinstance(t, int):
             return t
         return timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
+
+class RubyCoinDaemon(LegacyRPCDaemon, FakeEstimateFeeDaemon):
+    
+    async def deserialised_block(self, hex_hash):
+        '''Return the deserialised block with the given hex hash.'''
+        return await self._send_single('getblock', (hex_hash, False))
