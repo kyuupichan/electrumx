@@ -1248,4 +1248,3 @@ class Rubycoin(Coin):
             return super().header_hash(header)
         else:
             return cls.HEADER_HASH(header)
-RubyCoin
