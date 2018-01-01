@@ -895,7 +895,7 @@ class Zclassic(EquihashMixin, Coin):
     TX_COUNT = 329196
     TX_COUNT_HEIGHT = 68379
     TX_PER_BLOCK = 5
-    RPC_PORT = 8822
+    RPC_PORT = 8023
     REORG_LIMIT = 800
 
 class Komodo(KomodoMixin, EquihashMixin, Coin):
