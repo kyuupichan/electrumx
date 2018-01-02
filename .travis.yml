@@ -10,6 +10,7 @@ python:
   - "nightly"
 # command to install dependencies
 install:
+  - pip install pytest==3.2.5
   - pip install aiohttp
   - pip install ecdsa
   - pip install plyvel
