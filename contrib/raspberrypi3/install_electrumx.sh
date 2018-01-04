@@ -3,6 +3,9 @@
 # install electrumx
 ###################
 
+# Remove "raspi-copies-and-fills" as it breaks the upgrade process
+sudo apt-get purge raspi-copies-and-fills
+
 # upgrade raspbian to 'stretch' distribution
 sudo echo 'deb http://mirrordirector.raspbian.org/raspbian/ testing main contrib non-free rpi' > /etc/apt/sources.list.d/stretch.list
 sudo apt-get update
