@@ -382,3 +382,99 @@ class DeserializerTxTimeAuxPow(DeserializerTxTime):
             header_end = static_header_size
         self.cursor = start
         return self._read_nbytes(header_end)
+
+
+class TxBitcoinDiamond(namedtuple("Tx",
+                                  "version preblockhash inputs outputs "
+                                  "locktime")):
+    '''Class representing a transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase
+
+
+class DeserializerBitcoinDiamond(Deserializer):
+    bitcoin_diamond_tx_version = 12
+
+    def read_tx(self):
+        '''Return a (Deserialized TX, TX_HASH) pair.
+
+        The hash needs to be reversed for human display; for efficiency
+        we process it in the natural serialized order.
+        '''
+        start = self.cursor
+        version = self._get_version()
+        if version != self.bitcoin_diamond_tx_version:
+            return Tx(
+                self._read_le_int32(),  # version
+                self._read_inputs(),    # inputs
+                self._read_outputs(),   # outputs
+                self._read_le_uint32()  # locktime
+            ), double_sha256(self.binary[start:self.cursor])
+        else:
+            return TxBitcoinDiamond(
+                self._read_le_int32(),  # version
+                hash_to_str(self._read_nbytes(32)),  # blockhash
+                self._read_inputs(),  # inputs
+                self._read_outputs(),  # outputs
+                self._read_le_uint32()  # locktime
+            ), double_sha256(self.binary[start:self.cursor])
+
+    def _get_version(self):
+        result, = unpack_int32_from(self.binary, self.cursor)
+        return result
+
+
+class TxBitcoinDiamondSegWit(namedtuple("Tx",
+                                        "version preblockhash marker flag "
+                                        "inputs outputs witness locktime")):
+    '''Class representing a SegWit transaction.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase
+
+
+class DeserializerBitcoinDiamondSegWit(DeserializerBitcoinDiamond,
+                                       DeserializerSegWit):
+    def read_tx(self):
+        '''Return a (Deserialized TX, TX_HASH) pair.
+
+        The hash needs to be reversed for human display; for efficiency
+        we process it in the natural serialized order.
+        '''
+        marker = self.binary[self.cursor + 4 + 32]
+        if marker:
+            return super().read_tx()
+
+        # Ugh, this is nasty.
+        start = self.cursor
+        version = self._read_le_int32()
+        if version == self.bitcoin_diamond_tx_version:
+            present_block_hash = hash_to_str(self._read_nbytes(32))
+        else:
+            present_block_hash = None
+        orig_ser = self.binary[start:self.cursor]
+
+        marker = self._read_byte()
+        flag = self._read_byte()
+
+        start = self.cursor
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        orig_ser += self.binary[start:self.cursor]
+
+        witness = self._read_witness(len(inputs))
+
+        start = self.cursor
+        locktime = self._read_le_uint32()
+        orig_ser += self.binary[start:self.cursor]
+
+        if present_block_hash is not None:
+            return TxBitcoinDiamondSegWit(version, present_block_hash, marker,
+                                          flag, inputs, outputs, witness,
+                                          locktime), double_sha256(orig_ser)
+        else:
+            return TxSegWit(version, marker, flag, inputs,
+                            outputs, witness, locktime), double_sha256(orig_ser)
