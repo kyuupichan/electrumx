@@ -444,7 +444,12 @@ class DeserializerBitcoinDiamondSegWit(DeserializerBitcoinDiamond,
         The hash needs to be reversed for human display; for efficiency
         we process it in the natural serialized order.
         '''
-        marker = self.binary[self.cursor + 4 + 32]
+        tx_version = self._get_version()
+        if tx_version == self.bitcoin_diamond_tx_version:
+            marker = self.binary[self.cursor + 4 + 32]
+        else:
+            marker = self.binary[self.cursor + 4]
+
         if marker:
             return super().read_tx()
 
