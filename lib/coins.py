@@ -449,8 +449,8 @@ class BitcoinDiamond(BitcoinSegwit, Coin):
     NAME = "BitcoinDiamond"
     SHORTNAME = "BCD"
     TX_VERSION = 12
-    TX_COUNT = 265026255
-    TX_COUNT_HEIGHT = 499923  # todo: tx sync estimate time
+    TX_COUNT = 274277819
+    TX_COUNT_HEIGHT = 498678
     TX_PER_BLOCK = 50
     REORG_LIMIT = 1000
     DESERIALIZER = lib_tx.DeserializerBitcoinDiamondSegWit
