@@ -486,12 +486,12 @@ class DashElectrumX(ElectrumX):
             'masternode.subscribe': self.masternode_subscribe,
         })
 
-    async def notify(self, height, touched):
+    def notify(self, height, touched):
         '''Notify the client about changes in masternode list.'''
-        await super().notify(height, touched)
+        result = super().notify(height, touched)
 
         for masternode in self.mns:
-            status = await self.daemon.masternode_list(['status', masternode])
+            status = self.daemon.masternode_list(['status', masternode])
             payload = {
                 'id': None,
                 'method': 'masternode.subscribe',
@@ -499,6 +499,7 @@ class DashElectrumX(ElectrumX):
                 'result': status.get(masternode),
             }
             self.send_binary(self.encode_payload(payload))
+        return result
 
     def server_version(self, client_name=None, protocol_version=None):
         '''Returns the server version as a string.
