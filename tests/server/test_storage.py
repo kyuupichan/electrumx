@@ -1,3 +1,4 @@
+import gc
 import pytest
 import os
 
@@ -23,7 +24,9 @@ def db(tmpdir, request):
     db = db_class(request.param)("db", False)
     yield db
     os.chdir(cwd)
-    db.close()
+    # Make sure all the locks and handles are closed
+    del db
+    gc.collect()
 
 
 def test_put_get(db):

@@ -3,9 +3,9 @@ Description=Electrumx
 After=network.target
 
 [Service]
-EnvironmentFile=/etc/electrumx.conf
+EnvironmentFile=/home/electrumx/electrumx.conf
 ExecStart=/usr/local/bin/electrumx_server.py
-User=electrumx
+User=osboxes
 LimitNOFILE=8192
 TimeoutStopSec=30min
 
