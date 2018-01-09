@@ -3,7 +3,7 @@ Description=Electrumx
 After=network.target
 
 [Service]
-EnvironmentFile=/home/osboxes/electrumx/electrumx.conf
+EnvironmentFile=/home/electrumx/electrumx.conf
 ExecStart=/usr/local/bin/electrumx_server.py
 User=osboxes
 LimitNOFILE=8192
