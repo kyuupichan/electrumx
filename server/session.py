@@ -501,16 +501,6 @@ class DashElectrumX(ElectrumX):
             self.send_binary(self.encode_payload(payload))
         return result
 
-    def server_version(self, client_name=None, protocol_version=None):
-        '''Returns the server version as a string.
-        Force version string response for Electrum-Dash 2.6.4 client caused by
-        https://github.com/dashpay/electrum-dash/commit/638cf6c0aeb7be14a85ad98f873791cb7b49ee29
-        '''
-        default_return = super().server_version(client_name, protocol_version)
-        if self.client == '2.6.4':
-            return '1.0'
-        return default_return
-
     # Masternode command handlers
     async def masternode_announce_broadcast(self, signmnb):
         '''Pass through the masternode announce message to be broadcast
