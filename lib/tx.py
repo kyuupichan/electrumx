@@ -208,13 +208,14 @@ class DeserializerSegWit(Deserializer):
 
     def _read_tx_parts(self):
         '''Return a (deserialized TX, tx_hash, vsize) tuple.'''
+        start = self.cursor
         marker = self.binary[self.cursor + 4]
         if marker:
-            tx, tx_hash = super().read_tx_and_hash()
-            return tx, tx_hash, self.binary_size
+            tx = super().read_tx()
+            tx_hash = double_sha256(self.binary[start:self.cursor])
+            return tx, tx_hash, self.binary_length
 
         # Ugh, this is nasty.
-        start = self.cursor
         version = self._read_le_int32()
         orig_ser = self.binary[start:self.cursor]
 
