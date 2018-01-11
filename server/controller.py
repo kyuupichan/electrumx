@@ -873,7 +873,7 @@ class Controller(ServerBase):
         if not raw_tx:
             return None
         raw_tx = util.hex_to_bytes(raw_tx)
-        tx, tx_hash = self.coin.DESERIALIZER(raw_tx).read_tx()
+        tx = self.coin.DESERIALIZER(raw_tx).read_tx()
         if index >= len(tx.outputs):
             return None
         return self.coin.address_from_script(tx.outputs[index].pk_script)

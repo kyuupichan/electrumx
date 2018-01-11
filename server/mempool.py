@@ -217,7 +217,7 @@ class MemPool(util.LoggedClass):
         for tx_hash, raw_tx in raw_tx_map.items():
             if tx_hash not in txs:
                 continue
-            tx, _tx_hash = deserializer(raw_tx).read_tx()
+            tx = deserializer(raw_tx).read_tx()
 
             # Convert the tx outputs into (hashX, value) pairs
             txout_pairs = [(script_hashX(txout.pk_script), txout.value)
@@ -301,7 +301,7 @@ class MemPool(util.LoggedClass):
             txin_pairs, txout_pairs = item
             tx_fee = (sum(v for hashX, v in txin_pairs) -
                       sum(v for hashX, v in txout_pairs))
-            tx, tx_hash = deserializer(raw_tx).read_tx()
+            tx = deserializer(raw_tx).read_tx()
             unconfirmed = any(hash_to_str(txin.prev_hash) in self.txs
                               for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
@@ -319,7 +319,7 @@ class MemPool(util.LoggedClass):
         for hex_hash, raw_tx in pairs:
             if not raw_tx:
                 continue
-            tx, tx_hash = deserializer(raw_tx).read_tx()
+            tx = deserializer(raw_tx).read_tx()
             for txin in tx.inputs:
                 spends.add((txin.prev_hash, txin.prev_idx))
         return spends
