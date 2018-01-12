@@ -38,15 +38,10 @@ class MemPool(util.LoggedClass):
         self.coin = bp.coin
         self.db = bp
         self.touched = set()
-        self.prioritized = set()
         self.stop = False
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
-
-    def prioritize(self, tx_hash):
-        '''Prioritize processing the given hash.  This is important during
-        initial mempool sync.'''
-        self.prioritized.add(tx_hash)
+        self.synchronized_event = asyncio.Event()
 
     def _resync_daemon_hashes(self, unprocessed, unfetched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
@@ -91,9 +86,9 @@ class MemPool(util.LoggedClass):
         fetch_size = 800
         process_some = self._async_process_some(fetch_size // 2)
 
-        await self.daemon.mempool_refresh_event.wait()
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
+        await self.daemon.mempool_refresh_event.wait()
         next_log = 0
         loops = -1  # Zero during initial catchup
 
@@ -111,6 +106,8 @@ class MemPool(util.LoggedClass):
                                  '({:,d} txs left)'.format(pct, todo))
             if not todo:
                 loops += 1
+                if loops > 0:
+                    self.synchronized_event.set()
                 now = time.time()
                 if now >= next_log and loops:
                     self.logger.info('{:,d} txs touching {:,d} addresses'
@@ -119,7 +116,6 @@ class MemPool(util.LoggedClass):
 
             try:
                 if not todo:
-                    self.prioritized.clear()
                     await self.daemon.mempool_refresh_event.wait()
 
                 self._resync_daemon_hashes(unprocessed, unfetched)
@@ -147,10 +143,6 @@ class MemPool(util.LoggedClass):
             nonlocal pending
 
             raw_txs = {}
-
-            for hex_hash in self.prioritized:
-                if hex_hash in unprocessed:
-                    raw_txs[hex_hash] = unprocessed.pop(hex_hash)
 
             while unprocessed and len(raw_txs) < limit:
                 hex_hash, raw_tx = unprocessed.popitem()
@@ -213,7 +205,7 @@ class MemPool(util.LoggedClass):
         db_utxo_lookup = self.db.db_utxo_lookup
         txs = self.txs
 
-        # Deserialize each tx and put it in our priority queue
+        # Deserialize each tx and put it in a pending list
         for tx_hash, raw_tx in raw_tx_map.items():
             if tx_hash not in txs:
                 continue

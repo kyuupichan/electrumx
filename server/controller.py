@@ -125,9 +125,8 @@ class Controller(ServerBase):
         return self.mempool.value(hashX)
 
     def sent_tx(self, tx_hash):
-        '''Call when a TX is sent.  Tells mempool to prioritize it.'''
+        '''Call when a TX is sent.'''
         self.txs_sent += 1
-        self.mempool.prioritize(tx_hash)
 
     def setup_bands(self):
         bands = []
@@ -206,14 +205,15 @@ class Controller(ServerBase):
                 self.next_log_sessions = time.time() + self.env.log_sessions
 
     async def wait_for_bp_catchup(self):
-        '''Wait for the block processor to catch up, then kick off server
-        background processes.'''
+        '''Wait for the block processor to catch up, and for the mempool to
+        synchronize, then kick off server background processes.'''
         await self.bp.caught_up_event.wait()
         self.logger.info('block processor has caught up')
+        self.ensure_future(self.mempool.main_loop())
+        await self.mempool.synchronized_event.wait()
         self.ensure_future(self.peer_mgr.main_loop())
         self.ensure_future(self.log_start_external_servers())
         self.ensure_future(self.housekeeping())
-        self.ensure_future(self.mempool.main_loop())
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
