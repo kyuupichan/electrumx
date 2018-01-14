@@ -332,9 +332,11 @@ class EquihashMixin(object):
             'version': version,
             'prev_block_hash': hash_to_str(header[4:36]),
             'merkle_root': hash_to_str(header[36:68]),
+            'hash_reserved': hash_to_str(header[68:100]),
             'timestamp': timestamp,
             'bits': bits,
             'nonce': hash_to_str(header[108:140]),
+            'n_solution': base64.b64encode(lib_tx.Deserializer(header, start=140)._read_varbytes()).decode('utf8')
         }
 
     @classmethod
@@ -1014,6 +1016,58 @@ class Zclassic(EquihashMixin, Coin):
     TX_PER_BLOCK = 5
     RPC_PORT = 8023
     REORG_LIMIT = 800
+    CHUNK_SIZE = 200
+
+class ZclassicTestnet(EquihashMixin, Coin):
+    NAME = "Zclassic"
+    SHORTNAME = "ZCL"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("1D25")
+    P2SH_VERBYTES = [bytes.fromhex("1CBA")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH         = ( '03e1c4bb705c871bf9bfda3e74b7f8f8'
+                             '6bff267993c215a89d5795e3708e5e1f')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 329196
+    TX_COUNT_HEIGHT = 68379
+    TX_PER_BLOCK = 5
+    RPC_PORT = 18023
+    REORG_LIMIT = 800
+    CHUNK_SIZE = 200
+
+class BitcoinPrivate(EquihashMixin, Coin):
+    NAME = "BitcoinPrivate"
+    SHORTNAME = "BTCP"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1325")
+    P2SH_VERBYTES = [bytes.fromhex("13AF")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH         = ( '0007104ccda289427919efc39dc9e4d4'
+                             '99804b7bebc22df55f8b834301260602')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 329196
+    TX_COUNT_HEIGHT = 68379
+    TX_PER_BLOCK = 5
+    RPC_PORT = 7932
+    REORG_LIMIT = 800
+    CHUNK_SIZE = 200
+
+class BitcoinPrivateTestnet(EquihashMixin, Coin):
+    NAME = "BitcoinPrivate"
+    SHORTNAME = "BTCP"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("1958")
+    P2SH_VERBYTES = [bytes.fromhex("19E0")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH         = ( '03e1c4bb705c871bf9bfda3e74b7f8f8'
+                             '6bff267993c215a89d5795e3708e5e1f')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 329196
+    TX_COUNT_HEIGHT = 68379
+    TX_PER_BLOCK = 5
+    RPC_PORT = 17932
+    REORG_LIMIT = 800
+    CHUNK_SIZE = 200
 
 class Koto(Coin):
     NAME = "Koto"
