@@ -382,7 +382,7 @@ class BitcoinMixin(object):
 
 class HOdlcoin(Coin):
     NAME = "HOdlcoin"
-    SHORTNAME = "HODL"
+    SHORTNAME = "HODLC"
     NET = "mainnet"
     BASIC_HEADER_SIZE = 88
     P2PKH_VERBYTE = bytes.fromhex("28")
