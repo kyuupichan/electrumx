@@ -380,6 +380,21 @@ class BitcoinMixin(object):
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
     RPC_PORT = 8332
 
+class HOdlcoin(Coin):
+    NAME = "HOdlcoin"
+    SHORTNAME = "HODLC"
+    NET = "mainnet"
+    BASIC_HEADER_SIZE = 88
+    P2PKH_VERBYTE = bytes.fromhex("28")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("a8")
+    GENESIS_HASH = ('008872e5582924544e5c707ee4b839bb'
+                    '82c28a9e94e917c94b40538d5658c04b')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 258858
+    TX_COUNT_HEIGHT = 382138
+    TX_PER_BLOCK = 5
+
 
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
