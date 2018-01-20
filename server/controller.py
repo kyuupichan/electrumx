@@ -825,6 +825,14 @@ class Controller(ServerBase):
         number = self.non_negative_integer(number)
         return await self.daemon_request('estimatefee', [number])
 
+    def mempool_get_fee_histogram(self):
+        '''Memory pool fee histogram.
+
+        TODO: The server should detect and discount transactions that
+        never get mined when they should.
+        '''
+        return self.mempool.get_fee_histogram()
+
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
