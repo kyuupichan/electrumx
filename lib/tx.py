@@ -323,6 +323,23 @@ class DeserializerZcash(DeserializerEquihash):
         return base_tx
 
 
+class DeserializerKoto(Deserializer):
+    def read_tx(self):
+        base_tx =  TxJoinSplit(
+            self._read_le_int32(),  # version
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
+        )
+        if base_tx.version >= 2:
+            joinsplit_size = self._read_varint()
+            if joinsplit_size > 0:
+                self.cursor += joinsplit_size * 1802 # JSDescription
+                self.cursor += 32 # joinSplitPubKey
+                self.cursor += 64 # joinSplitSig
+        return base_tx
+
+
 class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
     '''Class representing transaction that has a time field.'''
 
