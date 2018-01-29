@@ -922,7 +922,7 @@ class Koto(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('6d424c350729ae633275d51dc3496e16'
                     'cd1b1d195c164da00f39c499a2e9959e')
-    DESERIALIZER = lib_tx.DeserializerKoto
+    DESERIALIZER = lib_tx.DeserializerZcash
     TX_COUNT = 158914
     TX_COUNT_HEIGHT = 67574
     TX_PER_BLOCK = 3
