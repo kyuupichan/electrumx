@@ -75,6 +75,58 @@ from and including the server's response to this call will use the
 negotiated protocol version.
 
 
+Script Hashes
+-------------
+
+A script hash is the hash of the binary bytes of the locking script
+(ScriptPubKey), expressed as a hexadecimal string.  The hash function
+to use is given by the "hash_function" member of `server.features`
+(currently "sha256" only).  Like for block and transaction hashes, when
+converting the big-endian binary hash to a hexadecimal string the
+least-significant byte appears first, and the most-significant byte
+last.
+
+For example, the legacy Bitcoin address from the genesis block
+
+    1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
+
+has P2PKH script
+
+    76a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac
+
+with SHA256 hash
+
+    6191c3b590bfcfa0475e877c302da1e323497acf3b42c08d8fa28e364edf018b
+
+which is sent to the server reversed as
+
+    8b01df4e368ea28f8dc0423bcf7a4923e3a12d307c875e47a0cfbf90b5c39161
+
+By subscribing to this hash you can find P2PKH payments to that address.
+
+One public key for that address (the genesis block public key) is
+
+    04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb
+    649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f
+
+which has P2PK script
+
+    4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb
+    649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac
+
+with SHA256 hash
+
+    3318537dfb3135df9f3d950dbdf8a7ae68dd7c7dfef61ed17963ff80f3850474
+
+which is sent to the server reversed as
+
+    740485f380ff6379d11ef6fe7d7cdd68aea7f8bd0d953d9fdf3531fb7d531833
+
+By subscribing to this hash you can find P2PK payments to that public
+key.  Note the Genesis block coinbase is unspendable and therefore not
+indexed.
+
+
 Protocol Version 1.0
 --------------------
 
@@ -774,20 +826,6 @@ Subscribe to a script hash.
     [**scripthash**, **status**]
 
 
-mempool.get_fee_histogram
-=========================
-
-Return a histogram of the fee rates paid by transactions in the memory
-pool, weighted by transaction size.
-
-The histogram is an array of (fee, vsize) values, where vsize_n is the
-cumulative virtual size of mempool transactions with a fee rate in the
-interval [fee_(n-1), fee_n)], and fee_(n-1) > fee_n.
-
-Fee intervals may have variable size. The choice of appropriate
-intervals is currently not part of the protocol.
-
-
 server.add_peer
 ===============
 
@@ -881,6 +919,36 @@ Get a list of features and services supported by the server.
       "server_version": "ElectrumX 1.0.17",
       "hash_function": "sha256"
   }
+
+Protocol Version 1.2
+--------------------
+
+Protocol version 1.2 is the same as version `1.1` except for the
+addition of a new method `mempool.get_fee_histogram`.
+
+All methods with taking addresses are deprecated, and will be removed
+at some point in the future.  You should update your code to use
+`Script Hashes`_ and the scripthash methods introduced in protocol 1.1
+instead.
+
+
+mempool.get_fee_histogram
+=========================
+
+Request a histogram of the fee rates paid by transactions in the memory
+pool, weighted by transaction size.
+
+  mempool.get_fee_histogram()
+
+**Response**
+
+  The histogram is an array of [fee, vsize] pairs, where vsize_n is
+  the cumulative virtual size of mempool transactions with a fee rate
+  in the interval [fee_(n-1), fee_n)], and fee_(n-1) > fee_n.
+
+Fee intervals may have variable size.  The choice of appropriate
+intervals is currently not part of the protocol.
+
 
 .. _JSON RPC 1.0: http://json-rpc.org/wiki/specification
 .. _JSON RPC 2.0: http://json-rpc.org/specification

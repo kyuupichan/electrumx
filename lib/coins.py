@@ -1283,3 +1283,18 @@ class Feathercoin(Coin):
     PEERS = [
         'electrumx-ch-1.feathercoin.ch s t',
     ]
+
+class Newyorkcoin(AuxPowMixin, Coin):
+    NAME = "Newyorkcoin"
+    SHORTNAME = "NYC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3c")
+    P2SH_VERBYTES = [bytes.fromhex("16")]
+    WIF_BYTE = bytes.fromhex("bc")
+    GENESIS_HASH = ('5597f25c062a3038c7fd815fe46c67de'
+                    'dfcb3c839fbc8e01ed4044540d08fe48')
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 5161944
+    TX_COUNT_HEIGHT = 3948743
+    TX_PER_BLOCK = 2
+    REORG_LIMIT = 2000

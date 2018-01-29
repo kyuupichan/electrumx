@@ -368,10 +368,7 @@ your sign request to identify your server.  They are not currently
 checked by the client except for the validity date.  When asked for a
 challenge password just leave it empty and press enter::
 
-    $ openssl genrsa -des3 -passout pass:x -out server.pass.key 2048
-    $ openssl rsa -passin pass:x -in server.pass.key -out server.key
-    writing RSA key
-    $ rm server.pass.key
+    $ openssl genrsa -out server.key 2048
     $ openssl req -new -key server.key -out server.csr
     ...
     Country Name (2 letter code) [AU]:US
