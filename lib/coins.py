@@ -923,9 +923,9 @@ class Koto(Coin):
     GENESIS_HASH = ('6d424c350729ae633275d51dc3496e16'
                     'cd1b1d195c164da00f39c499a2e9959e')
     DESERIALIZER = lib_tx.DeserializerKoto
-    TX_COUNT = 115965
-    TX_COUNT_HEIGHT = 55117
-    TX_PER_BLOCK = 5
+    TX_COUNT = 158914
+    TX_COUNT_HEIGHT = 67574
+    TX_PER_BLOCK = 3
     RPC_PORT = 8432
     REORG_LIMIT = 800
 
