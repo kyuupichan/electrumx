@@ -1314,3 +1314,15 @@ class Newyorkcoin(AuxPowMixin, Coin):
     TX_COUNT_HEIGHT = 3948743
     TX_PER_BLOCK = 2
     REORG_LIMIT = 2000
+
+class Bitcore(BitcoinMixin, Coin):
+    NAME = "Bitcore"
+    SHORTNAME = "BTX"
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    GENESIS_HASH = ('604148281e5c4b7f2487e5d03cd60d8e'
+                    '6f69411d613f6448034508cea52e9574')
+    TX_COUNT = 126979
+    TX_COUNT_HEIGHT = 126946
+    TX_PER_BLOCK = 2
+    RPC_PORT = 8556
+
