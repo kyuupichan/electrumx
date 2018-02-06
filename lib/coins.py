@@ -1165,7 +1165,6 @@ class Fujicoin(Coin):
                     'a636f70856183086842667a1597714a0')
     ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.001
-    DAEMON = daemon.FakeEstimateFeeDaemon
     TX_COUNT = 170478
     TX_COUNT_HEIGHT = 1521676
     TX_PER_BLOCK = 1
