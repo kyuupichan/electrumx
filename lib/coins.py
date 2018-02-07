@@ -881,6 +881,22 @@ class Zcash(EquihashMixin, Coin):
     RPC_PORT = 8232
     REORG_LIMIT = 800
 
+class BitcoinZ(EquihashMixin, Coin):
+    NAME = "BitcoinZ"
+    SHORTNAME = "BTCZ"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1CB8")
+    P2SH_VERBYTES = [bytes.fromhex("1CBD")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('f499ee3d498b4298ac6a64205b8addb7'
+                    'c43197e2a660229be65db8a4534d75c1')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 171976
+    TX_COUNT_HEIGHT = 81323
+    TX_PER_BLOCK = 3
+    RPC_PORT = 1979
+    REORG_LIMIT = 800
+
 class Hush(EquihashMixin, Coin):
     NAME = "Hush"
     SHORTNAME = "HUSH"
@@ -1149,7 +1165,6 @@ class Fujicoin(Coin):
                     'a636f70856183086842667a1597714a0')
     ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.001
-    DAEMON = daemon.FakeEstimateFeeDaemon
     TX_COUNT = 170478
     TX_COUNT_HEIGHT = 1521676
     TX_PER_BLOCK = 1
@@ -1298,3 +1313,15 @@ class Newyorkcoin(AuxPowMixin, Coin):
     TX_COUNT_HEIGHT = 3948743
     TX_PER_BLOCK = 2
     REORG_LIMIT = 2000
+
+class Bitcore(BitcoinMixin, Coin):
+    NAME = "Bitcore"
+    SHORTNAME = "BTX"
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    GENESIS_HASH = ('604148281e5c4b7f2487e5d03cd60d8e'
+                    '6f69411d613f6448034508cea52e9574')
+    TX_COUNT = 126979
+    TX_COUNT_HEIGHT = 126946
+    TX_PER_BLOCK = 2
+    RPC_PORT = 8556
+
