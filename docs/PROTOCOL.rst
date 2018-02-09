@@ -434,14 +434,25 @@ Subscribe to receive block headers when a new block is found.
 
 **Response**
 
-  The *deserialized header* [2]_ of the current block.
+  The *deserialized header* [2]_ of the current block chain tip.
 
 **Notification Parameters**
 
   As this is a subcription, the client will receive a notification
   when a new block is found.  The parameters are:
 
-    [**header**]
+    [**deserialized_header**]
+
+  **NOTE**: if a new block comes in quickly so the server has not
+  finished processing the prior block(s), it may skip them and only
+  notify of the new tip.  The protocol does not guarantee
+  notifications of all intermediate blocks.
+
+  In a similar vein, the client also needs to be able to handle chain
+  reorganisations; in case of a re-org the new tip will not connect
+  directly onto the prior chain tip.  The client needs to be able to
+  figure out where the connection point and request any missing block
+  headers.
 
 
 blockchain.numblocks.subscribe
