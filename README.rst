@@ -33,9 +33,7 @@ Features
   time to height 448k (mid January 2017) reported is under 4h 30m.  On
   the same hardware JElectrum would take around 4 days and
   electrum-server probably around 1 month.
-- The full Electrum protocol is implemented.  The only exception is
-  the blockchain.address.get_proof RPC call, which is not used by
-  Electrum GUI clients, and can only be invoked from the command line.
+- The full current Electrum protocol is implemented.
 - Various configurable means of controlling resource consumption and
   handling denial of service attacks.  These include maximum
   connection counts, subscription limits per-connection and across all

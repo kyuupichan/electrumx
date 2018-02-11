@@ -5,11 +5,11 @@ Electrum Protocol
 This is intended to be a reference for client and server authors
 alike.
 
-I have attempted to ensure what is written is correct for the three
-known server implementations: electrum-server, jelectrum and
-ElectrumX, and also for Electrum clients of the 2.x series.  We know
-other clients exist but I am not aware of the source of any being
-publicly available.
+I have attempted to ensure what is written is correct for the two
+known remaining server implementations: jelectrum and ElectrumX, and
+also for Electrum clients of the 2.x series.  We know other clients
+exist but I am not aware of the source of any being publicly
+available.
 
 
 Message Stream
@@ -25,14 +25,14 @@ requests should limit their size depending on the nature of their
 query, because servers will limit response size as an anti-DoS
 mechanism.
 
-RPC calls and responses are separated by newlines in the stream.  The
-JSON specification does not permit control characters within strings,
-so no confusion is possible there.  However it does permit newlines as
-extraneous whitespace between elements; client and server MUST NOT use
-newlines in such a way.
+Eeach RPC call, and each response, is separated by a single newline in
+their respective streams.  The JSON specification does not permit
+control characters within strings, so no confusion is possible there.
+However it does permit newlines as extraneous whitespace between
+elements; client and server MUST NOT use newlines in such a way.
 
 If using JSON RPC 2.0's feature of parameter passing by name, the
-names shown in the protocol versions's description MUST be used.
+names shown in the protocol version's description MUST be used.
 
 A server advertising support for a particular protocol version MUST
 support each method documented for that protocol version, unless the
@@ -40,6 +40,7 @@ method is explicitly marked optional.  It may support other methods or
 additional parameters with unspecified behaviour.  Use of additional
 parameters is discouraged as it may conflict with future versions of
 the protocol.
+
 
 Notifications
 -------------
@@ -255,19 +256,6 @@ Return the unconfirmed transactions of a bitcoin address.
       "fee": 24310
     }
   ]
-
-
-blockchain.address.get_proof
-============================
-
-This method is optional and deprecated, and hence its response will
-not be described here.
-
-  blockchain.address.get_proof(**address**)
-
-  **address**
-
-    The address as a Base58 string.
 
 
 blockchain.address.listunspent
@@ -681,9 +669,8 @@ following changes:
 
 * improved semantics of `server.version` to aid protocol negotiation,
   and a changed return value.
-* version 1.0 methods `blockchain.address.get_proof`,
-  `blockchain.utxo.get_address` and `blockchain.numblocks.subscribe`
-  have been removed.
+* version 1.0 methods `blockchain.utxo.get_address`
+  and `blockchain.numblocks.subscribe` have been removed.
 * method `blockchain.transaction.get` no longer takes the *height*
   argument that was ignored in 1.0, providing one will return an
   error.
