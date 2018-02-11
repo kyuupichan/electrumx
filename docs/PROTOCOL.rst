@@ -272,14 +272,17 @@ Return an ordered list of UTXOs sent to a bitcoin address.
 **Response**
 
     A list of unspent outputs in blockchain order.  Each transaction
-    is a dictionary with keys *height* , *tx_pos*, *tx_height* and
+    is a dictionary with keys *height* , *tx_pos*, *tx_hash* and
     *value* keys.  *height* is the integer height of the block the
-    transaction was confirmed in; if unconfirmed then *height* is 0 if
-    all inputs are confirmed, and -1 otherwise.  *tx_hash* the
-    transaction hash in hexadecimal, *tx_pos* the zero-based index of
-    the output in the transaction's list of outputs, and *value* its
-    integer value in minimum coin units (satoshis in the case of
-    Bitcoin).
+    transaction was confirmed in,  *tx_hash* the transaction hash in
+    hexadecimal, *tx_pos* the zero-based index of the output in the
+    transaction's list of outputs, and *value* its integer value in
+    minimum coin units (satoshis in the case of Bitcoin).
+
+    This function takes the mempool into account.  Mempool
+    transactions paying to the address are included at the end of the
+    list in an undefined order, each with *tx_height* of zero.  Any
+    output that is spent in the mempool does not appear.
 
 **Response Example**
 
