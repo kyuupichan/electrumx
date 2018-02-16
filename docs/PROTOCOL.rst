@@ -5,11 +5,11 @@ Electrum Protocol
 This is intended to be a reference for client and server authors
 alike.
 
-I have attempted to ensure what is written is correct for the three
-known server implementations: electrum-server, jelectrum and
-ElectrumX, and also for Electrum clients of the 2.x series.  We know
-other clients exist but I am not aware of the source of any being
-publicly available.
+I have attempted to ensure what is written is correct for the two
+known remaining server implementations: jelectrum and ElectrumX, and
+also for Electrum clients of the 2.x series.  We know other clients
+exist but I am not aware of the source of any being publicly
+available.
 
 
 Message Stream
@@ -25,14 +25,14 @@ requests should limit their size depending on the nature of their
 query, because servers will limit response size as an anti-DoS
 mechanism.
 
-RPC calls and responses are separated by newlines in the stream.  The
-JSON specification does not permit control characters within strings,
-so no confusion is possible there.  However it does permit newlines as
-extraneous whitespace between elements; client and server MUST NOT use
-newlines in such a way.
+Eeach RPC call, and each response, is separated by a single newline in
+their respective streams.  The JSON specification does not permit
+control characters within strings, so no confusion is possible there.
+However it does permit newlines as extraneous whitespace between
+elements; client and server MUST NOT use newlines in such a way.
 
 If using JSON RPC 2.0's feature of parameter passing by name, the
-names shown in the protocol versions's description MUST be used.
+names shown in the protocol version's description MUST be used.
 
 A server advertising support for a particular protocol version MUST
 support each method documented for that protocol version, unless the
@@ -40,6 +40,7 @@ method is explicitly marked optional.  It may support other methods or
 additional parameters with unspecified behaviour.  Use of additional
 parameters is discouraged as it may conflict with future versions of
 the protocol.
+
 
 Notifications
 -------------
@@ -257,19 +258,6 @@ Return the unconfirmed transactions of a bitcoin address.
   ]
 
 
-blockchain.address.get_proof
-============================
-
-This method is optional and deprecated, and hence its response will
-not be described here.
-
-  blockchain.address.get_proof(**address**)
-
-  **address**
-
-    The address as a Base58 string.
-
-
 blockchain.address.listunspent
 ==============================
 
@@ -284,14 +272,17 @@ Return an ordered list of UTXOs sent to a bitcoin address.
 **Response**
 
     A list of unspent outputs in blockchain order.  Each transaction
-    is a dictionary with keys *height* , *tx_pos*, *tx_height* and
+    is a dictionary with keys *height* , *tx_pos*, *tx_hash* and
     *value* keys.  *height* is the integer height of the block the
-    transaction was confirmed in; if unconfirmed then *height* is 0 if
-    all inputs are confirmed, and -1 otherwise.  *tx_hash* the
-    transaction hash in hexadecimal, *tx_pos* the zero-based index of
-    the output in the transaction's list of outputs, and *value* its
-    integer value in minimum coin units (satoshis in the case of
-    Bitcoin).
+    transaction was confirmed in,  *tx_hash* the transaction hash in
+    hexadecimal, *tx_pos* the zero-based index of the output in the
+    transaction's list of outputs, and *value* its integer value in
+    minimum coin units (satoshis in the case of Bitcoin).
+
+    This function takes the mempool into account.  Mempool
+    transactions paying to the address are included at the end of the
+    list in an undefined order, each with *tx_height* of zero.  Any
+    output that is spent in the mempool does not appear.
 
 **Response Example**
 
@@ -434,14 +425,25 @@ Subscribe to receive block headers when a new block is found.
 
 **Response**
 
-  The *deserialized header* [2]_ of the current block.
+  The *deserialized header* [2]_ of the current block chain tip.
 
 **Notification Parameters**
 
   As this is a subcription, the client will receive a notification
   when a new block is found.  The parameters are:
 
-    [**header**]
+    [**deserialized_header**]
+
+  **NOTE**: if a new block comes in quickly so the server has not
+  finished processing the prior block(s), it may skip them and only
+  notify of the new tip.  The protocol does not guarantee
+  notifications of all intermediate blocks.
+
+  In a similar vein, the client also needs to be able to handle chain
+  reorganisations; in case of a re-org the new tip will not connect
+  directly onto the prior chain tip.  The client needs to be able to
+  figure out where the connection point and request any missing block
+  headers.
 
 
 blockchain.numblocks.subscribe
@@ -670,9 +672,8 @@ following changes:
 
 * improved semantics of `server.version` to aid protocol negotiation,
   and a changed return value.
-* version 1.0 methods `blockchain.address.get_proof`,
-  `blockchain.utxo.get_address` and `blockchain.numblocks.subscribe`
-  have been removed.
+* version 1.0 methods `blockchain.utxo.get_address`
+  and `blockchain.numblocks.subscribe` have been removed.
 * method `blockchain.transaction.get` no longer takes the *height*
   argument that was ignored in 1.0, providing one will return an
   error.

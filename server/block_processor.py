@@ -64,7 +64,7 @@ class Prefetcher(LoggedClass):
         Used in blockchain reorganisations.  This coroutine can be
         called asynchronously to the _prefetch coroutine so we must
         synchronize with a semaphore.'''
-        with await self.semaphore:
+        async with self.semaphore:
             self.fetched_height = self.bp.height
             self.refill_event.set()
 
@@ -85,7 +85,7 @@ class Prefetcher(LoggedClass):
         '''
         daemon = self.bp.daemon
         daemon_height = await daemon.height(self.bp.caught_up_event.is_set())
-        with await self.semaphore:
+        async with self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
                 # Constrain fetch count to between 0 and 500 regardless;

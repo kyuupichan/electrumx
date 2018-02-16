@@ -662,7 +662,7 @@ class DB(util.LoggedClass):
         while self.comp_cursor != -1:
             if self.semaphore.locked:
                 self.log_info('compact_history: waiting on semaphore...')
-            with await self.semaphore:
+            async with self.semaphore:
                 await loop.run_in_executor(None, self._compact_history, limit)
 
     def cancel_history_compaction(self):
