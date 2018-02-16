@@ -260,7 +260,7 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        if self.client_version < (2, 8, 3):
+        if self.client_version <= (2, 8, 3):
             self.chunk_indices.append(index)
             self.chunk_indices = self.chunk_indices[-5:]
             # -2 allows backing up a single chunk but no more.
