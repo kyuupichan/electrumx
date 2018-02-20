@@ -1324,3 +1324,43 @@ class Bitcore(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 126946
     TX_PER_BLOCK = 2
     RPC_PORT = 8556
+
+
+class BitcoinAtom(Coin):
+    NAME = "BitcoinAtom"
+    SHORTNAME = "BCA"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("17")
+    P2SH_VERBYTES = [bytes.fromhex("0a")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('000000000019d6689c085ae165831e93'
+                    '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    STATIC_BLOCK_HEADERS = False
+    DESERIALIZER = lib_tx.DeserializerBitcoinAtom
+    HEADER_SIZE_POST_FORK = 84
+    BLOCK_PROOF_OF_STAKE = 0x01
+    BLOCK_PROOF_OF_STAKE_FLAGS = b'\x01\x00\x00\x00'
+    TX_COUNT = 295158744
+    TX_COUNT_HEIGHT = 589197
+    TX_PER_BLOCK = 10
+    RPC_PORT = 9136
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        header_to_be_hashed = header[:cls.BASIC_HEADER_SIZE]
+        # New block header format has some extra flags in the end
+        if len(header) == cls.HEADER_SIZE_POST_FORK:
+            flags, = struct.unpack('<I', header[-4:])
+            # Proof of work blocks have special serialization
+            if flags & cls.BLOCK_PROOF_OF_STAKE != 0:
+                header_to_be_hashed += cls.BLOCK_PROOF_OF_STAKE_FLAGS
+
+        return double_sha256(header_to_be_hashed)
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
