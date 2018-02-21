@@ -7,7 +7,6 @@ before_install:
   - sudo apt-get install -yq libleveldb-dev librocksdb libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev
 python:
   - "3.6"
-  - "nightly"
 # command to install dependencies
 install:
   - pip install aiohttp
