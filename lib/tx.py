@@ -390,3 +390,14 @@ class DeserializerTxTimeAuxPow(DeserializerTxTime):
             header_end = static_header_size
         self.cursor = start
         return self._read_nbytes(header_end)
+
+
+class DeserializerBitcoinAtom(DeserializerSegWit):
+    FORK_BLOCK_HEIGHT = 505888
+
+    def read_header(self, height, static_header_size):
+        '''Return the block header bytes'''
+        header_len = static_header_size
+        if height >= self.FORK_BLOCK_HEIGHT:
+            header_len += 4 # flags
+        return self._read_nbytes(header_len)
