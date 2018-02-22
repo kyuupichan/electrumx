@@ -112,7 +112,6 @@ class ElectrumX(SessionBase):
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.mempool_statuses = {}
-        self.chunk_indices = []
         self.protocol_version = None
         self.set_protocol_handlers((1, 0))
 
@@ -260,15 +259,6 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        if self.client_version < (2, 8, 3):
-            self.chunk_indices.append(index)
-            self.chunk_indices = self.chunk_indices[-5:]
-            # -2 allows backing up a single chunk but no more.
-            if index <= max(self.chunk_indices[:-2], default=-1):
-                msg = ('chunk indices not advancing (wrong network?): {}'
-                       .format(self.chunk_indices))
-                # use INVALID_REQUEST to trigger a disconnect
-                raise RPCError(msg, JSONRPC.INVALID_REQUEST)
         return self.controller.get_chunk(index)
 
     def is_tor(self):
