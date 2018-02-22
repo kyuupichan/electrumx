@@ -13,6 +13,7 @@ python:
   - "nightly"
 # command to install dependencies
 install:
+  - pip install Cython==0.27.3 --install-option="--no-cython-compile"
   - pip install aiohttp
   - pip install ecdsa
   - pip install plyvel
