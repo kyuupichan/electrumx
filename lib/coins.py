@@ -1314,6 +1314,20 @@ class Newyorkcoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 2
     REORG_LIMIT = 2000
 
+class NewyorkcoinTestnet(Newyorkcoin):
+    SHORTNAME = "tNYC"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("71")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("f1")
+    GENESIS_HASH = ('24463e4d3c625b0a9059f309044c2cf0'
+                    'd7e196cf2a6ecce901f24f681be33c8f')
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 5161944
+    TX_COUNT_HEIGHT = 3948743
+    TX_PER_BLOCK = 2
+    REORG_LIMIT = 2000
+
 class Bitcore(BitcoinMixin, Coin):
     NAME = "Bitcore"
     SHORTNAME = "BTX"
