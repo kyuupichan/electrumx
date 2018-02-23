@@ -448,6 +448,7 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 499923
     TX_PER_BLOCK = 50
     REORG_LIMIT = 1000
+    RPC_PORT = 8338
 
     @classmethod
     def header_hash(cls, header):
@@ -458,6 +459,22 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
             return double_sha256(header)
         else:
             return double_sha256(header[:68] + header[100:112])
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        h = dict(
+            block_height=height,
+            version=struct.unpack('<I', header[:4])[0],
+            prev_block_hash=hash_to_str(header[4:36]),
+            merkle_root=hash_to_str(header[36:68]),
+            timestamp=struct.unpack('<I', header[100:104])[0],
+            reserved=hash_to_str(header[72:100]),
+            bits=hash_to_str(header[104:108]),
+            nonce=hash_to_str(header[108:140]),
+            solution=hash_to_str(header[140:])
+        )
+
+        return h
 
 
 class Emercoin(Coin):
