@@ -401,3 +401,106 @@ class DeserializerBitcoinAtom(DeserializerSegWit):
         if height >= self.FORK_BLOCK_HEIGHT:
             header_len += 4 # flags
         return self._read_nbytes(header_len)
+
+
+# Decred
+class TxInputDcr(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
+    '''Class representing a Decred transaction input.'''
+
+    ZERO = bytes(32)
+    MINUS_1 = 4294967295
+
+    @cachedproperty
+    def is_coinbase(self):
+        # The previous output of a coin base must have a max value index and a
+        # zero hash.
+        return (self.prev_hash == TxInputDcr.ZERO and
+                self.prev_idx == TxInputDcr.MINUS_1)
+
+    def __str__(self):
+        prev_hash = hash_to_str(self.prev_hash)
+        return ("Input({}, {:d}, tree={}, sequence={:d})"
+                .format(prev_hash, self.prev_idx, self.tree, self.sequence))
+
+
+class TxOutputDcr(namedtuple("TxOutput", "value version pk_script")):
+    '''Class representing a transaction output.'''
+    pass
+
+
+class TxDcr(namedtuple("Tx", "version inputs outputs locktime expiry "
+                             "witness")):
+    '''Class representing transaction that has a time field.'''
+
+    @cachedproperty
+    def is_coinbase(self):
+        return self.inputs[0].is_coinbase
+
+
+class DeserializerDecred(Deserializer):
+
+    @staticmethod
+    def blake256(data):
+        from blake256.blake256 import blake_hash
+        return blake_hash(data)
+
+    def read_tx_block(self):
+        '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
+        read_tx = self.read_tx
+        txs = [read_tx() for _ in range(self._read_varint())]
+        stxs = [read_tx() for _ in range(self._read_varint())]
+        return txs + stxs
+
+    def _read_inputs(self):
+        read_input = self._read_input
+        return [read_input() for i in range(self._read_varint())]
+
+    def _read_input(self):
+        return TxInputDcr(
+            self._read_nbytes(32),   # prev_hash
+            self._read_le_uint32(),  # prev_idx
+            self._read_byte(),       # tree
+            self._read_le_uint32(),  # sequence
+        )
+
+    def _read_outputs(self):
+        read_output = self._read_output
+        return [read_output() for _ in range(self._read_varint())]
+
+    def _read_output(self):
+        return TxOutputDcr(
+            self._read_le_int64(),  # value
+            self._read_le_uint16(),  # version
+            self._read_varbytes(),  # pk_script
+        )
+
+    def _read_witness(self, fields):
+        read_witness_field = self._read_witness_field
+        assert fields == self._read_varint()
+        return [read_witness_field() for _ in range(fields)]
+
+    def _read_witness_field(self):
+        value_in = self._read_le_int64()
+        block_height = self._read_le_uint32()
+        block_index = self._read_le_uint32()
+        script = self._read_varbytes()
+        return value_in, block_height, block_index, script
+
+    def read_tx(self):
+        start = self.cursor
+        version = self._read_le_int32()
+        assert version == 1 # TODO check other versions for segwit
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        expiry = self._read_le_uint32()
+        no_witness_tx = b'\x01\x00\x01\x00' + self.binary[start+4:self.cursor]
+        witness = self._read_witness(len(inputs))
+        return TxDcr(
+            version,
+            inputs,
+            outputs,
+            locktime,
+            expiry,
+            witness
+        ), DeserializerDecred.blake256(no_witness_tx)        
