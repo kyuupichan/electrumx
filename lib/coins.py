@@ -478,14 +478,13 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
 
 
 class BitcoinGoldRegtest(BitcoinGold):
-    NAME = "BitcoinGoldRegtest"
     FORK_HEIGHT = 3000
     XPUB_VERBYTES = bytes.fromhex("043587CF")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6F")
     P2SH_VERBYTES = [bytes.fromhex("C4")]
     WIF_BYTE = bytes.fromhex("EF")
-    TX_COUNT = 3000
+    TX_COUNT = 0
     TX_COUNT_HEIGHT = 3000
     NET = 'regtest'
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
