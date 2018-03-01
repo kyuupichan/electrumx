@@ -1288,7 +1288,7 @@ class Feathercoin(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488BC26")
     XPRV_VERBYTES = bytes.fromhex("0488DAEE")
     P2PKH_VERBYTE = bytes.fromhex("0E")
-    P2SH_VERBYTES = [bytes.fromhex("32"), bytes.fromhex("05")]
+    P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("8E")
     GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
                     'c99d9714d334efa41a195a7e7e04bfe2')
