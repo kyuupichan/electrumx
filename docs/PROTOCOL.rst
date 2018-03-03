@@ -388,7 +388,10 @@ bandwidth-intensive request.
 **Response**
 
     The binary block headers, as hexadecimal strings, in order
-    concatenated together.
+    concatenated together.  As many as headers as are available at
+    starting height 2016 * index will be returned; this may range from
+    0 to 2016.
+
 
 
 blockchain.estimatefee

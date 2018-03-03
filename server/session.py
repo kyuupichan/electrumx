@@ -254,6 +254,26 @@ class ElectrumX(SessionBase):
         '''Returns a dictionary of server features.'''
         return self.env.server_features()
 
+    def block_headers(self, start_height, count):
+        '''Return concatenated block headers as hex for the main chain;
+        count headers starting at start_height.
+
+        start_height and count must be non-negative integers.'''
+        start_height = self.controller.non_negative_integer(start_height)
+        count = self.controller.non_negative_integer(count)
+        return self.controller.block_headers(start_height, count).hex()
+
+    def block_get_chunk(self, index):
+        '''Return a chunk of block headers as a hexadecimal string.
+
+        index: the chunk index'''
+        index = self.controller.non_negative_integer(index)
+        chunk_size = self.coin.CHUNK_SIZE
+        start_height = index * chunk_size
+        count = chunk_size
+
+        return self.controller.block_headers(start_height, count).hex()
+
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.
 
