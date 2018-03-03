@@ -747,13 +747,16 @@ class Controller(ServerBase):
 
         return await self.run_in_executor(job)
 
-    def get_chunk(self, index):
-        '''Return header chunk as hex.  Index is a non-negative integer.'''
-        chunk_size = self.coin.CHUNK_SIZE
-        start_height = index * chunk_size
-        count = chunk_size
-        headers, n = self.bp.read_headers(start_height, count).hex()
-        return headers
+    def block_headers(self, start_height, count):
+        '''Read count block headers starting at start_height; both
+        must be non-negative.
+
+        The return value is (hex, n), where hex is the hex encoding of
+        the concatenated headers, and n is the number of headers read
+        (0 <= n <= count).
+        '''
+        headers, n = self.bp.read_headers(start_height, count)
+        return headers.hex(), n
 
     # Client RPC "blockchain" command handlers
 

@@ -927,14 +927,50 @@ Get a list of features and services supported by the server.
 Protocol Version 1.2
 --------------------
 
-Protocol version 1.2 is the same as version `1.1` except for the
-addition of a new method `mempool.get_fee_histogram`.
+Protocol version 1.2 introduces new methods `blockcahin.block.get_chunk`,
+`mempool.get_fee_histogram`.
 
-All methods with taking addresses are deprecated, and will be removed
-at some point in the future.  You should update your code to use
-`Script Hashes`_ and the scripthash methods introduced in protocol 1.1
-instead.
+`blockchain.block.get_chunk` and all methods beginning
+ `blockchain.address.` are deprecated and support will be removed in
+ some future protocol version.  You should update your code to use
+ `blockchain.block.headers` and `Script Hashes`_ with the scripthash
+ methods introduced in protocol 1.1 instead.
 
+blockchain.block.headers
+========================
+
+Return concatenated block headers as hexadecimal from the main chain.
+
+  blockchain.block.headers(**start_height**, **count**)
+
+  **start_height**
+
+    The height of the first header requested, a non-negative integer.
+
+  **count**
+
+    The number of headers requested, a non-negative integer.
+
+**Response**
+
+    A dictionary with at least 3 members:
+
+* **count**
+
+    The number of headers returned, between zero and the number
+    requested.  If the chain has not extended sufficiently far, only
+    the available headers will be returned.  If more headers than
+    **max** were requested at most **max** will be returned.
+
+* **hex**
+
+    The binary block headers concatenated together as hexadecimal
+    strings, in order.
+
+* **max**
+
+    The maximum number of headers the server will return in a single
+    request.
 
 mempool.get_fee_histogram
 =========================
