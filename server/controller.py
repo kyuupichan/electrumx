@@ -299,11 +299,11 @@ class Controller(ServerBase):
 
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
-        if not 0 <= height <= self.bp.db_height:
-            raise RPCError('height {:,d} out of range'.format(height))
         if height in self.header_cache:
             return self.header_cache[height]
-        header = self.bp.read_headers(height, 1)
+        header, n = self.bp.read_headers(height, 1)
+        if n != 1:
+            raise RPCError('height {:,d} out of range'.format(height))
         header = self.coin.electrum_header(header, height)
         self.header_cache[height] = header
         return header
@@ -750,10 +750,10 @@ class Controller(ServerBase):
     def get_chunk(self, index):
         '''Return header chunk as hex.  Index is a non-negative integer.'''
         chunk_size = self.coin.CHUNK_SIZE
-        next_height = self.bp.db_height + 1
-        start_height = min(index * chunk_size, next_height)
-        count = min(next_height - start_height, chunk_size)
-        return self.bp.read_headers(start_height, count).hex()
+        start_height = index * chunk_size
+        count = chunk_size
+        headers, n = self.bp.read_headers(start_height, count).hex()
+        return headers
 
     # Client RPC "blockchain" command handlers
 
