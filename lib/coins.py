@@ -438,6 +438,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
 
 
 class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
+    CHUNK_SIZE = 252
     NAME = "BitcoinGold"
     SHORTNAME = "BTG"
     FORK_HEIGHT = 491407
@@ -487,6 +488,7 @@ class BitcoinGoldRegtest(BitcoinGold):
     TX_COUNT = 0
     TX_COUNT_HEIGHT = 3000
     NET = 'regtest'
+    RPC_PORT=18444
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
                     'bf5beb436012afca590b1a11466e2206')
 
