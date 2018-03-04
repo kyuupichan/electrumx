@@ -400,7 +400,7 @@ blockchain.estimatefee
 Return the estimated transaction fee per kilobyte for a transaction to
 be confirmed within a certain number of blocks.
 
-  blockchain.block.get_chunk(**number**)
+  blockchain.estimatefee(**number**)
 
   **number**
 
@@ -555,7 +555,7 @@ blockchain.transaction.get_merkle
 Return the markle branch to a confirmed transaction given its hash
 and height.
 
-  blockchain.transaction.get(**tx_hash**, **height**)
+  blockchain.transaction.get_merkle(**tx_hash**, **height**)
 
   **tx_hash**
 
@@ -927,7 +927,7 @@ Get a list of features and services supported by the server.
 Protocol Version 1.2
 --------------------
 
-Protocol version 1.2 introduces new methods `blockcahin.block.get_chunk`,
+Protocol version 1.2 introduces new methods `blockchain.block.headers`,
 `mempool.get_fee_histogram`.
 
 `blockchain.block.get_chunk` and all methods beginning
