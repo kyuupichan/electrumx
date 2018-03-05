@@ -551,10 +551,32 @@ Return a raw transaction.
 
    In non-verbose mode return the raw transaction as a hexadecimal string.
 
-   With verbose=True, return the deserialized JSON transaction.
-   Also return the key {"blockhash": <hex block hash>} if the transaction is included into a block.
+   With verbose=True, return an object with keys "hex", that is the raw transaction, and "blockhash".
+   When the transaction is included into a block, the "blockhash" value will be the relative blockhash.
 
    Return a null value if the transaction is not found.
+
+**Response Examples**
+
+  Non verbose:
+
+  ::
+    02000000029d4d491c11a84285203147ab8fa39335834ae1a1946f2a63b8cf9d33326dfd24010000006a47304402204a063e2a589dba0bba49ec37d05f90e5b232ba70af08e1eb8a34dbaf7c7a36be022071a46a726482896873a2d9bb6587238662a64c0304069a8b57c61c30ddb1b21c012102cd44f359b884463e4b22c614d98f43a58d23214119340d4ab6dce2f556d4f712feffbf0ba5bdcd88b97e3082d027e7d91f2bd6c59735724e37f51341390cdfa85ee15b77f01feffffff0200ca9a3b0000000017a914b18d08cc1c9fa531aca09851c3e559e1572e1a738718a8f008000000001976a914a185ab6529459aa3b9d8c0924ca5e66d30cfd72088ac63020000
+
+
+  Verbose mode:
+
+  ::
+      {
+
+         "hex": "02000000029d4d491c11a84285203147ab8fa39335834ae1a1946f2a63b8cf9d33326dfd24010000006a47304402204a063e2a589dba0bba49ec37d05f90e5b232ba70af08e1eb8a34dbaf7c7a36be022071a46a726482896873a2d9bb6587238662a64c0304069a8b57c61c30ddb1b21c012102cd44f359b884463e4b22c614d98f43a58d23214119340d4ab6dce2f556d4f712feffbf0ba5bdcd88b97e3082d027e7d91f2bd6c59735724e37f51341390cdfa85ee15b77f01feffffff0200ca9a3b0000000017a914b18d08cc1c9fa531aca09851c3e559e1572e1a738718a8f008000000001976a914a185ab6529459aa3b9d8c0924ca5e66d30cfd72088ac63020000",
+         "blockhash": "000000000d23bc62fd701706ba32e2af08e80ef1461b3c36d8f923281b0321d0"
+
+      }
+
+
+
+
 
 
 blockchain.transaction.get_merkle
@@ -932,22 +954,17 @@ Get a list of features and services supported by the server.
       "hash_function": "sha256"
   }
 
-Protocol Version 1.2
---------------------
-
 Protocol version 1.2 introduces new methods `blockchain.block.headers`,
 `mempool.get_fee_histogram`.
 
-* `blockchain.block.get_chunk` and all methods beginning
- `blockchain.address.` are deprecated and support will be removed in
- some future protocol version.  You should update your code to use
- `blockchain.block.headers` and `Script Hashes`_ with the scripthash
- methods introduced in protocol 1.1 instead.
+* `blockchain.block.get_chunk` and all methods beginning `blockchain.address.` are deprecated
+  and support will be removed in some future protocol version.  You should update your code to use `blockchain.block.headers`
+  and `Script Hashes`_ with the scripthash methods introduced in protocol 1.1 instead.
 
-* `blockchain.transaction.get` now have the optional parameter *verbose*.
- In verbose mode (default=False) the transaction is deserialized in JSON.
- Also, if the transaction is included in a block, the related blockhash is returned.
- Note: On some coins verbose mode may not be available and an error is returned.
+* `blockchain.transaction.get` now have the optional parameter *verbose*. In verbose mode (default=False) the
+  result is enriched with the relative inclusion blockhash, if any. Feature may have be unavailable.
+
+
 
 
 blockchain.block.headers
@@ -992,7 +1009,7 @@ Return concatenated block headers as hexadecimal from the main chain.
 
   {
       "count": 2,
-      "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299'"
+      "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299"
       "max": 2016
   }
 
