@@ -532,7 +532,7 @@ blockchain.transaction.get
 
 Return a raw transaction.
 
-  blockchain.transaction.get(**tx_hash**, **height**)
+  blockchain.transaction.get(**tx_hash**, **height**, **verbose** = [False])
 
   **tx_hash**
 
@@ -544,9 +544,17 @@ Return a raw transaction.
     is optional and ignored; it is recommended that clients do not
     send it as it will be removed in a future protocol version.
 
+  **verbose** [optional]
+    Set verbose mode (default = False).
+
 **Response**
 
-    The raw transaction as a hexadecimal string.
+   In non-verbose mode return the raw transaction as a hexadecimal string.
+
+   With verbose=True, return the deserialized JSON transaction.
+   Also return the key {"blockhash": <hex block hash>} if the transaction is included into a block.
+
+   Return a null value if the transaction is not found.
 
 
 blockchain.transaction.get_merkle
@@ -930,11 +938,17 @@ Protocol Version 1.2
 Protocol version 1.2 introduces new methods `blockchain.block.headers`,
 `mempool.get_fee_histogram`.
 
-`blockchain.block.get_chunk` and all methods beginning
+* `blockchain.block.get_chunk` and all methods beginning
  `blockchain.address.` are deprecated and support will be removed in
  some future protocol version.  You should update your code to use
  `blockchain.block.headers` and `Script Hashes`_ with the scripthash
  methods introduced in protocol 1.1 instead.
+
+* `blockchain.transaction.get` now have the optional parameter *verbose*.
+ In verbose mode (default=False) the transaction is deserialized in JSON.
+ Also, if the transaction is included in a block, the related blockhash is returned.
+ Note: On some coins verbose mode may not be available and an error is returned.
+
 
 blockchain.block.headers
 ========================
