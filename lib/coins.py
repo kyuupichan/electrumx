@@ -1121,13 +1121,12 @@ class Denarius(Coin):
                     '64d641a5dbf0de89fd0182c2c4828fcd')
     DESERIALIZER = lib_tx.DeserializerTxTime
     TX_COUNT = 4230
+    RPC_PORT = 32339
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
     DAEMON = daemon.FakeEstimateFeeDaemon
     TX_COUNT_HEIGHT = 306187
     TX_PER_BLOCK = 4000
-    IRC_PREFIX = "DNR_"
-    IRC_CHANNEL = "#electrum-dnr"
     
     @classmethod
     def header_hash(cls, header):
@@ -1145,7 +1144,5 @@ class DenariusTestnet(Denarius):
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('000086bfe8264d241f7f8e5393f74778'
                     '4b8ca2aa98bdd066278d590462a4fdb4')
-    IRC_PREFIX = "DNRT_"
-    IRC_CHANNEL = "#electrum-dnrt"
     RPC_PORT = 32338
     REORG_LIMIT = 2000
