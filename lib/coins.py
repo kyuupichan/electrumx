@@ -1232,6 +1232,45 @@ class CanadaeCoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 1
     RPC_PORT = 34330
     REORG_LIMIT = 1000
+	
+class Denarius(Coin):
+    NAME = "Denarius"
+    SHORTNAME = "DNR"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1E") #Address starts with a D
+    P2SH_VERBYTES = [bytes.fromhex("5A")]
+    WIF_BYTE = bytes.fromhex("9E") #WIF starts with a 6
+    GENESIS_HASH = ('00000d5dbbda01621cfc16bbc1f9bf32'
+                    '64d641a5dbf0de89fd0182c2c4828fcd')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    TX_COUNT = 4230
+    RPC_PORT = 32339
+    ESTIMATE_FEE = 0.00001
+    RELAY_FEE = 0.00001
+    DAEMON = daemon.FakeEstimateFeeDaemon
+    TX_COUNT_HEIGHT = 306187
+    TX_PER_BLOCK = 4000
+    
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import tribus_hash
+        return tribus_hash.getPoWHash(header)
+
+
+class DenariusTestnet(Denarius):
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("12")
+    P2SH_VERBYTES = [bytes.fromhex("74")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('000086bfe8264d241f7f8e5393f74778'
+                    '4b8ca2aa98bdd066278d590462a4fdb4')
+    RPC_PORT = 32338
+    REORG_LIMIT = 2000
 
 
 class Sibcoin(Dash):
