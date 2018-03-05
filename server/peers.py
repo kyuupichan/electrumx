@@ -19,31 +19,12 @@ from lib.jsonrpc import JSONSession
 from lib.peer import Peer
 from lib.socks import SocksProxy
 import lib.util as util
-from server.irc import IRC
 import server.version as version
 
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
 STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
-
-
-def peers_from_env(env):
-    '''Return a list of peers from the environment settings.'''
-    hosts = {identity.host: {'tcp_port': identity.tcp_port,
-                             'ssl_port': identity.ssl_port}
-             for identity in env.identities}
-    features = {
-        'hosts': hosts,
-        'pruning': None,
-        'server_version': version.VERSION,
-        'protocol_min': version.PROTOCOL_MIN,
-        'protocol_max': version.PROTOCOL_MAX,
-        'genesis_hash': env.coin.GENESIS_HASH,
-        'hash_function': 'sha256',
-    }
-
-    return [Peer(ident.host, features, 'env') for ident in env.identities]
 
 
 class PeerSession(JSONSession):
@@ -246,11 +227,10 @@ class PeerManager(util.LoggedClass):
         self.env = env
         self.controller = controller
         self.loop = controller.loop
-        if env.irc and env.coin.IRC_PREFIX:
-            self.irc = IRC(env, self)
-        else:
-            self.irc = None
-        self.myselves = peers_from_env(env)
+
+        # Our clearnet and Tor Peers, if any
+        self.myselves =  [Peer(ident.host, env.server_features(), 'env')
+                          for ident in env.identities]
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the
@@ -432,22 +412,6 @@ class PeerManager(util.LoggedClass):
                      for real_name in coin_peers]
             self.add_peers(peers, limit=None)
 
-    def connect_to_irc(self):
-        '''Connect to IRC if not disabled.'''
-        if self.irc:
-            pairs = [(peer.real_name(), ident.nick_suffix) for peer, ident
-                     in zip(self.myselves, self.env.identities)]
-            self.ensure_future(self.irc.start(pairs))
-        elif self.env.irc:
-            self.logger.info('IRC is disabled for this coin')
-        else:
-            self.logger.info('IRC is disabled')
-
-    def add_irc_peer(self, nick, real_name):
-        '''Add an IRC peer.'''
-        peer = Peer.from_real_name(real_name, '{}'.format(nick))
-        self.add_peers([peer])
-
     def ensure_future(self, coro, callback=None):
         '''Schedule the coro to be run.'''
         return self.controller.ensure_future(coro, callback=callback)
@@ -459,7 +423,6 @@ class PeerManager(util.LoggedClass):
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
         '''
-        self.connect_to_irc()
         if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
             return

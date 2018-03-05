@@ -64,7 +64,7 @@ class Prefetcher(LoggedClass):
         Used in blockchain reorganisations.  This coroutine can be
         called asynchronously to the _prefetch coroutine so we must
         synchronize with a semaphore.'''
-        with await self.semaphore:
+        async with self.semaphore:
             self.fetched_height = self.bp.height
             self.refill_event.set()
 
@@ -85,7 +85,7 @@ class Prefetcher(LoggedClass):
         '''
         daemon = self.bp.daemon
         daemon_height = await daemon.height(self.bp.caught_up_event.is_set())
-        with await self.semaphore:
+        async with self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
                 # Constrain fetch count to between 0 and 500 regardless;
@@ -253,6 +253,8 @@ class BlockProcessor(server.db.DB):
                 self.logger.info('processed {:,d} block{} in {:.1f}s'
                                  .format(len(blocks), s,
                                          time.time() - start))
+                self.controller.mempool.on_new_block(self.touched)
+            self.touched.clear()
         elif hprevs[0] != chain[0]:
             await self.reorg_chain()
         else:
@@ -511,7 +513,6 @@ class BlockProcessor(server.db.DB):
         if self.caught_up_event.is_set():
             self.flush(True)
         else:
-            self.touched.clear()
             if time.time() > self.next_cache_check:
                 self.check_cache_size()
                 self.next_cache_check = time.time() + 30

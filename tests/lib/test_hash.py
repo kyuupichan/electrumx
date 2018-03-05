@@ -1,6 +1,7 @@
 #
 # Tests of lib/hash.py
 #
+from functools import partial
 
 import pytest
 
@@ -66,3 +67,19 @@ def test_Base58_encode_check():
     with pytest.raises(TypeError):
         lib_hash.Base58.encode_check('foo')
     assert lib_hash.Base58.encode_check(b'foo') == '4t9WKfuAB8'
+
+def test_Base58_decode_check_custom():
+    decode_check_sha256 = partial(lib_hash.Base58.decode_check,
+                                  hash_fn=lib_hash.sha256)
+    with pytest.raises(TypeError):
+        decode_check_sha256(b'foo')
+    assert decode_check_sha256('4t9WFhKfWr') == b'foo'
+    with pytest.raises(lib_hash.Base58Error):
+        decode_check_sha256('4t9WFhKfWp')
+
+def test_Base58_encode_check_custom():
+    encode_check_sha256 = partial(lib_hash.Base58.encode_check,
+                                  hash_fn=lib_hash.sha256)
+    with pytest.raises(TypeError):
+        encode_check_sha256('foo')
+    assert encode_check_sha256(b'foo') == '4t9WFhKfWr'

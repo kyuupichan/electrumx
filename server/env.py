@@ -15,6 +15,7 @@ from ipaddress import ip_address
 from lib.coins import Coin
 from lib.env_base import EnvBase
 import lib.util as lib_util
+import server.version as version
 
 
 NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
@@ -67,10 +68,6 @@ class Env(EnvBase):
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
 
-        # IRC
-        self.irc = self.boolean('IRC', False)
-        self.irc_nick = self.default('IRC_NICK', None)
-
         # Identities
         clearnet_identity = self.clearnet_identity()
         tor_identity = self.tor_identity(clearnet_identity)
@@ -103,7 +100,7 @@ class Env(EnvBase):
                    or host.lower() == 'localhost')
         else:
             bad = (ip.is_multicast or ip.is_unspecified
-                   or (ip.is_private and (self.irc or self.peer_announce)))
+                   or (ip.is_private and self.peer_announce))
         if bad:
             raise self.Error('"{}" is not a valid REPORT_HOST'.format(host))
         tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port) or None
@@ -146,6 +143,22 @@ class Env(EnvBase):
             ssl_port,
             '_tor',
         )
+
+    def server_features(self):
+        '''Return the server features dictionary.'''
+        hosts = {identity.host: {'tcp_port': identity.tcp_port,
+                                 'ssl_port': identity.ssl_port}
+                 for identity in self.identities}
+
+        return {
+            'hosts': hosts,
+            'pruning': None,
+            'server_version': version.VERSION,
+            'protocol_min': version.PROTOCOL_MIN,
+            'protocol_max': version.PROTOCOL_MAX,
+            'genesis_hash': self.coin.GENESIS_HASH,
+            'hash_function': 'sha256',
+        }
 
     def peer_discovery_enum(self):
         pd = self.default('PEER_DISCOVERY', 'on').strip().lower()

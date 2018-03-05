@@ -125,9 +125,8 @@ class Controller(ServerBase):
         return self.mempool.value(hashX)
 
     def sent_tx(self, tx_hash):
-        '''Call when a TX is sent.  Tells mempool to prioritize it.'''
+        '''Call when a TX is sent.'''
         self.txs_sent += 1
-        self.mempool.prioritize(tx_hash)
 
     def setup_bands(self):
         bands = []
@@ -206,15 +205,15 @@ class Controller(ServerBase):
                 self.next_log_sessions = time.time() + self.env.log_sessions
 
     async def wait_for_bp_catchup(self):
-        '''Wait for the block processor to catch up, then kick off server
-        background processes.'''
+        '''Wait for the block processor to catch up, and for the mempool to
+        synchronize, then kick off server background processes.'''
         await self.bp.caught_up_event.wait()
         self.logger.info('block processor has caught up')
+        self.ensure_future(self.mempool.main_loop())
+        await self.mempool.synchronized_event.wait()
         self.ensure_future(self.peer_mgr.main_loop())
         self.ensure_future(self.log_start_external_servers())
         self.ensure_future(self.housekeeping())
-        self.ensure_future(self.mempool.main_loop())
-        self.ensure_future(self.notify())
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
@@ -272,27 +271,26 @@ class Controller(ServerBase):
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', host, env.ssl_port, ssl=sslc)
 
-    async def notify(self):
+    def notify_sessions(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        while True:
-            await self.mempool.touched_event.wait()
-            touched = self.mempool.touched.copy()
-            self.mempool.touched.clear()
-            self.mempool.touched_event.clear()
+        # Invalidate caches
+        hc = self.history_cache
+        for hashX in set(hc).intersection(touched):
+            del hc[hashX]
 
-            # Invalidate caches
-            hc = self.history_cache
-            for hashX in set(hc).intersection(touched):
-                del hc[hashX]
-            if self.bp.db_height != self.cache_height:
-                self.cache_height = self.bp.db_height
-                self.header_cache.clear()
+        height = self.bp.db_height
+        if height != self.cache_height:
+            self.cache_height = height
+            self.header_cache.clear()
 
-            # Make a copy; self.sessions can change whilst await-ing
-            sessions = [s for s in self.sessions
-                        if isinstance(s, self.coin.SESSIONCLS)]
-            for session in sessions:
-                await session.notify(self.bp.db_height, touched)
+        # Height notifications are synchronous.  Those sessions with
+        # touched addresses are scheduled for asynchronous completion
+        for session in self.sessions:
+            if isinstance(session, LocalRPC):
+                continue
+            session_touched = session.notify(height, touched)
+            if session_touched is not None:
+                self.ensure_future(session.notify_async(session_touched))
 
     def notify_peers(self, updates):
         '''Notify of peer updates.'''
@@ -301,11 +299,11 @@ class Controller(ServerBase):
 
     def electrum_header(self, height):
         '''Return the binary header at the given height.'''
-        if not 0 <= height <= self.bp.db_height:
-            raise RPCError('height {:,d} out of range'.format(height))
         if height in self.header_cache:
             return self.header_cache[height]
-        header = self.bp.read_headers(height, 1)
+        header, n = self.bp.read_headers(height, 1)
+        if n != 1:
+            raise RPCError('height {:,d} out of range'.format(height))
         header = self.coin.electrum_header(header, height)
         self.header_cache[height] = header
         return header
@@ -749,13 +747,16 @@ class Controller(ServerBase):
 
         return await self.run_in_executor(job)
 
-    def get_chunk(self, index):
-        '''Return header chunk as hex.  Index is a non-negative integer.'''
-        chunk_size = self.coin.CHUNK_SIZE
-        next_height = self.bp.db_height + 1
-        start_height = min(index * chunk_size, next_height)
-        count = min(next_height - start_height, chunk_size)
-        return self.bp.read_headers(start_height, count).hex()
+    def block_headers(self, start_height, count):
+        '''Read count block headers starting at start_height; both
+        must be non-negative.
+
+        The return value is (hex, n), where hex is the hex encoding of
+        the concatenated headers, and n is the number of headers read
+        (0 <= n <= count).
+        '''
+        headers, n = self.bp.read_headers(start_height, count)
+        return headers.hex(), n
 
     # Client RPC "blockchain" command handlers
 
@@ -790,15 +791,16 @@ class Controller(ServerBase):
         return await self.unconfirmed_history(hashX)
 
     async def hashX_listunspent(self, hashX):
-        '''Return the list of UTXOs of a script hash.
-
-        We should remove mempool spends from the in-DB UTXOs.'''
+        '''Return the list of UTXOs of a script hash, including mempool
+        effects.'''
         utxos = await self.get_utxos(hashX)
-        spends = await self.mempool.spends(hashX)
+        utxos = sorted(utxos)
+        utxos.extend(self.mempool.get_utxos(hashX))
+        spends = await self.mempool.potential_spends(hashX)
 
         return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
-                for utxo in sorted(utxos)
+                for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
     async def address_listunspent(self, address):
@@ -826,6 +828,14 @@ class Controller(ServerBase):
         '''
         number = self.non_negative_integer(number)
         return await self.daemon_request('estimatefee', [number])
+
+    def mempool_get_fee_histogram(self):
+        '''Memory pool fee histogram.
+
+        TODO: The server should detect and discount transactions that
+        never get mined when they should.
+        '''
+        return self.mempool.get_fee_histogram()
 
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
@@ -875,7 +885,7 @@ class Controller(ServerBase):
         if not raw_tx:
             return None
         raw_tx = util.hex_to_bytes(raw_tx)
-        tx, tx_hash = self.coin.DESERIALIZER(raw_tx).read_tx()
+        tx = self.coin.DESERIALIZER(raw_tx).read_tx()
         if index >= len(tx.outputs):
             return None
         return self.coin.address_from_script(tx.outputs[index].pk_script)

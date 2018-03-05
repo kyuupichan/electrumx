@@ -20,8 +20,6 @@ export TCP_PORT=50001
 export SSL_PORT=50002
 
 # visibility
-export IRC=
-export IRC_NICK=hostname
 export REPORT_HOST=hostname.com
 export RPC_PORT=8000
 

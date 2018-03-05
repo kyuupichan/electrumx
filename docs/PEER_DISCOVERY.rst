@@ -1,11 +1,8 @@
 Peer Discovery
 ==============
 
-This is a suggestion of a peer discovery prtocol as a way to gradually
-move off depending on IRC.
-
-It will be implemented in ElectrumX from version 0.11.0
-onwards.
+This was imlpemented in ElectrumX as of version 0.11.0.  Support for
+IRC peer discovery was removed in ElectrumX version 1.2.1.
 
 
 Peer Database
@@ -154,14 +151,12 @@ Unknown keys should be silently ignored.
 * **protocol_min**
 
   Strings that are the minimum and maximum Electrum protocol versions
-  this server speaks.  The maximum value should be the same as what
-  would suffix the letter **v** in the IRC real name.  Example: "1.1".
+  this server speaks.  Example: "1.1".
 
 * **pruning**
 
   An integer, the pruning limit.  Omit or set to *null* if there is no
-  pruning limit.  Should be the same as what would suffix the letter
-  **p** in the IRC real name.
+  pruning limit.
 
 
 server.add_peer RPC call
@@ -182,18 +177,6 @@ To prevent abuse a server may do nothing with second and subsequent
 calls to this method from a single connection.
 
 The result should be True if accepted and False otherwise.
-
-
-IRC
----
-
-Other server implementations may not have implemented the peer
-discovery protocol yet.  Whilst we transition away from IRC, in order
-to keep these servers in the connected peer set, having one or two in
-the hard-coded peer list used to seed this process should suffice.
-Any peer on IRC will report other peers on IRC, and so if any one of
-them is known to any single peer implementing this protocol, they will
-all become known to all peers quite rapidly.
 
 
 Notes to Implementators

@@ -25,6 +25,8 @@ class SessionBase(JSONSession):
     sessions.
     '''
 
+    MAX_CHUNK_SIZE = 2016
+
     def __init__(self, controller, kind):
         # Force v2 as a temporary hack for old Coinomi wallets
         # Remove in April 2017
@@ -112,71 +114,78 @@ class ElectrumX(SessionBase):
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.mempool_statuses = {}
-        self.chunk_indices = []
         self.protocol_version = None
         self.set_protocol_handlers((1, 0))
 
     def sub_count(self):
         return len(self.hashX_subs)
 
-    async def notify(self, height, touched):
-        '''Notify the client about changes in height and touched addresses.
+    async def notify_async(self, our_touched):
+        changed = {}
 
-        Cache is a shared cache for this update.
-        '''
-        pairs = []
-        changed = []
-
-        matches = touched.intersection(self.hashX_subs)
-        for hashX in matches:
+        for hashX in our_touched:
             alias = self.hashX_subs[hashX]
             status = await self.address_status(hashX)
-            changed.append((alias, status))
+            changed[alias] = status
 
-        if height != self.notified_height:
-            self.notified_height = height
-            if self.subscribe_headers:
-                args = (self.controller.electrum_header(height), )
-                pairs.append(('blockchain.headers.subscribe', args))
+        # Check mempool hashXs - the status is a function of the
+        # confirmed state of other transactions.  Note: we cannot
+        # iterate over mempool_statuses as it changes size.
+        for hashX in set(self.mempool_statuses):
+            old_status = self.mempool_statuses[hashX]
+            status = await self.address_status(hashX)
+            if status != old_status:
+                alias = self.hashX_subs[hashX]
+                changed[alias] = status
 
-            if self.subscribe_height:
-                pairs.append(('blockchain.numblocks.subscribe', (height, )))
-
-            # Check mempool hashXs - the status is a function of the
-            # confirmed state of other transactions
-            for hashX in set(self.mempool_statuses).difference(matches):
-                old_status = self.mempool_statuses[hashX]
-                status = await self.address_status(hashX)
-                if status != old_status:
-                    alias = self.hashX_subs[hashX]
-                    changed.append((alias, status))
-
-        for alias_status in changed:
-            if len(alias_status[0]) == 64:
+        for alias, status in changed.items():
+            if len(alias) == 64:
                 method = 'blockchain.scripthash.subscribe'
             else:
                 method = 'blockchain.address.subscribe'
-            pairs.append((method, alias_status))
+            self.send_notification(method, (alias, status))
 
-        if pairs:
-            self.send_notifications(pairs)
-            if changed:
-                es = '' if len(changed) == 1 else 'es'
-                self.log_info('notified of {:,d} address{}'
-                              .format(len(changed), es))
+        if changed:
+            es = '' if len(changed) == 1 else 'es'
+            self.log_info('notified of {:,d} address{}'
+                          .format(len(changed), es))
+
+    def notify(self, height, touched):
+        '''Notify the client about changes to touched addresses (from mempool
+        updates or new blocks) and height.
+
+        Return the set of addresses the session needs to be
+        asyncronously notified about.  This can be empty if there are
+        possible mempool status updates.
+
+        Returns None if nothing needs to be notified asynchronously.
+        '''
+        height_changed = height != self.notified_height
+        if height_changed:
+            self.notified_height = height
+            if self.subscribe_headers:
+                args = (self.controller.electrum_header(height), )
+                self.send_notification('blockchain.headers.subscribe', args)
+            if self.subscribe_height:
+                args = (height, )
+                self.send_notification('blockchain.numblocks.subscribe', args)
+
+        our_touched = touched.intersection(self.hashX_subs)
+        if our_touched or (height_changed and self.mempool_statuses):
+            return our_touched
+
+        return None
 
     def height(self):
         '''Return the current flushed database height.'''
         return self.bp.db_height
 
-    def current_electrum_header(self):
-        '''Used as response to a headers subscription request.'''
-        return self.controller.electrum_header(self.height())
-
     def headers_subscribe(self):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
-        return self.current_electrum_header()
+        height = self.height()
+        self.notified_height = height
+        return self.controller.electrum_header(height)
 
     def numblocks_subscribe(self):
         '''Subscribe to get height of new blocks.'''
@@ -245,22 +254,36 @@ class ElectrumX(SessionBase):
 
     def server_features(self):
         '''Returns a dictionary of server features.'''
-        return self.controller.peer_mgr.my_clearnet_peer().features
+        return self.env.server_features()
+
+    def block_headers(self, start_height, count):
+        '''Return count concatenated block headers as hex for the main chain;
+        starting at start_height.
+
+        start_height and count must be non-negative integers.  At most
+        MAX_CHUNK_SIZE headers will be returned.
+        '''
+        start_height = self.controller.non_negative_integer(start_height)
+        count = self.controller.non_negative_integer(count)
+        count = min(count, self.MAX_CHUNK_SIZE)
+        hex_str, n =  self.controller.block_headers(start_height, count)
+        return {'hex': hex_str, 'count': n, 'max': self.MAX_CHUNK_SIZE}
 
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        if self.client_version < (2, 8, 3):
-            self.chunk_indices.append(index)
-            self.chunk_indices = self.chunk_indices[-5:]
-            # -2 allows backing up a single chunk but no more.
-            if index <= max(self.chunk_indices[:-2], default=-1):
-                msg = ('chunk indices not advancing (wrong network?): {}'
-                       .format(self.chunk_indices))
-                # use INVALID_REQUEST to trigger a disconnect
-                raise RPCError(msg, JSONRPC.INVALID_REQUEST)
+        chunk_size = self.coin.CHUNK_SIZE
+        start_height = index * chunk_size
+        hex_str, n =  self.controller.block_headers(start_height, chunk_size)
+        return hex_str
+
+    def block_get_chunk(self, index):
+        '''Return a chunk of block headers as a hexadecimal string.
+
+        index: the chunk index'''
+        index = self.controller.non_negative_integer(index)
         return self.controller.get_chunk(index)
 
     def is_tor(self):
@@ -441,6 +464,14 @@ class ElectrumX(SessionBase):
                 'blockchain.transaction.get': controller.transaction_get,
             })
 
+        if ptuple >= (1, 2):
+            # New handler as of 1.2
+            handlers.update({
+                'mempool.get_fee_histogram':
+                controller.mempool_get_fee_histogram,
+                'blockchain.block.headers': self.block_headers,
+            })
+
         self.electrumx_handlers = handlers
 
     def request_handler(self, method):
@@ -478,12 +509,12 @@ class DashElectrumX(ElectrumX):
             'masternode.subscribe': self.masternode_subscribe,
         })
 
-    async def notify(self, height, touched):
+    def notify(self, height, touched):
         '''Notify the client about changes in masternode list.'''
-        await super().notify(height, touched)
+        result = super().notify(height, touched)
 
         for masternode in self.mns:
-            status = await self.daemon.masternode_list(['status', masternode])
+            status = self.daemon.masternode_list(['status', masternode])
             payload = {
                 'id': None,
                 'method': 'masternode.subscribe',
@@ -491,16 +522,7 @@ class DashElectrumX(ElectrumX):
                 'result': status.get(masternode),
             }
             self.send_binary(self.encode_payload(payload))
-
-    def server_version(self, client_name=None, protocol_version=None):
-        '''Returns the server version as a string.
-        Force version string response for Electrum-Dash 2.6.4 client caused by
-        https://github.com/dashpay/electrum-dash/commit/638cf6c0aeb7be14a85ad98f873791cb7b49ee29
-        '''
-        default_return = super().server_version(client_name, protocol_version)
-        if self.client == '2.6.4':
-            return '1.0'
-        return default_return
+        return result
 
     # Masternode command handlers
     async def masternode_announce_broadcast(self, signmnb):
