@@ -1253,11 +1253,11 @@ class Denarius(Coin):
     TX_COUNT_HEIGHT = 306187
     TX_PER_BLOCK = 4000
     
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import tribus_hash
-        return tribus_hash.getPoWHash(header)
+    #@classmethod
+    #def header_hash(cls, header):
+        #'''Given a header return the hash.'''
+        #import tribus_hash
+        #return tribus_hash.getPoWHash(header)
 
 
 class DenariusTestnet(Denarius):
