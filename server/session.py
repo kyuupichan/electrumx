@@ -25,6 +25,8 @@ class SessionBase(JSONSession):
     sessions.
     '''
 
+    MAX_CHUNK_SIZE = 2016
+
     def __init__(self, controller, kind):
         # Force v2 as a temporary hack for old Coinomi wallets
         # Remove in April 2017
@@ -112,7 +114,6 @@ class ElectrumX(SessionBase):
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.mempool_statuses = {}
-        self.chunk_indices = []
         self.protocol_version = None
         self.set_protocol_handlers((1, 0))
 
@@ -255,20 +256,34 @@ class ElectrumX(SessionBase):
         '''Returns a dictionary of server features.'''
         return self.env.server_features()
 
+    def block_headers(self, start_height, count):
+        '''Return count concatenated block headers as hex for the main chain;
+        starting at start_height.
+
+        start_height and count must be non-negative integers.  At most
+        MAX_CHUNK_SIZE headers will be returned.
+        '''
+        start_height = self.controller.non_negative_integer(start_height)
+        count = self.controller.non_negative_integer(count)
+        count = min(count, self.MAX_CHUNK_SIZE)
+        hex_str, n =  self.controller.block_headers(start_height, count)
+        return {'hex': hex_str, 'count': n, 'max': self.MAX_CHUNK_SIZE}
+
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        if self.client_version < (2, 8, 3):
-            self.chunk_indices.append(index)
-            self.chunk_indices = self.chunk_indices[-5:]
-            # -2 allows backing up a single chunk but no more.
-            if index <= max(self.chunk_indices[:-2], default=-1):
-                msg = ('chunk indices not advancing (wrong network?): {}'
-                       .format(self.chunk_indices))
-                # use INVALID_REQUEST to trigger a disconnect
-                raise RPCError(msg, JSONRPC.INVALID_REQUEST)
+        chunk_size = self.coin.CHUNK_SIZE
+        start_height = index * chunk_size
+        hex_str, n =  self.controller.block_headers(start_height, chunk_size)
+        return hex_str
+
+    def block_get_chunk(self, index):
+        '''Return a chunk of block headers as a hexadecimal string.
+
+        index: the chunk index'''
+        index = self.controller.non_negative_integer(index)
         return self.controller.get_chunk(index)
 
     def is_tor(self):
@@ -452,7 +467,9 @@ class ElectrumX(SessionBase):
         if ptuple >= (1, 2):
             # New handler as of 1.2
             handlers.update({
-                'mempool.get_fee_histogram': controller.mempool_get_fee_histogram,
+                'mempool.get_fee_histogram':
+                controller.mempool_get_fee_histogram,
+                'blockchain.block.headers': self.block_headers,
             })
 
         self.electrumx_handlers = handlers

@@ -70,6 +70,8 @@ class Coin(object):
     BLOCK_PROCESSOR = BlockProcessor
     XPUB_VERBYTES = bytes('????', 'utf-8')
     XPRV_VERBYTES = bytes('????', 'utf-8')
+    ENCODE_CHECK = Base58.encode_check
+    DECODE_CHECK = Base58.decode_check
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -168,7 +170,7 @@ class Coin(object):
     def P2PKH_address_from_hash160(cls, hash160):
         '''Return a P2PKH address given a public key.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2PKH_VERBYTE + hash160)
+        return cls.ENCODE_CHECK(cls.P2PKH_VERBYTE + hash160)
 
     @classmethod
     def P2PKH_address_from_pubkey(cls, pubkey):
@@ -179,7 +181,7 @@ class Coin(object):
     def P2SH_address_from_hash160(cls, hash160):
         '''Return a coin address given a hash160.'''
         assert len(hash160) == 20
-        return Base58.encode_check(cls.P2SH_VERBYTES[0] + hash160)
+        return cls.ENCODE_CHECK(cls.P2SH_VERBYTES[0] + hash160)
 
     @classmethod
     def multisig_address(cls, m, pubkeys):
@@ -212,7 +214,7 @@ class Coin(object):
 
         Pass the address (either P2PKH or P2SH) in base58 form.
         '''
-        raw = Base58.decode_check(address)
+        raw = cls.DECODE_CHECK(address)
 
         # Require version byte(s) plus hash160.
         verbyte = -1
@@ -233,7 +235,7 @@ class Coin(object):
         payload = bytearray(cls.WIF_BYTE) + privkey_bytes
         if compressed:
             payload.append(0x01)
-        return Base58.encode_check(payload)
+        return cls.ENCODE_CHECK(payload)
 
     @classmethod
     def header_hash(cls, header):
@@ -1230,6 +1232,45 @@ class CanadaeCoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 1
     RPC_PORT = 34330
     REORG_LIMIT = 1000
+	
+class Denarius(Coin):
+    NAME = "Denarius"
+    SHORTNAME = "DNR"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1E") #Address starts with a D
+    P2SH_VERBYTES = [bytes.fromhex("5A")]
+    WIF_BYTE = bytes.fromhex("9E") #WIF starts with a 6
+    GENESIS_HASH = ('00000d5dbbda01621cfc16bbc1f9bf32'
+                    '64d641a5dbf0de89fd0182c2c4828fcd')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    TX_COUNT = 4230
+    RPC_PORT = 32339
+    ESTIMATE_FEE = 0.00001
+    RELAY_FEE = 0.00001
+    DAEMON = daemon.FakeEstimateFeeDaemon
+    TX_COUNT_HEIGHT = 306187
+    TX_PER_BLOCK = 4000
+    
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import tribus_hash
+        return tribus_hash.getPoWHash(header)
+
+
+class DenariusTestnet(Denarius):
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("12")
+    P2SH_VERBYTES = [bytes.fromhex("74")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('000086bfe8264d241f7f8e5393f74778'
+                    '4b8ca2aa98bdd066278d590462a4fdb4')
+    RPC_PORT = 32338
+    REORG_LIMIT = 2000
 
 
 class Sibcoin(Dash):
@@ -1286,7 +1327,7 @@ class Feathercoin(Coin):
     XPUB_VERBYTES = bytes.fromhex("0488BC26")
     XPRV_VERBYTES = bytes.fromhex("0488DAEE")
     P2PKH_VERBYTE = bytes.fromhex("0E")
-    P2SH_VERBYTES = [bytes.fromhex("32"), bytes.fromhex("05")]
+    P2SH_VERBYTES = [bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("8E")
     GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
                     'c99d9714d334efa41a195a7e7e04bfe2')
@@ -1324,3 +1365,43 @@ class Bitcore(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 126946
     TX_PER_BLOCK = 2
     RPC_PORT = 8556
+
+
+class BitcoinAtom(Coin):
+    NAME = "BitcoinAtom"
+    SHORTNAME = "BCA"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("17")
+    P2SH_VERBYTES = [bytes.fromhex("0a")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('000000000019d6689c085ae165831e93'
+                    '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    STATIC_BLOCK_HEADERS = False
+    DESERIALIZER = lib_tx.DeserializerBitcoinAtom
+    HEADER_SIZE_POST_FORK = 84
+    BLOCK_PROOF_OF_STAKE = 0x01
+    BLOCK_PROOF_OF_STAKE_FLAGS = b'\x01\x00\x00\x00'
+    TX_COUNT = 295158744
+    TX_COUNT_HEIGHT = 589197
+    TX_PER_BLOCK = 10
+    RPC_PORT = 9136
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        header_to_be_hashed = header[:cls.BASIC_HEADER_SIZE]
+        # New block header format has some extra flags in the end
+        if len(header) == cls.HEADER_SIZE_POST_FORK:
+            flags, = struct.unpack('<I', header[-4:])
+            # Proof of work blocks have special serialization
+            if flags & cls.BLOCK_PROOF_OF_STAKE != 0:
+                header_to_be_hashed += cls.BLOCK_PROOF_OF_STAKE_FLAGS
+
+        return double_sha256(header_to_be_hashed)
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
