@@ -883,6 +883,22 @@ class Zcash(EquihashMixin, Coin):
     RPC_PORT = 8232
     REORG_LIMIT = 800
 
+class Snowgem(EquihashMixin, Coin):
+    NAME = "Snowgem"
+    SHORTNAME = "SNG"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1C28")
+    P2SH_VERBYTES = [bytes.fromhex("1C2D")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00068b35729d9d2b0c294ff1fe9af009'
+                    '4740524311a131de40e7f705e4c29a5b')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 140698
+    TX_COUNT_HEIGHT = 102802
+    TX_PER_BLOCK = 2
+    RPC_PORT = 16112
+    REORG_LIMIT = 800
+
 class BitcoinZ(EquihashMixin, Coin):
     NAME = "BitcoinZ"
     SHORTNAME = "BTCZ"
