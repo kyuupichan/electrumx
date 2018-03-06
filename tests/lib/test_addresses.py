@@ -60,7 +60,7 @@ def test_address_to_hashX(address):
 def test_address_from_hash160(address):
     coin, addr, hash, _ = address
 
-    raw = Base58.decode_check(addr)
+    raw = coin.DECODE_CHECK(addr)
     verlen = len(raw) - 20
     assert verlen > 0
     verbyte, hash_bytes = raw[:verlen], raw[verlen:]

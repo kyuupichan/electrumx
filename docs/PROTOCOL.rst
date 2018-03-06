@@ -388,7 +388,10 @@ bandwidth-intensive request.
 **Response**
 
     The binary block headers, as hexadecimal strings, in order
-    concatenated together.
+    concatenated together.  As many as headers as are available at
+    starting height 2016 * index will be returned; this may range from
+    0 to 2016.
+
 
 
 blockchain.estimatefee
@@ -397,7 +400,7 @@ blockchain.estimatefee
 Return the estimated transaction fee per kilobyte for a transaction to
 be confirmed within a certain number of blocks.
 
-  blockchain.block.get_chunk(**number**)
+  blockchain.estimatefee(**number**)
 
   **number**
 
@@ -552,7 +555,7 @@ blockchain.transaction.get_merkle
 Return the markle branch to a confirmed transaction given its hash
 and height.
 
-  blockchain.transaction.get(**tx_hash**, **height**)
+  blockchain.transaction.get_merkle(**tx_hash**, **height**)
 
   **tx_hash**
 
@@ -924,13 +927,60 @@ Get a list of features and services supported by the server.
 Protocol Version 1.2
 --------------------
 
-Protocol version 1.2 is the same as version `1.1` except for the
-addition of a new method `mempool.get_fee_histogram`.
+Protocol version 1.2 introduces new methods `blockchain.block.headers`,
+`mempool.get_fee_histogram`.
 
-All methods with taking addresses are deprecated, and will be removed
-at some point in the future.  You should update your code to use
-`Script Hashes`_ and the scripthash methods introduced in protocol 1.1
-instead.
+`blockchain.block.get_chunk` and all methods beginning
+ `blockchain.address.` are deprecated and support will be removed in
+ some future protocol version.  You should update your code to use
+ `blockchain.block.headers` and `Script Hashes`_ with the scripthash
+ methods introduced in protocol 1.1 instead.
+
+blockchain.block.headers
+========================
+
+Return concatenated block headers as hexadecimal from the main chain.
+
+  blockchain.block.headers(**start_height**, **count**)
+
+  **start_height**
+
+    The height of the first header requested, a non-negative integer.
+
+  **count**
+
+    The number of headers requested, a non-negative integer.
+
+**Response**
+
+    A dictionary with at least 3 members:
+
+* **count**
+
+    The number of headers returned, between zero and the number
+    requested.  If the chain has not extended sufficiently far, only
+    the available headers will be returned.  If more headers than
+    **max** were requested at most **max** will be returned.
+
+* **hex**
+
+    The binary block headers concatenated together as hexadecimal
+    strings, in order.
+
+* **max**
+
+    The maximum number of headers the server will return in a single
+    request.
+
+**Example Response**
+
+::
+
+  {
+      "count": 2,
+      "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299'"
+      "max": 2016
+  }
 
 
 mempool.get_fee_histogram
