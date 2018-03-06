@@ -883,8 +883,8 @@ class Zcash(EquihashMixin, Coin):
     RPC_PORT = 8232
     REORG_LIMIT = 800
 
-class Snowgem(EquihashMixin, Coin):
-    NAME = "Snowgem"
+class snowgem(EquihashMixin, Coin):
+    NAME = "snowgem"
     SHORTNAME = "SNG"
     NET = "mainnet"
     P2PKH_VERBYTE = bytes.fromhex("1C28")
