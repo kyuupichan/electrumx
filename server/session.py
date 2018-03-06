@@ -279,13 +279,6 @@ class ElectrumX(SessionBase):
         hex_str, n =  self.controller.block_headers(start_height, chunk_size)
         return hex_str
 
-    def block_get_chunk(self, index):
-        '''Return a chunk of block headers as a hexadecimal string.
-
-        index: the chunk index'''
-        index = self.controller.non_negative_integer(index)
-        return self.controller.get_chunk(index)
-
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
         running.'''
