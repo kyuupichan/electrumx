@@ -274,7 +274,7 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        chunk_size = self.coin.CHUNK_SIZE
+        chunk_size = self.controller.coin.CHUNK_SIZE
         start_height = index * chunk_size
         hex_str, n =  self.controller.block_headers(start_height, chunk_size)
         return hex_str
