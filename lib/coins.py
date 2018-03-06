@@ -405,7 +405,6 @@ class BitcoinCash(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 479636
     TX_PER_BLOCK = 50
     PEERS = [
-        'electroncash.bitcoinplug.com s t',  # 1 strike
         'electrum-abc.criptolayer.net s50012',
         'electroncash.cascharia.com s50002',
         'bch.arihanc.com t52001 s52002',
@@ -1232,7 +1231,7 @@ class CanadaeCoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 1
     RPC_PORT = 34330
     REORG_LIMIT = 1000
-	
+
 class Denarius(Coin):
     NAME = "Denarius"
     SHORTNAME = "DNR"
@@ -1252,7 +1251,7 @@ class Denarius(Coin):
     DAEMON = daemon.FakeEstimateFeeDaemon
     TX_COUNT_HEIGHT = 306187
     TX_PER_BLOCK = 4000
-    
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
