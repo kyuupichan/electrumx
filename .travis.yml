@@ -18,6 +18,7 @@ install:
   - pip install plyvel
   - pip install pyrocksdb
   - pip install pytest-cov
+  - pip install pylru
 # command to run tests
 script: pytest --cov=server --cov=lib --cov=wallet
 # Dont report coverage from nightly
