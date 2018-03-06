@@ -849,19 +849,7 @@ class Controller(ServerBase):
         verbose: (optional, default=False), enable\disable verbose mode
         '''
         self.assert_tx_hash(tx_hash)
-        transaction = await self.daemon_request('getrawtransaction', tx_hash, int(verbose))
-        if not transaction:
-            return
-        if verbose and isinstance(transaction, dict):
-            try:
-                return {
-                    'hex': transaction['hex'],
-                    'blockhash': transaction.get('blockhash')
-                }
-            except KeyError:
-                self.logger.exception('verbose mode failed')
-                raise RPCError("error in verbose mode")
-        return transaction
+        return await self.daemon_request('getrawtransaction', tx_hash, int(verbose))
 
     async def transaction_get_1_0(self, tx_hash, height=None):
         '''Return the serialized raw transaction given its hash

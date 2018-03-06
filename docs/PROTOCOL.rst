@@ -532,7 +532,7 @@ blockchain.transaction.get
 
 Return a raw transaction.
 
-  blockchain.transaction.get(**tx_hash**, **height**, **verbose** = [False])
+  blockchain.transaction.get(**tx_hash**, **height**)
 
   **tx_hash**
 
@@ -544,39 +544,9 @@ Return a raw transaction.
     is optional and ignored; it is recommended that clients do not
     send it as it will be removed in a future protocol version.
 
-  **verbose** [optional]
-    Set verbose mode (default = False).
-
 **Response**
 
-   In non-verbose mode return the raw transaction as a hexadecimal string.
-
-   With verbose=True, return an object with keys "hex", that is the raw transaction, and "blockhash".
-   When the transaction is included into a block, the "blockhash" value will be the relative blockhash.
-
-   Return a null value if the transaction is not found.
-
-**Response Examples**
-
-  Non verbose:
-
-  ::
-    02000000029d4d491c11a84285203147ab8fa39335834ae1a1946f2a63b8cf9d33326dfd24010000006a47304402204a063e2a589dba0bba49ec37d05f90e5b232ba70af08e1eb8a34dbaf7c7a36be022071a46a726482896873a2d9bb6587238662a64c0304069a8b57c61c30ddb1b21c012102cd44f359b884463e4b22c614d98f43a58d23214119340d4ab6dce2f556d4f712feffbf0ba5bdcd88b97e3082d027e7d91f2bd6c59735724e37f51341390cdfa85ee15b77f01feffffff0200ca9a3b0000000017a914b18d08cc1c9fa531aca09851c3e559e1572e1a738718a8f008000000001976a914a185ab6529459aa3b9d8c0924ca5e66d30cfd72088ac63020000
-
-
-  Verbose mode:
-
-  ::
-      {
-
-         "hex": "02000000029d4d491c11a84285203147ab8fa39335834ae1a1946f2a63b8cf9d33326dfd24010000006a47304402204a063e2a589dba0bba49ec37d05f90e5b232ba70af08e1eb8a34dbaf7c7a36be022071a46a726482896873a2d9bb6587238662a64c0304069a8b57c61c30ddb1b21c012102cd44f359b884463e4b22c614d98f43a58d23214119340d4ab6dce2f556d4f712feffbf0ba5bdcd88b97e3082d027e7d91f2bd6c59735724e37f51341390cdfa85ee15b77f01feffffff0200ca9a3b0000000017a914b18d08cc1c9fa531aca09851c3e559e1572e1a738718a8f008000000001976a914a185ab6529459aa3b9d8c0924ca5e66d30cfd72088ac63020000",
-         "blockhash": "000000000d23bc62fd701706ba32e2af08e80ef1461b3c36d8f923281b0321d0"
-
-      }
-
-
-
-
+    The raw transaction as a hexadecimal string.
 
 
 blockchain.transaction.get_merkle
@@ -954,6 +924,9 @@ Get a list of features and services supported by the server.
       "hash_function": "sha256"
   }
 
+Protocol Version 1.2
+--------------------
+
 Protocol version 1.2 introduces new methods `blockchain.block.headers`,
 `mempool.get_fee_histogram`.
 
@@ -962,7 +935,7 @@ Protocol version 1.2 introduces new methods `blockchain.block.headers`,
   and `Script Hashes`_ with the scripthash methods introduced in protocol 1.1 instead.
 
 * `blockchain.transaction.get` now have the optional parameter *verbose*. In verbose mode (default=False) the
-  result is enriched with the relative inclusion blockhash, if any. Feature may have be unavailable.
+  result is enriched with the relative inclusion blockhash, if any.
 
 
 
@@ -1034,3 +1007,24 @@ intervals is currently not part of the protocol.
 
 .. _JSON RPC 1.0: http://json-rpc.org/wiki/specification
 .. _JSON RPC 2.0: http://json-rpc.org/specification
+
+
+blockchain.transaction.get
+==========================
+
+Return a raw transaction.
+
+  blockchain.transaction.get(**tx_hash**, **verbose** = [False])
+
+  **tx_hash**
+
+    The transaction hash as a hexadecimal string.
+
+  **verbose** [optional]
+    Set verbose mode (default = False).
+
+**Response**
+
+   In non-verbose mode return the raw transaction as a hexadecimal string.
+
+   With verbose=True, return a JSON object with the deserialized transaction.
