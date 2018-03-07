@@ -227,6 +227,185 @@ Subscribe to a bitcoin address.
 
   .. function:: blockchain.address.subscribe(address, status)
 
+
+blockchain.block.get_header
+---------------------------
+
+Return the :ref:`deserialized header <deserialized header>` of the
+block at the given height.
+
+**Signature**
+
+  .. function:: blockchain.block.get_header(height)
+
+  *height*
+
+    The height of the block, an integer.
+
+**Result**
+
+  The coin-specific :ref:`deserialized header <deserialized header>`.
+
+**Example Result**
+
+::
+
+  {
+    "bits": 392292856,
+    "block_height": 510000,
+    "merkle_root": "297cfcc6a66e063692b20650d21cc0ac7a2a80f7277ebd7c5d6c7010a070d25c",
+    "nonce": 3347656422,
+    "prev_block_hash": "0000000000000000002292de0d9f03dfa15a04dbf09102d5d4552117b717fa86",
+    "timestamp": 1519083654,
+    "version": 536870912
+  }
+
+blockchain.block.get_chunk
+--------------------------
+
+Return a concatenated chunk of block headers.  Typically, a chunk
+consists of a fixed number of block headers over which difficulty is
+constant, and at the end of which difficulty is retargeted.
+
+In the case of Bitcoin a chunk is 2,016 headers, each of 80 bytes, so
+chunk 5 consists of the block headers from height 10,080 to 12,095
+inclusive.  When encoded as hexadecimal, the result string is twice as
+long, so for Bitcoin it takes 322,560 bytes, making this a
+bandwidth-intensive request.
+
+**Signature**
+
+  .. function:: blockchain.block.get_chunk(index)
+
+  *index*
+
+    The zero-based index of the chunk, an integer.
+
+**Result**
+
+    The binary block headers as hexadecimal strings, in-order and
+    concatenated together.  As many as headers as are available at the
+    implied starting height will be returned; this may range from zero
+    to the coin-specific chunk size.
+
+blockchain.estimatefee
+----------------------
+
+Return the estimated transaction fee per kilobyte for a transaction to
+be confirmed within a certain number of blocks.
+
+**Signature**
+
+  .. function:: blockchain.estimatefee(number)
+
+  *number*
+
+    The number of blocks to target for confirmation.
+
+**Result**
+
+  The estimated transaction fee in coin units per kilobyte, as a
+  floating point number.  If the daemon does not have enough
+  information to make an estimate, the integer ``-1`` is returned.
+
+**Example Result**
+
+::
+
+  0.00101079
+
+blockchain.headers.subscribe
+----------------------------
+
+Subscribe to receive block headers when a new block is found.
+
+**Signature**
+
+  .. function:: blockchain.headers.subscribe()
+
+**Result**
+
+  The coin-specific :ref:`deserialized header <deserialized header>`
+  of the current block chain tip.
+
+**Notifications**
+
+  As this is a subcription, the client will receive a notification
+  when a new block is found.  The notification's signature is:
+
+    .. function:: blockchain.headers.subscribe(header)
+
+    * *header* The coin-specific :ref:`deserialized header
+      <deserialized header>` of the new block chain tip.
+
+.. note:: should a new block arrive quickly, perhaps while the server
+  is still processing prior blocks, the server may only notify of the
+  most recent chain tip.  The protocol does not guarantee notification
+  of all intermediate blocks.
+
+  In a similar way the client must be prepared to handle chain
+  reorganisations.  Should a re-org happen the new chain tip will not
+  sit directly on top of the prior chain tip.  The client must be able
+  to figure out the common ancestor block and request any missing
+  block headers to acquire a consistent view of the chain state.
+
+
+blockchain.numblocks.subscribe
+------------------------------
+
+Subscribe to receive the block height when a new block is found.
+
+.. note:: This subscription is deprecated in favour of
+  :func:`blockchain.headers.subscribe` which provides more detailed
+  and useful information.
+
+**Signature**
+
+  .. function:: blockchain.numblocks.subscribe()
+
+**Result**
+
+  The height of the current block, an integer.
+
+**Notifications**
+
+  As this is a subcription, the client will receive a notification
+  when a new block is found.  The notification's signature is:
+
+    .. function:: blockchain.numblocks.subscribe(height)
+
+.. note:: should a new block arrive quickly, perhaps while the server
+  is still processing prior blocks, the server may only notify of the
+  most recent height.  The protocol does not guarantee notification of
+  all intermediate block heights.  Similarly if a chain reorganization
+  occurs resulting in the same chain height, the client may or may not
+  receive a notification.
+
+blockchain.relayfee
+-------------------
+
+Return the minimum fee a low-priority transaction must pay in order to
+be accepted to the daemon's memory pool.
+
+**Signature**
+
+  .. function:: blockchain.relayfee()
+
+**Result**
+
+  The fee in whole coin units (BTC, not satoshis for Bitcoin) as a
+  floating point number.
+
+**Example Results**
+
+::
+
+   1e-05
+
+::
+
+   0.0
+
 mempool.get_fee_histogram
 -------------------------
 
@@ -378,7 +557,7 @@ server.features
   * *server_version*
 
     A string that identifies the server software.  Should be the same
-    as the response to :func:`server.version` RPC call.
+    as the result to the :func:`server.version` RPC call.
 
   * *protocol_max*
   * *protocol_min*

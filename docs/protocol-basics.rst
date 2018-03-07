@@ -68,6 +68,34 @@ description for more detail.  All responses received in the stream
 from and including the server's response to this call will use the
 negotiated protocol version.
 
+.. _deserialized header:
+
+Deserialized Headers
+--------------------
+
+A deserialized header is a dictionary that is coin-specific, and may
+even vary in its members for the same coin at different heights.
+
+A typical example would be similar to this template::
+
+  {
+    "block_height": <integer>,
+    "version": <integer>,
+    "prev_block_hash": <hexadecimal string>,
+    "merkle_root":  <hexadecimal string>,
+    "timestamp": <integer>,
+    "bits": <integer>,
+    "nonce": <integer>
+  }
+
+The precise meaning of a block header varies across coins, and also by
+coin depending on height, so deserialized headers are deprecated and
+will be removed from the protocol in some future version.  Instead,
+raw headers (as hexadecimal strings) along with their height will be
+returned by RPC calls, and it will be up to the client to interpret
+them.  Detailed knowledge of the meaning of a block header is neither
+necessary nor appropriate in the server.
+
 .. _script hashes:
 
 Script Hashes
