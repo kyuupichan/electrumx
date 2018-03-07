@@ -846,10 +846,10 @@ class Controller(ServerBase):
         '''Return the serialized raw transaction given its hash
 
         tx_hash: the transaction hash as a hexadecimal string
-        verbose: (optional, default=False), enable\disable verbose mode
+        verbose: passed on to the daemon
         '''
         self.assert_tx_hash(tx_hash)
-        return await self.daemon_request('getrawtransaction', tx_hash, int(verbose))
+        return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
     async def transaction_get_1_0(self, tx_hash, height=None):
         '''Return the serialized raw transaction given its hash
