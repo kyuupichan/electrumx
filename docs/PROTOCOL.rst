@@ -930,11 +930,11 @@ Protocol Version 1.2
 Protocol version 1.2 introduces new methods `blockchain.block.headers`,
 `mempool.get_fee_histogram`.
 
-`blockchain.block.get_chunk` and all methods beginning
- `blockchain.address.` are deprecated and support will be removed in
- some future protocol version.  You should update your code to use
- `blockchain.block.headers` and `Script Hashes`_ with the scripthash
- methods introduced in protocol 1.1 instead.
+* `blockchain.block.get_chunk` and all methods beginning `blockchain.address.` are deprecated
+  and support will be removed in some future protocol version.  You should update your code to use `blockchain.block.headers`
+  and `Script Hashes`_ with the scripthash methods introduced in protocol 1.1 instead.
+
+* `blockchain.transaction.get` now has an optional parameter *verbose*.
 
 blockchain.block.headers
 ========================
@@ -978,7 +978,7 @@ Return concatenated block headers as hexadecimal from the main chain.
 
   {
       "count": 2,
-      "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299'"
+      "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299"
       "max": 2016
   }
 
@@ -1003,3 +1003,25 @@ intervals is currently not part of the protocol.
 
 .. _JSON RPC 1.0: http://json-rpc.org/wiki/specification
 .. _JSON RPC 2.0: http://json-rpc.org/specification
+
+
+blockchain.transaction.get
+==========================
+
+Return a raw transaction.
+
+  blockchain.transaction.get(**tx_hash**, **verbose**=False)
+
+  **tx_hash**
+
+    The transaction hash as a hexadecimal string.
+
+  **verbose**
+    Verbose mode, passed on to bitcoind in **getrawtransaction**.
+
+**Response**
+
+   In non-verbose mode return the raw transaction as a hexadecimal string.
+
+   If verbose, returns what your coin's bitcoind returns; see its
+   documentation for details.
