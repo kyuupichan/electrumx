@@ -1,5 +1,5 @@
-The ElectrumX RPC Interface
-===========================
+RPC Interface
+=============
 
 You can query the status of a running server, and affect its behaviour
 by sending JSON RPC commands to the LocalRPC port it is listening on.

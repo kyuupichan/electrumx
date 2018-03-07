@@ -123,3 +123,28 @@ key.
 .. note:: The Genesis block coinbase is unspendable and therefore not
    indexed.  It will not show with the above P2PK script hash
    subscription.
+
+.. _status:
+
+Status
+------
+
+To calculate the `status` of a :ref:`script hash <script hashes>` (or
+address):
+
+1. order confirmed transactions to the script hash by height (and
+position in the block if there are more than one in a block)
+
+2. form a string that is the concatenation of strings
+``"tx_hash:height:"`` for each transaction in order, where:
+
+  * ``tx_hash`` is the transaction hash in hexadecimal
+
+  * ``height`` is the height of the block it is in.
+
+3. Next, with mempool transactions in any order, append a string that
+is the same, but where **height** is ``-1`` if the transaction has at
+least one unconfirmed input, and ``0`` if all inputs are confirmed.
+
+4. The :dfn:`status` of the script hash is the :func:`sha256` hash of the
+full string expressed as a hexadecimal string.

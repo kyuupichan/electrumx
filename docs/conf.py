@@ -20,7 +20,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'ElectrumX'
-copyright = '2018, Neil Booth'
+copyright = '2016-2018, Neil Booth'
 author = 'Neil Booth'
 
 # The short X.Y version
@@ -80,7 +80,14 @@ html_theme = 'alabaster'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    'description': 'Lightweight Electrum Server in Python',
+    'github_user': 'kyuupichan',
+    'github_repo': 'electrumx',
+    'github_button': True,
+    'github_type': 'star',
+    'github_banner': True,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -94,9 +101,12 @@ html_static_path = ['_static']
 # defined by theme itself.  Builtin themes are using these templates by
 # default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
 # 'searchbox.html']``.
-#
-# html_sidebars = {}
 
+html_sidebars = {
+    '**': [
+        'about.html', 'navigation.html', 'searchbox.html',
+    ]
+}
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
