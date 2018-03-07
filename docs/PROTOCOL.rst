@@ -934,11 +934,7 @@ Protocol version 1.2 introduces new methods `blockchain.block.headers`,
   and support will be removed in some future protocol version.  You should update your code to use `blockchain.block.headers`
   and `Script Hashes`_ with the scripthash methods introduced in protocol 1.1 instead.
 
-* `blockchain.transaction.get` now have the optional parameter *verbose*. In verbose mode (default=False) the
-  result is enriched with the relative inclusion blockhash, if any.
-
-
-
+* `blockchain.transaction.get` now has an optional parameter *verbose*.
 
 blockchain.block.headers
 ========================
@@ -1014,17 +1010,18 @@ blockchain.transaction.get
 
 Return a raw transaction.
 
-  blockchain.transaction.get(**tx_hash**, **verbose** = [False])
+  blockchain.transaction.get(**tx_hash**, **verbose**=False)
 
   **tx_hash**
 
     The transaction hash as a hexadecimal string.
 
-  **verbose** [optional]
-    Set verbose mode (default = False).
+  **verbose**
+    Verbose mode, passed on to bitcoind in **getrawtransaction**.
 
 **Response**
 
    In non-verbose mode return the raw transaction as a hexadecimal string.
 
-   With verbose=True, return a JSON object with the deserialized transaction.
+   If verbose, returns what your coin's bitcoind returns; see its
+   documentation for details.
