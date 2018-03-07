@@ -470,7 +470,7 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
             merkle_root=hash_to_str(header[36:68]),
             timestamp=struct.unpack('<I', header[100:104])[0],
             reserved=hash_to_str(header[72:100]),
-            bits=hash_to_str(header[104:108]),
+            bits=struct.unpack('<I', header[104:108])[0],
             nonce=hash_to_str(header[108:140]),
             solution=hash_to_str(header[140:])
         )
