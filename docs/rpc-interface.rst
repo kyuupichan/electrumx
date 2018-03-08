@@ -8,7 +8,7 @@ provided.
 
 The general form of invocation is::
 
-  electrumx_rpc.py [-p PORT] <command> [arg1 [arg2...]
+  electrumx_rpc.py [-p PORT] <command> [arg1 [arg2...]]
 
 The port to send the commands to can be specified on the command line,
 otherwise the environment variable :envvar:`RPC_PORT` is used, and if
