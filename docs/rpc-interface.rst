@@ -148,7 +148,15 @@ Return a list of peer Electrum servers serving the same coin network.
 This command takes no arguments.
 
 Peer data is obtained via a peer discovery protocol documented
-:ref:`here <Peer Discovery>`.
+:ref:`here <Peer Discovery>`::
+
+  $ electrumx_rpc.py peers
+  Host                           Status   TCP   SSL Server             Min  Max  Pruning   Last Good    Last Try Tries               Source IP Address
+  bch.tedy.pw                    good   50001 50002 ElectrumX 1.2.1    0.9  1.2          07h 29m 23s 07h 30m 40s     0                 peer 185.215.224.26
+  shsmithgoggryfbx.onion         good   60001 60002 ElectrumX 1.2.1    0.9  1.2          07h 30m 34s 07h 30m 38s     0                 peer
+  bccarihace4jdcnt.onion         good   52001 52002 ElectrumX 1.2.1    0.9  1.2          07h 30m 34s 07h 30m 39s     0                 peer
+  [...]
+  electroncash.checksum0.com     good   50001 50002 ElectrumX 1.2.1    0.9  1.1          07h 30m 40s 07h 30m 41s     0                 peer 149.56.198.233
 
 reorg
 -----
