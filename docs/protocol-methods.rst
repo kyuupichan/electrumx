@@ -6,12 +6,10 @@ blockchain.address.get_balance
 
 Return the confirmed and unconfirmed balances of a bitcoin address.
 
-.. note:: This method is deprecated; support will be removed in a later
-   protocol version.  Use :func:`blockchain.scripthash.get_balance` instead.
-
 **Signature**
 
   .. function:: blockchain.address.get_balance(address)
+  .. deprecated:: 1.2
 
   * *address*
 
@@ -19,28 +17,17 @@ Return the confirmed and unconfirmed balances of a bitcoin address.
 
 **Result**
 
-  A dictionary with keys `confirmed` and `unconfirmed`.  The value of
-  each is the appropriate balance in coin units as a string.
-
-**Result Example**::
-
-  {
-    "confirmed": "1.03873966",
-    "unconfirmed": "0.236844"
-  }
-
+  See :func:`blockchain.scripthash.get_balance`.
 
 blockchain.address.get_history
 ------------------------------
 
 Return the confirmed and unconfirmed history of a bitcoin address.
 
-.. note:: This method is deprecated; support will be removed in a later
-   protocol version.  Use :func:`blockchain.scripthash.get_history` instead.
-
 **Signature**
 
   .. function:: blockchain.address.get_history(address)
+  .. deprecated:: 1.2
 
   * *address*
 
@@ -48,60 +35,17 @@ Return the confirmed and unconfirmed history of a bitcoin address.
 
 **Result**
 
-    A list of confirmed transactions in blockchain order, with the
-    output of :func:`blockchain.address.get_mempool` appended to the
-    list.  Each confirmed transaction is a dictionary with the following
-    keys:
-
-    * *height*
-
-      The integer height of the block the transaction was confirmed
-      in.
-
-    * *tx_hash*
-
-      The transaction hash in hexadecimal.
-
-    See :func:`blockchain.address.get_mempool` for how mempool
-    transactions are returned.
-
-**Result Examples**
-
-::
-
-  [
-    {
-      "height": 200004,
-      "tx_hash": "acc3758bd2a26f869fcc67d48ff30b96464d476bca82c1cd6656e7d506816412"
-    },
-    {
-      "height": 215008,
-      "tx_hash": "f3e1bf48975b8d6060a9de8884296abb80be618dc00ae3cb2f6cee3085e09403"
-    }
-  ]
-
-::
-
-  [
-    {
-      "fee": 20000,
-      "height": 0,
-      "tx_hash": "9fbed79a1e970343fcd39f4a2d830a6bde6de0754ed2da70f489d0303ed558ec"
-    }
-  ]
-
+  As for :func:`blockchain.scripthash.get_history`.
 
 blockchain.address.get_mempool
 ------------------------------
 
 Return the unconfirmed transactions of a bitcoin address.
 
-.. note:: This method is deprecated; support will be removed in a later
-   protocol version.  Use :func:`blockchain.scripthash.get_mempool` instead.
-
 **Signature**
 
   .. function:: blockchain.address.get_mempool(address)
+  .. deprecated:: 1.2
 
   * *address*
 
@@ -109,45 +53,17 @@ Return the unconfirmed transactions of a bitcoin address.
 
 **Result**
 
-    A list of mempool transactions in arbitrary order.  Each mempool
-    transaction is a dictionary with the following keys:
-
-    * *height*
-
-      ``0`` if all inputs are confirmed, and ``-1`` otherwise.
-
-    * *tx_hash*
-
-      The transaction hash in hexadecimal.
-
-    * *fee*
-
-      The transaction fee in minimum coin units (satoshis).
-
-**Result Example**
-
-::
-
-  [
-    {
-      "tx_hash": "45381031132c57b2ff1cbe8d8d3920cf9ed25efd9a0beb764bdb2f24c7d1c7e3",
-      "height": 0,
-      "fee": 24310
-    }
-  ]
-
+  As for :func:`blockchain.scripthash.get_mempool`.
 
 blockchain.address.listunspent
 ------------------------------
 
 Return an ordered list of UTXOs sent to a bitcoin address.
 
-.. note:: This method is deprecated; support will be removed in a later
-   protocol version.  Use :func:`blockchain.scripthash.get_mempool` instead.
-
 **Signature**
 
   .. function:: blockchain.address.listunspent(address)
+  .. deprecated:: 1.2
 
   * *address*
 
@@ -155,61 +71,17 @@ Return an ordered list of UTXOs sent to a bitcoin address.
 
 **Result**
 
-    A list of unspent outputs in blockchain order.  This function
-    takes the mempool into account.  Mempool transactions paying to
-    the address are included at the end of the list in an undefined
-    order.  Any output that is spent in the mempool does not appear.
-    Each output is a dictionary with the following keys:
-
-    * *height*
-
-      The integer height of the block the transaction was confirmed
-      in.  ``0`` if the transaction is in the mempool.
-
-    * *tx_pos*
-
-      The zero-based index of the output in the transaction's list of
-      outputs.
-
-    * *tx_hash*
-
-      The output's transaction hash as a hexadecimal string.
-
-    * *value*
-
-      The output's value in minimum coin units (satoshis).
-
-**Result Example**
-
-::
-
-  [
-    {
-      "tx_pos": 0,
-      "value": 45318048,
-      "tx_hash": "9f2c45a12db0144909b5db269415f7319179105982ac70ed80d76ea79d923ebf",
-      "height": 437146
-    },
-    {
-      "tx_pos": 0,
-      "value": 919195,
-      "tx_hash": "3d2290c93436a3e964cfc2f0950174d8847b1fbe3946432c4784e168da0f019f",
-      "height": 441696
-    }
-  ]
-
+  As for :func:`blockchain.scripthash.listunspent`.
 
 blockchain.address.subscribe
 ----------------------------
 
 Subscribe to a bitcoin address.
 
-.. note:: This method is deprecated; support will be removed in a later
-   protocol version.  Use :func:`blockchain.scripthash.subscribe` instead.
-
 **Signature**
 
   .. function:: blockchain.address.subscribe(address)
+  .. deprecated:: 1.2
 
   *address*
 
@@ -226,7 +98,6 @@ Subscribe to a bitcoin address.
   signature is
 
   .. function:: blockchain.address.subscribe(address, status)
-
 
 blockchain.block.get_header
 ---------------------------
@@ -263,9 +134,10 @@ block at the given height.
 blockchain.block.get_chunk
 --------------------------
 
-Return a concatenated chunk of block headers.  Typically, a chunk
-consists of a fixed number of block headers over which difficulty is
-constant, and at the end of which difficulty is retargeted.
+Return a concatenated chunk of block headers from the main chain.
+Typically, a chunk consists of a fixed number of block headers over
+which difficulty is constant, and at the end of which difficulty is
+retargeted.
 
 In the case of Bitcoin a chunk is 2,016 headers, each of 80 bytes, so
 chunk 5 consists of the block headers from height 10,080 to 12,095
@@ -276,6 +148,7 @@ bandwidth-intensive request.
 **Signature**
 
   .. function:: blockchain.block.get_chunk(index)
+  .. deprecated:: 1.2
 
   *index*
 
@@ -287,6 +160,55 @@ bandwidth-intensive request.
     concatenated together.  As many as headers as are available at the
     implied starting height will be returned; this may range from zero
     to the coin-specific chunk size.
+
+blockchain.block.headers
+------------------------
+
+Return a concatenated chunk of block headers from the main chain.
+
+**Signature**
+
+  .. function:: blockchain.block.headers(start_height, count)
+  .. versionadded:: 1.2
+
+  *start_height*
+
+    The height of the first header requested, a non-negative integer.
+
+  *count*
+
+    The number of headers requested, a non-negative integer.
+
+**Result**
+
+  A dictionary with the following members:
+
+  * *count*
+
+    The number of headers returned, between zero and the number
+    requested.  If the chain has not extended sufficiently far, only
+    the available headers will be returned.  If more headers than
+    *max* were requested at most *max* will be returned.
+
+  * *hex*
+
+    The binary block headers concatenated together in-order as a
+    hexadecimal string.
+
+  * *max*
+
+    The maximum number of headers the server will return in a single
+    request.
+
+**Example Response**
+
+::
+
+  {
+    "count": 2,
+    "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299"
+     "max": 2016
+  }
 
 blockchain.estimatefee
 ----------------------
@@ -355,13 +277,11 @@ blockchain.numblocks.subscribe
 
 Subscribe to receive the block height when a new block is found.
 
-.. note:: This subscription is deprecated in favour of
-  :func:`blockchain.headers.subscribe` which provides more detailed
-  and useful information.
-
 **Signature**
 
   .. function:: blockchain.numblocks.subscribe()
+
+  *Removed in version 1.1.*
 
 **Result**
 
@@ -406,6 +326,222 @@ be accepted to the daemon's memory pool.
 
    0.0
 
+blockchain.scripthash.get_balance
+---------------------------------
+
+Return the confirmed and unconfirmed balances of a :ref:`script hash
+<script hashes>`.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.get_balance(scripthash)
+  .. versionadded:: 1.1
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+**Result**
+
+  A dictionary with keys `confirmed` and `unconfirmed`.  The value of
+  each is the appropriate balance in coin units as a string.
+
+**Result Example**
+
+::
+
+  {
+    "confirmed": "1.03873966",
+    "unconfirmed": "0.236844"
+  }
+
+blockchain.scripthash.get_history
+---------------------------------
+
+Return the confirmed and unconfirmed history of a :ref:`script hash
+<script hashes>`.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.get_history(scripthash)
+  .. versionadded:: 1.1
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+**Result**
+
+  A list of confirmed transactions in blockchain order, with the
+  output of :func:`blockchain.scripthash.get_mempool` appended to the
+  list.  Each confirmed transaction is a dictionary with the following
+  keys:
+
+  * *height*
+
+    The integer height of the block the transaction was confirmed in.
+
+  * *tx_hash*
+
+    The transaction hash in hexadecimal.
+
+  See :func:`blockchain.scripthash.get_mempool` for how mempool
+  transactions are returned.
+
+**Result Examples**
+
+::
+
+  [
+    {
+      "height": 200004,
+      "tx_hash": "acc3758bd2a26f869fcc67d48ff30b96464d476bca82c1cd6656e7d506816412"
+    },
+    {
+      "height": 215008,
+      "tx_hash": "f3e1bf48975b8d6060a9de8884296abb80be618dc00ae3cb2f6cee3085e09403"
+    }
+  ]
+
+::
+
+  [
+    {
+      "fee": 20000,
+      "height": 0,
+      "tx_hash": "9fbed79a1e970343fcd39f4a2d830a6bde6de0754ed2da70f489d0303ed558ec"
+    }
+  ]
+
+blockchain.scripthash.get_mempool
+---------------------------------
+
+Return the unconfirmed transactions of a :ref:`script hash <script
+hashes>`.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.get_mempool(scripthash)
+  .. versionadded:: 1.1
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+**Result**
+
+  A list of mempool transactions in arbitrary order.  Each mempool
+  transaction is a dictionary with the following keys:
+
+  * *height*
+
+    ``0`` if all inputs are confirmed, and ``-1`` otherwise.
+
+  * *tx_hash*
+
+    The transaction hash in hexadecimal.
+
+  * *fee*
+
+    The transaction fee in minimum coin units (satoshis).
+
+**Result Example**
+
+::
+
+  [
+    {
+      "tx_hash": "45381031132c57b2ff1cbe8d8d3920cf9ed25efd9a0beb764bdb2f24c7d1c7e3",
+      "height": 0,
+      "fee": 24310
+    }
+  ]
+
+blockchain.scripthash.listunspent
+---------------------------------
+
+Return an ordered list of UTXOs sent to a script hash.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.listunspent(scripthash)
+  .. versionadded:: 1.1
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+**Result**
+
+  A list of unspent outputs in blockchain order.  This function takes
+  the mempool into account.  Mempool transactions paying to the
+  address are included at the end of the list in an undefined order.
+  Any output that is spent in the mempool does not appear.  Each
+  output is a dictionary with the following keys:
+
+  * *height*
+
+    The integer height of the block the transaction was confirmed in.
+    ``0`` if the transaction is in the mempool.
+
+  * *tx_pos*
+
+    The zero-based index of the output in the transaction's list of
+    outputs.
+
+  * *tx_hash*
+
+    The output's transaction hash as a hexadecimal string.
+
+  * *value*
+
+    The output's value in minimum coin units (satoshis).
+
+**Result Example**
+
+::
+
+  [
+    {
+      "tx_pos": 0,
+      "value": 45318048,
+      "tx_hash": "9f2c45a12db0144909b5db269415f7319179105982ac70ed80d76ea79d923ebf",
+      "height": 437146
+    },
+    {
+      "tx_pos": 0,
+      "value": 919195,
+      "tx_hash": "3d2290c93436a3e964cfc2f0950174d8847b1fbe3946432c4784e168da0f019f",
+      "height": 441696
+    }
+  ]
+
+blockchain.scripthash.subscribe
+-------------------------------
+
+Subscribe to a script hash.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.subscribe(scripthash)
+  .. versionadded:: 1.1
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+**Result**
+
+  The :ref:`status <status>` of the script hash.
+
+**Notifications**
+
+  As this is a subcription, the client will receive a notification
+  when the :ref:`status <status>` of the script hash changes.  Its
+  signature is
+
+  .. function:: blockchain.scripthash.subscribe(address, status)
+
 blockchain.transaction.broadcast
 --------------------------------
 
@@ -414,6 +550,8 @@ Broadcast a transaction to the network.
 **Signature**
 
   .. function:: blockchain.transaction.broadcast(raw_tx)
+  .. versionchanged:: 1.1
+     errors returned as JSON RPC errors rather than as a result.
 
   *raw_tx*
 
@@ -423,13 +561,12 @@ Broadcast a transaction to the network.
 
   The transaction hash as a hexadecimal string.
 
-  .. note:: protocol version 1.0 (only) does not respond according to
-     the JSON RPC specification if an error occurs.  If the daemon
-     rejects the transaction, the result is the error message string
-     from the daemon, as if the call were successful.  The client
-     needs to determine if an error occurred by comparing the result
-     to the expected transaction hash.  Protocol version 1.1 and later
-     return a JSON RPC error as would be expected.
+  **Note** protocol version 1.0 (only) does not respond according to
+  the JSON RPC specification if an error occurs.  If the daemon
+  rejects the transaction, the result is the error message string from
+  the daemon, as if the call were successful.  The client needs to
+  determine if an error occurred by comparing the result to the
+  expected transaction hash.
 
 **Result Examples**
 
@@ -451,6 +588,10 @@ Return a raw transaction.
 **Signature**
 
   .. function:: blockchain.transaction.get(tx_hash, verbose=False)
+  .. versionchanged:: 1.1
+     ignored argument *height* removed
+  .. versionchanged:: 1.2
+     *verbose* argument added
 
   *tx_hash*
 
@@ -458,11 +599,7 @@ Return a raw transaction.
 
   *verbose*
 
-    .. versionadded:: 1.2
-
-    .. note:: Protocol version 1.0 also had a 2nd argument but ignored
-       it.  This was removed in protocol 1.1 which took a single argument
-       only.
+    Whether a verbose coin-specific response is required.
 
 **Result**
 
@@ -541,20 +678,20 @@ and height.
 
   A dictionary with the following keys:
 
-    * *block_height*
+  * *block_height*
 
-      The height of the block the transaction was confirmed in.
+    The height of the block the transaction was confirmed in.
 
-    * *merkle*
+  * *merkle*
 
-      A list of transaction hashes the current hash is paired with,
-      recursively, in order to trace up to obtain merkle root of the
-      block, deepest pairing first.
+    A list of transaction hashes the current hash is paired with,
+    recursively, in order to trace up to obtain merkle root of the
+    block, deepest pairing first.
 
-    * *pos*
+  * *pos*
 
-      The 0-based index of the position of the transaction in the
-      ordered list of transactions in the block.
+    The 0-based index of the position of the transaction in the
+    ordered list of transactions in the block.
 
 **Result Example**
 
@@ -579,6 +716,32 @@ and height.
     "pos": 710
   }
 
+blockchain.utxo.get_address
+---------------------------
+
+Return the address paid to by a UTXO.
+
+**Signature**
+
+  .. function:: blockchain.utxo.get_address(tx_hash, index)
+  *Optional in version 1.0.*
+  *Removed in version 1.1.*
+
+  *tx_hash*
+
+    The transaction hash as a hexadecimal string.
+
+  *index*
+
+    The zero-based index of the UTXO in the transaction.
+
+**Result**
+
+  A Base58 address string, or :const:`null`.  If the transaction
+  doesn't exist, the index is out of range, or the output is not paid
+  to an address, :const:`null` must be returned.  If the output is
+  spent :const:`null` *may* be returned.
+
 mempool.get_fee_histogram
 -------------------------
 
@@ -588,7 +751,6 @@ mempool.get_fee_histogram
 **Signature**
 
   .. function:: mempool.get_fee_histogram()
-
   .. versionadded:: 1.2
 
 **Result**
@@ -793,10 +955,11 @@ server.version
 
   Identify the client to the server and negotiate the protocol version.
 
-
 **Signature**
 
   .. function:: server.version(client_name="", protocol_version="1.1")
+  .. versionchanged:: 1.1
+     *protocol_version* is not ignored.
 
   * *client_name*
 
@@ -808,9 +971,6 @@ server.version
     string.  If ``protocol_min`` and ``protocol_max`` are the same,
     they can be passed as a single string rather than as an array of
     two strings, as for the default value.
-
-    .. versionadded:: 1.1
-       *protocol_version* is not ignored.
 
   The server should use the highest protocol version both support::
 

@@ -32,7 +32,7 @@ available .
    features
    HOWTO
    ENVIRONMENT
-   protocol-new
+   PROTOCOL
    PEER_DISCOVERY
    RPC-INTERFACE
    ARCHITECTURE
