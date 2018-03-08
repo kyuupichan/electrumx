@@ -489,7 +489,6 @@ class DeserializerDecred(Deserializer):
     def read_tx(self):
         start = self.cursor
         version = self._read_le_int32()
-        assert version == 1 # TODO check other versions for segwit
         inputs = self._read_inputs()
         outputs = self._read_outputs()
         locktime = self._read_le_uint32()
