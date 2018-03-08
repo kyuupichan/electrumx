@@ -47,17 +47,20 @@ Removed methods
 Version 1.2
 ===========
 
-Changes:
+Changes
+-------
 
   * :func:`blockchain.transaction.get` now has an optional parameter
     *verbose*.
 
-New methods:
+New methods
+-----------
 
   * :func:`blockchain.block.headers`
   * :func:`mempool.get_fee_histogram`
 
-Deprecated methods:
+Deprecated methods
+------------------
 
   * :func:`blockchain.block.get_chunk`.  Switch to
     :func:`blockchain.block.headers`
