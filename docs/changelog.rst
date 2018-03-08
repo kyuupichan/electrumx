@@ -8,6 +8,26 @@ revert to 1.1.x if you wish.  The initial synchronisation process
 should be around 10-15% faster than 1.1, owing to this change and
 Justin Arthur's optimisations from 1.1.1.
 
+Version 1.3
+-----------
+
+* Switch to :ref:`version 1.2` of the protocol.
+  :func:`mempool.get_fee_histogram` implementation contributed by ecdsa,
+  verbose mode of :func:`blockchain.transaction.get` by gdassori.
+* :func:`blockchain.scripthash.listunspent` now takes into account mempool
+  spends and receipts.
+* Improved client notification handling.
+* Wait for mempool to fully sync before serving.
+* Documentation moved to `readthedocs.io
+  <https://electrumx.readthedocs.io/>`_.  Rewritten and improved
+  protocol documentation.
+* new/updated coins: Chips (cipig), Feathercoin (lclc), Zclassic(heyrhett),
+  Dash (thelazier), NYC (xarakas), Koto (wo01), BitcoinZ (cipig), BitCore
+  (cipig), Fujicoin (fujicoin), Bitcoin Atom (erasmospunk), Deanrius (carsenk),
+  SNG (blackjok3rtt).
+* Minor fixes and improvements: duckartes, blin00, bauerj,
+  erasmospunk, SomberNight, romanz.
+
 Version 1.2.1
 -------------
 
@@ -69,74 +89,12 @@ it's best they become separate coins now.
 - onion peers only reported if can connect; hard-coded exception removed
 - small fix for blockchain.transaction.broadcast
 
-Version 1.1pre2
----------------
-
-- peerdisc: handle protocol 1.1 server replies
-- issue `#251`_: fix protocol version reported in server.peers.subscribe
-- fix handling of failed transaction broadcast
-- fix typos (SomberNight)
-- doc and test updates
-- dash: return errors in JSON error field for protocol 1.1
-
-Version 1.1pre1
----------------
-
-Many changes, mostly to prepare for support of Electrum protocol 1.1
-which the next Electrum client release will use.
-
-*NOTE*: the **COIN** environment variable is now mandatory, and if you
-were running for any bitcoin flavour (Cash, Segwit, mainnet or
-testnet) you will need to update your **COIN** and **NET** environment
-variable settings as the old ones will no longer work.
-
-- implement protocol version 1.1 and update protocol documentation
-- rework lib/coins.py for the various bitcoin flavours
-- show protocol version in "sessions" ElectrumX RPC call
-- permit **HOST** envvar to be a comma-separated list
-- daemon abstraction refactoring (erasmospunk)
-- permit alternative event loop policies (based on suggestion / work
-  of JustinTArthur)
-- misc configuration updates (SubPar)
-- add Neblio support (neblioteam) and Bitbay (anoxxxy)
-- HOWTO.rst update for running on privileged port (EagleTM)
-- issues closed: exclude test dirs from installation (`#223`_).
-
-Version 1.0.17
---------------
-
-- fix #227 introduced in 1.0.16
-
-Version 1.0.16
---------------
-
-- updated server lists for post-fork.  If you are on the Segwit chain
-  you should have NET be "bitcoin-segwit", and if on the Bitcoin Cash chain
-  continue to use "mainnet".
-- binding address fix for multi-homed machines (mmouse)
-- listen to IPv4 and IPv6 local interfaces
-- add Fujicoin (fujicoin), Crown (Extreemist), RegTest (RCasatta),
-  Monacoin (cryptocoin-junkey)
-- bug fixes and updates (Kefkius, mmouse, thesamesam, cryptocoin-junkey,
-  jtarthur)
-
-Version 1.0.15
---------------
-
-- split server networks faster if a fork is detected
-- minor speedup
-- add Vertcoin support (erasmospunk)
-- update Faircoin (thokon00)
-
-
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
 LKaFk4KkVpw9pYoUpbckQSKKgCVC4oj78b
 
-.. _#223: https://github.com/kyuupichan/electrumx/issues/223
-.. _#251: https://github.com/kyuupichan/electrumx/issues/251
 .. _#277: https://github.com/kyuupichan/electrumx/issues/277
 .. _#287: https://github.com/kyuupichan/electrumx/issues/287
-.. _#302: https://github.com/kyuupichan/electrumx/issues/287
+.. _#302: https://github.com/kyuupichan/electrumx/issues/302

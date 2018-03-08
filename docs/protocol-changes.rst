@@ -44,6 +44,8 @@ Removed methods
   * :func:`blockchain.utxo.get_address`
   * :func:`blockchain.numblocks.subscribe`
 
+.. _version 1.2:
+
 Version 1.2
 ===========
 

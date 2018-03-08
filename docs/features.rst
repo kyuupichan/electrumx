@@ -64,8 +64,10 @@ and associated complications.
 Roadmap
 =======
 
-- offloading more work of wallet synchronization to the client
-- supporting better client privacy
-- wallet server engine
-- new features such as possibly adding label server functionality
-- potentially move some functionality to C or C++
+* switch to the `aiorpcX <https://github.com/kyuupichan/aiorpcX>`_
+  package for RPC and proxy handling
+* offloading more work of wallet synchronization to the client
+* supporting better client privacy
+* wallet server engine
+* new features such as possibly adding label server functionality
+* potentially move some functionality to C or C++
