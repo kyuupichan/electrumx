@@ -13,6 +13,10 @@ A reimplementation of Electrum-Server for a future with bigger blocks.
   :Language: Python (>= 3.6)
   :Author: Neil Booth
 
+Source Code
+===========
+
+See the respository on `github <https://github.com/kyuupichan/electrumx/>`_.
 
 Getting Started
 ===============
