@@ -329,6 +329,12 @@ class ElectrumX(SessionBase):
 
         return banner
 
+    def ping(self):
+        '''Serves as a connection keep-alive mechanism and for the client to
+        confirm the server is still responding.
+        '''
+        return None
+
     def server_version(self, client_name=None, protocol_version=None):
         '''Returns the server version as a string.
 
@@ -463,6 +469,7 @@ class ElectrumX(SessionBase):
                 'mempool.get_fee_histogram':
                 controller.mempool_get_fee_histogram,
                 'blockchain.block.headers': self.block_headers,
+                'server.ping': self.ping,
             })
 
         self.electrumx_handlers = handlers

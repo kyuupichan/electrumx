@@ -745,8 +745,8 @@ Return the address paid to by a UTXO.
 mempool.get_fee_histogram
 -------------------------
 
-  Return a histogram of the fee rates paid by transactions in the
-  memory pool, weighted by transaction size.
+Return a histogram of the fee rates paid by transactions in the memory
+pool, weighted by transaction size.
 
 **Signature**
 
@@ -776,8 +776,8 @@ mempool.get_fee_histogram
 server.add_peer
 ---------------
 
-  This call is intended for a new server to get itself into a server's
-  peers list, and should not be used by wallet clients.
+A newly-started server uses this call to get itself into other servers'
+peers lists.  It sould not be used by wallet clients.
 
 **Signature**
 
@@ -800,7 +800,7 @@ server.add_peer
 server.banner
 -------------
 
-  Return a banner to be shown in the Electrum console.
+Return a banner to be shown in the Electrum console.
 
 **Signature**
 
@@ -820,7 +820,7 @@ server.banner
 server.donation_address
 -----------------------
 
-  Return a server donation address.
+Return a server donation address.
 
 **Signature**
 
@@ -840,7 +840,7 @@ server.donation_address
 server.features
 ---------------
 
-  Return a list of features and services supported by the server.
+Return a list of features and services supported by the server.
 
 **Signature**
 
@@ -949,17 +949,35 @@ server.peers.subscribe
   the default port for the coin network is implied.  If 's' or 't' is
   missing then the server does not support that transport.
 
+server.ping
+-----------
+
+Ping the server to ensure it is responding, and to keep the session
+alive.  The server may disconnect clients that have sent no requests
+for roughly 10 minutes.
+
+**Signature**
+
+  .. function:: server.ping()
+  .. versionadded:: 1.2
+
+**Result**
+
+  Returns :const:`null`.
 
 server.version
 --------------
 
-  Identify the client to the server and negotiate the protocol version.
+Identify the client to the server and negotiate the protocol version.
 
 **Signature**
 
   .. function:: server.version(client_name="", protocol_version="1.1")
   .. versionchanged:: 1.1
      *protocol_version* is not ignored.
+  .. versionchanged:: 1.2
+     Use :func:`server.ping` rather than sending version requests as a
+     ping mechanism.
 
   * *client_name*
 

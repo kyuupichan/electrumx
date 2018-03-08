@@ -58,6 +58,7 @@ New methods
 
   * :func:`blockchain.block.headers`
   * :func:`mempool.get_fee_histogram`
+  * :func:`server.ping`
 
 Deprecated methods
 ------------------
