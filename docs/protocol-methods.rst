@@ -406,6 +406,179 @@ be accepted to the daemon's memory pool.
 
    0.0
 
+blockchain.transaction.broadcast
+--------------------------------
+
+Broadcast a transaction to the network.
+
+**Signature**
+
+  .. function:: blockchain.transaction.broadcast(raw_tx)
+
+  *raw_tx*
+
+    The raw transaction as a hexadecimal string.
+
+**Result**
+
+  The transaction hash as a hexadecimal string.
+
+  .. note:: protocol version 1.0 (only) does not respond according to
+     the JSON RPC specification if an error occurs.  If the daemon
+     rejects the transaction, the result is the error message string
+     from the daemon, as if the call were successful.  The client
+     needs to determine if an error occurred by comparing the result
+     to the expected transaction hash.  Protocol version 1.1 and later
+     return a JSON RPC error as would be expected.
+
+**Result Examples**
+
+::
+
+   "a76242fce5753b4212f903ff33ac6fe66f2780f34bdb4b33b175a7815a11a98e"
+
+Protocol version 1.0 returning an error as the result:
+
+::
+
+  "258: txn-mempool-conflict"
+
+blockchain.transaction.get
+--------------------------
+
+Return a raw transaction.
+
+**Signature**
+
+  .. function:: blockchain.transaction.get(tx_hash, verbose=False)
+
+  *tx_hash*
+
+    The transaction hash as a hexadecimal string.
+
+  *verbose*
+
+    .. versionadded:: 1.2
+
+    .. note:: Protocol version 1.0 also had a 2nd argument but ignored
+       it.  This was removed in protocol 1.1 which took a single argument
+       only.
+
+**Result**
+
+    If *verbose* is :const:`False`, the raw transaction as a
+    hexadecimal string.  If :const:`True`, the result is coin-specific
+    and whatever the coin daemon returns when asked for a verbose form
+    of the raw transaction.
+
+**Example Results**
+
+When *verbose* is :const:`False`::
+
+  "01000000015bb9142c960a838329694d3fe9ba08c2a6421c5158d8f7044cb7c48006c1b48"
+  "4000000006a4730440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a824"
+  "6a137f29d0fc02201de12de9c056912a4e581a62d12fb5f43ee6c08ed0238c32a1ee76921"
+  "3ca8b8b412103bcf9a004f1f7a9a8d8acce7b51c983233d107329ff7c4fb53e44c855dbe1"
+  "f6a4feffffff02c6b68200000000001976a9141041fb024bd7a1338ef1959026bbba86006"
+  "4fe5f88ac50a8cf00000000001976a91445dac110239a7a3814535c15858b939211f85298"
+  "88ac61ee0700"
+
+When *verbose* is :const:`True`::
+
+ {
+   "blockhash": "0000000000000000015a4f37ece911e5e3549f988e855548ce7494a0a08b2ad6",
+   "blocktime": 1520074861,
+   "confirmations": 679,
+   "hash": "36a3692a41a8ac60b73f7f41ee23f5c917413e5b2fad9e44b34865bd0d601a3d",
+   "hex": "01000000015bb9142c960a838329694d3fe9ba08c2a6421c5158d8f7044cb7c48006c1b484000000006a4730440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a8246a137f29d0fc02201de12de9c056912a4e581a62d12fb5f43ee6c08ed0238c32a1ee769213ca8b8b412103bcf9a004f1f7a9a8d8acce7b51c983233d107329ff7c4fb53e44c855dbe1f6a4feffffff02c6b68200000000001976a9141041fb024bd7a1338ef1959026bbba860064fe5f88ac50a8cf00000000001976a91445dac110239a7a3814535c15858b939211f8529888ac61ee0700",
+   "locktime": 519777,
+   "size": 225,
+   "time": 1520074861,
+   "txid": "36a3692a41a8ac60b73f7f41ee23f5c917413e5b2fad9e44b34865bd0d601a3d",
+   "version": 1,
+   "vin": [ {
+     "scriptSig": {
+       "asm": "30440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a8246a137f29d0fc02201de12de9c056912a4e581a62d12fb5f43ee6c08ed0238c32a1ee769213ca8b8b[ALL|FORKID] 03bcf9a004f1f7a9a8d8acce7b51c983233d107329ff7c4fb53e44c855dbe1f6a4",
+       "hex": "4730440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a8246a137f29d0fc02201de12de9c056912a4e581a62d12fb5f43ee6c08ed0238c32a1ee769213ca8b8b412103bcf9a004f1f7a9a8d8acce7b51c983233d107329ff7c4fb53e44c855dbe1f6a4"
+     },
+     "sequence": 4294967294,
+     "txid": "84b4c10680c4b74c04f7d858511c42a6c208bae93f4d692983830a962c14b95b",
+     "vout": 0}],
+   "vout": [ { "n": 0,
+              "scriptPubKey": { "addresses": [ "12UxrUZ6tyTLoR1rT1N4nuCgS9DDURTJgP"],
+                                "asm": "OP_DUP OP_HASH160 1041fb024bd7a1338ef1959026bbba860064fe5f OP_EQUALVERIFY OP_CHECKSIG",
+                                "hex": "76a9141041fb024bd7a1338ef1959026bbba860064fe5f88ac",
+                                "reqSigs": 1,
+                                "type": "pubkeyhash"},
+              "value": 0.0856647},
+            { "n": 1,
+              "scriptPubKey": { "addresses": [ "17NMgYPrguizvpJmB1Sz62ZHeeFydBYbZJ"],
+                                "asm": "OP_DUP OP_HASH160 45dac110239a7a3814535c15858b939211f85298 OP_EQUALVERIFY OP_CHECKSIG",
+                                "hex": "76a91445dac110239a7a3814535c15858b939211f8529888ac",
+                                "reqSigs": 1,
+                                "type": "pubkeyhash"},
+              "value": 0.1360904}]}
+
+blockchain.transaction.get_merkle
+---------------------------------
+
+Return the markle branch to a confirmed transaction given its hash
+and height.
+
+**Signature**
+
+  .. function:: blockchain.transaction.get_merkle(tx_hash, height)
+
+  *tx_hash*
+
+    The transaction hash as a hexadecimal string.
+
+  *height*
+
+    The height at which it was confirmed, an integer.
+
+**Result**
+
+  A dictionary with the following keys:
+
+    * *block_height*
+
+      The height of the block the transaction was confirmed in.
+
+    * *merkle*
+
+      A list of transaction hashes the current hash is paired with,
+      recursively, in order to trace up to obtain merkle root of the
+      block, deepest pairing first.
+
+    * *pos*
+
+      The 0-based index of the position of the transaction in the
+      ordered list of transactions in the block.
+
+**Result Example**
+
+::
+
+  {
+    "merkle":
+    [
+      "713d6c7e6ce7bbea708d61162231eaa8ecb31c4c5dd84f81c20409a90069cb24",
+      "03dbaec78d4a52fbaf3c7aa5d3fccd9d8654f323940716ddf5ee2e4bda458fde",
+      "e670224b23f156c27993ac3071940c0ff865b812e21e0a162fe7a005d6e57851",
+      "369a1619a67c3108a8850118602e3669455c70cdcdb89248b64cc6325575b885",
+      "4756688678644dcb27d62931f04013254a62aeee5dec139d1aac9f7b1f318112",
+      "7b97e73abc043836fd890555bfce54757d387943a6860e5450525e8e9ab46be5",
+      "61505055e8b639b7c64fd58bce6fc5c2378b92e025a02583303f69930091b1c3",
+      "27a654ff1895385ac14a574a0415d3bbba9ec23a8774f22ec20d53dd0b5386ff",
+      "5312ed87933075e60a9511857d23d460a085f3b6e9e5e565ad2443d223cfccdc",
+      "94f60b14a9f106440a197054936e6fb92abbd69d6059b38fdf79b33fc864fca0",
+      "2d64851151550e8c4d337f335ee28874401d55b358a66f1bafab2c3e9f48773d"
+    ],
+    "block_height": 450538,
+    "pos": 710
+  }
+
 mempool.get_fee_histogram
 -------------------------
 
