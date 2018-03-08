@@ -19,8 +19,8 @@ from server.controller import Controller
 def main():
     '''Set up logging and run the server.'''
     logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)-9s %(message)-100s '
-                               '%(name)s [%(filename)s:%(lineno)d]')
+                        format='%(asctime)s %(levelname)-7s %(message)-100s '
+                               '[%(filename)s:%(lineno)d]')
     logging.info('ElectrumX server starting')
     try:
         controller = Controller(Env())
