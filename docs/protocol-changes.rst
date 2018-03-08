@@ -52,6 +52,8 @@ Changes
 
   * :func:`blockchain.transaction.get` now has an optional parameter
     *verbose*.
+  * :func:`blockchain.headers.subscribe` now has an optional parameter
+    *raw*.
 
 New methods
 -----------
@@ -75,3 +77,4 @@ Deprecated methods
     :func:`blockchain.scripthash.listunspent`.
   * :func:`blockchain.address.subscribe`.  Switch to
     :func:`blockchain.scripthash.subscribe`.
+  * :func:`blockchain.headers.subscribe` with *raw* other than :const:`True`.

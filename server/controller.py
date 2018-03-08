@@ -297,16 +297,20 @@ class Controller(ServerBase):
         for session in self.sessions:
             session.notify_peers(updates)
 
-    def electrum_header(self, height):
+    def raw_header(self, height):
         '''Return the binary header at the given height.'''
-        if height in self.header_cache:
-            return self.header_cache[height]
         header, n = self.bp.read_headers(height, 1)
         if n != 1:
             raise RPCError('height {:,d} out of range'.format(height))
-        header = self.coin.electrum_header(header, height)
-        self.header_cache[height] = header
         return header
+
+    def electrum_header(self, height):
+        '''Return the deserialized header at the given height.'''
+        if height not in self.header_cache:
+            raw_header = self.raw_header(height)
+            self.header_cache[height] = self.coin.electrum_header(raw_header,
+                                                                  height)
+        return self.header_cache[height]
 
     def session_delay(self, session):
         priority = self.session_priority(session)

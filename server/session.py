@@ -108,6 +108,7 @@ class ElectrumX(SessionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
+        self.subscribe_headers_raw = False
         self.subscribe_height = False
         self.notified_height = None
         self.max_send = self.env.max_send
@@ -164,7 +165,7 @@ class ElectrumX(SessionBase):
         if height_changed:
             self.notified_height = height
             if self.subscribe_headers:
-                args = (self.controller.electrum_header(height), )
+                args = (self.subscribe_headers_result(height), )
                 self.send_notification('blockchain.headers.subscribe', args)
             if self.subscribe_height:
                 args = (height, )
@@ -180,12 +181,25 @@ class ElectrumX(SessionBase):
         '''Return the current flushed database height.'''
         return self.bp.db_height
 
-    def headers_subscribe(self):
+    def assert_boolean(self, value):
+        '''Return param value it is boolean otherwise raise an RPCError.'''
+        if value in (False, True):
+            return value
+        raise RPCError('{} should be a boolean value'.format(value))
+
+    def subscribe_headers_result(self, height):
+        '''The result of a header subscription for the given height.'''
+        if self.subscribe_headers_raw:
+            raw_header = self.controller.raw_header(height)
+            return {'hex': raw_header.hex(), 'height': height}
+        return self.controller.electrum_header(height)
+
+    def headers_subscribe(self, raw=False):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
-        height = self.height()
-        self.notified_height = height
-        return self.controller.electrum_header(height)
+        self.subscribe_headers_raw = self.assert_boolean(raw)
+        self.notified_height = self.height()
+        return self.subscribe_headers_result(self.height())
 
     def numblocks_subscribe(self):
         '''Subscribe to get height of new blocks.'''

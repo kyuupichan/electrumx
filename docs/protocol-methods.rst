@@ -243,12 +243,51 @@ Subscribe to receive block headers when a new block is found.
 
 **Signature**
 
-  .. function:: blockchain.headers.subscribe()
+  .. function:: blockchain.headers.subscribe(raw=False)
+  .. versionchanged:: 1.2
+     Optional *raw* parameter added.
+
+  * *raw*
+
+    :const:`False` or :const:`True`.  The value :const:`False` is
+    deprecated.
 
 **Result**
 
-  The coin-specific :ref:`deserialized header <deserialized header>`
-  of the current block chain tip.
+  The header of the current block chain tip.  If *raw* is
+  :const:`True` the result is a dictionary with two members:
+
+  * *hex*
+
+    The binary header as a hexadecimal string.
+
+  * *height*
+
+    The height of the header, an integer.
+
+  If *raw* is :const:`False` the result is the coin-specific
+  :ref:`deserialized header <deserialized header>`.
+
+**Example Result**
+
+  With *raw* :const:`False`::
+
+   {
+     "bits": 402858285,
+     "block_height": 520481,
+     "merkle_root": "8e8e932eb858fd53cf09943d7efc9a8f674dc1363010ee64907a292d2fb0c25d",
+     "nonce": 3288656012,
+     "prev_block_hash": "000000000000000000b512b5d9fc7c5746587268547c04aa92383aaea0080289",
+     "timestamp": 1520495819,
+     "version": 536870912
+   }
+
+  With *raw* :const:`True`::
+
+   {
+     "height": 520481,
+     "hex": "00000020890208a0ae3a3892aa047c5468725846577cfcd9b512b50000000000000000005dc2b02f2d297a9064ee103036c14d678f9afc7e3d9409cf53fd58b82e938e8ecbeca05a2d2103188ce804c4"
+   }
 
 **Notifications**
 
@@ -257,13 +296,14 @@ Subscribe to receive block headers when a new block is found.
 
     .. function:: blockchain.headers.subscribe(header)
 
-    * *header* The coin-specific :ref:`deserialized header
-      <deserialized header>` of the new block chain tip.
+    * *header*
+
+      See **Result** above.
 
 .. note:: should a new block arrive quickly, perhaps while the server
   is still processing prior blocks, the server may only notify of the
   most recent chain tip.  The protocol does not guarantee notification
-  of all intermediate blocks.
+  of all intermediate block headers.
 
   In a similar way the client must be prepared to handle chain
   reorganisations.  Should a re-org happen the new chain tip will not
@@ -293,13 +333,6 @@ Subscribe to receive the block height when a new block is found.
   when a new block is found.  The notification's signature is:
 
     .. function:: blockchain.numblocks.subscribe(height)
-
-.. note:: should a new block arrive quickly, perhaps while the server
-  is still processing prior blocks, the server may only notify of the
-  most recent height.  The protocol does not guarantee notification of
-  all intermediate block heights.  Similarly if a chain reorganization
-  occurs resulting in the same chain height, the client may or may not
-  receive a notification.
 
 blockchain.relayfee
 -------------------
@@ -724,8 +757,8 @@ Return the address paid to by a UTXO.
 **Signature**
 
   .. function:: blockchain.utxo.get_address(tx_hash, index)
-  *Optional in version 1.0.*
-  *Removed in version 1.1.*
+
+  *Optional in version 1.0.  Removed in version 1.1.*
 
   *tx_hash*
 
