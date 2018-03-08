@@ -75,7 +75,6 @@ A typical result is as follows (with annotated comments)::
     "logged": 0,                   # The number of sessions being logged
     "paused": 0,                   # The number of paused sessions
     "peers": {                     # Various categories of server peers
-                                   # as determined by :ref:`Peer Discovery`
         "bad": 0,                  # Not responding or invalid height etc.
         "good": 28,                # Responding with good data
         "never": 0,                # Never managed to connect
@@ -96,6 +95,8 @@ the error count reaches a certain level (currently ``10``) that client
 is disconnected.
 
 :ref:`logging <session logging>` of sessions can be enabled by RPC.
+
+For more information on peers see :ref:`here <peers>`.
 
 Clients that are slow to consume data sent to them are :dfn:`paused`
 until their socket buffer drains sufficiently, at which point
@@ -140,6 +141,8 @@ in the logs or with the `sessions`_ RPC command::
 The return value shows this command turned off logging for sesssions
 0, 1 and 2.  It was turned on for sessions 3 and 4, and there was no
 session 5.
+
+.. _peers:
 
 peers
 -----
