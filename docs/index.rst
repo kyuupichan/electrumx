@@ -55,7 +55,7 @@ Documentation
    ENVIRONMENT
    PROTOCOL
    PEER_DISCOVERY
-   RPC-INTERFACE
+   rpc-interface
    ARCHITECTURE
    authors
 

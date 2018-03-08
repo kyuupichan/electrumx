@@ -1,3 +1,5 @@
+.. _Peer Discovery:
+
 Peer Discovery
 ==============
 
