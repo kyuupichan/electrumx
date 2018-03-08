@@ -30,6 +30,7 @@ available .
 .. toctree::
 
    features
+   changelog
    HOWTO
    ENVIRONMENT
    PROTOCOL
