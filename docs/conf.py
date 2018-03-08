@@ -11,11 +11,11 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
+from server.version import VERSION
 
 # -- Project information -----------------------------------------------------
 
@@ -24,9 +24,9 @@ copyright = '2016-2018, Neil Booth'
 author = 'Neil Booth'
 
 # The short X.Y version
-version = ''
+version = VERSION.split()[-1]
 # The full version, including alpha/beta/rc tags
-release = '1.2.1'
+release = VERSION
 
 
 # -- General configuration ---------------------------------------------------

@@ -56,6 +56,8 @@ Changes
     *verbose*.
   * :func:`blockchain.headers.subscribe` now has an optional parameter
     *raw*.
+  * :func:`server.vesrion` should not be used for "ping" functionality;
+    use the new :func:`server.ping` method instead.
 
 New methods
 -----------

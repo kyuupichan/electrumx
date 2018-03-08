@@ -957,8 +957,8 @@ Return a list of features and services supported by the server.
 server.peers.subscribe
 ----------------------
 
-  Return a list of peer servers.  Despite the name this is not a
-  subscription and the server must send no notifications.
+Return a list of peer servers.  Despite the name this is not a
+subscription and the server must send no notifications.
 
 **Signature**
 

@@ -9,14 +9,28 @@ ElectrumX
 
 A reimplementation of Electrum-Server for a future with bigger blocks.
 
-  :Licence: MIT
-  :Language: Python (>= 3.6)
-  :Author: Neil Booth
+The current version is |release|.
 
 Source Code
 ===========
 
-See the respository on `github <https://github.com/kyuupichan/electrumx/>`_.
+The project is hosted on `GitHub
+<https://github.com/kyuupichan/electrumx/>`_.  and uses `Travis
+<https://travis-ci.org/kyuupichan/electrumx>`_ for Continuous
+Integration.
+
+Please submit an issue on the `bug tracker
+<https://github.com/kyuupichan/electrumx/issues>`_ if you have found a
+bug or have a suggestion to improve the server.
+
+Authors and License
+===================
+
+Neil Booth wrote the vast majority of the code; see :ref:`Authors`.
+Python version at least 3.6 is required.
+
+The code is released under the `MIT Licence
+<https://github.com/kyuupichan/electrumx/LICENCE>`_.
 
 Getting Started
 ===============
@@ -30,6 +44,8 @@ available .
 .. _installer: https://github.com/bauerj/electrumx-installer
 .. _Dockerfile: https://github.com/lukechilds/docker-electrumx
 
+Documentation
+=============
 
 .. toctree::
 
@@ -41,7 +57,7 @@ available .
    PEER_DISCOVERY
    RPC-INTERFACE
    ARCHITECTURE
-
+   authors
 
 Indices and tables
 ==================
