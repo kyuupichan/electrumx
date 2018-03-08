@@ -478,17 +478,34 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
         return h
 
 
-class BitcoinGoldRegtest(BitcoinGold):
-    FORK_HEIGHT = 3000
+class BitcoinGoldTestnet(BitcoinGold):
+    FORK_HEIGHT = 1
+    SHORTNAME = "TBTG"
     XPUB_VERBYTES = bytes.fromhex("043587CF")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6F")
     P2SH_VERBYTES = [bytes.fromhex("C4")]
     WIF_BYTE = bytes.fromhex("EF")
     TX_COUNT = 0
-    TX_COUNT_HEIGHT = 3000
+    TX_COUNT_HEIGHT = 1
+    NET = 'testnet'
+    RPC_PORT = 18338
+    GENESIS_HASH = ('00000000e0781ebe24b91eedc293adfe'
+                    'a2f557b53ec379e78959de3853e6f9f6')
+
+
+class BitcoinGoldRegtest(BitcoinGold):
+    FORK_HEIGHT = 2000
+    SHORTNAME = "TBTG"
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTES = [bytes.fromhex("C4")]
+    WIF_BYTE = bytes.fromhex("EF")
+    TX_COUNT = 0
+    TX_COUNT_HEIGHT = 1
     NET = 'regtest'
-    RPC_PORT=18444
+    RPC_PORT = 18444
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
                     'bf5beb436012afca590b1a11466e2206')
 
@@ -566,11 +583,6 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
     ]
-
-
-class BitcoinGoldTestnet(BitcoinTestnetMixin, BitcoinGold):
-    NAME = "BitcoinGold"
-    FORK_HEIGHT = 1210320
 
 
 class BitcoinSegwitRegtest(BitcoinSegwitTestnet):
