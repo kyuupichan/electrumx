@@ -1470,5 +1470,5 @@ class DecredTestnet(Decred):
     TX_COUNT = 3176305
     TX_COUNT_HEIGHT = 254198
     TX_PER_BLOCK = 1000
-    RPC_PORT = 19119
+    RPC_PORT = 19109
     
