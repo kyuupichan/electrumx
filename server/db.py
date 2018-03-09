@@ -19,7 +19,7 @@ from collections import namedtuple
 import lib.util as util
 from lib.hash import hash_to_str
 from server.storage import db_class
-from server.version import VERSION
+from server.version import VERSION, PROTOCOL_MIN, PROTOCOL_MAX
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
@@ -131,6 +131,8 @@ class DB(util.LoggedClass):
         self.read_history_state()
 
         self.logger.info('software version: {}'.format(VERSION))
+        self.logger.info('supported protocol versions: {}-{}'
+                         .format(PROTOCOL_MIN, PROTOCOL_MAX))
         self.logger.info('DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
         self.logger.info('network: {}'.format(self.coin.NET))
