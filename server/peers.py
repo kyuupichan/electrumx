@@ -240,7 +240,6 @@ class PeerManager(util.LoggedClass):
         self.permit_onion_peer_time = time.time()
         self.proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
                                 loop=self.loop)
-        self.import_peers()
 
     def my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -426,6 +425,8 @@ class PeerManager(util.LoggedClass):
         if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
             return
+
+        self.import_peers()
 
         # Wait a few seconds after starting the proxy detection loop
         # for proxy detection to succeed
