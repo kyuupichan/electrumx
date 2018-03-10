@@ -11,7 +11,7 @@ setuptools.setup(
     # "x11_hash" package (1.4) is required to sync DASH network.
     # "tribus_hash" package is required to sync Denarius network.
     # "blake256" package is required to sync Decred network.
-    install_requires=['plyvel', 'pylru', 'aiohttp >= 1'],
+    install_requires=['aiorpcX >= 0.4.1', 'plyvel', 'pylru', 'aiohttp >= 1'],
     packages=setuptools.find_packages(exclude=['tests']),
     description='ElectrumX Server',
     author='Neil Booth',
@@ -20,9 +20,11 @@ setuptools.setup(
     url='https://github.com/kyuupichan/electrumx/',
     long_description='Server implementation for the Electrum wallet',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
+        'Framework :: AsyncIO',
         'Topic :: Internet',
         'License :: OSI Approved :: MIT License',
         'Operating System :: Unix',
+        "Programming Language :: Python :: 3.6",
     ],
 )
