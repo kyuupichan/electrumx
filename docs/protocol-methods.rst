@@ -573,7 +573,7 @@ Subscribe to a script hash.
   when the :ref:`status <status>` of the script hash changes.  Its
   signature is
 
-  .. function:: blockchain.scripthash.subscribe(address, status)
+  .. function:: blockchain.scripthash.subscribe(scripthash, status)
 
 blockchain.transaction.broadcast
 --------------------------------
