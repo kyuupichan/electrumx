@@ -8,7 +8,6 @@
 '''Peer management.'''
 
 import asyncio
-import logging
 import random
 import socket
 import ssl
@@ -216,7 +215,7 @@ class PeerSession(JSONSession):
         self.close_connection()
 
 
-class PeerManager(object):
+class PeerManager(util.LoggedClass):
     '''Looks after the DB of peer network servers.
 
     Attempts to maintain a connection with up to 8 peers.
@@ -302,7 +301,7 @@ class PeerManager(object):
             elif check_ports:
                 for match in matches:
                     if match.check_ports(peer):
-                        logging.info('ports changed for {}'.format(peer))
+                        self.logger.info('ports changed for {}'.format(peer))
                         retry = True
 
         if new_peers:
@@ -314,8 +313,8 @@ class PeerManager(object):
             else:
                 use_peers = new_peers
             for n, peer in enumerate(use_peers):
-                logging.info('accepted new peer {:d}/{:d} {} from {} '
-                             .format(n + 1, len(use_peers), peer, source))
+                self.logger.info('accepted new peer {:d}/{:d} {} from {} '
+                                 .format(n + 1, len(use_peers), peer, source))
             self.peers.update(use_peers)
 
         if retry:
@@ -332,12 +331,12 @@ class PeerManager(object):
     async def on_add_peer(self, features, source_info):
         '''Add a peer (but only if the peer resolves to the source).'''
         if not source_info:
-            logging.info('ignored add_peer request: no source info')
+            self.log_info('ignored add_peer request: no source info')
             return False
         source = source_info[0]
         peers = Peer.peers_from_features(features, source)
         if not peers:
-            logging.info('ignored add_peer request: no peers given')
+            self.log_info('ignored add_peer request: no peers given')
             return False
 
         # Just look at the first peer, require it
@@ -358,12 +357,12 @@ class PeerManager(object):
                 reason = 'source-destination mismatch'
 
         if permit:
-            logging.info('accepted add_peer request from {} for {}'
-                         .format(source, host))
+            self.log_info('accepted add_peer request from {} for {}'
+                          .format(source, host))
             self.add_peers([peer], check_ports=True)
         else:
-            logging.warning('rejected add_peer request from {} for {} ({})'
-                            .format(source, host, reason))
+            self.log_warning('rejected add_peer request from {} for {} ({})'
+                             .format(source, host, reason))
 
         return permit
 
@@ -435,19 +434,19 @@ class PeerManager(object):
             if self.proxy:
                 continue
 
-            logging.info(f'trying to detect proxy on "{host}" ports {ports}')
+            self.log_info(f'trying to detect proxy on "{host}" ports {ports}')
             result = await cls.auto_detect_host(host, ports, None,
                                                 loop=self.loop)
             self.proxy_tried_event.set()
             if isinstance(result, cls):
                 self.proxy = result
-                logging.info(f'detected {self.proxy}')
+                self.log_info(f'detected {self.proxy}')
                 continue
 
             for failure_msg in result:
-                logging.info(failure_msg)
+                self.log_info(failure_msg)
             pause = 600
-            logging.info(f'will retry proxy detection in {pause} seconds')
+            self.log_info(f'will retry proxy detection in {pause} seconds')
             self.loop.call_later(pause, self.detect_proxy_event.set)
 
     def proxy_peername(self):
@@ -463,11 +462,11 @@ class PeerManager(object):
           3) Retrying old peers at regular intervals.
         '''
         if self.env.peer_discovery != self.env.PD_ON:
-            logging.info('peer discovery is disabled')
+            self.logger.info('peer discovery is disabled')
             return
 
-        logging.info('beginning peer discovery. Force use of proxy: {}'
-                     .format(self.env.force_proxy))
+        self.logger.info('beginning peer discovery. Force use of proxy: {}'
+                         .format(self.env.force_proxy))
 
         # Wait a few moments while trying to detect a proxy
         self.ensure_future(self.detect_proxy_loop())
@@ -548,10 +547,10 @@ class PeerManager(object):
         exception = future.exception()
         if exception:
             kind, port = port_pairs[0]
-            logging.info('failed connecting to {} at {} port {:d} '
-                         'in {:.1f}s: {}'
-                         .format(peer, kind, port,
-                                 time.time() - peer.last_try, exception))
+            self.logger.info('failed connecting to {} at {} port {:d} '
+                             'in {:.1f}s: {}'
+                             .format(peer, kind, port,
+                                     time.time() - peer.last_try, exception))
             port_pairs = port_pairs[1:]
             if port_pairs:
                 self.retry_peer(peer, port_pairs)
@@ -567,7 +566,7 @@ class PeerManager(object):
             how = 'via {} at {}'.format(kind, peer.ip_addr)
         status = 'verified' if good else 'failed to verify'
         elapsed = now - peer.last_try
-        logging.info('{} {} {} in {:.1f}s'.format(status, peer, how, elapsed))
+        self.log_info('{} {} {} in {:.1f}s'.format(status, peer, how, elapsed))
 
         if good:
             peer.try_count = 0
@@ -595,7 +594,7 @@ class PeerManager(object):
 
         if forget:
             desc = 'bad' if peer.bad else 'unreachable'
-            logging.info('forgetting {} peer: {}'.format(desc, peer))
+            self.logger.info('forgetting {} peer: {}'.format(desc, peer))
             self.peers.discard(peer)
 
         return forget
