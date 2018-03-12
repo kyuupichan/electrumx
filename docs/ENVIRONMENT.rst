@@ -64,9 +64,16 @@ Miscellaneous
 
 These environment variables are optional:
 
+* **LOG_FORMAT**
+
+  The Python logging `format string
+  <https://docs.python.org/3/library/logging.html#logrecord-attributes>`_
+  to use.  Defaults to `%(levelname)s:%(name)s:%(message)s`.
+
 * **ALLOW_ROOT**
 
-  Set this environment variable to anything non-empty to allow running ElectrumX as root.
+  Set this environment variable to anything non-empty to allow running
+  ElectrumX as root.
 
 * **NET**
 
