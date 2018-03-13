@@ -262,9 +262,9 @@ class Daemon(LoggedClass):
         network_info = await self.getnetworkinfo()
         return network_info['relayfee']
 
-    async def getrawtransaction(self, hex_hash):
+    async def getrawtransaction(self, hex_hash, verbose=False):
         '''Return the serialized raw transaction with the given hash.'''
-        return await self._send_single('getrawtransaction', (hex_hash, 0))
+        return await self._send_single('getrawtransaction', (hex_hash, int(verbose)))
 
     async def getrawtransactions(self, hex_hashes, replace_errs=True):
         '''Return the serialized raw transactions with the given hashes.

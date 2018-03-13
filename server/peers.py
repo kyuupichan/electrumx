@@ -15,9 +15,10 @@ import time
 from collections import defaultdict, Counter
 from functools import partial
 
+import aiorpcx
+
 from lib.jsonrpc import JSONSession
 from lib.peer import Peer
-from lib.socks import SocksProxy
 import lib.util as util
 import server.version as version
 
@@ -238,9 +239,9 @@ class PeerManager(util.LoggedClass):
         # any other peers with the same host name or IP address.
         self.peers = set()
         self.permit_onion_peer_time = time.time()
-        self.proxy = SocksProxy(env.tor_proxy_host, env.tor_proxy_port,
-                                loop=self.loop)
-        self.import_peers()
+        self.proxy_tried_event = asyncio.Event()
+        self.detect_proxy_event = asyncio.Event()
+        self.proxy = None
 
     def my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -416,6 +417,43 @@ class PeerManager(util.LoggedClass):
         '''Schedule the coro to be run.'''
         return self.controller.ensure_future(coro, callback=callback)
 
+    async def detect_proxy_loop(self):
+        '''Detect a proxy.  If found, returns with self.proxy set to an
+        aiorpcX.SOCKSProxy instance.  Otherwise retries occasionally.'''
+        host = self.env.tor_proxy_host
+        if self.env.tor_proxy_port is None:
+            ports = [9050, 9150, 1080]
+        else:
+            ports = [self.env.tor_proxy_port]
+
+        cls = aiorpcx.SOCKSProxy
+        self.detect_proxy_event.set()
+        while True:
+            await self.detect_proxy_event.wait()
+            self.detect_proxy_event.clear()
+            if self.proxy:
+                continue
+
+            self.log_info(f'trying to detect proxy on "{host}" ports {ports}')
+            result = await cls.auto_detect_host(host, ports, None,
+                                                loop=self.loop)
+            self.proxy_tried_event.set()
+            if isinstance(result, cls):
+                self.proxy = result
+                self.log_info(f'detected {self.proxy}')
+                continue
+
+            for failure_msg in result:
+                self.log_info(failure_msg)
+            pause = 600
+            self.log_info(f'will retry proxy detection in {pause} seconds')
+            self.loop.call_later(pause, self.detect_proxy_event.set)
+
+    def proxy_peername(self):
+        '''Return the peername of the proxy, if there is a proxy, otherwise
+        None.'''
+        return self.proxy.peername if self.proxy else None
+
     async def main_loop(self):
         '''Main loop performing peer maintenance.  This includes
 
@@ -427,13 +465,14 @@ class PeerManager(util.LoggedClass):
             self.logger.info('peer discovery is disabled')
             return
 
-        # Wait a few seconds after starting the proxy detection loop
-        # for proxy detection to succeed
-        self.ensure_future(self.proxy.auto_detect_loop())
-        await self.proxy.tried_event.wait()
-
-        self.logger.info('beginning peer discovery; force use of proxy: {}'
+        self.logger.info('beginning peer discovery. Force use of proxy: {}'
                          .format(self.env.force_proxy))
+
+        # Wait a few moments while trying to detect a proxy
+        self.ensure_future(self.detect_proxy_loop())
+        await self.proxy_tried_event.wait()
+
+        self.import_peers()
 
         while True:
             timeout = self.loop.call_later(WAKEUP_SECS, self.retry_event.set)
@@ -478,24 +517,25 @@ class PeerManager(util.LoggedClass):
         kind, port = port_pairs[0]
         sslc = ssl.SSLContext(ssl.PROTOCOL_TLS) if kind == 'SSL' else None
 
+        host = self.env.cs_host(for_rpc=False)
+        if isinstance(host, list):
+            host = host[0]
+
+        kwargs = {'ssl': sslc}
         if self.env.force_proxy or peer.is_tor:
             # Only attempt a proxy connection if the proxy is up
-            if not self.proxy.is_up():
+            if not self.proxy:
                 return
             create_connection = self.proxy.create_connection
         else:
             create_connection = self.loop.create_connection
-
-        # Use our listening Host/IP for outgoing connections so our
-        # peers see the correct source.
-        host = self.env.cs_host(for_rpc=False)
-        if isinstance(host, list):
-            host = host[0]
-        local_addr = (host, None) if host else None
+            # Use our listening Host/IP for outgoing connections so
+            # our peers see the correct source.
+            if host:
+                kwargs['local_addr'] = (host, None)
 
         protocol_factory = partial(PeerSession, peer, self, kind)
-        coro = create_connection(protocol_factory, peer.host, port, ssl=sslc,
-                                 local_addr=local_addr)
+        coro = create_connection(protocol_factory, peer.host, port, **kwargs)
         callback = partial(self.connection_done, peer, port_pairs)
         self.ensure_future(coro, callback)
 

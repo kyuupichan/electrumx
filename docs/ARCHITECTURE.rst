@@ -1,5 +1,5 @@
-Components
-==========
+Architecture
+============
 
 .. image:: https://docs.google.com/drawings/d/1Su_DR2c8__-4phm12hAzV65fL2tNm_1IhKr4XivkW6Q/pub?w=720&h=540
     :target: https://docs.google.com/drawings/d/1Su_DR2c8__-4phm12hAzV65fL2tNm_1IhKr4XivkW6Q/pub?w=960&h=720

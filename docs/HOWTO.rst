@@ -1,4 +1,9 @@
-=============
+.. _HOWTO:
+
+=====
+HOWTO
+=====
+
 Prerequisites
 =============
 
@@ -13,16 +18,17 @@ Package          Notes
 Python3          ElectrumX uses asyncio.  Python version >= 3.6 is
                  **required**.
 `aiohttp`_       Python library for asynchronous HTTP.  Version >=
-                 1.0 required; I am using 1.0.5.
+                 1.0 required; I am using 3.0.1.
 `pylru`_         Python LRU cache package.  I'm using 1.0.9.
 DB Engine        I use `plyvel`_ 0.9, a Python interface to LevelDB.
                  A database engine package is required but others
                  are supported (see **Database Engine** below).
-`x11_hash`_      Only required for DASH.  Python X11 Hash package.  Only
-                 required if for Dash.  Version 1.4 tested.
 ================ ========================
 
-You need to be running a non-pruning bitcoin daemon with::
+Some coins need an additional package, typically for their block hash
+functions.  For example, `x11_hash`_ is required for DASH.
+
+You **must** to be running a non-pruning bitcoin daemon with::
 
   txindex=1
 

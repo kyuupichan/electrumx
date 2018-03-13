@@ -92,6 +92,16 @@ def test_COIN_NET():
     os.environ['NET'] = 'testnet'
     e = Env()
     assert e.coin == lib_coins.LitecoinTestnet
+    os.environ.pop('NET')
+    os.environ['COIN'] = ' BitcoinGold '
+    e = Env()
+    assert e.coin == lib_coins.BitcoinGold
+    os.environ['NET'] = 'testnet'
+    e = Env()
+    assert e.coin == lib_coins.BitcoinGoldTestnet
+    os.environ['NET'] = 'regtest'
+    e = Env()
+    assert e.coin == lib_coins.BitcoinGoldRegtest
 
 def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)
