@@ -436,6 +436,8 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
+        'node.arihanc.com s t',
+        'arihancckjge66iv.onion s t',
     ]
 
 
