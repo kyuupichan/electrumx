@@ -92,8 +92,8 @@ process.  The sample scripts and these instructions assume it is all
 under one account which I have called ``electrumx``.
 
 Next create a directory where the database will be stored and make it
-writeable by the electrumx account.  I recommend this directory live
-on an SSD::
+writeable by the ``electrumx`` account.  I recommend this directory
+live on an SSD::
 
     mkdir /path/to/db_directory
     chown electrumx /path/to/db_directory
@@ -148,14 +148,14 @@ This copies 3 things: the top level server run script, a :file:`log/`
 directory with the logger :command:`run` script, an :file:`env/`
 directory.
 
-You need to configure the environment variables under :file:`env/` to
-your setup, as explained in `ENVIRONMENT.rst`_.  ElectrumX server
-currently takes no command line arguments; all of its configuration is
-taken from its environment which is set up according to :file:`env/`
-directory (see :manpage:`envdir` man page).  Finally you need to
-change the :command:`log/run` script to use the directory where you
-want the logs to be written by multilog.  The directory need not exist
-as :command:`multilog` will create it, but its parent directory must
+You need to configure the :ref:`environment variables <environment>`
+under :file:`env/` to your setup.  ElectrumX server currently takes no
+command line arguments; all of its configuration is taken from its
+environment which is set up according to :file:`env/` directory (see
+:manpage:`envdir` man page).  Finally you need to change the
+:command:`log/run` script to use the directory where you want the logs
+to be written by multilog.  The directory need not exist as
+:command:`multilog` will create it, but its parent directory must
 exist.
 
 Now start the :command:`svscan` process.  This will not do much as the
@@ -187,8 +187,8 @@ The sample unit file assumes that the repository is located at
 :file:`/home/electrumx/electrumx`. If that differs on your system, you
 need to change the unit file accordingly.
 
-You need to set a few configuration variables in :file:`/etc/electrumx.conf`,
-see `ENVIRONMENT.rst`_ for the list of required variables.
+You need to set a few :ref:`environment variables <environment>` in
+:file:`/etc/electrumx.conf`.
 
 Now you can start ElectrumX using :command:`systemctl`::
 
@@ -242,8 +242,8 @@ if the daemon is on the same host.  It may even be beneficial to have
 the daemon on a *separate* machine so the machine doing the indexing
 has its caches and disk I/O tuned to that task only.
 
-The :envvar:`CACHE_MB` environment variable controls the total cache size
-ElectrumX uses; see `ENVIRONMENT.rst`_ for caveats.
+The :envvar:`CACHE_MB` environment variable controls the total cache
+size ElectrumX uses; see :ref:`here <CACHE>` for caveats.
 
 Here is my experience with the codebase of year ago (the current
 codebase is faster), to given heights and rough wall-time.  The period
@@ -428,7 +428,6 @@ You can then set the port as follows and advertise the service externally on the
     REPORT_SSL_PORT=110
 
 
-.. _`ENVIRONMENT.rst`: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _`contrib/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/contrib/systemd/electrumx.service
 .. _`daemontools`: http://cr.yp.to/daemontools.html
 .. _`runit`: http://smarden.org/runit/index.html

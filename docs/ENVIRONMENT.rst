@@ -1,3 +1,5 @@
+.. _environment:
+
 =====================
 Environment Variables
 =====================
@@ -382,6 +384,8 @@ the Python process is often quite a bit fatter than the cache size,
 because of Python overhead and also because leveldb consumes a lot of
 memory when flushing.  So I recommend you do not set this over 60% of
 your available physical RAM:
+
+.. _CACHE:
 
 * **CACHE_MB**
 
