@@ -149,6 +149,9 @@ directory with the logger :command:`run` script, an :file:`env/`
 directory.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 0e7cd49... More improvements to HOWTO.rst
 You need to configure the :ref:`environment variables <environment>`
 under :file:`env/` to your setup.  ElectrumX server currently takes no
 command line arguments; all of its configuration is taken from its
@@ -157,6 +160,7 @@ environment which is set up according to :file:`env/` directory (see
 :command:`log/run` script to use the directory where you want the logs
 to be written by multilog.  The directory need not exist as
 :command:`multilog` will create it, but its parent directory must
+<<<<<<< HEAD
 =======
 You need to configure the environment variables under :file:`env/` to
 your setup, as explained in `ENVIRONMENT.rst`_.  ElectrumX server
@@ -167,6 +171,8 @@ change the :command:`log/run` script to use the directory where you
 want the logs to be written by multilog.  The directory need not exist
 as :command:`multilog` will create it, but its parent directory must
 >>>>>>> e577172... Improve HOWTO markup
+=======
+>>>>>>> 0e7cd49... More improvements to HOWTO.rst
 exist.
 
 Now start the :command:`svscan` process.  This will not do much as the
@@ -199,12 +205,17 @@ The sample unit file assumes that the repository is located at
 need to change the unit file accordingly.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 You need to set a few :ref:`environment variables <environment>` in
 :file:`/etc/electrumx.conf`.
 =======
 You need to set a few configuration variables in :file:`/etc/electrumx.conf`,
 see `ENVIRONMENT.rst`_ for the list of required variables.
 >>>>>>> e577172... Improve HOWTO markup
+=======
+You need to set a few :ref:`environment variables <environment>` in
+:file:`/etc/electrumx.conf`.
+>>>>>>> 0e7cd49... More improvements to HOWTO.rst
 
 Now you can start ElectrumX using :command:`systemctl`::
 
@@ -259,12 +270,17 @@ the daemon on a *separate* machine so the machine doing the indexing
 has its caches and disk I/O tuned to that task only.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 The :envvar:`CACHE_MB` environment variable controls the total cache
 size ElectrumX uses; see :ref:`here <CACHE>` for caveats.
 =======
 The :envvar:`CACHE_MB` environment variable controls the total cache size
 ElectrumX uses; see `ENVIRONMENT.rst`_ for caveats.
 >>>>>>> e577172... Improve HOWTO markup
+=======
+The :envvar:`CACHE_MB` environment variable controls the total cache
+size ElectrumX uses; see :ref:`here <CACHE>` for caveats.
+>>>>>>> 0e7cd49... More improvements to HOWTO.rst
 
 Here is my experience with the codebase of year ago (the current
 codebase is faster), to given heights and rough wall-time.  The period
