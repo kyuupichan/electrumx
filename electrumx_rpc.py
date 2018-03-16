@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2018, Neil Booth
 #
 # All rights reserved.
 #
@@ -13,56 +13,11 @@
 import argparse
 import asyncio
 import json
-from functools import partial
 from os import environ
 
-from lib.jsonrpc import JSONSession, JSONRPCv2
+from aiorpcx import ClientSession
+
 from server.controller import Controller
-
-
-class RPCClient(JSONSession):
-
-    def __init__(self):
-        super().__init__(version=JSONRPCv2)
-        self.max_send = 0
-        self.max_buffer_size = 5*10**6
-
-    async def wait_for_response(self):
-        await self.items_event.wait()
-        await self.process_pending_items()
-
-    def send_rpc_request(self, method, params):
-        handler = partial(self.handle_response, method)
-        self.send_request(handler, method, params)
-
-    def handle_response(self, method, result, error):
-        if method in ('groups', 'peers', 'sessions') and not error:
-            lines_func = getattr(Controller, '{}_text_lines'.format(method))
-            for line in lines_func(result):
-                print(line)
-        elif error:
-            print('error: {} (code {:d})'
-                  .format(error['message'], error['code']))
-        else:
-            print(json.dumps(result, indent=4, sort_keys=True))
-
-
-def rpc_send_and_wait(port, method, params, timeout=15):
-    loop = asyncio.get_event_loop()
-    coro = loop.create_connection(RPCClient, 'localhost', port)
-    try:
-        transport, rpc_client = loop.run_until_complete(coro)
-        rpc_client.send_rpc_request(method, params)
-        try:
-            coro = rpc_client.wait_for_response()
-            loop.run_until_complete(asyncio.wait_for(coro, timeout))
-        except asyncio.TimeoutError:
-            print('request timed out after {}s'.format(timeout))
-    except OSError:
-        print('cannot connect - is ElectrumX catching up, not running, or '
-              'is {:d} the wrong RPC port?'.format(port))
-    finally:
-        loop.close()
 
 
 def main():
@@ -86,7 +41,25 @@ def main():
     if method in ('log', 'disconnect'):
         params = [params]
 
-    rpc_send_and_wait(port, method, params)
+    async def send_request():
+        # aiorpcX makes this so easy...
+        async with ClientSession('localhost', port) as session:
+            result = await session.send_request(method, params, timeout=15)
+            if method in ('groups', 'peers', 'sessions'):
+                lines_func = getattr(Controller, f'{method}_text_lines')
+                for line in lines_func(result):
+                    print(line)
+            else:
+                print(json.dumps(result, indent=4, sort_keys=True))
+
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(send_request())
+    except OSError:
+        print('cannot connect - is ElectrumX catching up, not running, or '
+              f'is {port} the wrong RPC port?')
+    except Exception as e:
+        print(f'error making request: {e}')
 
 
 if __name__ == '__main__':
