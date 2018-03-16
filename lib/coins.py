@@ -574,6 +574,9 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     NAME = "BitcoinCash"
     PEERS = [
         'electrum-testnet-abc.criptolayer.net s50112',
+        'bchtestnet.arihanc.com t53001 s53002',
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',
+        
     ]
 
 
