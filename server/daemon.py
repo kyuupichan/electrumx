@@ -309,7 +309,15 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 class AxeDaemon(Daemon):
+=======
+class Axe(Daemon):
+>>>>>>> 644ec6e... add AXE daemon
+=======
+class AxeDaemon(Daemon):
+>>>>>>> 5abedd1... fix class
 
     async def masternode_broadcast(self, params):
         '''Broadcast a transaction to the network.'''

@@ -22,7 +22,15 @@ install:
   - pip install pytest-cov
   - pip install pylru
   - pip install blake256
+<<<<<<< HEAD
+<<<<<<< HEAD
   - pip install axe-hash
+=======
+  - pip install axe_hash
+>>>>>>> f1aa935... add axe_hash
+=======
+  - pip install axe-hash
+>>>>>>> 210985a... edit
 # command to run tests
 script: pytest --cov=server --cov=lib --cov=wallet
 # Dont report coverage from nightly

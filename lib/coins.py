@@ -575,7 +575,19 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     PEERS = [
         'electrum-testnet-abc.criptolayer.net s50112',
         'bchtestnet.arihanc.com t53001 s53002',
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
         'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',
+=======
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',     
+>>>>>>> 3ac2e82... Add arihanc to various coins (#416)
+=======
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',
+>>>>>>> a2acb59... add AXE test block
+=======
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',
+>>>>>>> 6ad886b... add AXE mainnet
     ]
 
 
@@ -589,7 +601,19 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'testnet.hsmiths.com t53011 s53012',
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
         'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
+=======
+        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t', 
+>>>>>>> 3ac2e82... Add arihanc to various coins (#416)
+=======
+        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
+>>>>>>> a2acb59... add AXE test block
+=======
+        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
+>>>>>>> 6ad886b... add AXE mainnet
     ]
 
 
@@ -1540,7 +1564,15 @@ class Axe(Coin):
     WIF_BYTE = bytes.fromhex("cc")
     TX_COUNT_HEIGHT = 30237
     TX_COUNT = 18405
+<<<<<<< HEAD
+<<<<<<< HEAD
     TX_PER_BLOCK = 1
+=======
+    TX_PER_BLOCK = 2
+>>>>>>> 6ad886b... add AXE mainnet
+=======
+    TX_PER_BLOCK = 1
+>>>>>>> 950d328... edit
     RPC_PORT = 9337
     PEERS = [
         '207.246.65.114 s t',
@@ -1552,5 +1584,15 @@ class Axe(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
+<<<<<<< HEAD
+<<<<<<< HEAD
         import axe_hash
         return axe_hash.getPoWHash(header)
+=======
+        import x11_hash
+        return x11_hash.getPoWHash(header)
+>>>>>>> 6ad886b... add AXE mainnet
+=======
+        import axe_hash
+        return axe_hash.getPoWHash(header)
+>>>>>>> 3c8dde3... add axe hash pow
