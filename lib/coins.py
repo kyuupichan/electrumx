@@ -409,6 +409,7 @@ class BitcoinCash(BitcoinMixin, Coin):
         'electrum-abc.criptolayer.net s50012',
         'electroncash.cascharia.com s50002',
         'bch.arihanc.com t52001 s52002',
+        'bccarihace4jdcnt.onion t52001 s52002',
         'jelectrum-cash.1209k.com s t',
         'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
@@ -436,6 +437,8 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
+        'node.arihanc.com s t',
+        'arihancckjge66iv.onion s t',
     ]
 
 
@@ -571,6 +574,8 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     NAME = "BitcoinCash"
     PEERS = [
         'electrum-testnet-abc.criptolayer.net s50112',
+        'bchtestnet.arihanc.com t53001 s53002',
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',     
     ]
 
 
@@ -584,6 +589,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'testnet.hsmiths.com t53011 s53012',
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
+        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t', 
     ]
 
 
