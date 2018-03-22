@@ -36,6 +36,7 @@ import struct
 from decimal import Decimal
 from hashlib import sha256
 from functools import partial
+import base64
 
 import lib.util as util
 from lib.hash import Base58, hash160, double_sha256, hash_to_str
@@ -949,6 +950,24 @@ class SnowGem(EquihashMixin, Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 16112
     REORG_LIMIT = 800
+    CHUNK_SIZE = 200
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits = struct.unpack('<II', header[100:108])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'hash_reserved': hash_to_str(header[68:100]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': hash_to_str(header[108:140]),
+            'n_solution': base64.b64encode(lib_tx.Deserializer(header, start=140)._read_varbytes()).decode('utf8')
+        }
 
 class BitcoinZ(EquihashMixin, Coin):
     NAME = "BitcoinZ"
