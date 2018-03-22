@@ -1013,6 +1013,10 @@ class Koto(Coin):
     TX_PER_BLOCK = 3
     RPC_PORT = 8432
     REORG_LIMIT = 800
+    PEERS = [
+        'fr.kotocoin.info s t',
+        'electrum.kotocoin.info s t',
+    ]
 
 class Komodo(KomodoMixin, EquihashMixin, Coin):
     NAME = "Komodo"
