@@ -1166,7 +1166,7 @@ class Monacoin(Coin):
         'electrumx1.monacoin.ninja s t',
         'electrumx2.monacoin.ninja s t',
         'electrumx1.movsign.info t',
-        'electrumx2.movsign.info t',
+        'electrumx2.movsign.info s t',
         'electrum-mona.bitbank.cc s t',
     ]
 
