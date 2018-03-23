@@ -1434,6 +1434,7 @@ class Pac(Coin):
         return x11_hash.getPoWHash(header)
 
 class PacTestnet(Coin):
+    NAME = "testPAC"
     SHORTNAME = "testPAC"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587CF")

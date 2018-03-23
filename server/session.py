@@ -281,7 +281,7 @@ class ElectrumX(SessionBase):
 
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.
-
+    
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
         return self.controller.get_chunk(index)
