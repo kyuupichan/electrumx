@@ -108,6 +108,7 @@ class ElectrumX(SessionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
+        self.subscribe_headers_raw = False
         self.subscribe_height = False
         self.notified_height = None
         self.max_send = self.env.max_send
@@ -164,7 +165,7 @@ class ElectrumX(SessionBase):
         if height_changed:
             self.notified_height = height
             if self.subscribe_headers:
-                args = (self.controller.electrum_header(height), )
+                args = (self.subscribe_headers_result(height), )
                 self.send_notification('blockchain.headers.subscribe', args)
             if self.subscribe_height:
                 args = (height, )
@@ -180,12 +181,25 @@ class ElectrumX(SessionBase):
         '''Return the current flushed database height.'''
         return self.bp.db_height
 
-    def headers_subscribe(self):
+    def assert_boolean(self, value):
+        '''Return param value it is boolean otherwise raise an RPCError.'''
+        if value in (False, True):
+            return value
+        raise RPCError('{} should be a boolean value'.format(value))
+
+    def subscribe_headers_result(self, height):
+        '''The result of a header subscription for the given height.'''
+        if self.subscribe_headers_raw:
+            raw_header = self.controller.raw_header(height)
+            return {'hex': raw_header.hex(), 'height': height}
+        return self.controller.electrum_header(height)
+
+    def headers_subscribe(self, raw=False):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
-        height = self.height()
-        self.notified_height = height
-        return self.controller.electrum_header(height)
+        self.subscribe_headers_raw = self.assert_boolean(raw)
+        self.notified_height = self.height()
+        return self.subscribe_headers_result(self.height())
 
     def numblocks_subscribe(self):
         '''Subscribe to get height of new blocks.'''
@@ -274,24 +288,19 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        chunk_size = self.coin.CHUNK_SIZE
+        chunk_size = self.controller.coin.CHUNK_SIZE
         start_height = index * chunk_size
         hex_str, n =  self.controller.block_headers(start_height, chunk_size)
         return hex_str
 
-    def block_get_chunk(self, index):
-        '''Return a chunk of block headers as a hexadecimal string.
-    
-        index: the chunk index'''
-        index = self.controller.non_negative_integer(index)
-        return self.controller.get_chunk(index)
-
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
         running.'''
-        proxy = self.controller.peer_mgr.proxy
+        peername = self.controller.peer_mgr.proxy_peername()
+        if not peername:
+            return False
         peer_info = self.peer_info()
-        return peer_info and peer_info[0] == proxy.ip_addr
+        return peer_info and peer_info[0] == peername[0]
 
     async def replaced_banner(self, banner):
         network_info = await self.controller.daemon_request('getnetworkinfo')
@@ -335,6 +344,12 @@ class ElectrumX(SessionBase):
                 banner = await self.replaced_banner(banner)
 
         return banner
+
+    def ping(self):
+        '''Serves as a connection keep-alive mechanism and for the client to
+        confirm the server is still responding.
+        '''
+        return None
 
     def server_version(self, client_name=None, protocol_version=None):
         '''Returns the server version as a string.
@@ -470,6 +485,7 @@ class ElectrumX(SessionBase):
                 'mempool.get_fee_histogram':
                 controller.mempool_get_fee_histogram,
                 'blockchain.block.headers': self.block_headers,
+                'server.ping': self.ping,
             })
 
         self.electrumx_handlers = handlers

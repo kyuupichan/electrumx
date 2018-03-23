@@ -1,3 +1,5 @@
+.. _environment:
+
 =====================
 Environment Variables
 =====================
@@ -64,9 +66,16 @@ Miscellaneous
 
 These environment variables are optional:
 
+* **LOG_FORMAT**
+
+  The Python logging `format string
+  <https://docs.python.org/3/library/logging.html#logrecord-attributes>`_
+  to use.  Defaults to `%(levelname)s:%(name)s:%(message)s`.
+
 * **ALLOW_ROOT**
 
-  Set this environment variable to anything non-empty to allow running ElectrumX as root.
+  Set this environment variable to anything non-empty to allow running
+  ElectrumX as root.
 
 * **NET**
 
@@ -375,6 +384,8 @@ the Python process is often quite a bit fatter than the cache size,
 because of Python overhead and also because leveldb consumes a lot of
 memory when flushing.  So I recommend you do not set this over 60% of
 your available physical RAM:
+
+.. _CACHE:
 
 * **CACHE_MB**
 

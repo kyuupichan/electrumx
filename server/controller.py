@@ -297,16 +297,20 @@ class Controller(ServerBase):
         for session in self.sessions:
             session.notify_peers(updates)
 
-    def electrum_header(self, height):
+    def raw_header(self, height):
         '''Return the binary header at the given height.'''
-        if height in self.header_cache:
-            return self.header_cache[height]
         header, n = self.bp.read_headers(height, 1)
         if n != 1:
             raise RPCError('height {:,d} out of range'.format(height))
-        header = self.coin.electrum_header(header, height)
-        self.header_cache[height] = header
         return header
+
+    def electrum_header(self, height):
+        '''Return the deserialized header at the given height.'''
+        if height not in self.header_cache:
+            raw_header = self.raw_header(height)
+            self.header_cache[height] = self.coin.electrum_header(raw_header,
+                                                                  height)
+        return self.header_cache[height]
 
     def session_delay(self, session):
         priority = self.session_priority(session)
@@ -842,13 +846,14 @@ class Controller(ServerBase):
         to the daemon's memory pool.'''
         return await self.daemon_request('relayfee')
 
-    async def transaction_get(self, tx_hash):
+    async def transaction_get(self, tx_hash, verbose=False):
         '''Return the serialized raw transaction given its hash
 
         tx_hash: the transaction hash as a hexadecimal string
+        verbose: passed on to the daemon
         '''
         self.assert_tx_hash(tx_hash)
-        return await self.daemon_request('getrawtransaction', tx_hash)
+        return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
     async def transaction_get_1_0(self, tx_hash, height=None):
         '''Return the serialized raw transaction given its hash
