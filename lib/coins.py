@@ -1540,7 +1540,7 @@ class Axe(Coin):
     WIF_BYTE = bytes.fromhex("cc")
     TX_COUNT_HEIGHT = 30237
     TX_COUNT = 18405
-    TX_PER_BLOCK = 2
+    TX_PER_BLOCK = 1
     RPC_PORT = 9337
     PEERS = [
         '207.246.65.114 s t',
