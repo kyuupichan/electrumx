@@ -43,7 +43,7 @@ from lib.script import ScriptPubKey, OpCodes
 import lib.tx as lib_tx
 from server.block_processor import BlockProcessor
 import server.daemon as daemon
-from server.session import ElectrumX, DashElectrumX
+from server.session import ElectrumX, DashElectrumX, AxeElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
