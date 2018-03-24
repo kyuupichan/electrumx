@@ -497,6 +497,11 @@ class BitcoinGoldTestnet(BitcoinGold):
     RPC_PORT = 18338
     GENESIS_HASH = ('00000000e0781ebe24b91eedc293adfe'
                     'a2f557b53ec379e78959de3853e6f9f6')
+    PEERS = [
+        'test-node1.bitcoingold.org s50002',
+        'test-node2.bitcoingold.org s50002',
+        'test-node3.bitcoingold.org s50002'
+    ]
 
 
 class BitcoinGoldRegtest(BitcoinGold):
