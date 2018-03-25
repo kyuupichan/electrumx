@@ -455,6 +455,10 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
     TX_PER_BLOCK = 50
     REORG_LIMIT = 1000
     RPC_PORT = 8338
+    PEERS = [
+        'electrumx-eu.bitcoingold.org s50002 t50001',
+        'electrumx-us.bitcoingold.org s50002 t50001'
+    ]
 
     @classmethod
     def header_hash(cls, header):
