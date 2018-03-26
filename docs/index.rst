@@ -52,11 +52,11 @@ Documentation
    features
    changelog
    HOWTO
-   ENVIRONMENT
-   PROTOCOL
-   PEER_DISCOVERY
+   environment
+   protocol
+   peer_discovery
    rpc-interface
-   ARCHITECTURE
+   architecture
    authors
 
 Indices and tables
