@@ -239,9 +239,8 @@ class PeerManager(util.LoggedClass):
         # any other peers with the same host name or IP address.
         self.peers = set()
         self.permit_onion_peer_time = time.time()
-        self.proxy_tried_event = asyncio.Event()
-        self.detect_proxy_event = asyncio.Event()
         self.proxy = None
+        self.last_proxy_try = 0
 
     def my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -417,37 +416,32 @@ class PeerManager(util.LoggedClass):
         '''Schedule the coro to be run.'''
         return self.controller.ensure_future(coro, callback=callback)
 
-    async def detect_proxy_loop(self):
-        '''Detect a proxy.  If found, returns with self.proxy set to an
-        aiorpcX.SOCKSProxy instance.  Otherwise retries occasionally.'''
+    async def maybe_detect_proxy(self):
+        '''Detect a proxy if we don't have one and some time has passed since
+        the last attempt.
+
+        If found self.proxy is set to an aiorpcX.SOCKSProxy instance,
+        otherwise None.
+        '''
+        if self.proxy or time.time() - self.last_proxy_try < 900:
+            return
+        self.last_proxy_try = time.time()
+
         host = self.env.tor_proxy_host
         if self.env.tor_proxy_port is None:
             ports = [9050, 9150, 1080]
         else:
             ports = [self.env.tor_proxy_port]
+        self.log_info(f'trying to detect proxy on "{host}" ports {ports}')
 
         cls = aiorpcx.SOCKSProxy
-        self.detect_proxy_event.set()
-        while True:
-            await self.detect_proxy_event.wait()
-            self.detect_proxy_event.clear()
-            if self.proxy:
-                continue
-
-            self.log_info(f'trying to detect proxy on "{host}" ports {ports}')
-            result = await cls.auto_detect_host(host, ports, None,
-                                                loop=self.loop)
-            self.proxy_tried_event.set()
-            if isinstance(result, cls):
-                self.proxy = result
-                self.log_info(f'detected {self.proxy}')
-                continue
-
+        result = await cls.auto_detect_host(host, ports, None, loop=self.loop)
+        if isinstance(result, cls):
+            self.proxy = result
+            self.log_info(f'detected {self.proxy}')
+        else:
             for failure_msg in result:
                 self.log_info(failure_msg)
-            pause = 600
-            self.log_info(f'will retry proxy detection in {pause} seconds')
-            self.loop.call_later(pause, self.detect_proxy_event.set)
 
     def proxy_peername(self):
         '''Return the peername of the proxy, if there is a proxy, otherwise
@@ -468,11 +462,8 @@ class PeerManager(util.LoggedClass):
         self.logger.info('beginning peer discovery. Force use of proxy: {}'
                          .format(self.env.force_proxy))
 
-        # Wait a few moments while trying to detect a proxy
-        self.ensure_future(self.detect_proxy_loop())
-        await self.proxy_tried_event.wait()
-
         self.import_peers()
+        await self.maybe_detect_proxy()
 
         while True:
             timeout = self.loop.call_later(WAKEUP_SECS, self.retry_event.set)
@@ -504,6 +495,9 @@ class PeerManager(util.LoggedClass):
 
         peers = [peer for peer in self.peers if should_retry(peer)]
 
+        if self.env.force_proxy or any(peer.is_tor for peer in peers):
+            await self.maybe_detect_proxy()
+
         for peer in peers:
             peer.try_count += 1
             pairs = peer.connection_port_pairs()
@@ -523,7 +517,7 @@ class PeerManager(util.LoggedClass):
 
         kwargs = {'ssl': sslc}
         if self.env.force_proxy or peer.is_tor:
-            # Only attempt a proxy connection if the proxy is up
+            # Only attempt a proxy connection if we have one
             if not self.proxy:
                 return
             create_connection = self.proxy.create_connection
