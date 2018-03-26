@@ -86,9 +86,9 @@ class Env(EnvBase):
         # We give the DB 250 files; allow ElectrumX 100 for itself
         value = max(0, min(env_value, nofile_limit - 350))
         if value < env_value:
-            self.log_warning('lowered maximum sessions from {:,d} to {:,d} '
-                             'because your open file limit is {:,d}'
-                             .format(env_value, value, nofile_limit))
+            self.logger.warning('lowered maximum sessions from {:,d} to {:,d} '
+                                'because your open file limit is {:,d}'
+                                .format(env_value, value, nofile_limit))
         return value
 
     def clearnet_identity(self):

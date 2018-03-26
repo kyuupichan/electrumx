@@ -6,6 +6,7 @@
 # and warranty status of this software.
 
 import asyncio
+import itertools
 import json
 import os
 import ssl
@@ -18,7 +19,7 @@ from functools import partial
 
 import pylru
 
-from lib.jsonrpc import JSONSessionBase, RPCError
+from aiorpcx import RPCError
 from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 from lib.peer import Peer
 from lib.server_base import ServerBase
@@ -26,7 +27,15 @@ import lib.util as util
 from server.daemon import DaemonError
 from server.mempool import MemPool
 from server.peers import PeerManager
-from server.session import LocalRPC
+from server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
+
+
+class SessionGroup(object):
+
+    def __init__(self, gid):
+        self.gid = gid
+        # Concurrency per group
+        self.semaphore = asyncio.Semaphore(20)
 
 
 class Controller(ServerBase):
@@ -36,7 +45,6 @@ class Controller(ServerBase):
     up with the daemon.
     '''
 
-    BANDS = 5
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
     def __init__(self, env):
@@ -45,9 +53,9 @@ class Controller(ServerBase):
 
         self.coin = env.coin
         self.servers = {}
-        # Map of session to the key of its list in self.groups
-        self.sessions = {}
-        self.groups = defaultdict(list)
+        self.sessions = set()
+        self.groups = set()
+        self.cur_group = self._new_group(0)
         self.txs_sent = 0
         self.next_log_sessions = 0
         self.state = self.CATCHING_UP
@@ -62,7 +70,6 @@ class Controller(ServerBase):
         self.header_cache = pylru.lrucache(8)
         self.cache_height = 0
         env.max_send = max(350000, env.max_send)
-        self.setup_bands()
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers reorg '
                 'sessions stop'.split())
@@ -128,29 +135,6 @@ class Controller(ServerBase):
         '''Call when a TX is sent.'''
         self.txs_sent += 1
 
-    def setup_bands(self):
-        bands = []
-        limit = self.env.bandwidth_limit
-        for n in range(self.BANDS):
-            bands.append(limit)
-            limit //= 4
-        limit = self.env.bandwidth_limit
-        for n in range(self.BANDS):
-            limit += limit // 2
-            bands.append(limit)
-        self.bands = sorted(bands)
-
-    def session_priority(self, session):
-        if isinstance(session, LocalRPC):
-            return 0
-        gid = self.sessions[session]
-        group_bw = sum(session.bw_used for session in self.groups[gid])
-        return 1 + (bisect_left(self.bands, session.bw_used)
-                    + bisect_left(self.bands, group_bw)) // 2
-
-    def is_deprioritized(self, session):
-        return self.session_priority(session) > self.BANDS
-
     async def run_in_executor(self, func, *args):
         '''Wait whilst running func in the executor.'''
         return await self.loop.run_in_executor(None, func, *args)
@@ -177,7 +161,7 @@ class Controller(ServerBase):
         except asyncio.CancelledError:
             pass
         except Exception:
-            self.log_error(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
 
     async def housekeeping(self):
         '''Regular housekeeping checks.'''
@@ -185,7 +169,6 @@ class Controller(ServerBase):
         while True:
             n += 1
             await asyncio.sleep(15)
-            JSONSessionBase.timeout_check()
             if n % 10 == 0:
                 self.clear_stale_sessions()
 
@@ -253,7 +236,6 @@ class Controller(ServerBase):
                          .format(self.max_subs))
         self.logger.info('max subscriptions per session: {:,d}'
                          .format(self.env.max_session_subs))
-        self.logger.info('bands: {}'.format(self.bands))
         if self.env.drop_client is not None:
             self.logger.info('drop clients matching: {}'
                              .format(self.env.drop_client.pattern))
@@ -304,7 +286,7 @@ class Controller(ServerBase):
         '''Return the binary header at the given height.'''
         header, n = self.bp.read_headers(height, 1)
         if n != 1:
-            raise RPCError('height {:,d} out of range'.format(height))
+            raise RPCError(BAD_REQUEST, f'height {height:,d} out of range')
         return header
 
     def electrum_header(self, height):
@@ -315,74 +297,54 @@ class Controller(ServerBase):
                                                                   height)
         return self.header_cache[height]
 
-    def session_delay(self, session):
-        priority = self.session_priority(session)
-        excess = max(0, priority - self.BANDS)
-        if excess != session.last_delay:
-            session.last_delay = excess
-            if excess:
-                session.log_info('high bandwidth use, deprioritizing by '
-                                 'delaying responses {:d}s'.format(excess))
-            else:
-                session.log_info('stopped delaying responses')
-        return max(int(session.pause), excess)
-
-    async def process_items(self, session):
-        '''Waits for incoming session items and processes them.'''
-        while True:
-            await session.items_event.wait()
-            await asyncio.sleep(self.session_delay(session))
-            if not session.pause:
-                await session.process_pending_items()
+    def _new_group(self, gid):
+        group = SessionGroup(gid)
+        self.groups.add(group)
+        return group
 
     def add_session(self, session):
-        session.items_future = self.ensure_future(self.process_items(session))
-        gid = int(session.start_time - self.start_time) // 900
-        self.groups[gid].append(session)
-        self.sessions[session] = gid
-        session.log_info('{} {}, {:,d} total'
-                         .format(session.kind, session.peername(),
-                                 len(self.sessions)))
+        self.sessions.add(session)
         if (len(self.sessions) >= self.max_sessions
                 and self.state == self.LISTENING):
             self.state = self.PAUSED
-            session.log_info('maximum sessions {:,d} reached, stopping new '
-                             'connections until count drops to {:,d}'
-                             .format(self.max_sessions, self.low_watermark))
+            session.logger.info('maximum sessions {:,d} reached, stopping new '
+                                'connections until count drops to {:,d}'
+                                .format(self.max_sessions, self.low_watermark))
             self.close_servers(['TCP', 'SSL'])
+        gid = int(session.start_time - self.start_time) // 900
+        if self.cur_group.gid != gid:
+            self.cur_group = self._new_group(gid)
+        return self.cur_group
 
     def remove_session(self, session):
         '''Remove a session from our sessions list if there.'''
-        session.items_future.cancel()
-        if session in self.sessions:
-            gid = self.sessions.pop(session)
-            assert gid in self.groups
-            self.groups[gid].remove(session)
+        self.sessions.remove(session)
 
     def close_session(self, session):
-        '''Close the session's transport and cancel its future.'''
-        session.close_connection()
+        '''Close the session's transport.'''
+        session.close()
         return 'disconnected {:d}'.format(session.session_id)
 
     def toggle_logging(self, session):
         '''Toggle logging of the session.'''
-        session.log_me = not session.log_me
+        session.toggle_logging()
         return 'log {:d}: {}'.format(session.session_id, session.log_me)
 
-    def clear_stale_sessions(self, grace=15):
-        '''Cut off sessions that haven't done anything for 10 minutes.  Force
-        close stubborn connections that won't close cleanly after a
-        short grace period.
-        '''
+    def _group_map(self):
+        group_map = defaultdict(list)
+        for session in self.sessions:
+            group_map[session.group].append(session)
+        return group_map
+
+    def clear_stale_sessions(self):
+        '''Cut off sessions that haven't done anything for 10 minutes.'''
         now = time.time()
-        shutdown_cutoff = now - grace
         stale_cutoff = now - self.env.session_timeout
 
         stale = []
         for session in self.sessions:
             if session.is_closing():
-                if session.close_time <= shutdown_cutoff:
-                    session.abort()
+                pass
             elif session.last_recv < stale_cutoff:
                 self.close_session(session)
                 stale.append(session.session_id)
@@ -390,16 +352,18 @@ class Controller(ServerBase):
             self.logger.info('closing stale connections {}'.format(stale))
 
         # Consolidate small groups
-        gids = [gid for gid, l in self.groups.items() if len(l) <= 4
-                and sum(session.bw_used for session in l) < 10000]
-        if len(gids) > 1:
-            sessions = sum([self.groups[gid] for gid in gids], [])
-            new_gid = max(gids)
-            for gid in gids:
-                del self.groups[gid]
-            for session in sessions:
-                self.sessions[session] = new_gid
-            self.groups[new_gid] = sessions
+        bw_limit = self.env.bandwidth_limit
+        group_map = self._group_map()
+        groups = [group for group, sessions in group_map.items()
+                  if len(sessions) <= 5 and
+                  sum(s.bw_charge for s in sessions) < bw_limit]
+        if len(groups) > 1:
+            new_gid = max(group.gid for group in groups)
+            new_group = self._new_group(new_gid)
+            for group in groups:
+                self.groups.remove(group)
+                for session in group_map[group]:
+                    session.group = new_group
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
@@ -412,10 +376,10 @@ class Controller(ServerBase):
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
-            'errors': sum(s.error_count for s in self.sessions),
+            'errors': sum(s.rpc.errors for s in self.sessions),
             'groups': len(self.groups),
             'logged': len([s for s in self.sessions if s.log_me]),
-            'paused': sum(s.pause for s in self.sessions),
+            'paused': sum(s.paused for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
@@ -454,11 +418,11 @@ class Controller(ServerBase):
     def group_data(self):
         '''Returned to the RPC 'groups' call.'''
         result = []
-        for gid in sorted(self.groups.keys()):
-            sessions = self.groups[gid]
-            result.append([gid,
+        group_map = self._group_map()
+        for group, sessions in group_map.items():
+            result.append([group.gid,
                            len(sessions),
-                           sum(s.bw_used for s in sessions),
+                           sum(s.bw_charge for s in sessions),
                            sum(s.count_pending_items() for s in sessions),
                            sum(s.txs_sent for s in sessions),
                            sum(s.sub_count() for s in sessions),
@@ -531,7 +495,7 @@ class Controller(ServerBase):
         sessions = sorted(self.sessions, key=lambda s: s.start_time)
         return [(session.session_id,
                  session.flags(),
-                 session.peername(for_log=for_log),
+                 session.peer_address_str(for_log=for_log),
                  session.client,
                  session.protocol_version,
                  session.count_pending_items(),
@@ -555,7 +519,7 @@ class Controller(ServerBase):
 
     def for_each_session(self, session_ids, operation):
         if not isinstance(session_ids, list):
-            raise RPCError('expected a list of session IDs')
+            raise RPCError(BAD_REQUEST, 'expected a list of session IDs')
 
         result = []
         for session_id in session_ids:
@@ -597,7 +561,7 @@ class Controller(ServerBase):
         try:
             self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
         except Exception as e:
-            raise RPCError('an error occured: {}'.format(e))
+            raise RPCError(BAD_REQUEST, f'an error occured: {e}')
         return 'now using daemon at {}'.format(self.daemon.logged_url())
 
     def rpc_stop(self):
@@ -628,7 +592,7 @@ class Controller(ServerBase):
         '''
         count = self.non_negative_integer(count)
         if not self.bp.force_chain_reorg(count):
-            raise RPCError('still catching up with daemon')
+            raise RPCError(BAD_REQUEST, 'still catching up with daemon')
         return 'scheduled a reorg of {:,d} blocks'.format(count)
 
     # Helpers for RPC "blockchain" command handlers
@@ -638,7 +602,7 @@ class Controller(ServerBase):
             return self.coin.address_to_hashX(address)
         except Exception:
             pass
-        raise RPCError('{} is not a valid address'.format(address))
+        raise RPCError(BAD_REQUEST, f'{address} is not a valid address')
 
     def scripthash_to_hashX(self, scripthash):
         try:
@@ -647,7 +611,7 @@ class Controller(ServerBase):
                 return bin_hash[:self.coin.HASHX_LEN]
         except Exception:
             pass
-        raise RPCError('{} is not a valid script hash'.format(scripthash))
+        raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')
 
     def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction
@@ -657,7 +621,7 @@ class Controller(ServerBase):
                 return
         except Exception:
             pass
-        raise RPCError('{} should be a transaction hash'.format(value))
+        raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
 
     def non_negative_integer(self, value):
         '''Return param value it is or can be converted to a non-negative
@@ -668,21 +632,22 @@ class Controller(ServerBase):
                 return value
         except ValueError:
             pass
-        raise RPCError('{} should be a non-negative integer'.format(value))
+        raise RPCError(BAD_REQUEST,
+                       f'{value} should be a non-negative integer')
 
     async def daemon_request(self, method, *args):
         '''Catch a DaemonError and convert it to an RPCError.'''
         try:
             return await getattr(self.daemon, method)(*args)
         except DaemonError as e:
-            raise RPCError('daemon error: {}'.format(e))
+            raise RPCError(DAEMON_ERROR, f'daemon error: {e}')
 
     def new_subscription(self):
         if self.subs_room <= 0:
             self.subs_room = self.max_subs - self.sub_count()
             if self.subs_room <= 0:
-                raise RPCError('server subscription limit {:,d} reached'
-                               .format(self.max_subs))
+                raise RPCError(BAD_REQUEST, f'server subscription limit '
+                               f'{self.max_subs:,d} reached')
         self.subs_room -= 1
 
     async def tx_merkle(self, tx_hash, height):
@@ -693,8 +658,8 @@ class Controller(ServerBase):
         try:
             pos = tx_hashes.index(tx_hash)
         except ValueError:
-            raise RPCError('tx hash {} not in block {} at height {:,d}'
-                           .format(tx_hash, hex_hashes[0], height))
+            raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
+                           f'block {hex_hashes[0]} at height {height:,d}')
 
         idx = pos
         hashes = [hex_str_to_hash(txh) for txh in tx_hashes]

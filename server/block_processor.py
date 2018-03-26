@@ -11,6 +11,7 @@
 
 import array
 import asyncio
+import logging
 from struct import pack, unpack
 import time
 from collections import defaultdict
@@ -19,15 +20,15 @@ from functools import partial
 from server.daemon import DaemonError
 from server.version import VERSION
 from lib.hash import hash_to_str
-from lib.util import chunks, formatted_time, LoggedClass
+from lib.util import chunks, formatted_time
 import server.db
 
 
-class Prefetcher(LoggedClass):
+class Prefetcher(object):
     '''Prefetches blocks (in the forward direction only).'''
 
     def __init__(self, bp):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.bp = bp
         self.caught_up = False
         # Access to fetched_height should be protected by the semaphore

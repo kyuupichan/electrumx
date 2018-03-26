@@ -8,17 +8,38 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import codecs
+import itertools
 import time
 from functools import partial
 
+from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
+
 from lib.hash import sha256, hash_to_str
-from lib.jsonrpc import JSONSession, RPCError, JSONRPCv2, JSONRPC
 import lib.util as util
 from server.daemon import DaemonError
 import server.version as version
 
+BAD_REQUEST = 1
+DAEMON_ERROR = 2
 
-class SessionBase(JSONSession):
+
+class Semaphores(object):
+
+    def __init__(self, semaphores):
+        self.semaphores = semaphores
+        self.acquired = []
+
+    async def __aenter__(self):
+        for semaphore in self.semaphores:
+            await semaphore.acquire()
+            self.acquired.append(semaphore)
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        for semaphore in self.acquired:
+            semaphore.release()
+
+
+class SessionBase(ServerSession):
     '''Base class of ElectrumX JSON sessions.
 
     Each session runs its tasks in asynchronous parallelism with other
@@ -26,11 +47,10 @@ class SessionBase(JSONSession):
     '''
 
     MAX_CHUNK_SIZE = 2016
+    session_counter = itertools.count()
 
     def __init__(self, controller, kind):
-        # Force v2 as a temporary hack for old Coinomi wallets
-        # Remove in April 2017
-        super().__init__(version=JSONRPCv2)
+        super().__init__(rpc_protocol=JSONRPCAutoDetect)
         self.kind = kind  # 'RPC', 'TCP' etc.
         self.controller = controller
         self.bp = controller.bp
@@ -39,24 +59,28 @@ class SessionBase(JSONSession):
         self.client = 'unknown'
         self.client_version = (1, )
         self.anon_logs = self.env.anon_logs
-        self.last_delay = 0
         self.txs_sent = 0
-        self.requests = []
-        self.start_time = time.time()
-        self.close_time = 0
+        self.log_me = False
         self.bw_limit = self.env.bandwidth_limit
-        self.bw_time = self.start_time
-        self.bw_interval = 3600
-        self.bw_used = 0
+        self._orig_mr = self.rpc.message_received
 
-    def close_connection(self):
-        '''Call this to close the connection.'''
-        self.close_time = time.time()
-        super().close_connection()
+    def peer_address_str(self, *, for_log=True):
+        '''Returns the peer's IP address and port as a human-readable
+        string, respecting anon logs if the output is for a log.'''
+        if for_log and self.anon_logs:
+            return 'xx.xx.xx.xx:xx'
+        return super().peer_address_str()
 
-    def peername(self, *, for_log=True):
-        '''Return the peer address and port.'''
-        return self.peer_addr(anon=for_log and self.anon_logs)
+    def message_received(self, message):
+        self.logger.info(f'processing {message}')
+        self._orig_mr(message)
+
+    def toggle_logging(self):
+        self.log_me = not self.log_me
+        if self.log_me:
+            self.rpc.message_received = self.message_received
+        else:
+            self.rpc.message_received = self._orig_mr
 
     def flags(self):
         '''Status flags.'''
@@ -65,38 +89,42 @@ class SessionBase(JSONSession):
             status += 'C'
         if self.log_me:
             status += 'L'
-        status += str(self.controller.session_priority(self))
+        status += str(self.concurrency.max_concurrent)
         return status
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
-        self.controller.add_session(self)
+        self.session_id = next(self.session_counter)
+        context = {'conn_id': f'{self.session_id}'}
+        self.logger = util.ConnectionLogger(self.logger, context)
+        self.rpc.logger = self.logger
+        self.group = self.controller.add_session(self)
+        self.logger.info(f'{self.kind} {self.peer_address_str()}, '
+                         f'{len(self.controller.sessions):,d} total')
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
         super().connection_lost(exc)
+        self.controller.remove_session(self)
         msg = ''
-        if self.pause:
+        if self.paused:
             msg += ' whilst paused'
-        if self.controller.is_deprioritized(self):
-            msg += ' whilst deprioritized'
+        if self.concurrency.max_concurrent != self.max_concurrent:
+            msg += ' whilst throttled'
         if self.send_size >= 1024*1024:
             msg += ('.  Sent {:,d} bytes in {:,d} messages'
                     .format(self.send_size, self.send_count))
         if msg:
             msg = 'disconnected' + msg
-            self.log_info(msg)
-        self.controller.remove_session(self)
+            self.logger.info(msg)
+        self.group = None
 
-    def using_bandwidth(self, amount):
-        now = time.time()
-        # Reduce the recorded usage in proportion to the elapsed time
-        elapsed = now - self.bw_time
-        self.bandwidth_start = now
-        refund = int(elapsed / self.bw_interval * self.bw_limit)
-        refund = min(refund, self.bw_used)
-        self.bw_used += amount - refund
+    def count_pending_items(self):
+        return self.rpc.pending_requests
+
+    def semaphore(self):
+        return Semaphores([self.concurrency.semaphore, self.group.semaphore])
 
     def sub_count(self):
         return 0
@@ -111,7 +139,7 @@ class ElectrumX(SessionBase):
         self.subscribe_headers_raw = False
         self.subscribe_height = False
         self.notified_height = None
-        self.max_send = self.env.max_send
+        self.max_response_size = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.mempool_statuses = {}
@@ -148,8 +176,8 @@ class ElectrumX(SessionBase):
 
         if changed:
             es = '' if len(changed) == 1 else 'es'
-            self.log_info('notified of {:,d} address{}'
-                          .format(len(changed), es))
+            self.logger.info('notified of {:,d} address{}'
+                             .format(len(changed), es))
 
     def notify(self, height, touched):
         '''Notify the client about changes to touched addresses (from mempool
@@ -185,7 +213,7 @@ class ElectrumX(SessionBase):
         '''Return param value it is boolean otherwise raise an RPCError.'''
         if value in (False, True):
             return value
-        raise RPCError('{} should be a boolean value'.format(value))
+        raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
 
     def subscribe_headers_result(self, height):
         '''The result of a header subscription for the given height.'''
@@ -209,7 +237,7 @@ class ElectrumX(SessionBase):
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
         peer_mgr = self.controller.peer_mgr
-        return await peer_mgr.on_add_peer(features, self.peer_info())
+        return await peer_mgr.on_add_peer(features, self.peer_address())
 
     def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
@@ -244,8 +272,8 @@ class ElectrumX(SessionBase):
     async def hashX_subscribe(self, hashX, alias):
         # First check our limit.
         if len(self.hashX_subs) >= self.max_subs:
-            raise RPCError('your address subscription limit {:,d} reached'
-                           .format(self.max_subs))
+            raise RPCError(BAD_REQUEST, 'your address subscription limit '
+                           f'{self.max_subs:,d} reached')
 
         # Now let the controller check its limit
         self.controller.new_subscription()
@@ -299,8 +327,8 @@ class ElectrumX(SessionBase):
         peername = self.controller.peer_mgr.proxy_peername()
         if not peername:
             return False
-        peer_info = self.peer_info()
-        return peer_info and peer_info[0] == peername[0]
+        peer_address = self.peer_address()
+        return peer_address and peer_address[0] == peername[0]
 
     async def replaced_banner(self, banner):
         network_info = await self.controller.daemon_request('getnetworkinfo')
@@ -338,8 +366,7 @@ class ElectrumX(SessionBase):
                 with codecs.open(banner_file, 'r', 'utf-8') as f:
                     banner = f.read()
             except Exception as e:
-                self.log_error('reading banner file {}: {}'
-                               .format(banner_file, e))
+                self.loggererror(f'reading banner file {banner_file}: {e}')
             else:
                 banner = await self.replaced_banner(banner)
 
@@ -360,8 +387,9 @@ class ElectrumX(SessionBase):
         if client_name:
             if self.env.drop_client is not None and \
                     self.env.drop_client.match(client_name):
-                raise RPCError('unsupported client: {}'
-                               .format(client_name), JSONRPC.FATAL_ERROR)
+                self.close_after_send = True
+                raise RPCError(BAD_REQUEST,
+                               f'unsupported client: {client_name}')
             self.client = str(client_name)[:17]
             try:
                 self.client_version = tuple(int(part) for part
@@ -376,10 +404,11 @@ class ElectrumX(SessionBase):
 
         # From protocol version 1.1, protocol_version cannot be omitted
         if ptuple is None or (ptuple >= (1, 1) and protocol_version is None):
-            self.log_info('unsupported protocol version request {}'
-                          .format(protocol_version))
-            raise RPCError('unsupported protocol version: {}'
-                           .format(protocol_version), JSONRPC.FATAL_ERROR)
+            self.logger.info('unsupported protocol version request {}'
+                             .format(protocol_version))
+            self.close_after_send = True
+            raise RPCError(BAD_REQUEST,
+                           f'unsupported protocol version: {protocol_version}')
 
         self.set_protocol_handlers(ptuple)
 
@@ -397,16 +426,15 @@ class ElectrumX(SessionBase):
         try:
             tx_hash = await self.daemon.sendrawtransaction([raw_tx])
             self.txs_sent += 1
-            self.log_info('sent tx: {}'.format(tx_hash))
+            self.logger.info('sent tx: {}'.format(tx_hash))
             self.controller.sent_tx(tx_hash)
             return tx_hash
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.log_info('sendrawtransaction: {}'.format(message),
-                          throttle=True)
-            raise RPCError('the transaction was rejected by network rules.'
-                           '\n\n{}\n[{}]'.format(message, raw_tx))
+            self.logger.info('sendrawtransaction: {}'.format(message))
+            raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
+                           f'network rules.\n\n{message}\n[{raw_tx}]')
 
     async def transaction_broadcast_1_0(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -505,7 +533,7 @@ class LocalRPC(SessionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = 'RPC'
-        self.max_send = 0
+        self.max_response_size = 0
         self.protocol_version = 'RPC'
 
     def request_handler(self, method):
@@ -535,13 +563,8 @@ class DashElectrumX(ElectrumX):
 
         for masternode in self.mns:
             status = self.daemon.masternode_list(['status', masternode])
-            payload = {
-                'id': None,
-                'method': 'masternode.subscribe',
-                'params': [masternode],
-                'result': status.get(masternode),
-            }
-            self.send_binary(self.encode_payload(payload))
+            self.send_notification('masternode.subscribe',
+                                   [masternode, status.get(masternode)])
         return result
 
     # Masternode command handlers
@@ -553,9 +576,9 @@ class DashElectrumX(ElectrumX):
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.log_info('masternode_broadcast: {}'.format(message))
-            raise RPCError('the masternode broadcast was rejected.'
-                           '\n\n{}\n[{}]'.format(message, signmnb))
+            self.logger.info('masternode_broadcast: {}'.format(message))
+            raise RPCError(BAD_REQUEST, 'the masternode broadcast was '
+                           f'rejected.\n\n{message}\n[{signmnb}]')
 
     async def masternode_announce_broadcast_1_0(self, signmnb):
         '''Pass through the masternode announce message to be broadcast

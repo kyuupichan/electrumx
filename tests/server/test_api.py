@@ -1,7 +1,7 @@
 import asyncio
 from unittest import mock
 
-from lib.jsonrpc import RPCError
+from aiorpcx import RPCError
 from server.env import Env
 from server.controller import Controller
 
@@ -27,8 +27,8 @@ async def coro(res):
     return res
 
 
-def raise_exception(exc, msg):
-    raise exc(msg)
+def raise_exception(msg):
+    raise RPCError(1, msg)
 
 
 def ensure_text_exception(test, exception):
@@ -82,7 +82,8 @@ def test_transaction_get():
         env = set_env()
         sut = Controller(env)
         sut.daemon_request = mock.Mock()
-        sut.daemon_request.return_value = coro(raise_exception(RPCError, 'some unhandled error'))
+        sut.daemon_request.return_value = coro(
+            raise_exception('some unhandled error'))
         await sut.transaction_get('ff' * 32, True)
 
     async def test_wrong_txhash():

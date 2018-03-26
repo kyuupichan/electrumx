@@ -8,6 +8,7 @@
 '''Peer management.'''
 
 import asyncio
+import logging
 import random
 import socket
 import ssl
@@ -18,7 +19,7 @@ from functools import partial
 import aiorpcx
 
 from lib.peer import Peer
-import lib.util as util
+from lib.util import ConnectionLogger
 import server.version as version
 
 
@@ -27,16 +28,17 @@ STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
 
 
-class PeerSession(aiorpcx.ClientSession, util.LoggedClass):
+class PeerSession(aiorpcx.ClientSession):
     '''An outgoing session to a peer.'''
 
     def __init__(self, peer, peer_mgr, kind, host, port, **kwargs):
         super().__init__(host, port, **kwargs)
-        util.LoggedClass.__init__(self)
         self.peer = peer
         self.peer_mgr = peer_mgr
         self.kind = kind
         self.timeout = 20 if self.peer.is_tor else 10
+        context = {'conn_id': f'{host}'}
+        self.logger = ConnectionLogger(self.logger, context)
 
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
@@ -52,6 +54,15 @@ class PeerSession(aiorpcx.ClientSession, util.LoggedClass):
         args = [version.VERSION, [version.PROTOCOL_MIN, version.PROTOCOL_MAX]]
         self.send_request('server.version', args, self.on_version,
                           timeout=self.timeout)
+
+    def _header_notification(self, header):
+        pass
+
+    def notification_handler(self, method):
+        # We subscribe so might be unlucky enough to get a notification...
+        if method == 'blockchain.headers.subscribe':
+            return self._header_notification
+        return None
 
     def is_good(self, request, instance):
         try:
@@ -73,12 +84,12 @@ class PeerSession(aiorpcx.ClientSession, util.LoggedClass):
         return False
 
     def fail(self, request, reason):
-        self.logger.error(f'[{self.peer.host}] {request} failed: {reason}')
+        self.logger.error(f'{request} failed: {reason}')
         self.peer_mgr.set_verification_status(self.peer, self.kind, False)
         self.close()
 
     def bad(self, reason):
-        self.logger.error(f'[{self.peer.host}] marking bad: {reason}')
+        self.logger.error(f'marking bad: {reason}')
         self.peer.mark_bad()
         self.peer_mgr.set_verification_status(self.peer, self.kind, False)
         self.close()
@@ -180,8 +191,7 @@ class PeerSession(aiorpcx.ClientSession, util.LoggedClass):
 
         features = self.peer_mgr.features_to_register(self.peer, peers)
         if features:
-            self.logger.info(f'[{self.peer.host}] registering ourself with '
-                             '"server.add_peer"')
+            self.logger.info(f'registering ourself with "server.add_peer"')
             self.send_request('server.add_peer', [features],
                               self.on_add_peer, timeout=self.timeout)
         else:
@@ -201,14 +211,14 @@ class PeerSession(aiorpcx.ClientSession, util.LoggedClass):
             self.peer_mgr.set_verification_status(self.peer, self.kind, True)
 
 
-class PeerManager(util.LoggedClass):
+class PeerManager(object):
     '''Looks after the DB of peer network servers.
 
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
     def __init__(self, env, controller):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
@@ -336,12 +346,12 @@ class PeerManager(util.LoggedClass):
     async def on_add_peer(self, features, source_info):
         '''Add a peer (but only if the peer resolves to the source).'''
         if not source_info:
-            self.log_info('ignored add_peer request: no source info')
+            self.logger.info('ignored add_peer request: no source info')
             return False
         source = source_info[0]
         peers = Peer.peers_from_features(features, source)
         if not peers:
-            self.log_info('ignored add_peer request: no peers given')
+            self.logger.info('ignored add_peer request: no peers given')
             return False
 
         # Just look at the first peer, require it
@@ -362,12 +372,12 @@ class PeerManager(util.LoggedClass):
                 reason = 'source-destination mismatch'
 
         if permit:
-            self.log_info('accepted add_peer request from {} for {}'
-                          .format(source, host))
+            self.logger.info('accepted add_peer request from {} for {}'
+                             .format(source, host))
             self.add_peers([peer], check_ports=True)
         else:
-            self.log_warning('rejected add_peer request from {} for {} ({})'
-                             .format(source, host, reason))
+            self.logger.warning('rejected add_peer request from {} for {} ({})'
+                                .format(source, host, reason))
 
         return permit
 
@@ -438,13 +448,13 @@ class PeerManager(util.LoggedClass):
             ports = [9050, 9150, 1080]
         else:
             ports = [self.env.tor_proxy_port]
-        self.log_info(f'trying to detect proxy on "{host}" ports {ports}')
+        self.logger.info(f'trying to detect proxy on "{host}" ports {ports}')
 
         cls = aiorpcx.SOCKSProxy
         result = await cls.auto_detect_host(host, ports, None, loop=self.loop)
         if isinstance(result, cls):
             self.proxy = result
-            self.log_info(f'detected {self.proxy}')
+            self.logger.info(f'detected {self.proxy}')
 
     def proxy_peername(self):
         '''Return the peername of the proxy, if there is a proxy, otherwise
@@ -544,10 +554,10 @@ class PeerManager(util.LoggedClass):
         if exception:
             session.close()
             kind, port = port_pairs.pop(0)
-            self.log_info('failed connecting to {} at {} port {:d} '
-                          'in {:.1f}s: {}'
-                          .format(peer, kind, port,
-                                  time.time() - peer.last_try, exception))
+            self.logger.info('failed connecting to {} at {} port {:d} '
+                             'in {:.1f}s: {}'
+                             .format(peer, kind, port,
+                                     time.time() - peer.last_try, exception))
             if port_pairs:
                 self.retry_peer(peer, port_pairs)
             else:
@@ -562,7 +572,7 @@ class PeerManager(util.LoggedClass):
             how = 'via {} at {}'.format(kind, peer.ip_addr)
         status = 'verified' if good else 'failed to verify'
         elapsed = now - peer.last_try
-        self.log_info('{} {} {} in {:.1f}s'.format(status, peer, how, elapsed))
+        self.logger.info(f'{status} {peer} {how} in {elapsed:.1f}s')
 
         if good:
             peer.try_count = 0
