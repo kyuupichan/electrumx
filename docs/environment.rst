@@ -133,7 +133,7 @@ These environment variables are optional:
 
   ElectrumX will listen on this port for local RPC connections.
   ElectrumX listens for RPC connections unless this is explicitly set
-  to blank.  The default depends on :envvar:`COIN` and :attr:`NET`
+  to blank.  The default depends on :envvar:`COIN` and :envvar:`NET`
   (e.g., 8000 for Bitcoin mainnet) if not set, as indicated in
   `lib/coins.py`_.
 
@@ -190,7 +190,7 @@ These environment variables are optional:
   The maximum number of blocks to be able to handle in a chain
   reorganisation.  ElectrumX retains some fairly compact undo
   information for this many blocks in levelDB.  The default is a
-  function of :envvar:`COIN` and :attr:`NET`; for Bitcoin mainnet it
+  function of :envvar:`COIN` and :envvar:`NET`; for Bitcoin mainnet it
   is 200.
 
 .. envvar:: EVENT_LOOP_POLICY
