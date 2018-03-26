@@ -439,9 +439,6 @@ class PeerManager(util.LoggedClass):
         if isinstance(result, cls):
             self.proxy = result
             self.log_info(f'detected {self.proxy}')
-        else:
-            for failure_msg in result:
-                self.log_info(failure_msg)
 
     def proxy_peername(self):
         '''Return the peername of the proxy, if there is a proxy, otherwise
