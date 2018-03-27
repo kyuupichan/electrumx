@@ -576,7 +576,7 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     PEERS = [
         'electrum-testnet-abc.criptolayer.net s50112',
         'bchtestnet.arihanc.com t53001 s53002',
-        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',     
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',
     ]
 
 
@@ -590,7 +590,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'testnet.hsmiths.com t53011 s53012',
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
-        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t', 
+        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
     ]
 
 
@@ -1528,7 +1528,7 @@ class Decred(Coin):
         if height > 0:
             return super().block(raw_block, height)
         else:
-            return Block(raw_block, cls.block_header(raw_block, height), [])        
+            return Block(raw_block, cls.block_header(raw_block, height), [])
 
 
 class DecredTestnet(Decred):
@@ -1544,4 +1544,32 @@ class DecredTestnet(Decred):
     TX_COUNT_HEIGHT = 254198
     TX_PER_BLOCK = 1000
     RPC_PORT = 19109
-    
+
+class Axe(Dash):
+    NAME = "Axe"
+    SHORTNAME = "AXE"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("02fe52cc")
+    XPRV_VERBYTES = bytes.fromhex("02fe52f8")
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("10")]
+    WIF_BYTE = bytes.fromhex("cc")
+    GENESIS_HASH = ('00000c33631ca6f2f61368991ce2dc03'
+                    '306b5bb50bf7cede5cfbba6db38e52e6')
+    DAEMON = daemon.DashDaemon
+    TX_COUNT = 18405
+    TX_COUNT_HEIGHT = 30237
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9337
+    REORG_LIMIT = 1000
+    PEERS = []
+
+    @classmethod
+    def header_hash(cls, header):
+        '''
+        Given a header return the hash for AXE.
+        Need to download `axe_hash` module
+        Source code: https://github.com/AXErunners/axe_hash
+        '''
+        import axe_hash
+        return axe_hash.getPoWHash(header)
