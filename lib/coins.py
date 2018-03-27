@@ -43,7 +43,7 @@ from lib.script import ScriptPubKey, OpCodes
 import lib.tx as lib_tx
 from server.block_processor import BlockProcessor
 import server.daemon as daemon
-from server.session import ElectrumX, DashElectrumX
+from server.session import ElectrumX, DashElectrumX, AxeElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -409,6 +409,7 @@ class BitcoinCash(BitcoinMixin, Coin):
         'electrum-abc.criptolayer.net s50012',
         'electroncash.cascharia.com s50002',
         'bch.arihanc.com t52001 s52002',
+        'bccarihace4jdcnt.onion t52001 s52002',
         'jelectrum-cash.1209k.com s t',
         'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
@@ -436,10 +437,13 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'ozahtqwp25chjdjd.onion s t',
         'us11.einfachmalnettsein.de s t',
         'ELEX01.blackpole.online s t',
+        'node.arihanc.com s t',
+        'arihancckjge66iv.onion s t',
     ]
 
 
 class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
+    CHUNK_SIZE = 252
     NAME = "BitcoinGold"
     SHORTNAME = "BTG"
     FORK_HEIGHT = 491407
@@ -450,6 +454,7 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 499923
     TX_PER_BLOCK = 50
     REORG_LIMIT = 1000
+    RPC_PORT = 8338
 
     @classmethod
     def header_hash(cls, header):
@@ -460,6 +465,54 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
             return double_sha256(header)
         else:
             return double_sha256(header[:68] + header[100:112])
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        h = dict(
+            block_height=height,
+            version=struct.unpack('<I', header[:4])[0],
+            prev_block_hash=hash_to_str(header[4:36]),
+            merkle_root=hash_to_str(header[36:68]),
+            timestamp=struct.unpack('<I', header[100:104])[0],
+            reserved=hash_to_str(header[72:100]),
+            bits=struct.unpack('<I', header[104:108])[0],
+            nonce=hash_to_str(header[108:140]),
+            solution=hash_to_str(header[140:])
+        )
+
+        return h
+
+
+class BitcoinGoldTestnet(BitcoinGold):
+    FORK_HEIGHT = 1
+    SHORTNAME = "TBTG"
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTES = [bytes.fromhex("C4")]
+    WIF_BYTE = bytes.fromhex("EF")
+    TX_COUNT = 0
+    TX_COUNT_HEIGHT = 1
+    NET = 'testnet'
+    RPC_PORT = 18338
+    GENESIS_HASH = ('00000000e0781ebe24b91eedc293adfe'
+                    'a2f557b53ec379e78959de3853e6f9f6')
+
+
+class BitcoinGoldRegtest(BitcoinGold):
+    FORK_HEIGHT = 2000
+    SHORTNAME = "TBTG"
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTES = [bytes.fromhex("C4")]
+    WIF_BYTE = bytes.fromhex("EF")
+    TX_COUNT = 0
+    TX_COUNT_HEIGHT = 1
+    NET = 'regtest'
+    RPC_PORT = 18444
+    GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
+                    'bf5beb436012afca590b1a11466e2206')
 
 
 class Emercoin(Coin):
@@ -521,6 +574,8 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     NAME = "BitcoinCash"
     PEERS = [
         'electrum-testnet-abc.criptolayer.net s50112',
+        'bchtestnet.arihanc.com t53001 s53002',
+        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion t53001 s53002',
     ]
 
 
@@ -534,12 +589,8 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'testnet.hsmiths.com t53011 s53012',
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
+        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
     ]
-
-
-class BitcoinGoldTestnet(BitcoinTestnetMixin, BitcoinGold):
-    NAME = "BitcoinGold"
-    FORK_HEIGHT = 1210320
 
 
 class BitcoinSegwitRegtest(BitcoinSegwitTestnet):
@@ -962,6 +1013,10 @@ class Koto(Coin):
     TX_PER_BLOCK = 3
     RPC_PORT = 8432
     REORG_LIMIT = 800
+    PEERS = [
+        'fr.kotocoin.info s t',
+        'electrum.kotocoin.info s t',
+    ]
 
 class Komodo(KomodoMixin, EquihashMixin, Coin):
     NAME = "Komodo"
@@ -1029,7 +1084,6 @@ class Bitbay(ScryptMixin, Coin):
     WIF_BYTE = bytes.fromhex("99")
     GENESIS_HASH = ('0000075685d3be1f253ce777174b1594'
                     '354e79954d2a32a6f77fe9cba00e6467')
-    DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 4594999
     TX_COUNT_HEIGHT = 1667070
     TX_PER_BLOCK = 3
@@ -1116,7 +1170,7 @@ class Monacoin(Coin):
         'electrumx1.monacoin.ninja s t',
         'electrumx2.monacoin.ninja s t',
         'electrumx1.movsign.info t',
-        'electrumx2.movsign.info t',
+        'electrumx2.movsign.info s t',
         'electrum-mona.bitbank.cc s t',
     ]
 
@@ -1455,7 +1509,7 @@ class Decred(Coin):
         if height > 0:
             return super().block(raw_block, height)
         else:
-            return Block(raw_block, cls.block_header(raw_block, height), [])        
+            return Block(raw_block, cls.block_header(raw_block, height), [])
 
 
 class DecredTestnet(Decred):
@@ -1471,4 +1525,32 @@ class DecredTestnet(Decred):
     TX_COUNT_HEIGHT = 254198
     TX_PER_BLOCK = 1000
     RPC_PORT = 19109
-    
+
+# Source: https://github.com/AXErunners/axe
+class Axe(Coin):
+    NAME = "Axe"
+    SHORTNAME = "AXE"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("02fe52cc")
+    XPRV_VERBYTES = bytes.fromhex("02fe52f8")
+    GENESIS_HASH = ('00000c33631ca6f2f61368991ce2dc03'
+                    '306b5bb50bf7cede5cfbba6db38e52e6')
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("10")]
+    WIF_BYTE = bytes.fromhex("cc")
+    TX_COUNT_HEIGHT = 30237
+    TX_COUNT = 18405
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9337
+    PEERS = [
+        '207.246.65.114 s t',
+        '45.32.168.226 s t',
+    ]
+    SESSIONCLS = AxeElectrumX
+    DAEMON = daemon.AxeDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import axe_hash
+        return axe_hash.getPoWHash(header)

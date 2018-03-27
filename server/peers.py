@@ -517,6 +517,11 @@ class PeerManager(util.LoggedClass):
         kind, port = port_pairs[0]
         sslc = ssl.SSLContext(ssl.PROTOCOL_TLS) if kind == 'SSL' else None
 
+        host = self.env.cs_host(for_rpc=False)
+        if isinstance(host, list):
+            host = host[0]
+
+        kwargs = {'ssl': sslc}
         if self.env.force_proxy or peer.is_tor:
             # Only attempt a proxy connection if the proxy is up
             if not self.proxy:
@@ -524,17 +529,13 @@ class PeerManager(util.LoggedClass):
             create_connection = self.proxy.create_connection
         else:
             create_connection = self.loop.create_connection
-
-        # Use our listening Host/IP for outgoing connections so our
-        # peers see the correct source.
-        host = self.env.cs_host(for_rpc=False)
-        if isinstance(host, list):
-            host = host[0]
-        local_addr = (host, None) if host else None
+            # Use our listening Host/IP for outgoing connections so
+            # our peers see the correct source.
+            if host:
+                kwargs['local_addr'] = (host, None)
 
         protocol_factory = partial(PeerSession, peer, self, kind)
-        coro = create_connection(protocol_factory, peer.host, port, ssl=sslc,
-                                 local_addr=local_addr)
+        coro = create_connection(protocol_factory, peer.host, port, **kwargs)
         callback = partial(self.connection_done, peer, port_pairs)
         self.ensure_future(coro, callback)
 

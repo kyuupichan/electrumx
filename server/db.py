@@ -95,7 +95,7 @@ class DB(util.LoggedClass):
         '''Open the databases.  If already open they are closed and re-opened.
 
         When syncing we want to reserve a lot of open files for the
-        synchtonization.  When serving clients we want the open files for
+        synchronization.  When serving clients we want the open files for
         serving network connections.
         '''
         def log_reason(message, is_for_sync):
