@@ -1552,5 +1552,5 @@ class Axe(Dash):
         Need to download `axe_hash` module
         Source code: https://github.com/AXErunners/axe_hash
         '''
-        import x11_hash
-        return x11_hash.getPoWHash(header)
+        import axe_hash
+        return axe_hash.getPoWHash(header)
