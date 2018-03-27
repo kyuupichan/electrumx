@@ -1552,5 +1552,5 @@ class Axe(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import x11_hash
-        return x11_hash.getPoWHash(header)
+        import axe_hash
+        return axe_hash.getPoWHash(header)
