@@ -254,6 +254,9 @@ class Controller(ServerBase):
         self.logger.info('max subscriptions per session: {:,d}'
                          .format(self.env.max_session_subs))
         self.logger.info('bands: {}'.format(self.bands))
+        if self.env.drop_client is not None:
+            self.logger.info('drop clients matching: {}'
+                             .format(self.env.drop_client.pattern))
         await self.start_external_servers()
 
     async def start_external_servers(self):

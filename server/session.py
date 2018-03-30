@@ -358,6 +358,10 @@ class ElectrumX(SessionBase):
         protocol_version: the protocol version spoken by the client
         '''
         if client_name:
+            if self.env.drop_client is not None and \
+                    self.env.drop_client.match(client_name):
+                raise RPCError('unsupported client: {}'
+                               .format(client_name), JSONRPC.FATAL_ERROR)
             self.client = str(client_name)[:17]
             try:
                 self.client_version = tuple(int(part) for part

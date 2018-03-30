@@ -201,6 +201,12 @@ These environment variables are optional:
 
   If you are not sure what this means leave it unset.
 
+.. envvar:: DROP_CLIENT
+
+  Set a regular expression to disconnect any client based on their
+  version string. For example to drop versions from 1.0 to 1.2 use
+  the regex ``1\.[0-2]\.\d+``.
+
 
 Resource Usage Limits
 =====================
