@@ -1254,8 +1254,7 @@ class Fujicoin(Coin):
     WIF_BYTE = bytes.fromhex("a4")
     GENESIS_HASH = ('adb6d9cfd74075e7f91608add4bd2a2e'
                     'a636f70856183086842667a1597714a0')
-    ESTIMATE_FEE = 0.001
-    RELAY_FEE = 0.001
+    DESERIALIZER = lib_tx.DeserializerSegWit
     TX_COUNT = 170478
     TX_COUNT_HEIGHT = 1521676
     TX_PER_BLOCK = 1
