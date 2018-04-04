@@ -54,6 +54,17 @@ class EnvBase(lib_util.LoggedClass):
                             .format(envvar, value))
 
     @classmethod
+    def custom(cls, envvar, default, parse):
+        value = environ.get(envvar)
+        if value is None:
+            return default
+        try:
+            return parse(value)
+        except Exception as e:
+            raise cls.Error('cannot parse envvar {} value {}'
+                            .format(envvar, value)) from e
+
+    @classmethod
     def obsolete(cls, envvars):
         bad = [envvar for envvar in envvars if environ.get(envvar)]
         if bad:
