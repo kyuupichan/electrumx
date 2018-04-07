@@ -407,7 +407,6 @@ class BitcoinCash(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 479636
     TX_PER_BLOCK = 50
     PEERS = [
-        'electrum-abc.criptolayer.net s50012',
         'electroncash.cascharia.com s50002',
         'bch.arihanc.com t52001 s52002',
         'bccarihace4jdcnt.onion t52001 s52002',
@@ -415,7 +414,9 @@ class BitcoinCash(BitcoinMixin, Coin):
         'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
         'electroncash.checksum0.com s t',
-    ]
+        'electron.jns.im s t',
+        'electrumx-cash.1209k.com s t',
+   ]
 
 
 class BitcoinSegwit(BitcoinMixin, Coin):
