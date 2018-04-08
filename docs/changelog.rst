@@ -1,12 +1,28 @@
 ChangeLog
 =========
 
-IMPORTANT: version 1.2 changes script hash indexing in the database,
-so you will need to rebuild your databases from scratch.  Running this
-version will refuse to open the DB and not corrupt it, so you can
-revert to 1.1.x if you wish.  The initial synchronisation process
-should be around 10-15% faster than 1.1, owing to this change and
-Justin Arthur's optimisations from 1.1.1.
+Version 1.4
+-----------
+
+* switch to `aiorpcX <https://github.com/kyuupichan/aiorpcX>`_ for all
+  networking, ``JSON RPC`` and proxy handling
+* proxy detection improvements
+* `documentation <https://electrumx.readthedocs.io/>`_ rewrite
+* new environment variable :envvar:`LOG_FORMAT` to control logging format
+* new environment variable :envvar:`DROP_CLIENT` to cut off unsupported
+     client software
+* coin updates: Litecoin (pooler), bitbayd (kongeo), BTG (wilsonmeier),
+     danny91, wakiyamap, snowgem, Dash (theLazier), fujicoin
+* new coins: Decred (cipherzzz), axe (-k),
+* typo fixes (dax, romanz)
+
+.. note:: the Dash-specific undocumented ``masternode.subscribe()``
+   RPC call was not following the JSON RPC spec; this was shown up by
+   the switch to aiorpcX.  I had to modify the code but it may break
+   Dash clients.
+
+   The Decred implementation doesn't work on mainnet; I will remove it
+   if this remains unfixed.
 
 Version 1.3
 -----------
@@ -42,6 +58,13 @@ Version 1.2.1
 
 Version 1.2
 -----------
+
+.. note:: version 1.2 changes script hash indexing in the database, so
+  you will need to rebuild your databases from scratch.  Running this
+  version will refuse to open the DB and not corrupt it, so you can
+  revert to 1.1.x if you wish.  The initial synchronisation process
+  should be around 10-15% faster than 1.1, owing to this change and
+  Justin Arthur's optimisations from 1.1.1.
 
 - separate P2PKH from P2PK entries in the history and UTXO databases.
   These were previously amalgamated by address as that is what
