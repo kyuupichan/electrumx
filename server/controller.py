@@ -54,8 +54,7 @@ class Controller(ServerBase):
         self.coin = env.coin
         self.servers = {}
         self.sessions = set()
-        self.groups = set()
-        self.cur_group = self._new_group(0)
+        self.cur_group = SessionGroup(0)
         self.txs_sent = 0
         self.next_log_sessions = 0
         self.state = self.CATCHING_UP
@@ -297,11 +296,6 @@ class Controller(ServerBase):
                                                                   height)
         return self.header_cache[height]
 
-    def _new_group(self, gid):
-        group = SessionGroup(gid)
-        self.groups.add(group)
-        return group
-
     def add_session(self, session):
         self.sessions.add(session)
         if (len(self.sessions) >= self.max_sessions
@@ -313,7 +307,7 @@ class Controller(ServerBase):
             self.close_servers(['TCP', 'SSL'])
         gid = int(session.start_time - self.start_time) // 900
         if self.cur_group.gid != gid:
-            self.cur_group = self._new_group(gid)
+            self.cur_group = SessionGroup(gid)
         return self.cur_group
 
     def remove_session(self, session):
@@ -358,9 +352,8 @@ class Controller(ServerBase):
                   if len(sessions) <= 5 and
                   sum(s.bw_charge for s in sessions) < bw_limit]
         if len(groups) > 1:
-            new_group = groups.pop()
+            new_group = groups[-1]
             for group in groups:
-                self.groups.remove(group)
                 for session in group_map[group]:
                     session.group = new_group
 
@@ -370,13 +363,14 @@ class Controller(ServerBase):
 
     def getinfo(self):
         '''A one-line summary of server state.'''
+        group_map = self._group_map()
         return {
             'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'errors': sum(s.rpc.errors for s in self.sessions),
-            'groups': len(self.groups),
+            'groups': len(group_map),
             'logged': len([s for s in self.sessions if s.log_me]),
             'paused': sum(s.paused for s in self.sessions),
             'pid': os.getpid(),
