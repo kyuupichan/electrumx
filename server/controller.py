@@ -46,7 +46,7 @@ class Controller(ServerBase):
     '''
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
-    PROTOCOL_MIN = '0.9'
+    PROTOCOL_MIN = '1.0'
     PROTOCOL_MAX = '1.2'
     VERSION = 'ElectrumX 1.4'
 
