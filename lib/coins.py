@@ -432,13 +432,10 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'electrum.vom-stausee.de s t',
         'electrum3.hachre.de s t',
         'electrum.hsmiths.com s t',
-        'erbium1.sytes.net s t',
         'helicarrier.bauerj.eu s t',
         'hsmiths4fyqlw5xw.onion s t',
         'luggscoqbymhvnkp.onion t80',
         'ozahtqwp25chjdjd.onion s t',
-        'us11.einfachmalnettsein.de s t',
-        'ELEX01.blackpole.online s t',
         'node.arihanc.com s t',
         'arihancckjge66iv.onion s t',
     ]
