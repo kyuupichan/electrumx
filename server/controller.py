@@ -358,8 +358,7 @@ class Controller(ServerBase):
                   if len(sessions) <= 5 and
                   sum(s.bw_charge for s in sessions) < bw_limit]
         if len(groups) > 1:
-            new_gid = max(group.gid for group in groups)
-            new_group = self._new_group(new_gid)
+            new_group = groups.pop()
             for group in groups:
                 self.groups.remove(group)
                 for session in group_map[group]:

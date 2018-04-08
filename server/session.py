@@ -118,7 +118,6 @@ class SessionBase(ServerSession):
         if msg:
             msg = 'disconnected' + msg
             self.logger.info(msg)
-        self.group = None
 
     def count_pending_items(self):
         return self.rpc.pending_requests
