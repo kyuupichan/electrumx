@@ -20,7 +20,6 @@ import aiorpcx
 
 from lib.peer import Peer
 from lib.util import ConnectionLogger
-import server.version as version
 
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
@@ -51,9 +50,9 @@ class PeerSession(aiorpcx.ClientSession):
                 self.peer.ip_addr = address[0]
 
         # Send server.version first
-        args = [version.VERSION, [version.PROTOCOL_MIN, version.PROTOCOL_MAX]]
-        self.send_request('server.version', args, self.on_version,
-                          timeout=self.timeout)
+        controller = self.peer_mgr.controller
+        self.send_request('server.version', controller.server_version_args(),
+                          self.on_version, timeout=self.timeout)
 
     def _header_notification(self, header):
         pass
@@ -226,7 +225,7 @@ class PeerManager(object):
         self.loop = controller.loop
 
         # Our clearnet and Tor Peers, if any
-        self.myselves =  [Peer(ident.host, env.server_features(), 'env')
+        self.myselves =  [Peer(ident.host, controller.server_features(), 'env')
                           for ident in env.identities]
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the

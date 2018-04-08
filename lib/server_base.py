@@ -53,7 +53,6 @@ class ServerBase(object):
 
         # First asyncio operation must be to set the event loop policy
         # as this replaces the event loop
-        self.logger.info('event loop policy: {}'.format(self.env.loop_policy))
         asyncio.set_event_loop_policy(self.env.loop_policy)
 
         # Trigger this event to cleanly shutdown

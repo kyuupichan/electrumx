@@ -46,10 +46,17 @@ class Controller(ServerBase):
     '''
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
+    PROTOCOL_MIN = '0.9'
+    PROTOCOL_MAX = '1.2'
+    VERSION = 'ElectrumX 1.4'
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
         super().__init__(env)
+        self.logger.info(f'software version: {self.VERSION}')
+        self.logger.info(f'supported protocol versions: '
+                         f'{self.PROTOCOL_MIN}-{self.PROTOCOL_MAX}')
+        self.logger.info(f'event loop policy: {env.loop_policy}')
 
         self.coin = env.coin
         self.servers = {}
@@ -83,6 +90,34 @@ class Controller(ServerBase):
         self.bp = self.coin.BLOCK_PROCESSOR(env, self, self.daemon)
         self.mempool = MemPool(self.bp, self)
         self.peer_mgr = PeerManager(env, self)
+
+    @classmethod
+    def short_version(cls):
+        '''Return e.g. "1.2" for ElectrumX 1.2'''
+        return cls.VERSION.split()[-1]
+
+    def server_features(self):
+        '''Return the server features dictionary.'''
+        return {
+            'hosts': self.env.hosts_dict(),
+            'pruning': None,
+            'server_version': self.VERSION,
+            'protocol_min': self.PROTOCOL_MIN,
+            'protocol_max': self.PROTOCOL_MAX,
+            'genesis_hash': self.coin.GENESIS_HASH,
+            'hash_function': 'sha256',
+        }
+
+    def server_version_args(self):
+        '''The arguments to a server.version RPC call to a peer.'''
+        return [self.VERSION, [self.PROTOCOL_MIN, self.PROTOCOL_MAX]]
+
+    def protocol_tuple(self, client_protocol_str):
+        '''Given a client's protocol version string, return the negotiated
+        protocol version tuple, or None if unsupported.
+        '''
+        return util.protocol_version(client_protocol_str,
+                                     self.PROTOCOL_MIN, self.PROTOCOL_MAX)
 
     async def start_servers(self):
         '''Start the RPC server and schedule the external servers to be

@@ -1,10 +1,10 @@
 import setuptools
-from server.version import VERSION
+from server.controller import Controller
 
 
 setuptools.setup(
     name='electrumx',
-    version=VERSION.split()[-1],
+    version=Controller.short_version(),
     scripts=['electrumx_server.py', 'electrumx_rpc.py'],
     python_requires='>=3.6',
     # via environment variables, in which case I've tested with 15.0.4

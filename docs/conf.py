@@ -15,7 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-from server.version import VERSION
+from server.controller import Controller
 
 # -- Project information -----------------------------------------------------
 
@@ -24,9 +24,9 @@ copyright = '2016-2018, Neil Booth'
 author = 'Neil Booth'
 
 # The short X.Y version
-version = VERSION.split()[-1]
-# The full version, including alpha/beta/rc tags
-release = VERSION
+version = Controller.short_version()
+# The full version including branding
+release = Controller.VERSION
 
 
 # -- General configuration ---------------------------------------------------

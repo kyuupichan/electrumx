@@ -18,7 +18,6 @@ from collections import defaultdict
 from functools import partial
 
 from server.daemon import DaemonError
-from server.version import VERSION
 from lib.hash import hash_to_str
 from lib.util import chunks, formatted_time
 import server.db
@@ -221,8 +220,8 @@ class BlockProcessor(server.db.DB):
         self.first_sync = False
         await self.controller.run_in_executor(self.flush, True)
         if self.utxo_db.for_sync:
-            self.logger.info('{} synced to height {:,d}'
-                             .format(VERSION, self.height))
+            self.logger.info(f'{self.controller.VERSION} synced to '
+                             f'height {height:,d}')
         self.open_dbs()
         self.caught_up_event.set()
 

@@ -17,7 +17,6 @@ from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
 from lib.hash import sha256, hash_to_str
 import lib.util as util
 from server.daemon import DaemonError
-import server.version as version
 
 BAD_REQUEST = 1
 DAEMON_ERROR = 2
@@ -293,10 +292,6 @@ class ElectrumX(SessionBase):
         hashX = self.controller.scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
-    def server_features(self):
-        '''Returns a dictionary of server features.'''
-        return self.env.server_features()
-
     def block_headers(self, start_height, count):
         '''Return count concatenated block headers as hex for the main chain;
         starting at start_height.
@@ -336,11 +331,9 @@ class ElectrumX(SessionBase):
         minor, revision = divmod(minor, 10000)
         revision //= 100
         daemon_version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
-        server_version = version.VERSION.split()[-1]
         for pair in [
-                ('$VERSION', version.VERSION), # legacy
-                ('$SERVER_VERSION', server_version),
-                ('$SERVER_SUBVERSION', version.VERSION),
+                ('$SERVER_VERSION', self.controller.short_version()),
+                ('$SERVER_SUBVERSION', self.controller.VERSION),
                 ('$DAEMON_VERSION', daemon_version),
                 ('$DAEMON_SUBVERSION', network_info['subversion']),
                 ('$DONATION_ADDRESS', self.env.donation_address),
@@ -398,8 +391,7 @@ class ElectrumX(SessionBase):
 
         # Find the highest common protocol version.  Disconnect if
         # that protocol version in unsupported.
-        ptuple = util.protocol_version(protocol_version, version.PROTOCOL_MIN,
-                                       version.PROTOCOL_MAX)
+        ptuple = self.controller.protocol_tuple(protocol_version)
 
         # From protocol version 1.1, protocol_version cannot be omitted
         if ptuple is None or (ptuple >= (1, 1) and protocol_version is None):
@@ -413,9 +405,9 @@ class ElectrumX(SessionBase):
 
         # The return value depends on the protocol version
         if ptuple < (1, 1):
-            return version.VERSION
+            return self.controller.VERSION
         else:
-            return (version.VERSION, self.protocol_version)
+            return (self.controller.VERSION, self.protocol_version)
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -479,7 +471,7 @@ class ElectrumX(SessionBase):
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
-            'server.features': self.server_features,
+            'server.features': self.controller.server_features,
             'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
         }
