@@ -544,6 +544,7 @@ class PeerManager(object):
             if not self.proxy:
                 return
             kwargs['proxy'] = self.proxy
+            kwargs['resolve'] = not peer.is_tor
         elif host:
             # Use our listening Host/IP for outgoing non-proxy
             # connections so our peers see the correct source.
