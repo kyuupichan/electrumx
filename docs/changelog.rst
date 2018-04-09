@@ -1,6 +1,14 @@
 ChangeLog
 =========
 
+Version 1.4.1
+-------------
+
+* minor bugfixes - cleaner shutdown; group handling
+* set PROTOCOL_MIN to 1.0; this will prevent 2.9.x clients from connecting
+  and encourage upgrades to more recent clients without the security hole
+* requires aiorpcx 0.5.4
+
 Version 1.4
 -----------
 

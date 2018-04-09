@@ -19,7 +19,7 @@ from functools import partial
 
 import pylru
 
-from aiorpcx import RPCError
+from aiorpcx import RPCError, TaskSet
 from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 from lib.peer import Peer
 from lib.server_base import ServerBase
@@ -48,7 +48,7 @@ class Controller(ServerBase):
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
     PROTOCOL_MIN = '1.0'
     PROTOCOL_MAX = '1.2'
-    VERSION = 'ElectrumX 1.4'
+    VERSION = 'ElectrumX 1.4.1'
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
@@ -60,6 +60,7 @@ class Controller(ServerBase):
 
         self.coin = env.coin
         self.servers = {}
+        self.tasks = TaskSet()
         self.sessions = set()
         self.cur_group = SessionGroup(0)
         self.txs_sent = 0
@@ -68,7 +69,6 @@ class Controller(ServerBase):
         self.max_sessions = env.max_sessions
         self.low_watermark = self.max_sessions * 19 // 20
         self.max_subs = env.max_subs
-        self.futures = {}
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
         self.next_stale_check = 0
@@ -127,25 +127,23 @@ class Controller(ServerBase):
             await self.start_server('RPC', self.env.cs_host(for_rpc=True),
                                     self.env.rpc_port)
 
-        self.ensure_future(self.bp.main_loop())
-        self.ensure_future(self.wait_for_bp_catchup())
+        self.create_task(self.bp.main_loop())
+        self.create_task(self.wait_for_bp_catchup())
 
     async def shutdown(self):
         '''Perform the shutdown sequence.'''
         self.state = self.SHUTTING_DOWN
 
-        # Close servers and sessions
+        # Close servers and sessions, and cancel all tasks
         self.close_servers(list(self.servers.keys()))
         for session in self.sessions:
             self.close_session(session)
+        self.tasks.cancel_all()
 
-        # Cancel pending futures
-        for future in self.futures:
-            future.cancel()
-
-        # Wait for all futures to finish
-        while not all(future.done() for future in self.futures):
-            await asyncio.sleep(0.1)
+        # Wait for the above to take effect
+        await self.tasks.wait()
+        for session in list(self.sessions):
+            await session.wait_closed()
 
         # Finally shut down the block processor and executor
         self.bp.shutdown(self.executor)
@@ -175,27 +173,21 @@ class Controller(ServerBase):
 
     def schedule_executor(self, func, *args):
         '''Schedule running func in the executor, return a task.'''
-        return self.ensure_future(self.run_in_executor(func, *args))
+        return self.create_task(self.run_in_executor(func, *args))
 
-    def ensure_future(self, coro, callback=None):
+    def create_task(self, coro, callback=None):
         '''Schedule the coro to be run.'''
-        future = asyncio.ensure_future(coro)
-        future.add_done_callback(self.on_future_done)
-        self.futures[future] = callback
-        return future
+        task = self.tasks.create_task(coro)
+        task.add_done_callback(callback or self.check_task_exception)
+        return task
 
-    def on_future_done(self, future):
-        '''Collect the result of a future after removing it from our set.'''
-        callback = self.futures.pop(future)
+    def check_task_exception(self, task):
+        '''Check a task for exceptions.'''
         try:
-            if callback:
-                callback(future)
-            else:
-                future.result()
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            self.logger.error(traceback.format_exc())
+            if not task.cancelled():
+                task.result()
+        except Exception as e:
+            self.logger.exception(f'uncaught task exception: {e}')
 
     async def housekeeping(self):
         '''Regular housekeeping checks.'''
@@ -226,11 +218,11 @@ class Controller(ServerBase):
         synchronize, then kick off server background processes.'''
         await self.bp.caught_up_event.wait()
         self.logger.info('block processor has caught up')
-        self.ensure_future(self.mempool.main_loop())
+        self.create_task(self.mempool.main_loop())
         await self.mempool.synchronized_event.wait()
-        self.ensure_future(self.peer_mgr.main_loop())
-        self.ensure_future(self.log_start_external_servers())
-        self.ensure_future(self.housekeeping())
+        self.create_task(self.peer_mgr.main_loop())
+        self.create_task(self.log_start_external_servers())
+        self.create_task(self.housekeeping())
 
     def close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
@@ -309,7 +301,7 @@ class Controller(ServerBase):
                 continue
             session_touched = session.notify(height, touched)
             if session_touched is not None:
-                self.ensure_future(session.notify_async(session_touched))
+                self.create_task(session.notify_async(session_touched))
 
     def notify_peers(self, updates):
         '''Notify of peer updates.'''

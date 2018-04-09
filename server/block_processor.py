@@ -198,7 +198,7 @@ class BlockProcessor(server.db.DB):
 
     async def main_loop(self):
         '''Main loop for block processing.'''
-        self.controller.ensure_future(self.prefetcher.main_loop())
+        self.controller.create_task(self.prefetcher.main_loop())
         await self.prefetcher.reset_height()
 
         while True:

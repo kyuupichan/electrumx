@@ -30,6 +30,8 @@ WAKEUP_SECS = 300
 class PeerSession(aiorpcx.ClientSession):
     '''An outgoing session to a peer.'''
 
+    sessions = set()
+
     def __init__(self, peer, peer_mgr, kind, host, port, **kwargs):
         super().__init__(host, port, **kwargs)
         self.peer = peer
@@ -42,6 +44,7 @@ class PeerSession(aiorpcx.ClientSession):
     def connection_made(self, transport):
         '''Handle an incoming client connection.'''
         super().connection_made(transport)
+        self.sessions.add(self)
 
         # Update IP address if not Tor
         if not self.peer.is_tor:
@@ -53,6 +56,11 @@ class PeerSession(aiorpcx.ClientSession):
         controller = self.peer_mgr.controller
         self.send_request('server.version', controller.server_version_args(),
                           self.on_version, timeout=self.timeout)
+
+    def connection_lost(self, exc):
+        '''Handle an incoming client connection.'''
+        super().connection_lost(exc)
+        self.sessions.remove(self)
 
     def _header_notification(self, header):
         pass
@@ -427,10 +435,6 @@ class PeerManager(object):
                      for real_name in coin_peers]
             self.add_peers(peers, limit=None)
 
-    def ensure_future(self, coro, callback=None):
-        '''Schedule the coro to be run.'''
-        return self.controller.ensure_future(coro, callback=callback)
-
     async def maybe_detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
         the last attempt.
@@ -477,12 +481,17 @@ class PeerManager(object):
         self.import_peers()
         await self.maybe_detect_proxy()
 
-        while True:
-            timeout = self.loop.call_later(WAKEUP_SECS, self.retry_event.set)
-            await self.retry_event.wait()
-            self.retry_event.clear()
-            timeout.cancel()
-            await self.retry_peers()
+        try:
+            while True:
+                timeout = self.loop.call_later(WAKEUP_SECS,
+                                               self.retry_event.set)
+                await self.retry_event.wait()
+                self.retry_event.clear()
+                timeout.cancel()
+                await self.retry_peers()
+        finally:
+            for session in list(PeerSession.sessions):
+                await session.wait_closed()
 
     def is_coin_onion_peer(self, peer):
         '''Return true if this peer is a hard-coded onion peer.'''
@@ -541,22 +550,19 @@ class PeerManager(object):
             kwargs['local_addr'] = (host, None)
 
         session = PeerSession(peer, self, kind, peer.host, port, **kwargs)
-        callback = partial(self.on_connected, session, peer, port_pairs)
-        self.ensure_future(session.create_connection(), callback)
+        callback = partial(self.on_connected, peer, port_pairs)
+        self.controller.create_task(session.create_connection(), callback)
 
-    def on_connected(self, session, peer, port_pairs, future):
+    def on_connected(self, peer, port_pairs, task):
         '''Called when a connection attempt succeeds or fails.
 
         If failed, close the session, log it and try remaining port pairs.
         '''
-        exception = future.exception()
-        if exception:
-            session.close()
+        if not task.cancelled() and task.exception():
             kind, port = port_pairs.pop(0)
-            self.logger.info('failed connecting to {} at {} port {:d} '
-                             'in {:.1f}s: {}'
-                             .format(peer, kind, port,
-                                     time.time() - peer.last_try, exception))
+            elapsed = time.time() - peer.last_try
+            self.logger.info(f'failed connecting to {peer} at {kind} port '
+                             f'{port} in {elapsed:.1f}s: {task.exception()}')
             if port_pairs:
                 self.retry_peer(peer, port_pairs)
             else:
