@@ -19,7 +19,7 @@ from functools import partial
 
 import pylru
 
-from aiorpcx import RPCError, TaskSet
+from aiorpcx import RPCError, TaskSet, _version
 from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 from lib.peer import Peer
 from lib.server_base import ServerBase
@@ -48,11 +48,14 @@ class Controller(ServerBase):
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
     PROTOCOL_MIN = '1.0'
     PROTOCOL_MAX = '1.2'
-    VERSION = 'ElectrumX 1.4.1'
+    VERSION = 'ElectrumX 1.4.2'
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
         super().__init__(env)
+        if _version < (0, 5, 5):
+            raise RuntimeError('ElectrumX requires aiorpcX 0.5.5')
+
         self.logger.info(f'software version: {self.VERSION}')
         self.logger.info(f'supported protocol versions: '
                          f'{self.PROTOCOL_MIN}-{self.PROTOCOL_MAX}')

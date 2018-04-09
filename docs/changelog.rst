@@ -1,6 +1,13 @@
 ChangeLog
 =========
 
+Version 1.4.2
+-------------
+
+* proxy remote IP reported properly if :envvar:`FORCE_PROXY` is set.
+  Fixes `#301`_.
+* requires aiorpcx 0.5.5
+
 Version 1.4.1
 -------------
 
@@ -128,4 +135,5 @@ LKaFk4KkVpw9pYoUpbckQSKKgCVC4oj78b
 
 .. _#277: https://github.com/kyuupichan/electrumx/issues/277
 .. _#287: https://github.com/kyuupichan/electrumx/issues/287
+.. _#301: https://github.com/kyuupichan/electrumx/issues/301
 .. _#302: https://github.com/kyuupichan/electrumx/issues/302
