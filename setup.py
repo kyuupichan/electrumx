@@ -1,10 +1,10 @@
 import setuptools
-from server.controller import Controller
+from server.version import VERSION
 
 
 setuptools.setup(
     name='electrumx',
-    version=Controller.short_version(),
+    version=VERSION,
     scripts=['electrumx_server.py', 'electrumx_rpc.py'],
     python_requires='>=3.6',
     # via environment variables, in which case I've tested with 15.0.4
@@ -17,7 +17,7 @@ setuptools.setup(
     author='Neil Booth',
     author_email='kyuupichan@gmail.com',
     license='MIT Licence',
-    url='https://github.com/kyuupichan/electrumx/',
+    url='https://github.com/kyuupichan/electrumx',
     long_description='Server implementation for the Electrum wallet',
     classifiers=[
         'Development Status :: 5 - Production/Stable',

@@ -1,6 +1,11 @@
 ChangeLog
 =========
 
+Version 1.4.3
+-------------
+
+* Fix `#442`_.
+
 Version 1.4.2
 -------------
 
@@ -137,3 +142,4 @@ LKaFk4KkVpw9pYoUpbckQSKKgCVC4oj78b
 .. _#287: https://github.com/kyuupichan/electrumx/issues/287
 .. _#301: https://github.com/kyuupichan/electrumx/issues/301
 .. _#302: https://github.com/kyuupichan/electrumx/issues/302
+.. _#442: https://github.com/kyuupichan/electrumx/issues/442

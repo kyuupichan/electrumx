@@ -28,6 +28,7 @@ from server.daemon import DaemonError
 from server.mempool import MemPool
 from server.peers import PeerManager
 from server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
+from server.version import VERSION
 
 
 class SessionGroup(object):
@@ -48,7 +49,7 @@ class Controller(ServerBase):
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
     PROTOCOL_MIN = '1.0'
     PROTOCOL_MAX = '1.2'
-    VERSION = 'ElectrumX 1.4.2'
+    VERSION = VERSION
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
@@ -140,7 +141,7 @@ class Controller(ServerBase):
         # Close servers and sessions, and cancel all tasks
         self.close_servers(list(self.servers.keys()))
         for session in self.sessions:
-            self.close_session(session)
+            session.abort()
         self.tasks.cancel_all()
 
         # Wait for the above to take effect

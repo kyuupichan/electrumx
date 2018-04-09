@@ -491,6 +491,7 @@ class PeerManager(object):
                 await self.retry_peers()
         finally:
             for session in list(PeerSession.sessions):
+                session.abort()
                 await session.wait_closed()
 
     def is_coin_onion_peer(self, peer):
