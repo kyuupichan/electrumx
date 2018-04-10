@@ -16,7 +16,7 @@ import time
 from collections import defaultdict, Counter
 from functools import partial
 
-import aiorpcx
+from aiorpcx import ClientSession, RPCError, SOCKSProxy
 
 from lib.peer import Peer
 from lib.util import ConnectionLogger
@@ -27,7 +27,7 @@ STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
 
 
-class PeerSession(aiorpcx.ClientSession):
+class PeerSession(ClientSession):
     '''An outgoing session to a peer.'''
 
     sessions = set()
@@ -439,8 +439,8 @@ class PeerManager(object):
         '''Detect a proxy if we don't have one and some time has passed since
         the last attempt.
 
-        If found self.proxy is set to an aiorpcX.SOCKSProxy instance,
-        otherwise None.
+        If found self.proxy is set to a SOCKSProxy instance, otherwise
+        None.
         '''
         if self.proxy or time.time() - self.last_proxy_try < 900:
             return
@@ -453,7 +453,7 @@ class PeerManager(object):
             ports = [self.env.tor_proxy_port]
         self.logger.info(f'trying to detect proxy on "{host}" ports {ports}')
 
-        cls = aiorpcx.SOCKSProxy
+        cls = SOCKSProxy
         result = await cls.auto_detect_host(host, ports, None, loop=self.loop)
         if isinstance(result, cls):
             self.proxy = result
