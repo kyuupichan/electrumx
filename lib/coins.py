@@ -1417,6 +1417,7 @@ class Feathercoin(Coin):
     WIF_BYTE = bytes.fromhex("8E")
     GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
                     'c99d9714d334efa41a195a7e7e04bfe2')
+    DESERIALIZER = lib_tx.DeserializerSegWit
     TX_COUNT = 3170843
     TX_COUNT_HEIGHT = 1981777
     TX_PER_BLOCK = 2
