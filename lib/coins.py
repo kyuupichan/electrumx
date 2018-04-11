@@ -416,7 +416,7 @@ class BitcoinCash(BitcoinMixin, Coin):
         'electroncash.checksum0.com s t',
         'electron.jns.im s t',
         'electrumx-cash.1209k.com s t',
-   ]
+    ]
 
 
 class BitcoinSegwit(BitcoinMixin, Coin):
