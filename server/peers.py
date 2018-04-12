@@ -42,7 +42,6 @@ class PeerSession(ClientSession):
         self.logger = ConnectionLogger(self.logger, context)
 
     def connection_made(self, transport):
-        '''Handle an incoming client connection.'''
         super().connection_made(transport)
         self.sessions.add(self)
 

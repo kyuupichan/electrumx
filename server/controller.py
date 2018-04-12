@@ -369,7 +369,7 @@ class Controller(ServerBase):
         stale = []
         for session in self.sessions:
             if session.is_closing():
-                pass
+                session.abort()
             elif session.last_recv < stale_cutoff:
                 self.close_session(session)
                 stale.append(session.session_id)
