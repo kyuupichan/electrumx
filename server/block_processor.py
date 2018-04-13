@@ -221,7 +221,7 @@ class BlockProcessor(server.db.DB):
         await self.controller.run_in_executor(self.flush, True)
         if self.utxo_db.for_sync:
             self.logger.info(f'{self.controller.VERSION} synced to '
-                             f'height {height:,d}')
+                             f'height {self.height:,d}')
         self.open_dbs()
         self.caught_up_event.set()
 
