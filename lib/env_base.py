@@ -8,19 +8,18 @@
 '''Class for server environment configuration and defaults.'''
 
 
+import logging
 from os import environ
 
-import lib.util as lib_util
 
-
-class EnvBase(lib_util.LoggedClass):
+class EnvBase(object):
     '''Wraps environment configuration.'''
 
     class Error(Exception):
         pass
 
     def __init__(self):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.allow_root = self.boolean('ALLOW_ROOT', False)
         self.host = self.default('HOST', 'localhost')
         self.rpc_host = self.default('RPC_HOST', 'localhost')
@@ -52,6 +51,17 @@ class EnvBase(lib_util.LoggedClass):
         except Exception:
             raise cls.Error('cannot convert envvar {} value {} to an integer'
                             .format(envvar, value))
+
+    @classmethod
+    def custom(cls, envvar, default, parse):
+        value = environ.get(envvar)
+        if value is None:
+            return default
+        try:
+            return parse(value)
+        except Exception as e:
+            raise cls.Error('cannot parse envvar {} value {}'
+                            .format(envvar, value)) from e
 
     @classmethod
     def obsolete(cls, envvars):

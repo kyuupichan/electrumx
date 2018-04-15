@@ -2,6 +2,7 @@
 
 import os
 import random
+import re
 
 import pytest
 
@@ -340,3 +341,13 @@ def test_tor_identity():
     assert ident.host == tor_host
     assert ident.tcp_port == 234
     assert ident.ssl_port == 432
+
+def test_ban_versions():
+    e = Env()
+    assert e.drop_client is None
+    ban_re = '1\.[0-2]\.\d+?[_\w]*'
+    os.environ['DROP_CLIENT'] = ban_re
+    e = Env()
+    assert e.drop_client == re.compile(ban_re)
+    assert e.drop_client.match("1.2.3_buggy_client")
+    assert e.drop_client.match("1.3.0_good_client") is None

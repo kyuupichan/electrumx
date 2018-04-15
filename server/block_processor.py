@@ -11,23 +11,23 @@
 
 import array
 import asyncio
+import logging
 from struct import pack, unpack
 import time
 from collections import defaultdict
 from functools import partial
 
 from server.daemon import DaemonError
-from server.version import VERSION
 from lib.hash import hash_to_str
-from lib.util import chunks, formatted_time, LoggedClass
+from lib.util import chunks, formatted_time
 import server.db
 
 
-class Prefetcher(LoggedClass):
+class Prefetcher(object):
     '''Prefetches blocks (in the forward direction only).'''
 
     def __init__(self, bp):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.bp = bp
         self.caught_up = False
         # Access to fetched_height should be protected by the semaphore
@@ -198,7 +198,7 @@ class BlockProcessor(server.db.DB):
 
     async def main_loop(self):
         '''Main loop for block processing.'''
-        self.controller.ensure_future(self.prefetcher.main_loop())
+        self.controller.create_task(self.prefetcher.main_loop())
         await self.prefetcher.reset_height()
 
         while True:
@@ -220,8 +220,8 @@ class BlockProcessor(server.db.DB):
         self.first_sync = False
         await self.controller.run_in_executor(self.flush, True)
         if self.utxo_db.for_sync:
-            self.logger.info('{} synced to height {:,d}'
-                             .format(VERSION, self.height))
+            self.logger.info(f'{self.controller.VERSION} synced to '
+                             f'height {self.height:,d}')
         self.open_dbs()
         self.caught_up_event.set()
 

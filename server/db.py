@@ -11,6 +11,7 @@
 
 import array
 import ast
+import logging
 import os
 from struct import pack, unpack
 from bisect import bisect_left, bisect_right
@@ -19,13 +20,12 @@ from collections import namedtuple
 import lib.util as util
 from lib.hash import hash_to_str
 from server.storage import db_class
-from server.version import VERSION, PROTOCOL_MIN, PROTOCOL_MAX
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
 
-class DB(util.LoggedClass):
+class DB(object):
     '''Simple wrapper of the backend database for querying.
 
     Performs no DB update, though the DB will be cleaned on opening if
@@ -41,7 +41,7 @@ class DB(util.LoggedClass):
         '''Raised on general DB errors generally indicating corruption.'''
 
     def __init__(self, env):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.env = env
         self.coin = env.coin
 
@@ -130,9 +130,6 @@ class DB(util.LoggedClass):
 
         self.read_history_state()
 
-        self.logger.info('software version: {}'.format(VERSION))
-        self.logger.info('supported protocol versions: {}-{}'
-                         .format(PROTOCOL_MIN, PROTOCOL_MAX))
         self.logger.info('DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
         self.logger.info('network: {}'.format(self.coin.NET))
@@ -581,9 +578,10 @@ class DB(util.LoggedClass):
         full_hist = b''.join(hist_list)
         nrows = (len(full_hist) + max_row_size - 1) // max_row_size
         if nrows > 4:
-            self.log_info('hashX {} is large: {:,d} entries across {:,d} rows'
-                          .format(hash_to_str(hashX), len(full_hist) // 4,
-                                  nrows))
+            self.logger.info('hashX {} is large: {:,d} entries across '
+                             '{:,d} rows'
+                             .format(hash_to_str(hashX), len(full_hist) // 4,
+                                     nrows))
 
         # Find what history needs to be written, and what keys need to
         # be deleted.  Start by assuming all keys are to be deleted,
@@ -652,11 +650,11 @@ class DB(util.LoggedClass):
         max_rows = self.comp_flush_count + 1
         self._flush_compaction(cursor, write_items, keys_to_delete)
 
-        self.log_info('history compaction: wrote {:,d} rows ({:.1f} MB), '
-                      'removed {:,d} rows, largest: {:,d}, {:.1f}% complete'
-                      .format(len(write_items), write_size / 1000000,
-                              len(keys_to_delete), max_rows,
-                              100 * cursor / 65536))
+        self.logger.info('history compaction: wrote {:,d} rows ({:.1f} MB), '
+                         'removed {:,d} rows, largest: {:,d}, {:.1f}% complete'
+                         .format(len(write_items), write_size / 1000000,
+                                 len(keys_to_delete), max_rows,
+                                 100 * cursor / 65536))
         return write_size
 
     async def compact_history(self, loop):
@@ -673,7 +671,7 @@ class DB(util.LoggedClass):
 
         while self.comp_cursor != -1:
             if self.semaphore.locked:
-                self.log_info('compact_history: waiting on semaphore...')
+                self.logger.info('compact_history: waiting on semaphore...')
             async with self.semaphore:
                 await loop.run_in_executor(None, self._compact_history, limit)
 

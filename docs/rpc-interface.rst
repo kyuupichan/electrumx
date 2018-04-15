@@ -172,6 +172,8 @@ That number of blocks will be backed up - using undo information
 stored in ElectrumX's database - and then ElectrumX will move forwards
 on the daemon's main chain to its current height.
 
+.. _sessions:
+
 sessions
 --------
 

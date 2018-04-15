@@ -36,17 +36,18 @@ set in its configuration file.  If you have an existing installation
 of bitcoind and have not previously set this you will need to reindex
 the blockchain with::
 
-    bitcoind -reindex
+  bitcoind -reindex
 
 which can take some time.
 
 While not a requirement for running ElectrumX, it is intended to be
 run with supervisor software such as Daniel Bernstein's
-`daemontools`_, Gerald Pape's `runit`_ package or `systemd`.  These
-make administration of secure unix servers very easy, and I strongly
-recommend you install one of these and familiarise yourself with them.
-The instructions below and sample run scripts assume `daemontools`;
-adapting to `runit` should be trivial for someone used to either.
+`daemontools`_, Gerrit Pape's `runit`_ package or :command:`systemd`.
+These make administration of secure unix servers very easy, and I
+strongly recommend you install one of these and familiarise yourself
+with them.  The instructions below and sample run scripts assume
+``daemontools``; adapting to ``runit`` should be trivial for someone
+used to either.
 
 When building the database from the genesis block, ElectrumX has to
 flush large quantities of data to disk and its DB.  You will have a
@@ -81,18 +82,18 @@ Check out the code from Github::
     git clone https://github.com/kyuupichan/electrumx.git
     cd electrumx
 
-You can install with `setup.py` or run the code from the source tree
-or a copy of it.
+You can install with :file:`setup.py` or run the code from the source
+tree or a copy of it.
 
 You should create a standard user account to run the server under;
 your own is probably adequate unless paranoid.  The paranoid might
 also want to create another user account for the daemontools logging
 process.  The sample scripts and these instructions assume it is all
-under one account which I have called *electrumx*.
+under one account which I have called ``electrumx``.
 
 Next create a directory where the database will be stored and make it
-writeable by the electrumx account.  I recommend this directory live
-on an SSD::
+writeable by the ``electrumx`` account.  I recommend this directory
+live on an SSD::
 
     mkdir /path/to/db_directory
     chown electrumx /path/to/db_directory
@@ -110,30 +111,32 @@ to at least 2,500.
 
 Note that setting the limit in your shell does *NOT* affect ElectrumX
 unless you are invoking ElectrumX directly from your shell.  If you
-are using `systemd`, you need to set it in the `.service` file (see
-`contrib/systemd/electrumx.service`_).
+are using :command:`systemd`, you need to set it in the
+:file:`.service` file (see `contrib/systemd/electrumx.service`_).
 
 
 Using daemontools
 -----------------
 
 Next create a daemontools service directory; this only holds symlinks
-(see daemontools documentation).  The `svscan` program will ensure the
-servers in the directory are running by launching a `supervise`
-supervisor for the server and another for its logging process.  You
-can run `svscan` under the *electrumx* account if that is the only one
-involved (server and logger) otherwise it will need to run as root so
-that the user can be switched to electrumx.
+(see daemontools documentation).  The :command:`svscan` program will
+ensure the servers in the directory are running by launching a
+:command:`supervise` supervisor for the server and another for its
+logging process.  You can run :command:`svscan` under the *electrumx*
+account if that is the only one involved (server and logger) otherwise
+it will need to run as root so that the user can be switched to
+electrumx.
 
-Assuming this directory is called `service`, you would do one of::
+Assuming this directory is called :file:`service`, you would do one
+of::
 
     mkdir /service       # If running svscan as root
     mkdir ~/service      # As electrumx if running svscan as that a/c
 
-Next create a directory to hold the scripts that the `supervise`
-process spawned by `svscan` will run - this directory must be readable
-by the `svscan` process.  Suppose this directory is called *scripts*,
-you might do::
+Next create a directory to hold the scripts that the
+:command:`supervise` process spawned by :command:`svscan` will run -
+this directory must be readable by the :command:`svscan` process.
+Suppose this directory is called :file:`scripts`, you might do::
 
     mkdir -p ~/scripts/electrumx
 
@@ -141,20 +144,22 @@ Then copy the all sample scripts from the ElectrumX source tree there::
 
     cp -R /path/to/repo/electrumx/contrib/daemontools ~/scripts/electrumx
 
-This copies 3 things: the top level server run script, a log/ directory
-with the logger run script, an env/ directory.
+This copies 3 things: the top level server run script, a :file:`log/`
+directory with the logger :command:`run` script, an :file:`env/`
+directory.
 
-You need to configure the environment variables under env/ to your
-setup, as explained in `ENVIRONMENT.rst`_.  ElectrumX server currently
-takes no command line arguments; all of its configuration is taken
-from its environment which is set up according to env/ directory (see
-'envdir' man page).  Finally you need to change the log/run script to
-use the directory where you want the logs to be written by multilog.
-The directory need not exist as multilog will create it, but its
-parent directory must exist.
+You need to configure the :ref:`environment variables <environment>`
+under :file:`env/` to your setup.  ElectrumX server currently takes no
+command line arguments; all of its configuration is taken from its
+environment which is set up according to :file:`env/` directory (see
+:manpage:`envdir` man page).  Finally you need to change the
+:command:`log/run` script to use the directory where you want the logs
+to be written by multilog.  The directory need not exist as
+:command:`multilog` will create it, but its parent directory must
+exist.
 
-Now start the 'svscan' process.  This will not do much as the service
-directory is still empty::
+Now start the :command:`svscan` process.  This will not do much as the
+service directory is still empty::
 
     svscan ~/service & disown
 
@@ -172,23 +177,24 @@ You can see its logs with::
 Using systemd
 -------------
 
-This repository contains a sample systemd unit file that you can use to
-setup ElectrumX with systemd. Simply copy it to :code:`/etc/systemd/system`::
+This repository contains a sample systemd unit file that you can use
+to setup ElectrumX with systemd. Simply copy it to
+:file:`/etc/systemd/system`::
 
     cp contrib/systemd/electrumx.service /etc/systemd/system/
 
 The sample unit file assumes that the repository is located at
-:code:`/home/electrumx/electrumx`. If that differs on your system, you need to
-change the unit file accordingly.
+:file:`/home/electrumx/electrumx`. If that differs on your system, you
+need to change the unit file accordingly.
 
-You need to set a few configuration variables in :code:`/etc/electrumx.conf`,
-see `ENVIRONMENT.rst`_ for the list of required variables.
+You need to set a few :ref:`environment variables <environment>` in
+:file:`/etc/electrumx.conf`.
 
-Now you can start ElectrumX using :code:`systemctl`::
+Now you can start ElectrumX using :command:`systemctl`::
 
     systemctl start electrumx
 
-You can use :code:`journalctl` to check the log output::
+You can use :command:`journalctl` to check the log output::
 
     journalctl -u electrumx -f
 
@@ -196,10 +202,11 @@ Once configured you may want to start ElectrumX at boot::
 
     systemctl enable electrumx
 
-**Warning**: systemd is aggressive in forcibly shutting down
-processes.  Depending on your hardware, ElectrumX can need several
-minutes to flush cached data to disk during initial sync.  You should
-set TimeoutStopSec to *at least* 10 mins in your `.service` file.
+.. Warning:: systemd is aggressive in forcibly shutting down
+   processes.  Depending on your hardware, ElectrumX can need several
+   minutes to flush cached data to disk during initial sync.  You
+   should set TimeoutStopSec to *at least* 10 mins in your
+   :file:`.service` file.
 
 
 Installing Python 3.6 under Ubuntu
@@ -213,11 +220,12 @@ in.  Because of this, it is easier to install Python 3.6.  See
 Installing on Raspberry Pi 3
 ----------------------------
 
-To install on the Raspberry Pi 3 you will need to update to the "stretch" distribution.
-See the full procedure in `contrib/raspberrypi3/install_electrumx.sh`_.
+To install on the Raspberry Pi 3 you will need to update to the
+``stretch`` distribution.  See the full procedure in
+`contrib/raspberrypi3/install_electrumx.sh`_.
 
-See also `contrib/raspberrypi3/run_electrumx.sh`_ for an easy way to configure and
-launch electrumx.
+See also `contrib/raspberrypi3/run_electrumx.sh`_ for an easy way to
+configure and launch electrumx.
 
 
 Sync Progress
@@ -225,8 +233,8 @@ Sync Progress
 
 Time taken to index the blockchain depends on your hardware of course.
 As Python is single-threaded most of the time only 1 core is kept
-busy.  ElectrumX uses Python's `asyncio` to prefill a cache of future
-blocks asynchronously to keep the CPU busy processing the chain
+busy.  ElectrumX uses Python's :mod:`asyncio` to prefill a cache of
+future blocks asynchronously to keep the CPU busy processing the chain
 without pausing.
 
 Consequently there will probably be only a minor boost in performance
@@ -234,12 +242,12 @@ if the daemon is on the same host.  It may even be beneficial to have
 the daemon on a *separate* machine so the machine doing the indexing
 has its caches and disk I/O tuned to that task only.
 
-The **CACHE_MB** environment variable controls the total cache size
-ElectrumX uses; see `ENVIRONMENT.rst`_ for caveats.
+The :envvar:`CACHE_MB` environment variable controls the total cache
+size ElectrumX uses; see :ref:`here <CACHE>` for caveats.
 
-Here is my experience with the current codebase, to given heights and
-rough wall-time.  The period from heights 363,000 to 378,000 is the
-most sluggish::
+Here is my experience with the codebase of year ago (the current
+codebase is faster), to given heights and rough wall-time.  The period
+from heights 363,000 to 378,000 is the most sluggish::
 
                  Machine A     Machine B
   181,000          25m 00s      5m 30s
@@ -252,28 +260,32 @@ most sluggish::
 
 *Machine A*: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU,
 8GB RAM and a DragonFlyBSD UFS fileystem on an SSD.  It requests
-blocks over the LAN from a bitcoind on machine B.  **DB_CACHE** the
-default of 1,200.  LevelDB.
+blocks over the LAN from a bitcoind on machine B.  :envvar:`DB_CACHE`
+the default of 1,200.  LevelDB.
 
 *Machine B*: a late 2012 iMac running Sierra 10.12.2, 2.9GHz quad-core
 Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on the same
-machine.  **DB_CACHE** set to 1,800.  LevelDB.
+machine.  :envvar:`DB_CACHE` set to 1,800.  LevelDB.
 
 For chains other than bitcoin-mainnet sychronization should be much
 faster.
 
-**Note**: ElectrumX will not serve normal client connections until it
-has fully synchronized and caught up with your daemon.  However
-LocalRPC connections are served at all times.
+.. note:: ElectrumX will not serve normal client connections until it
+          has fully synchronized and caught up with your daemon.
+          However LocalRPC connections are served at all times.
 
 
 Terminating ElectrumX
 =====================
 
 The preferred way to terminate the server process is to send it the
-**stop** RPC command, or alternatively on Unix the INT or TERM
-signals.  For a daemontools supervised process this can be done by
-bringing it down like so::
+``stop`` RPC command::
+
+  electrumx_rpy.py stop
+
+or alternatively on Unix the ``INT`` or ``TERM`` signals.  For a
+daemontools supervised process this can be done by bringing it down
+like so::
 
     svc -d ~/service/electrumx
 
@@ -297,9 +309,10 @@ You can see the status of a running service with::
 
     svstat ~/service/electrumx
 
-`svscan` can of course handle multiple services simultaneously from
-the same service directory, such as a testnet or altcoin server.  See
-the man pages of these various commands for more information.
+:command:`svscan` can of course handle multiple services
+simultaneously from the same service directory, such as a testnet or
+altcoin server.  See the man pages of these various commands for more
+information.
 
 
 Understanding the Logs
@@ -362,11 +375,12 @@ to height 280,000 is should be fairly accurate.
 Creating an self-signed SSL certificate
 =======================================
 
-These instructions are based on those of the `electrum-server` documentation.
+These instructions are based on those of the ``electrum-server``
+documentation.
 
 To run an SSL server you need to generate a self-signed certificate
-using openssl.  Alternatively you could not set **SSL_PORT** in the
-environment and not serve over SSL, but this is not recommended.
+using openssl.  Alternatively you could not set :envvar:`SSL_PORT` in
+the environment and not serve over SSL, but this is not recommended.
 
 Use the sample code below to create a self-signed cert with a
 recommended validity of 5 years. You may supply any information for
@@ -385,8 +399,9 @@ challenge password just leave it empty and press enter::
     ...
     $ openssl x509 -req -days 1825 -in server.csr -signkey server.key -out server.crt
 
-The `server.crt` file goes in **SSL_CERTFILE** and `server.key` in
-**SSL_KEYFILE** in the server process's environment.
+The :file:`server.crt` file goes in :envvar:`SSL_CERTFILE` and
+:file:`server.key` in :envvar:`SSL_KEYFILE` in the server process's
+environment.
 
 Starting with Electrum 1.9, the client will learn and locally cache
 the SSL certificate for your server upon the first request to prevent
@@ -400,18 +415,19 @@ copy of your certificate and key in case you need to restore them.
 Running on a privileged port
 ============================
 
-You may choose to run electrumx on a different port than 50001 / 50002.
-If you choose a privileged port ( < 1024 ) it makes sense to make use of a iptables NAT rule.
+You may choose to run electrumx on a different port than 50001
+/ 50002.  If you choose a privileged port ( < 1024 ) it makes sense to
+make use of a iptables NAT rule.
 
-An example, which will forward Port 110 to the internal port 50002 follows:
+An example, which will forward Port 110 to the internal port 50002 follows::
 
     iptables -t nat -A PREROUTING -p tcp --dport 110 -j DNAT --to-destination 127.0.0.1:50002
 
-You can then set the port as follows and advertise the service externally on the privileged port
+You can then set the port as follows and advertise the service externally on the privileged port::
+
     REPORT_SSL_PORT=110
 
 
-.. _`ENVIRONMENT.rst`: https://github.com/kyuupichan/electrumx/blob/master/docs/ENVIRONMENT.rst
 .. _`contrib/systemd/electrumx.service`: https://github.com/kyuupichan/electrumx/blob/master/contrib/systemd/electrumx.service
 .. _`daemontools`: http://cr.yp.to/daemontools.html
 .. _`runit`: http://smarden.org/runit/index.html
