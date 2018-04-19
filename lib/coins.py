@@ -1584,12 +1584,14 @@ class Xuez(Dash):
     WIF_BYTE = bytes.fromhex("d4")
     GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
                     '4d18e24e7aaa0c69864c4054b4f29445')
+    SESSIONCLS = XuezElectrumX
     DAEMON = daemon.DashDaemon
     TX_COUNT = 30000
     TX_COUNT_HEIGHT = 15000
     TX_PER_BLOCK = 1
     RPC_PORT = 41799
     REORG_LIMIT = 1000
+    BASIC_HEADER_SIZE = 112
     PEERS = []
 
     @classmethod
@@ -1601,4 +1603,17 @@ class Xuez(Dash):
         '''
         import xevan_hash
         return xevan_hash.getPoWHash(header)
-        
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce,
+        }        
