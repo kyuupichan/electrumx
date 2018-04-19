@@ -1597,7 +1597,7 @@ class Xuez(Dash):
         '''
         Given a header return the hash for Xuez.
         Need to download `xevan_hash` module
-        Source code: https://github.com/AXErunners/axe_hash
+        Source code: https://github.com/xuez/xuez
         '''
         import xevan_hash
         return xevan_hash.getPoWHash(header)
