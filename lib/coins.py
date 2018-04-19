@@ -1572,3 +1572,33 @@ class Axe(Dash):
         '''
         import x11_hash
         return x11_hash.getPoWHash(header)
+
+class Xuez(Dash):
+    NAME = "Xuez"
+    SHORTNAME = "XUEZ"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("022d2533")
+    XPRV_VERBYTES = bytes.fromhex("0221312b")
+    P2PKH_VERBYTE = bytes.fromhex("48")
+    P2SH_VERBYTES = [bytes.fromhex("12")]
+    WIF_BYTE = bytes.fromhex("d4")
+    GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
+                    '4d18e24e7aaa0c69864c4054b4f29445')
+    DAEMON = daemon.DashDaemon
+    TX_COUNT = 30000
+    TX_COUNT_HEIGHT = 15000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 41799
+    REORG_LIMIT = 1000
+    PEERS = []
+
+    @classmethod
+    def header_hash(cls, header):
+        '''
+        Given a header return the hash for Xuez.
+        Need to download `xevan_hash` module
+        Source code: https://github.com/AXErunners/axe_hash
+        '''
+        import xevan_hash
+        return xevan_hash.getPoWHash(header)
+        
