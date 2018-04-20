@@ -1584,7 +1584,7 @@ class Xuez(Dash):
     WIF_BYTE = bytes.fromhex("d4")
     GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
                     '4d18e24e7aaa0c69864c4054b4f29445')
-    
+
     DAEMON = daemon.DashDaemon
     TX_COUNT = 30000
     TX_COUNT_HEIGHT = 15000
@@ -1611,8 +1611,8 @@ class Xuez(Dash):
         return {
             'block_height': height,
             'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
+            'prev_block_hash': (header[4:36]),
+            'merkle_root': (header[36:68]),
             'timestamp': timestamp,
             'bits': bits,
             'nonce': nonce,
