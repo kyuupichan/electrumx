@@ -1573,7 +1573,7 @@ class Axe(Dash):
         import x11_hash
         return x11_hash.getPoWHash(header)
 
-class Xuez(Dash):
+class Xuez(Coin):
     NAME = "Xuez"
     SHORTNAME = "XUEZ"
     NET = "mainnet"
