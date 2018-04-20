@@ -1585,7 +1585,7 @@ class Xuez(Dash):
     GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
                     '4d18e24e7aaa0c69864c4054b4f29445')
 
-    DAEMON = daemon.DashDaemon
+    
     TX_COUNT = 30000
     TX_COUNT_HEIGHT = 15000
     TX_PER_BLOCK = 1
