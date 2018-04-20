@@ -1584,7 +1584,7 @@ class Xuez(Dash):
     WIF_BYTE = bytes.fromhex("d4")
     GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
                     '4d18e24e7aaa0c69864c4054b4f29445')
-    
+
     DAEMON = daemon.DashDaemon
     TX_COUNT = 30000
     TX_COUNT_HEIGHT = 15000
@@ -1601,8 +1601,14 @@ class Xuez(Dash):
         Need to download `xevan_hash` module
         Source code: https://github.com/xuez/xuez
         '''
+        version, = struct.unpack('<I', header[:4])
+
         import xevan_hash
-        return xevan_hash.getPoWHash(header)
+        
+        if  version == 1 :
+            return xevan_hash.getPoWHash(header[:80])
+        else:
+            return xevan_hash.getPoWHash(header)
 
     @classmethod
     def electrum_header(cls, header, height):
