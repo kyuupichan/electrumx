@@ -5,51 +5,6 @@ import pytest
 from lib import util
 
 
-class LoggedClassTest(util.LoggedClass):
-
-    def __init__(self):
-        super().__init__()
-        self.logger.info = self.note_info
-        self.logger.warning = self.note_warning
-        self.logger.error = self.note_error
-
-    def note_info(self, msg):
-        self.info_msg = msg
-
-    def note_warning(self, msg):
-        self.warning_msg = msg
-
-    def note_error(self, msg):
-        self.error_msg = msg
-
-
-def test_LoggedClass():
-    test = LoggedClassTest()
-    assert test.log_prefix == ''
-    test.log_prefix = 'prefix'
-    test.log_error('an error')
-    assert test.error_msg == 'prefixan error'
-    test.log_warning('a warning')
-    assert test.warning_msg == 'prefixa warning'
-    test.log_info('some info')
-    assert test.info_msg == 'prefixsome info'
-
-    assert test.throttled == 0
-    test.log_info('some info', throttle=True)
-    assert test.throttled == 1
-    assert test.info_msg == 'prefixsome info'
-    test.log_info('some info', throttle=True)
-    assert test.throttled == 2
-    assert test.info_msg == 'prefixsome info'
-    test.log_info('some info', throttle=True)
-    assert test.throttled == 3
-    assert test.info_msg == 'prefixsome info (throttling later logs)'
-    test.info_msg = ''
-    test.log_info('some info', throttle=True)
-    assert test.throttled == 4
-    assert test.info_msg == ''
-
-
 def test_cachedproperty():
     class Target:
 

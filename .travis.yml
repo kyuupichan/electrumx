@@ -14,12 +14,15 @@ python:
 # command to install dependencies
 install:
   - pip install aiohttp
+  - pip install aiorpcX
   - pip install ecdsa
   - pip install plyvel
   - pip install pyrocksdb
   - pip install tribus-hash
   - pip install pytest-cov
   - pip install pylru
+  - pip install blake256
+  - pip install x11_hash
 # command to run tests
 script: pytest --cov=server --cov=lib --cov=wallet
 # Dont report coverage from nightly

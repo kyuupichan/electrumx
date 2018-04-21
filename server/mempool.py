@@ -9,16 +9,16 @@
 
 import asyncio
 import itertools
+import logging
 import time
 from collections import defaultdict
 
 from lib.hash import hash_to_str, hex_str_to_hash
-import lib.util as util
 from server.daemon import DaemonError
 from server.db import UTXO
 
 
-class MemPool(util.LoggedClass):
+class MemPool(object):
     '''Representation of the daemon's mempool.
 
     Updated regularly in caught-up state.  Goal is to enable efficient
@@ -33,7 +33,7 @@ class MemPool(util.LoggedClass):
     '''
 
     def __init__(self, bp, controller):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.daemon = bp.daemon
         self.controller = controller
         self.coin = bp.coin
