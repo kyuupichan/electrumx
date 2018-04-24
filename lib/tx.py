@@ -519,12 +519,7 @@ class DeserializerBitcoinDiamond(Deserializer):
     bitcoin_diamond_tx_version = 12
 
     def read_tx(self):
-        '''Return a (Deserialized TX, TX_HASH) pair.
-
-        The hash needs to be reversed for human display; for efficiency
-        we process it in the natural serialized order.
-        '''
-        start = self.cursor
+        # Return a Deserialized TX.
         version = self._get_version()
         if version != self.bitcoin_diamond_tx_version:
             return Tx(
@@ -532,7 +527,7 @@ class DeserializerBitcoinDiamond(Deserializer):
                 self._read_inputs(),    # inputs
                 self._read_outputs(),   # outputs
                 self._read_le_uint32()  # locktime
-            ), double_sha256(self.binary[start:self.cursor])
+            )
         else:
             return TxBitcoinDiamond(
                 self._read_le_int32(),  # version
@@ -540,7 +535,7 @@ class DeserializerBitcoinDiamond(Deserializer):
                 self._read_inputs(),  # inputs
                 self._read_outputs(),  # outputs
                 self._read_le_uint32()  # locktime
-            ), double_sha256(self.binary[start:self.cursor])
+            )
 
     def _get_version(self):
         result, = unpack_int32_from(self.binary, self.cursor)
@@ -600,7 +595,54 @@ class DeserializerBitcoinDiamondSegWit(DeserializerBitcoinDiamond,
         if present_block_hash is not None:
             return TxBitcoinDiamondSegWit(version, present_block_hash, marker,
                                           flag, inputs, outputs, witness,
-                                          locktime), double_sha256(orig_ser)
+                                          locktime)
         else:
             return TxSegWit(version, marker, flag, inputs,
-                            outputs, witness, locktime), double_sha256(orig_ser)
+                            outputs, witness, locktime)
+
+    def _read_tx_parts(self):
+        '''Return a (deserialized TX, tx_hash, vsize) tuple.'''
+        start = self.cursor
+        tx_version = self._get_version()
+        if tx_version == self.bitcoin_diamond_tx_version:
+            marker = self.binary[self.cursor + 4 + 32]
+        else:
+            marker = self.binary[self.cursor + 4]
+
+        if marker:
+            tx = super().read_tx()
+            tx_hash = double_sha256(self.binary[start:self.cursor])
+            return tx, tx_hash, self.binary_length
+
+        # Ugh, this is nasty.
+        version = self._read_le_int32()
+        if version == self.bitcoin_diamond_tx_version:
+            present_block_hash = hash_to_str(self._read_nbytes(32))
+        else:
+            present_block_hash = None
+        orig_ser = self.binary[start:self.cursor]
+
+        marker = self._read_byte()
+        flag = self._read_byte()
+
+        start = self.cursor
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        orig_ser += self.binary[start:self.cursor]
+
+        base_size = self.cursor - start
+        witness = self._read_witness(len(inputs))
+
+        start = self.cursor
+        locktime = self._read_le_uint32()
+        orig_ser += self.binary[start:self.cursor]
+        vsize = (3 * base_size + self.binary_length) // 4
+
+        if present_block_hash is not None:
+            return TxBitcoinDiamondSegWit(
+                version, present_block_hash, marker, flag, inputs, outputs,
+                witness, locktime), double_sha256(orig_ser), vsize
+        else:
+            return TxSegWit(
+                version, marker, flag, inputs, outputs, witness,
+                locktime), double_sha256(orig_ser), vsize
