@@ -514,6 +514,17 @@ class BitcoinGoldRegtest(BitcoinGold):
                     'bf5beb436012afca590b1a11466e2206')
 
 
+class BitcoinDiamond(BitcoinSegwit, Coin):
+    NAME = "BitcoinDiamond"
+    SHORTNAME = "BCD"
+    TX_VERSION = 12
+    TX_COUNT = 274277819
+    TX_COUNT_HEIGHT = 498678
+    TX_PER_BLOCK = 50
+    REORG_LIMIT = 1000
+    DESERIALIZER = lib_tx.DeserializerBitcoinDiamondSegWit
+
+
 class Emercoin(Coin):
     NAME = "Emercoin"
     SHORTNAME = "EMC"
