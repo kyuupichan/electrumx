@@ -1592,13 +1592,11 @@ class Pivx(Coin):
     ZEROCOIN_HEADER = 112
     ZEROCOIN_START_HEIGHT = 863787
     ZEROCOIN_BLOCK_VERSION = 4
-    IRC_PREFIX = "D_"
-    IRC_CHANNEL = "#electrum-pivx"
 
     @classmethod
     def static_header_len(cls, height):
         '''Given a header height return its length.'''
-        if (height >= cls.ZEROCOIN_START_HEIGHT):
+        if height >= cls.ZEROCOIN_START_HEIGHT:
             return cls.ZEROCOIN_HEADER
         else:
             return cls.BASIC_HEADER_SIZE
@@ -1618,7 +1616,7 @@ class Pivx(Coin):
         version, = struct.unpack('<I', header[:4])
         timestamp, bits, nonce = struct.unpack('<III', header[68:80])
 
-        if (version >= cls.ZEROCOIN_BLOCK_VERSION):
+        if version >= cls.ZEROCOIN_BLOCK_VERSION:
             return {
                 'block_height': height,
                 'version': version,
@@ -1654,13 +1652,11 @@ class PivxTestnet(Pivx):
     TX_COUNT = 2157510
     TX_PER_BLOCK = 4
     RPC_PORT = 51472
-    IRC_PREFIX = "D_"
-    IRC_CHANNEL = "#electrum-pivx"
 
     @classmethod
     def static_header_len(cls, height):
         '''Given a header height return its length.'''
-        if (height >= 201564):
+        if height >= 201564:
             return cls.ZEROCOIN_HEADER
         else:
             return cls.BASIC_HEADER_SIZE
