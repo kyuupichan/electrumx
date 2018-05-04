@@ -25,7 +25,7 @@ Clients making batch requests should limit their size depending on the
 nature of their query, because servers will limit response size as an
 anti-DoS mechanism.
 
-Eeach RPC call, and each response, is separated by a single newline in
+Each RPC call, and each response, is separated by a single newline in
 their respective streams.  The JSON specification does not permit
 control characters within strings, so no confusion is possible there.
 However it does permit newlines as extraneous whitespace between
