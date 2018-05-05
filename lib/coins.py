@@ -1433,6 +1433,27 @@ class Feathercoin(Coin):
         'electrumx-ch-1.feathercoin.ch s t',
     ]
 
+class UFO(Coin):
+    NAME = "UniformFiscalObject"
+    SHORTNAME = "UFO"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("1B")
+    P2SH_VERBYTES = [bytes.fromhex("44")]
+    WIF_BYTE = bytes.fromhex("9B")
+    GENESIS_HASH = ('ba1d39b4928ab03d813d952daf65fb77'
+                    '97fcf538a9c1b8274f4edc8557722d13')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 1608926
+    TX_COUNT_HEIGHT = 1300154
+    TX_PER_BLOCK = 2
+    RPC_PORT = 9888
+    REORG_LIMIT = 2000
+    PEERS = [
+        'electrumx1.ufobject.com s t',
+    ]
+
 class Newyorkcoin(AuxPowMixin, Coin):
     NAME = "Newyorkcoin"
     SHORTNAME = "NYC"
