@@ -1434,7 +1434,7 @@ class Feathercoin(Coin):
     ]
 
 class UFO(Coin):
-    NAME = "Uniform Fiscal Object"
+    NAME = "UniformFiscalObject"
     SHORTNAME = "UFO"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
