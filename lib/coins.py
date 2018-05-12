@@ -1495,6 +1495,23 @@ class Bitcore(BitcoinMixin, Coin):
     RPC_PORT = 8556
 
 
+class GameCredits(Coin):
+    NAME = "GameCredits"
+    SHORTNAME = "GAME"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("a6")
+    GENESIS_HASH = ('91ec5f25ee9a0ffa1af7d4da4db9a552'
+                    '228dd2dc77cdb15b738be4e1f55f30ee')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 316796
+    TX_COUNT_HEIGHT = 2040250
+    TX_PER_BLOCK = 2
+    RPC_PORT = 40001
+    REORG_LIMIT = 1000
+
+
 class BitcoinAtom(Coin):
     NAME = "BitcoinAtom"
     SHORTNAME = "BCA"
