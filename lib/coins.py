@@ -1642,6 +1642,7 @@ class DeepOnion(Coin):
     WIF_BYTE = bytes.fromhex("9f")
     GENESIS_HASH = ('000004e29458ef4f2e0abab544737b07'
                     '344e6ff13718f7c2d12926166db07b5e')
+    DESERIALIZER = lib_tx.DeserializerSegWit
     TX_COUNT = 2142648
     TX_COUNT_HEIGHT = 535662
     TX_PER_BLOCK = 4
