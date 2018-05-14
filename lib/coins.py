@@ -1630,3 +1630,35 @@ class Axe(Dash):
         '''
         import x11_hash
         return x11_hash.getPoWHash(header)
+
+class DeepOnion(Coin):
+    NAME = "DeepOnion"
+    SHORTNAME = "ONION"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1F")
+    P2SH_VERBYTES = [bytes.fromhex("4E")]
+    WIF_BYTE = bytes.fromhex("9f")
+    GENESIS_HASH = ('000004e29458ef4f2e0abab544737b07'
+                    '344e6ff13718f7c2d12926166db07b5e')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 2142648
+    TX_COUNT_HEIGHT = 535662
+    TX_PER_BLOCK = 4
+    RPC_PORT = 18580
+    REORG_LIMIT = 200
+    PEERS = [
+        '5h2mgqgwwwaautbv.onion',
+        'xui3kzolhlf7l27o.onion',
+        '2cwpvkcb5jtjstl6.onion',
+        '3abqfoqreyvvn3ar.onion',
+        's62fag4q7vndmlzv.onion',
+        'byna6dnpchz5pg6i.onion',
+        'mbzs3fl3j5zbeq4x.onion',
+        'd3rr6k7gmecy6ypa.onion',
+        'amvkvsn2acljbepf.onion',
+        'soixq24dni2s42hb.onion',
+        'uhiqc3ge6iawnejq.onion',
+        'x3t3u2hwfaxq4q5w.onion',
+    ]
