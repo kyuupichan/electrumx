@@ -1622,4 +1622,5 @@ class Xuez(Coin):
             'timestamp': timestamp,
             'bits': bits,
             'nonce': nonce,
+            'nAccumulatorCheckpoint': hash_to_str(header[80:112]),
         }        
