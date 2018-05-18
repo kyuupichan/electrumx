@@ -1647,3 +1647,21 @@ class Axe(Dash):
         '''
         import x11_hash
         return x11_hash.getPoWHash(header)
+
+
+class Mktcoin(Coin):
+    NAME = "Mktcoin"
+    SHORTNAME = "MLM"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("04C6B21E")
+    XPRV_VERBYTES = bytes.fromhex("04C6ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("6E")
+    P2SH_VERBYTES = [bytes.fromhex("73")]
+    WIF_BYTE = bytes.fromhex("EE")
+    GENESIS_HASH = ("dcbcae705b0af93fe0aaad1cc588ba24"
+                    "3d02ed543d09bf5b167127c05cfcd5ce")
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    RPC_PORT = 9276
+    TX_COUNT = 370000
+    TX_COUNT_HEIGHT = 263140
+    TX_PER_BLOCK = 2
