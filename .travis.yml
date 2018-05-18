@@ -23,7 +23,7 @@ install:
   - pip install pylru
   - pip install blake256
   - pip install x11_hash
-  - pip install git+git://github.com/ddude1/Xevan_in_Python.git
+  - pip install xevan_hash
 # command to run tests
 script: pytest --cov=server --cov=lib --cov=wallet
 # Dont report coverage from nightly
