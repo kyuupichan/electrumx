@@ -396,6 +396,7 @@ class Controller(ServerBase):
         '''A one-line summary of server state.'''
         group_map = self._group_map()
         return {
+            'version': VERSION,
             'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,
