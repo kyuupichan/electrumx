@@ -1511,6 +1511,23 @@ class GameCredits(Coin):
     RPC_PORT = 40001
     REORG_LIMIT = 1000
 
+class Machinecoin(Coin):
+    NAME = "Machinecoin"
+    SHORTNAME = "MAC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("26"), bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("b2")
+    GENESIS_HASH = ('6a1f879bcea5471cbfdee1fd0cb2ddcc'
+                    '4fed569a500e352d41de967703e83172')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 137641
+    TX_COUNT_HEIGHT = 513020
+    TX_PER_BLOCK = 2
+    RPC_PORT = 40332
+    REORG_LIMIT = 800
 
 class BitcoinAtom(Coin):
     NAME = "BitcoinAtom"
