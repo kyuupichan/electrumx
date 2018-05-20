@@ -308,12 +308,24 @@ class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
 
 class DeserializerZcash(DeserializerEquihash):
     def read_tx(self):
+        header = self._read_le_uint32()
+        overwinterd = ((header >> 31) == 1)
+        if overwinterd:
+            version = header & 0x7fffffff
+            vid = self._read_le_uint32()  # versionGroupId
+        else:
+            version = header
+        i = self._read_inputs(),    # inputs
+        o = self._read_outputs(),   # outputs
+        l = self._read_le_uint32()  # locktime
         base_tx =  TxJoinSplit(
-            self._read_le_int32(),  # version
-            self._read_inputs(),    # inputs
-            self._read_outputs(),   # outputs
-            self._read_le_uint32()  # locktime
+            version,
+            i,
+            o,
+            l
         )
+        if base_tx.version >= 3:
+            e = self._read_le_uint32()  # expiryHeight
         if base_tx.version >= 2:
             joinsplit_size = self._read_varint()
             if joinsplit_size > 0:
