@@ -1310,11 +1310,17 @@ class Bitzeny(Coin):
     ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.001
     DAEMON = daemon.FakeEstimateFeeDaemon
-    TX_COUNT = 1000
-    TX_COUNT_HEIGHT = 10000
+    TX_COUNT = 1408733
+    TX_COUNT_HEIGHT = 1015115
     TX_PER_BLOCK = 1
     RPC_PORT = 9252
     REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import zny_yescrypt
+        return zny_yescrypt.getPoWHash(header)
 
 
 class CanadaeCoin(AuxPowMixin, Coin):
@@ -1445,6 +1451,27 @@ class Feathercoin(Coin):
         'electrumx-ch-1.feathercoin.ch s t',
     ]
 
+class UFO(Coin):
+    NAME = "UniformFiscalObject"
+    SHORTNAME = "UFO"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("1B")
+    P2SH_VERBYTES = [bytes.fromhex("44")]
+    WIF_BYTE = bytes.fromhex("9B")
+    GENESIS_HASH = ('ba1d39b4928ab03d813d952daf65fb77'
+                    '97fcf538a9c1b8274f4edc8557722d13')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 1608926
+    TX_COUNT_HEIGHT = 1300154
+    TX_PER_BLOCK = 2
+    RPC_PORT = 9888
+    REORG_LIMIT = 2000
+    PEERS = [
+        'electrumx1.ufobject.com s t',
+    ]
+
 class Newyorkcoin(AuxPowMixin, Coin):
     NAME = "Newyorkcoin"
     SHORTNAME = "NYC"
@@ -1454,6 +1481,20 @@ class Newyorkcoin(AuxPowMixin, Coin):
     WIF_BYTE = bytes.fromhex("bc")
     GENESIS_HASH = ('5597f25c062a3038c7fd815fe46c67de'
                     'dfcb3c839fbc8e01ed4044540d08fe48')
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 5161944
+    TX_COUNT_HEIGHT = 3948743
+    TX_PER_BLOCK = 2
+    REORG_LIMIT = 2000
+
+class NewyorkcoinTestnet(Newyorkcoin):
+    SHORTNAME = "tNYC"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("71")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("f1")
+    GENESIS_HASH = ('24463e4d3c625b0a9059f309044c2cf0'
+                    'd7e196cf2a6ecce901f24f681be33c8f')
     DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 5161944
     TX_COUNT_HEIGHT = 3948743
@@ -1471,6 +1512,40 @@ class Bitcore(BitcoinMixin, Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 8556
 
+
+class GameCredits(Coin):
+    NAME = "GameCredits"
+    SHORTNAME = "GAME"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("a6")
+    GENESIS_HASH = ('91ec5f25ee9a0ffa1af7d4da4db9a552'
+                    '228dd2dc77cdb15b738be4e1f55f30ee')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 316796
+    TX_COUNT_HEIGHT = 2040250
+    TX_PER_BLOCK = 2
+    RPC_PORT = 40001
+    REORG_LIMIT = 1000
+
+class Machinecoin(Coin):
+    NAME = "Machinecoin"
+    SHORTNAME = "MAC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("26"), bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("b2")
+    GENESIS_HASH = ('6a1f879bcea5471cbfdee1fd0cb2ddcc'
+                    '4fed569a500e352d41de967703e83172')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 137641
+    TX_COUNT_HEIGHT = 513020
+    TX_PER_BLOCK = 2
+    RPC_PORT = 40332
+    REORG_LIMIT = 800
 
 class BitcoinAtom(Coin):
     NAME = "BitcoinAtom"
@@ -1590,3 +1665,66 @@ class Axe(Dash):
         '''
         import x11_hash
         return x11_hash.getPoWHash(header)
+
+class Xuez(Coin):
+    NAME = "Xuez"
+    SHORTNAME = "XUEZ"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("022d2533")
+    XPRV_VERBYTES = bytes.fromhex("0221312b")
+    P2PKH_VERBYTE = bytes.fromhex("48")
+    P2SH_VERBYTES = [bytes.fromhex("12")]
+    WIF_BYTE = bytes.fromhex("d4")
+    GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
+                    '4d18e24e7aaa0c69864c4054b4f29445')
+
+    
+    TX_COUNT = 30000
+    TX_COUNT_HEIGHT = 15000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 41799
+    REORG_LIMIT = 1000
+    BASIC_HEADER_SIZE = 112
+    PEERS = []
+
+    @classmethod
+    def header_hash(cls, header):
+        '''
+        Given a header return the hash for Xuez.
+        Need to download `xevan_hash` module
+        Source code: https://github.com/xuez/xuez
+        '''
+        version, = struct.unpack('<I', header[:4])
+
+        import xevan_hash
+        
+        if  version == 1 :
+            return xevan_hash.getPoWHash(header[:80])
+        else:
+            return xevan_hash.getPoWHash(header)
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+        if  version == 1 :
+            return {
+                'block_height': height,
+                'version': version,
+                'prev_block_hash': hash_to_str(header[4:36]),
+                'merkle_root': hash_to_str(header[36:68]),
+                'timestamp': timestamp,
+                'bits': bits,
+                'nonce': nonce,
+            }        
+        else:
+            return {
+                'block_height': height,
+                'version': version,
+                'prev_block_hash': hash_to_str(header[4:36]),
+                'merkle_root': hash_to_str(header[36:68]),
+                'timestamp': timestamp,
+                'bits': bits,
+                'nonce': nonce,
+                'nAccumulatorCheckpoint': hash_to_str(header[80:112]),
+            }        
