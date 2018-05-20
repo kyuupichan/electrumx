@@ -315,8 +315,8 @@ class DeserializerZcash(DeserializerEquihash):
             vid = self._read_le_uint32()  # versionGroupId
         else:
             version = header
-        i = self._read_inputs(),    # inputs
-        o = self._read_outputs(),   # outputs
+        i = self._read_inputs()     # inputs
+        o = self._read_outputs()    # outputs
         l = self._read_le_uint32()  # locktime
         base_tx =  TxJoinSplit(
             version,
