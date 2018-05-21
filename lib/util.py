@@ -128,6 +128,13 @@ def chunks(items, size):
         yield items[i: i + size]
 
 
+def resolve_limit(limit):
+    if limit is None:
+        return -1
+    assert isinstance(limit, int) and limit >= 0
+    return limit
+
+
 def bytes_to_int(be_bytes):
     '''Interprets a big-endian sequence of bytes as an integer'''
     return int.from_bytes(be_bytes, 'big')

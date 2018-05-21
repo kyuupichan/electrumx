@@ -95,7 +95,7 @@ def check_hashX_compaction(db):
 
 def check_written(db, histories):
     for hashX, hist in histories.items():
-        db_hist = array.array('I', db.get_history_txnums(hashX, limit=None))
+        db_hist = array.array('I', db.history.get_txnums(hashX, limit=None))
         assert hist == db_hist
 
 def compact_history(db):
