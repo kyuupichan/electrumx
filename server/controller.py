@@ -20,7 +20,7 @@ from functools import partial
 import pylru
 
 from aiorpcx import RPCError, TaskSet, _version
-from lib.hash import double_sha256, hash_to_str, hex_str_to_hash
+from lib.hash import double_sha256, hash_to_str, hex_str_to_hash, HASHX_LEN
 from lib.peer import Peer
 from lib.server_base import ServerBase
 import lib.util as util
@@ -633,7 +633,7 @@ class Controller(ServerBase):
         try:
             bin_hash = hex_str_to_hash(scripthash)
             if len(bin_hash) == 32:
-                return bin_hash[:self.coin.HASHX_LEN]
+                return bin_hash[:HASHX_LEN]
         except Exception:
             pass
         raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')

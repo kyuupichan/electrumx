@@ -39,7 +39,7 @@ from functools import partial
 import base64
 
 import lib.util as util
-from lib.hash import Base58, hash160, double_sha256, hash_to_str
+from lib.hash import Base58, hash160, double_sha256, hash_to_str, HASHX_LEN
 from lib.script import ScriptPubKey, OpCodes
 import lib.tx as lib_tx
 from server.block_processor import BlockProcessor
@@ -63,7 +63,6 @@ class Coin(object):
     RPC_URL_REGEX = re.compile('.+@(\[[0-9a-fA-F:]+\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE = 2016
-    HASHX_LEN = 11
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
@@ -135,7 +134,7 @@ class Coin(object):
         '''
         if script and script[0] == OP_RETURN:
             return None
-        return sha256(script).digest()[:cls.HASHX_LEN]
+        return sha256(script).digest()[:HASHX_LEN]
 
     @util.cachedproperty
     def address_handlers(cls):
@@ -1660,7 +1659,7 @@ class Xuez(Coin):
     GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
                     '4d18e24e7aaa0c69864c4054b4f29445')
 
-    
+
     TX_COUNT = 30000
     TX_COUNT_HEIGHT = 15000
     TX_PER_BLOCK = 1
@@ -1679,7 +1678,7 @@ class Xuez(Coin):
         version, = struct.unpack('<I', header[:4])
 
         import xevan_hash
-        
+
         if  version == 1 :
             return xevan_hash.getPoWHash(header[:80])
         else:
@@ -1698,7 +1697,7 @@ class Xuez(Coin):
                 'timestamp': timestamp,
                 'bits': bits,
                 'nonce': nonce,
-            }        
+            }
         else:
             return {
                 'block_height': height,
@@ -1709,4 +1708,4 @@ class Xuez(Coin):
                 'bits': bits,
                 'nonce': nonce,
                 'nAccumulatorCheckpoint': hash_to_str(header[80:112]),
-            }        
+            }
