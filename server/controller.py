@@ -79,6 +79,8 @@ class Controller(ServerBase):
         self.history_cache = pylru.lrucache(256)
         self.header_cache = pylru.lrucache(8)
         self.cache_height = 0
+        self.cache_mn_height = 0
+        self.mn_cache = pylru.lrucache(256)
         env.max_send = max(350000, env.max_send)
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers reorg '
