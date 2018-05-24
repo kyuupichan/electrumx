@@ -18,7 +18,7 @@ from collections import defaultdict
 from functools import partial
 
 from server.daemon import DaemonError
-from lib.hash import hash_to_str
+from lib.hash import hash_to_str, HASHX_LEN
 from lib.util import chunks, formatted_time
 import server.db
 
@@ -606,7 +606,7 @@ class BlockProcessor(server.db.DB):
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
         touched = self.touched
-        undo_entry_len = 12 + self.coin.HASHX_LEN
+        undo_entry_len = 12 + HASHX_LEN
 
         for tx, tx_hash in reversed(txs):
             for idx, txout in enumerate(tx.outputs):

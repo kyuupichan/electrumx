@@ -438,7 +438,7 @@ class ElectrumX(SessionBase):
         try:
             return await self.transaction_broadcast(raw_tx)
         except RPCError as e:
-            message = e.msg
+            message = e.message
             if 'non-mandatory-script-verify-flag' in message:
                 message = (
                     'Your client produced a transaction that is not accepted '
@@ -578,7 +578,7 @@ class DashElectrumX(ElectrumX):
         try:
             return await self.masternode_announce_broadcast(signmnb)
         except RPCError as e:
-            return e.msg
+            return e.message
 
     async def masternode_subscribe(self, vin):
         '''Returns the status of masternode.'''

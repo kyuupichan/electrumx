@@ -18,7 +18,7 @@ from bisect import bisect_left, bisect_right
 from collections import namedtuple
 
 import lib.util as util
-from lib.hash import hash_to_str
+from lib.hash import hash_to_str, HASHX_LEN
 from server.storage import db_class
 
 
@@ -609,7 +609,7 @@ class DB(object):
         hist_map = {}
         hist_list = []
 
-        key_len = self.coin.HASHX_LEN + 2
+        key_len = HASHX_LEN + 2
         write_size = 0
         for key, hist in self.hist_db.iterator(prefix=prefix):
             # Ignore non-history entries

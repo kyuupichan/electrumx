@@ -1,6 +1,7 @@
 */__pycache__/
 .cache/
 tests/*/__pycache__/
+.pytest_cache/
 */*~
 *.#*
 *#

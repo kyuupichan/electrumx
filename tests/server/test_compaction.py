@@ -6,7 +6,7 @@ from os import environ, urandom
 from struct import pack
 import random
 
-from lib.hash import hash_to_str
+from lib.hash import hash_to_str, HASHX_LEN
 from server.env import Env
 from server.db import DB
 
@@ -14,7 +14,7 @@ from server.db import DB
 def create_histories(db, hashX_count=100):
     '''Creates a bunch of random transaction histories, and write them
     to disk in a series of small flushes.'''
-    hashXs = [urandom(db.coin.HASHX_LEN) for n in range(hashX_count)]
+    hashXs = [urandom(HASHX_LEN) for n in range(hashX_count)]
     mk_array = lambda : array.array('I')
     histories = {hashX : mk_array() for hashX in hashXs}
     this_history = defaultdict(mk_array)
@@ -42,7 +42,7 @@ def check_hashX_compaction(db):
     db.max_hist_row_entries = 40
     row_size = db.max_hist_row_entries * 4
     full_hist = array.array('I', range(100)).tobytes()
-    hashX = urandom(db.coin.HASHX_LEN)
+    hashX = urandom(HASHX_LEN)
     pairs = ((1, 20), (26, 50), (56, 30))
 
     cum = 0

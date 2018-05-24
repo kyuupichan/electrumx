@@ -64,10 +64,26 @@ and associated complications.
 Roadmap
 =======
 
-* switch to the `aiorpcX <https://github.com/kyuupichan/aiorpcX>`_
-  package for RPC and proxy handling
-* offloading more work of wallet synchronization to the client
-* supporting better client privacy
-* wallet server engine
-* new features such as possibly adding label server functionality
-* potentially move some functionality to C or C++
+* break ElectrumX up into simple services that initially can be run in
+  separate processes on a single host.  Then support running them on
+  different hosts, and finally support sharding.  With this we can
+  take advantage of multiple cores and hosts, and scale to much larger
+  block sizes.  This should solve several issues with the current
+  history storage mechanism.
+* fully asynchronous operation.  At present too much is synchronous, such
+  as file system access.
+* protocol improvements targeting better client and server scalability
+  to large wallets (100k addresses) and address histories.  Some
+  aspects of the current protocol are very inefficient.
+* investigate speaking the Bitcoin protocol and connecting to the
+  Bitcoin network directly for some queries.  This could lead to
+  ElectrumX being runnable without a node without a tx index, or a
+  pruning node, or not needing to run a node at all.  ElectrumX would
+  store all blocks itself and index the transactions therein.
+* lifting internal limits such as maximum 4 billion transactions
+* supporting better user privacy.  I believe significantly improved
+  user address privacy might be possible with a simple addition to the
+  protocol, and assuming a server network of which a reasonable
+  fraction (40%?) are cooperative and non-colluding
+* new features such as possibly adding label or wallet server
+  functionality
