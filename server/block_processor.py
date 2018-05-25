@@ -14,7 +14,6 @@ import asyncio
 import logging
 from struct import pack, unpack
 import time
-from collections import defaultdict
 from functools import partial
 
 from server.daemon import DaemonError
