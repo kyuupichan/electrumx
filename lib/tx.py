@@ -312,20 +312,17 @@ class DeserializerZcash(DeserializerEquihash):
         overwinterd = ((header >> 31) == 1)
         if overwinterd:
             version = header & 0x7fffffff
-            vid = self._read_le_uint32()  # versionGroupId
+            self._read_le_uint32()  # versionGroupId
         else:
             version = header
-        i = self._read_inputs()     # inputs
-        o = self._read_outputs()    # outputs
-        l = self._read_le_uint32()  # locktime
         base_tx =  TxJoinSplit(
             version,
-            i,
-            o,
-            l
+            self._read_inputs(),     # inputs
+            self._read_outputs(),    # outputs
+            self._read_le_uint32()   # locktime
         )
         if base_tx.version >= 3:
-            e = self._read_le_uint32()  # expiryHeight
+            self._read_le_uint32()  # expiryHeight
         if base_tx.version >= 2:
             joinsplit_size = self._read_varint()
             if joinsplit_size > 0:
