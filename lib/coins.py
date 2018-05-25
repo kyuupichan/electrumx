@@ -1035,24 +1035,6 @@ class Koto(Coin):
         'electrum.kotocoin.info s t',
     ]
 
-class KotoTestnet(Koto):
-    SHORTNAME = "TOKO"
-    NET = "testnet"
-    P2PKH_VERBYTE = bytes.fromhex("18A4")
-    P2SH_VERBYTES = [bytes.fromhex("1839")]
-    WIF_BYTE = bytes.fromhex("EF")
-    GENESIS_HASH = ('bf84afbde20c2d213b68b231ddb585ab'
-                    '616ef7567226820f00d9b397d774d2f0')
-    TX_COUNT = 91144
-    TX_COUNT_HEIGHT = 89662
-    TX_PER_BLOCK = 1
-    RPC_PORT = 18432
-    REORG_LIMIT = 800
-    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
-    PEERS = [
-        'testnet.kotocoin.info s t',
-    ]
-
 class Komodo(KomodoMixin, EquihashMixin, Coin):
     NAME = "Komodo"
     SHORTNAME = "KMD"
