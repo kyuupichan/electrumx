@@ -317,9 +317,9 @@ class DeserializerZcash(DeserializerEquihash):
             version = header
         base_tx =  TxJoinSplit(
             version,
-            self._read_inputs(),     # inputs
-            self._read_outputs(),    # outputs
-            self._read_le_uint32()   # locktime
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
         )
         if base_tx.version >= 3:
             self._read_le_uint32()  # expiryHeight
