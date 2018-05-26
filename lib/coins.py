@@ -933,6 +933,19 @@ class Zcash(EquihashMixin, Coin):
     RPC_PORT = 8232
     REORG_LIMIT = 800
 
+class ZcashTestnet(Zcash):
+    SHORTNAME = "TAZ"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("1D25")
+    P2SH_VERBYTES = [bytes.fromhex("1CBA")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH = ('05a60a92d99d85997cce3b87616c089f'
+                    '6124d7342af37106edc76126334a2c38')
+    TX_COUNT = 242312
+    TX_COUNT_HEIGHT = 321685
+    TX_PER_BLOCK = 2
+    RPC_PORT = 18232
+
 class SnowGem(EquihashMixin, Coin):
     NAME = "SnowGem"
     SHORTNAME = "SNG"
