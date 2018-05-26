@@ -31,9 +31,11 @@ class History(object):
         self.unflushed = defaultdict(partial(array.array, 'I'))
         self.unflushed_count = 0
 
-    def open_db(self, db_class, for_sync):
+    def open_db(self, db_class, for_sync, utxo_flush_count):
         self.db = db_class('hist', for_sync)
         self.read_state()
+        self.clear_excess(utxo_flush_count)
+        return self.flush_count
 
     def close_db(self):
         self.db.close()
@@ -61,11 +63,11 @@ class History(object):
             self.logger.error(msg)
             raise RuntimeError(msg)
 
-    def clear_excess(self, flush_count):
+    def clear_excess(self, utxo_flush_count):
         # < might happen at end of compaction as both DBs cannot be
         # updated atomically
-        if self.flush_count <= flush_count:
-            return self.flush_count
+        if self.flush_count <= utxo_flush_count:
+            return
 
         self.logger.info('DB shut down uncleanly.  Scanning for '
                          'excess history flushes...')
@@ -73,19 +75,18 @@ class History(object):
         keys = []
         for key, hist in self.db.iterator(prefix=b''):
             flush_id, = unpack('>H', key[-2:])
-            if flush_id > flush_count:
+            if flush_id > utxo_flush_count:
                 keys.append(key)
 
         self.logger.info('deleting {:,d} history entries'.format(len(keys)))
 
-        self.flush_count = flush_count
+        self.flush_count = utxo_flush_count
         with self.db.write_batch() as batch:
             for key in keys:
                 batch.delete(key)
             self.write_state(batch)
 
         self.logger.info('deleted excess history entries')
-        return self.flush_count
 
     def write_state(self, batch):
         '''Write state to the history DB.'''

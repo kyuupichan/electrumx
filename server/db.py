@@ -125,7 +125,10 @@ class DB(object):
             if self.first_sync == self.utxo_db.for_sync:
                 break
 
-        self.history.open_db(self.db_class, for_sync)
+        # Open history DB, clear excess history
+        self.utxo_flush_count = self.history.open_db(self.db_class, for_sync,
+                                                     self.utxo_flush_count)
+        self.clear_excess_undo_info()
 
         self.logger.info('DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
@@ -136,16 +139,6 @@ class DB(object):
         if self.first_sync:
             self.logger.info('sync time so far: {}'
                              .format(util.formatted_time(self.wall_time)))
-
-    def clean_db(self):
-        '''Clean out stale DB items.
-
-        Stale DB items are excess history flushed since the most
-        recent UTXO flush (only happens on unclean shutdown), and aged
-        undo information.
-        '''
-        self.utxo_flush_count = self.history.clear_excess(self.utxo_flush_count)
-        self.clear_excess_undo_info()
 
     def fs_update_header_offsets(self, offset_start, height_start, headers):
         if self.coin.STATIC_BLOCK_HEADERS:
