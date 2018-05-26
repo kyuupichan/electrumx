@@ -421,9 +421,9 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
-    TX_COUNT = 217380620
-    TX_COUNT_HEIGHT = 464000
-    TX_PER_BLOCK = 1800
+    TX_COUNT = 318337769
+    TX_COUNT_HEIGHT = 524213
+    TX_PER_BLOCK = 1400
     PEERS = [
         'btc.smsys.me s995',
         'E-X.not.fyi s t',
