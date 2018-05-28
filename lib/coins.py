@@ -1730,7 +1730,7 @@ class Pac(Coin):
         'electro-pac.paccoin.io s t'
     ]
     SESSIONCLS = PacElectrumX
-    DAEMON = daemon.PacDaemon
+    DAEMON = daemon.DashDaemon
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
 
