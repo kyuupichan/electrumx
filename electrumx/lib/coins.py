@@ -1174,6 +1174,31 @@ class Reddcoin(Coin):
     RPC_PORT = 45443
 
 
+class TokenPay(ScryptMixin, Coin):
+    NAME = "TokenPay"
+    SHORTNAME = "TPAY"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("41")
+    P2SH_VERBYTES = [bytes.fromhex("7e")]
+    WIF_BYTE = bytes.fromhex("b3")
+    GENESIS_HASH = ('000008b71ab32e585a23f0de642dc113'
+                    '740144e94c0ece047751e9781f953ae9')
+    DESERIALIZER = lib_tx.DeserializerTokenPay
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 147934
+    TX_COUNT_HEIGHT = 73967
+    TX_PER_BLOCK = 100
+    RPC_PORT = 8800
+    REORG_LIMIT = 500
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+
+    PEERS = [
+        "electrum-us.tpay.ai s",
+        "electrum-eu.tpay.ai s",
+    ]
+
+
 class Vertcoin(Coin):
     NAME = "Vertcoin"
     SHORTNAME = "VTC"

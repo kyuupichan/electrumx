@@ -64,7 +64,9 @@ addresses = [
     (coins.PivxTestnet, "yJ8iHtUxj9U4vsXLCZTbPNbuxG6NJNCvb8",
      "e808105b7bfcc8b102cafa7242089b22c77a3b94", "31d61c3076fa0b2b7c74ef"),
     (coins.PivxTestnet, "yCcNWqqMhDmsPzKchCPK1ux4HpxK7j3xpB",
-     "ab72728952c06dfc0f6cf21449dd645422731ec4", "eb3a3155215538d51de7cc")
+     "ab72728952c06dfc0f6cf21449dd645422731ec4", "eb3a3155215538d51de7cc"),
+    (coins.TokenPay, "TDE2X28FGtckatxuP3d8s3V726G4TLNHpT",
+     "23b5dd9b7b402388c7a40bc88c261f3178acf30d", "7c7bdf0e0713f3752f4b88"),
 ]
 
 
