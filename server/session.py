@@ -143,7 +143,7 @@ class ElectrumX(SessionBase):
         self.hashX_subs = {}
         self.mempool_statuses = {}
         self.protocol_version = None
-        self.set_protocol_handlers((1, 3))
+        self.set_protocol_handlers((1, 0))
 
     def sub_count(self):
         return len(self.hashX_subs)
