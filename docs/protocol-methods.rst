@@ -367,12 +367,16 @@ Return the confirmed and unconfirmed balances of a :ref:`script hash
 
 **Signature**
 
-  .. function:: blockchain.scripthash.get_balance(scripthash)
+  .. function:: blockchain.scripthash.get_balance(scripthash, minconf=1)
   .. versionadded:: 1.1
 
   *scripthash*
 
     The script hash as a hexadecimal string.
+
+  *minconf*
+
+    The minimum confirmations a transaction must have in order to be considered confirmed.
 
 **Result**
 

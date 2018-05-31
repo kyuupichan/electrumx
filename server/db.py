@@ -339,11 +339,11 @@ class DB(object):
         with self.utxo_db.write_batch() as batch:
             self.write_utxo_state(batch)
 
-    def get_balance(self, hashX):
+    def get_balance(self, hashX, minconf=1):
         '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
+        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None, minconf=minconf))
 
-    def get_utxos(self, hashX, limit=1000):
+    def get_utxos(self, hashX, limit=1000, minconf=1):
         '''Generator that yields all UTXOs for an address sorted in no
         particular order.  By default yields at most 1000 entries.
         Set limit to None to get them all.
@@ -360,6 +360,8 @@ class DB(object):
             tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
             value, = unpack('<Q', db_value)
             tx_hash, height = self.fs_tx_hash(tx_num)
+            if height < minconf:
+                continue
             yield UTXO(tx_num, tx_pos, tx_hash, height, value)
 
     def db_utxo_lookup(self, tx_hash, tx_idx):
