@@ -700,10 +700,21 @@ class Controller(ServerBase):
 
         return {"block_height": height, "merkle": merkle_branch, "pos": pos}
 
-    async def get_balance(self, hashX):
-        utxos = await self.get_utxos(hashX)
-        confirmed = sum(utxo.value for utxo in utxos)
-        unconfirmed = self.mempool_value(hashX)
+    async def get_balance(self, hashX, minconf=1):
+        if minconf != 1:
+            all_utxos = await self.get_utxos(hashX, 1)
+            utxos = await self.get_utxos(hashX, minconf)
+            all_utxos_sum = sum(utxo.value for utxo in all_utxos)
+            utxos_sum = sum(utxo.value for utxo in utxos_sum)
+            diff = all_utxos-utxos_sum
+            confirmed = sum(utxo.value for utxo in utxos)
+            unconfirmed = self.mempool_value(hashX)
+            unconfirmed += diff
+        else:
+            utxos = await self.get_utxos(hashX, minconf)
+            confirmed = sum(utxo.value for utxo in utxos)
+            unconfirmed = self.mempool_value(hashX)
+
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
     async def unconfirmed_history(self, hashX):
@@ -757,15 +768,15 @@ class Controller(ServerBase):
 
     # Client RPC "blockchain" command handlers
 
-    async def address_get_balance(self, address):
+    async def address_get_balance(self, address, minconf = 1):
         '''Return the confirmed and unconfirmed balance of an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.get_balance(hashX)
+        return await self.get_balance(hashX, minconf)
 
-    async def scripthash_get_balance(self, scripthash):
+    async def scripthash_get_balance(self, scripthash, minconf = 1):
         '''Return the confirmed and unconfirmed balance of a scripthash.'''
         hashX = self.scripthash_to_hashX(scripthash)
-        return await self.get_balance(hashX)
+        return await self.get_balance(hashX, minconf)
 
     async def address_get_history(self, address):
         '''Return the confirmed and unconfirmed history of an address.'''
