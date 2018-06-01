@@ -44,7 +44,7 @@ from lib.script import ScriptPubKey, OpCodes
 import lib.tx as lib_tx
 from server.block_processor import BlockProcessor
 import server.daemon as daemon
-from server.session import ElectrumX, DashElectrumX, PacElectrumX
+from server.session import ElectrumX, DashElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -1729,7 +1729,7 @@ class Pac(Coin):
         'electrum.paccoin.io s t',
         'electro-pac.paccoin.io s t'
     ]
-    SESSIONCLS = PacElectrumX
+    SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001

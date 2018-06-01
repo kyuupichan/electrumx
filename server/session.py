@@ -547,28 +547,29 @@ class DashElectrumX(ElectrumX):
         self.electrumx_handlers.update({
             'masternode.announce.broadcast': mna_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
+            'masternode.list': self.masternode_list,
+            'masternode.info': self.masternode_info,
         })
+
+    async def notify_masternodes_async(self):
+        for masternode in self.mns:
+            status = await self.daemon.masternode_list(['status', masternode])
+            self.send_notification('masternode.subscribe',
+                                    [masternode, status.get(masternode)])
 
     def notify(self, height, touched):
         '''Notify the client about changes in masternode list.'''
         result = super().notify(height, touched)
-
-        try:
-            for masternode in self.mns:
-                status = self.daemon.masternode_list(['status', masternode])
-                if hasattr(status, 'get'):
-                    self.send_notification('masternode.subscribe',
-                                           [masternode, status.get(masternode)])
-        except DaemonError as e:
-            error, = e.args
-            message = error['message']
-            self.logger.info('there was an error when notifying the masternode status: {}'.format(message))
+        self.controller.create_task(self.notify_masternodes_async())
         return result
+
 
     # Masternode command handlers
     async def masternode_announce_broadcast(self, signmnb):
         '''Pass through the masternode announce message to be broadcast
-        by the daemon.'''
+        by the daemon.
+
+        signmnb: masternode announce message.'''
         try:
             return await self.daemon.masternode_broadcast(['relay', signmnb])
         except DaemonError as e:
@@ -580,7 +581,9 @@ class DashElectrumX(ElectrumX):
 
     async def masternode_announce_broadcast_1_0(self, signmnb):
         '''Pass through the masternode announce message to be broadcast
-        by the daemon.'''
+        by the daemon.
+
+        signmnb: masternode announce message.'''
         # An ugly API, like the old Electrum transaction broadcast API
         try:
             return await self.masternode_announce_broadcast(signmnb)
@@ -588,34 +591,35 @@ class DashElectrumX(ElectrumX):
             return e.message
 
     async def masternode_subscribe(self, vin):
-        '''Returns the status of masternode.'''
+        '''Returns the status of masternode.
+    
+        vin: masternode collateral.
+        '''
         result = await self.daemon.masternode_list(['status', vin])
         if result is not None:
             self.mns.add(vin)
             return result.get(vin)
         return None
 
-class PacElectrumX(DashElectrumX):
-    '''A TCP server that handles incoming Electrum $PAC connections.'''
-
-    def set_protocol_handlers(self, ptuple):
-        super().set_protocol_handlers(ptuple)
-        self.electrumx_handlers.update({
-            'masternode.list': self.masternode_list,
-            'masternode.info': self.masternode_info,
-        })
-
     async def masternode_list(self, payees=[]):
-        '''Returns the list of masternodes.'''
+        '''
+        Returns the list of masternodes.
+
+        payees: a single string or an array of masternode payee addresses.
+        '''
         result = []
 
         def get_masternode_payment_queue(mns):
             ''' 
-            Calculates the position in the payment queue for all the valid 
+            Returns the calculated position in the payment queue for all the valid 
             masterernodes in the given mns list.
+
+            mns: a list of masternodes information.
             '''
             now = int(datetime.datetime.utcnow().strftime("%s"))
             mn_queue=[]
+
+            # Only ENABLED masternodes are considered for the list.
             for line in mns:
                 mnstat = mns[line].split()
                 if mnstat[0] == 'ENABLED':
@@ -638,7 +642,10 @@ class PacElectrumX(DashElectrumX):
 
         def get_payment_position(payment_queue, address):
             '''
-            Given an ordered masternode list, returns the position of the payment list for the given address.
+            Returns the position of the payment list for the given address.
+
+            payment_queue: position in the payment queue for the masternode.
+            address: masternode payee address.
             '''
             position = -1
             for pos, mn in enumerate(payment_queue, start=1):
@@ -647,6 +654,8 @@ class PacElectrumX(DashElectrumX):
                     break
             return position
 
+        # Accordingly with the masternode payment queue, a custom list with 
+        # the masternode information including the payment position is returned.
         if self.controller.cache_mn_height != self.height():
             self.controller.cache_mn_height = self.height()
             self.controller.mn_cache.clear()
@@ -681,7 +690,11 @@ class PacElectrumX(DashElectrumX):
         return result
 
     async def masternode_info(self, address):
-        '''Returns the full info of masternode.'''
+        '''
+        Returns the full info of masternode.
+
+        address: masternode payee address.
+        '''
         result = []
         address_list = ''.join(address.split()).split(',')
         result = await self.masternode_list(address_list)
