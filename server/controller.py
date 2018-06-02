@@ -47,7 +47,7 @@ class Controller(ServerBase):
     '''
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
-    PROTOCOL_MIN = '1.0'
+    PROTOCOL_MIN = '1.1'
     PROTOCOL_MAX = '1.2'
     VERSION = VERSION
 
@@ -850,15 +850,6 @@ class Controller(ServerBase):
         self.assert_tx_hash(tx_hash)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
-    async def transaction_get_1_0(self, tx_hash, height=None):
-        '''Return the serialized raw transaction given its hash
-
-        tx_hash: the transaction hash as a hexadecimal string
-        height: ignored, do not use
-        '''
-        # For some reason Electrum protocol 1.0 passes a height.
-        return await self.transaction_get(tx_hash)
-
     async def transaction_get_merkle(self, tx_hash, height):
         '''Return the markle tree to a confirmed transaction given its hash
         and height.
@@ -869,23 +860,3 @@ class Controller(ServerBase):
         self.assert_tx_hash(tx_hash)
         height = self.non_negative_integer(height)
         return await self.tx_merkle(tx_hash, height)
-
-    async def utxo_get_address(self, tx_hash, index):
-        '''Returns the address sent to in a UTXO, or null if the UTXO
-        cannot be found.
-
-        tx_hash: the transaction hash of the UTXO
-        index: the index of the UTXO in the transaction'''
-        # Used only for electrum client command-line requests.  We no
-        # longer index by address, so need to request the raw
-        # transaction.  So it works for any TXO not just UTXOs.
-        self.assert_tx_hash(tx_hash)
-        index = self.non_negative_integer(index)
-        raw_tx = await self.daemon_request('getrawtransaction', tx_hash)
-        if not raw_tx:
-            return None
-        raw_tx = util.hex_to_bytes(raw_tx)
-        tx = self.coin.DESERIALIZER(raw_tx).read_tx()
-        if index >= len(tx.outputs):
-            return None
-        return self.coin.address_from_script(tx.outputs[index].pk_script)

@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016-2018, Neil Booth
 #
 # All rights reserved.
 #
@@ -136,14 +136,13 @@ class ElectrumX(SessionBase):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
         self.subscribe_headers_raw = False
-        self.subscribe_height = False
         self.notified_height = None
         self.max_response_size = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.mempool_statuses = {}
         self.protocol_version = None
-        self.set_protocol_handlers((1, 0))
+        self.set_protocol_handlers((1, 1))
 
     def sub_count(self):
         return len(self.hashX_subs)
@@ -194,9 +193,6 @@ class ElectrumX(SessionBase):
             if self.subscribe_headers:
                 args = (self.subscribe_headers_result(height), )
                 self.send_notification('blockchain.headers.subscribe', args)
-            if self.subscribe_height:
-                args = (height, )
-                self.send_notification('blockchain.numblocks.subscribe', args)
 
         our_touched = touched.intersection(self.hashX_subs)
         if our_touched or (height_changed and self.mempool_statuses):
@@ -227,11 +223,6 @@ class ElectrumX(SessionBase):
         self.subscribe_headers_raw = self.assert_boolean(raw)
         self.notified_height = self.height()
         return self.subscribe_headers_result(self.height())
-
-    def numblocks_subscribe(self):
-        '''Subscribe to get height of new blocks.'''
-        self.subscribe_height = True
-        return self.height()
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
@@ -394,8 +385,7 @@ class ElectrumX(SessionBase):
         # that protocol version in unsupported.
         ptuple = self.controller.protocol_tuple(protocol_version)
 
-        # From protocol version 1.1, protocol_version cannot be omitted
-        if ptuple is None or (ptuple >= (1, 1) and protocol_version is None):
+        if ptuple is None:
             self.logger.info('unsupported protocol version request {}'
                              .format(protocol_version))
             self.close_after_send = True
@@ -404,11 +394,7 @@ class ElectrumX(SessionBase):
 
         self.set_protocol_handlers(ptuple)
 
-        # The return value depends on the protocol version
-        if ptuple < (1, 1):
-            return self.controller.VERSION
-        else:
-            return (self.controller.VERSION, self.protocol_version)
+        return (self.controller.VERSION, self.protocol_version)
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -428,27 +414,6 @@ class ElectrumX(SessionBase):
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
 
-    async def transaction_broadcast_1_0(self, raw_tx):
-        '''Broadcast a raw transaction to the network.
-
-        raw_tx: the raw transaction as a hexadecimal string'''
-        # An ugly API: current Electrum clients only pass the raw
-        # transaction in hex and expect error messages to be returned in
-        # the result field.  And the server shouldn't be doing the client's
-        # user interface job here.
-        try:
-            return await self.transaction_broadcast(raw_tx)
-        except RPCError as e:
-            message = e.message
-            if 'non-mandatory-script-verify-flag' in message:
-                message = (
-                    'Your client produced a transaction that is not accepted '
-                    'by the network any more.  Please upgrade to Electrum '
-                    '2.5.1 or newer.'
-                )
-
-            return message
-
     def set_protocol_handlers(self, ptuple):
         protocol_version = '.'.join(str(part) for part in ptuple)
         if protocol_version == self.protocol_version:
@@ -467,6 +432,17 @@ class ElectrumX(SessionBase):
             'blockchain.estimatefee': controller.estimatefee,
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.relayfee': controller.relayfee,
+            'blockchain.scripthash.get_balance':
+            controller.scripthash_get_balance,
+            'blockchain.scripthash.get_history':
+            controller.scripthash_get_history,
+            'blockchain.scripthash.get_mempool':
+            controller.scripthash_get_mempool,
+            'blockchain.scripthash.listunspent':
+            controller.scripthash_listunspent,
+            'blockchain.scripthash.subscribe': self.scripthash_subscribe,
+            'blockchain.transaction.broadcast': self.transaction_broadcast,
+            'blockchain.transaction.get': controller.transaction_get,
             'blockchain.transaction.get_merkle':
             controller.transaction_get_merkle,
             'server.add_peer': self.add_peer,
@@ -476,32 +452,6 @@ class ElectrumX(SessionBase):
             'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
         }
-
-        if ptuple < (1, 1):
-            # Methods or semantics unique to 1.0 and earlier protocols
-            handlers.update({
-                'blockchain.numblocks.subscribe': self.numblocks_subscribe,
-                'blockchain.utxo.get_address': controller.utxo_get_address,
-                'blockchain.transaction.broadcast':
-                self.transaction_broadcast_1_0,
-                'blockchain.transaction.get': controller.transaction_get_1_0,
-            })
-
-        if ptuple >= (1, 1):
-            # New handlers as of 1.1, or different semantics
-            handlers.update({
-                'blockchain.scripthash.get_balance':
-                controller.scripthash_get_balance,
-                'blockchain.scripthash.get_history':
-                controller.scripthash_get_history,
-                'blockchain.scripthash.get_mempool':
-                controller.scripthash_get_mempool,
-                'blockchain.scripthash.listunspent':
-                controller.scripthash_listunspent,
-                'blockchain.scripthash.subscribe': self.scripthash_subscribe,
-                'blockchain.transaction.broadcast': self.transaction_broadcast,
-                'blockchain.transaction.get': controller.transaction_get,
-            })
 
         if ptuple >= (1, 2):
             # New handler as of 1.2
@@ -542,10 +492,9 @@ class DashElectrumX(ElectrumX):
 
     def set_protocol_handlers(self, ptuple):
         super().set_protocol_handlers(ptuple)
-        mna_broadcast = (self.masternode_announce_broadcast if ptuple >= (1, 1)
-                         else self.masternode_announce_broadcast_1_0)
         self.electrumx_handlers.update({
-            'masternode.announce.broadcast': mna_broadcast,
+            'masternode.announce.broadcast':
+            self.masternode_announce_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
             'masternode.list': self.masternode_list,
             'masternode.info': self.masternode_info,
@@ -578,17 +527,6 @@ class DashElectrumX(ElectrumX):
             self.logger.info('masternode_broadcast: {}'.format(message))
             raise RPCError(BAD_REQUEST, 'the masternode broadcast was '
                            f'rejected.\n\n{message}\n[{signmnb}]')
-
-    async def masternode_announce_broadcast_1_0(self, signmnb):
-        '''Pass through the masternode announce message to be broadcast
-        by the daemon.
-
-        signmnb: masternode announce message.'''
-        # An ugly API, like the old Electrum transaction broadcast API
-        try:
-            return await self.masternode_announce_broadcast(signmnb)
-        except RPCError as e:
-            return e.message
 
     async def masternode_subscribe(self, vin):
         '''Returns the status of masternode.
