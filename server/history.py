@@ -30,6 +30,7 @@ class History(object):
         self.max_hist_row_entries = 12500
         self.unflushed = defaultdict(partial(array.array, 'I'))
         self.unflushed_count = 0
+        self.db = None
 
     def open_db(self, db_class, for_sync, utxo_flush_count):
         self.db = db_class('hist', for_sync)
@@ -38,7 +39,9 @@ class History(object):
         return self.flush_count
 
     def close_db(self):
-        self.db.close()
+        if self.db:
+            self.db.close()
+            self.db = None
 
     def read_state(self):
         state = self.db.get(b'state\0\0')
