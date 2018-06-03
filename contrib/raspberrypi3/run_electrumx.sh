@@ -4,7 +4,7 @@
 ###############
 
 # configure electrumx
-export COIN=Bitcoin
+export COIN=BitcoinSegwit
 export DAEMON_URL=http://rpcuser:rpcpassword@127.0.0.1
 export NET=mainnet
 export CACHE_MB=400
