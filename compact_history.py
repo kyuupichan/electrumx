@@ -49,16 +49,19 @@ def compact_history():
     db = DB(env)
 
     assert not db.first_sync
+    history = db.history
     # Continue where we left off, if interrupted
-    if db.comp_cursor == -1:
-        db.comp_cursor = 0
+    if history.comp_cursor == -1:
+        history.comp_cursor = 0
 
-    db.comp_flush_count = max(db.comp_flush_count, 1)
+    history.comp_flush_count = max(history.comp_flush_count, 1)
     limit = 8 * 1000 * 1000
 
-    while db.comp_cursor != -1:
-        db._compact_history(limit)
+    while history.comp_cursor != -1:
+        history._compact_history(limit)
 
+    # When completed also update the UTXO flush count
+    db.set_flush_count(history.flush_count)
 
 def main():
     logging.basicConfig(level=logging.INFO)

@@ -39,7 +39,7 @@ from functools import partial
 import base64
 
 import lib.util as util
-from lib.hash import Base58, hash160, double_sha256, hash_to_str
+from lib.hash import Base58, hash160, double_sha256, hash_to_str, HASHX_LEN
 from lib.script import ScriptPubKey, OpCodes
 import lib.tx as lib_tx
 from server.block_processor import BlockProcessor
@@ -63,7 +63,6 @@ class Coin(object):
     RPC_URL_REGEX = re.compile('.+@(\[[0-9a-fA-F:]+\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE = 2016
-    HASHX_LEN = 11
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
@@ -135,7 +134,7 @@ class Coin(object):
         '''
         if script and script[0] == OP_RETURN:
             return None
-        return sha256(script).digest()[:cls.HASHX_LEN]
+        return sha256(script).digest()[:HASHX_LEN]
 
     @util.cachedproperty
     def address_handlers(cls):
@@ -422,9 +421,9 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
-    TX_COUNT = 217380620
-    TX_COUNT_HEIGHT = 464000
-    TX_PER_BLOCK = 1800
+    TX_COUNT = 318337769
+    TX_COUNT_HEIGHT = 524213
+    TX_PER_BLOCK = 1400
     PEERS = [
         'btc.smsys.me s995',
         'E-X.not.fyi s t',
@@ -948,6 +947,19 @@ class Zcash(EquihashMixin, Coin):
     TX_PER_BLOCK = 5
     RPC_PORT = 8232
     REORG_LIMIT = 800
+
+class ZcashTestnet(Zcash):
+    SHORTNAME = "TAZ"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("1D25")
+    P2SH_VERBYTES = [bytes.fromhex("1CBA")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH = ('05a60a92d99d85997cce3b87616c089f'
+                    '6124d7342af37106edc76126334a2c38')
+    TX_COUNT = 242312
+    TX_COUNT_HEIGHT = 321685
+    TX_PER_BLOCK = 2
+    RPC_PORT = 18232
 
 class SnowGem(EquihashMixin, Coin):
     NAME = "SnowGem"
@@ -1676,7 +1688,7 @@ class Xuez(Coin):
     GENESIS_HASH = ('000000e1febc39965b055e8e0117179a'
                     '4d18e24e7aaa0c69864c4054b4f29445')
 
-    
+
     TX_COUNT = 30000
     TX_COUNT_HEIGHT = 15000
     TX_PER_BLOCK = 1
@@ -1695,7 +1707,7 @@ class Xuez(Coin):
         version, = struct.unpack('<I', header[:4])
 
         import xevan_hash
-        
+
         if  version == 1 :
             return xevan_hash.getPoWHash(header[:80])
         else:
@@ -1714,7 +1726,7 @@ class Xuez(Coin):
                 'timestamp': timestamp,
                 'bits': bits,
                 'nonce': nonce,
-            }        
+            }
         else:
             return {
                 'block_height': height,
@@ -1725,4 +1737,4 @@ class Xuez(Coin):
                 'bits': bits,
                 'nonce': nonce,
                 'nAccumulatorCheckpoint': hash_to_str(header[80:112]),
-            }        
+            }
