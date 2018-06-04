@@ -591,7 +591,7 @@ class Controller(ServerBase):
 
     def rpc_stop(self):
         '''Shut down the server cleanly.'''
-        self.shutdown_event.set()
+        self.loop.call_soon(self.shutdown_event.set)
         return 'stopping'
 
     def rpc_getinfo(self):
