@@ -1061,13 +1061,19 @@ masternode.announce.broadcast
 
 Pass through the masternode announce message to be broadcast by the daemon.
 
+Whenever a masternode comes online or a client is syncing, they will send this message which describes the masternode entry and how to validate messages from it.
+
 **Signature**
 
-  .. function:: masternode.announce.broadcast(masternode_announce_message)
+  .. function:: masternode.announce.broadcast(signmnb)
+
+  * *signmnb*
+
+    Masternode announce message.
   
 **Result**
 
-  A message with the result of the broadcasting, it could be a success message or an error one including the reason of failure.
+  True if the announce was broadcasted succesfully otherwise False.
 
 masternode.subscribe
 --------------
@@ -1076,7 +1082,11 @@ Returns the status of masternode.
 
 **Signature**
 
-  .. function:: masternode.subscribe(masternode_collateral)
+  .. function:: masternode.subscribe(vin)
+
+  * *vin*
+
+    Masternode collateral.
 
 **Result**
 
@@ -1093,27 +1103,19 @@ Returns the list of masternodes.
   
   * *payees*
 
-    A single string or an array of masternode payee addresses.
+    An array of masternode payee addresses.
 
 **Result**
 
   An array with the masternodes information.
   
-  * If the payee is empty, all the masternodes in the network will be retrieved.
-  * If the payee is a string, only the related masternode information will be retrieved.
-  * If the payee is an array, the related masternodes information will be retrieved.
-  
 **Examples**::
 
-  masternode.list()
-  masternode.list("9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab")
-  masternode.list("['9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab',
-  '9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ac']")
+  masternode.list("['PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE',
+  'PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcF']")
 
 **Example Results**::
     
-  When nothing is sent all masternodes information is received.
-  
     [
       {
         "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab",
@@ -1122,23 +1124,25 @@ Returns the list of masternodes.
         "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
         "lastseen": "2018-04-01 12:34",
         "activeseconds": 1258000,
-        "lastpaidtime": "2018-03-15 05:29",
+        "lastpaidtime": "2018-03-10 12:29",
         "lastpaidblock": 1234,
         "ip": "1.0.0.1",
-        "paymentposition": 3333,
+        "paymentposition": 184,
+        "inselection": true,
         "balance": 510350
       },
       {
         "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ac",
         "status": "ENABLED",
         "protocol": 70213,
-        "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
+        "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcF",
         "lastseen": "2018-04-01 12:34",
         "activeseconds": 1258000,
         "lastpaidtime": "2018-03-15 05:29",
         "lastpaidblock": 1234,
         "ip": "1.0.0.2",
         "paymentposition": 3333,
+        "inselection": false,
         "balance": 520700
       },
       ...,
@@ -1146,87 +1150,3 @@ Returns the list of masternodes.
       ...,
       ...
     ]
-  
-  When a single string is sent, only one record is received.
-  
-    {
-      "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab",
-      "status": "ENABLED",
-      "protocol": 70213,
-      "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
-      "lastseen": "2018-04-01 12:34",
-      "activeseconds": 1258000,
-      "lastpaidtime": "2018-03-15 05:29",
-      "lastpaidblock": 1234,
-      "ip": "1.0.0.1",
-      "paymentposition": 3333,
-      "balance": 510350
-    }
-  
-  When an array is sent, an array is received.
-  
-    [
-      {
-        "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab",
-        "status": "ENABLED",
-        "protocol": 70213,
-        "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
-        "lastseen": "2018-04-01 12:34",
-        "activeseconds": 1258000,
-        "lastpaidtime": "2018-03-15 05:29",
-        "lastpaidblock": 1234,
-        "ip": "1.0.0.1",
-        "paymentposition": 3333,
-        "balance": 510350
-      },
-      {
-        "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ac",
-        "status": "ENABLED",
-        "protocol": 70213,
-        "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
-        "lastseen": "2018-04-01 12:34",
-        "activeseconds": 1258000,
-        "lastpaidtime": "2018-03-15 05:29",
-        "lastpaidblock": 1234,
-        "ip": "1.0.0.2",
-        "paymentposition": 3333,
-        "balance": 520700
-      }
-    ]
-
-masternode.info
---------------
-
-Returns the full info of masternode.
-
-**Signature**
-
-  .. function:: masternode.info(masternode_payee)
-  
-  * *masternode_payee*
-
-    Masternode payee address.
-
-**Result**
-
-  An array with the full information of the masternode.
-  
-**Examples**::
-
-  .. masternode.info("9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab")
-
-**Example Results**::
-
-    {
-      "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab",
-      "status": "ENABLED",
-      "protocol": 70213,
-      "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
-      "lastseen": "2018-04-01 12:34",
-      "activeseconds": 1258000,
-      "lastpaidtime": "2018-03-15 05:29",
-      "lastpaidblock": 1234,
-      "ip": "1.0.0.1",
-      "paymentposition": 3333,
-      "balance": 510350
-    }

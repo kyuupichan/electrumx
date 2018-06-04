@@ -496,8 +496,7 @@ class DashElectrumX(ElectrumX):
             'masternode.announce.broadcast':
             self.masternode_announce_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
-            'masternode.list': self.masternode_list,
-            'masternode.info': self.masternode_info,
+            'masternode.list': self.masternode_list
         })
 
     async def notify_masternodes_async(self):
@@ -539,11 +538,11 @@ class DashElectrumX(ElectrumX):
             return result.get(vin)
         return None
 
-    async def masternode_list(self, payees=[]):
+    async def masternode_list(self, payees):
         '''
         Returns the list of masternodes.
 
-        payees: a single string or an array of masternode payee addresses.
+        payees: a list of masternode payee addresses.
         '''
         result = []
 
@@ -619,24 +618,12 @@ class DashElectrumX(ElectrumX):
                 mn_list.append(mn_info)
             self.controller.mn_cache = mn_list
 
+        # If payees is an empty list the whole masternode list is returned
         if payees:
-            if type(payees) is str:
-                result = [mn for mn in self.controller.mn_cache if mn['payee'] == payees]
-            else:
-                result = [mn for mn in self.controller.mn_cache for address in payees if mn['payee'] == address]
+            result = [mn for mn in self.controller.mn_cache 
+            for address in payees if mn['payee'] == address]
         else:
             result = self.controller.mn_cache
 
         result = sorted(result, key=lambda x: x['paymentposition'])
         return result
-
-    async def masternode_info(self, address):
-        '''
-        Returns the full info of masternode.
-
-        address: masternode payee address.
-        '''
-        result = []
-        address_list = ''.join(address.split()).split(',')
-        result = await self.masternode_list(address_list)
-        return result 
