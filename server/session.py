@@ -594,7 +594,7 @@ class DashElectrumX(ElectrumX):
 
         # Accordingly with the masternode payment queue, a custom list with 
         # the masternode information including the payment position is returned.
-        if self.controller.cache_mn_height != self.height():
+        if self.controller.cache_mn_height != self.height() or not self.controller.mn_cache:
             self.controller.cache_mn_height = self.height()
             self.controller.mn_cache.clear()
             full_mn_list = await self.daemon.masternode_list(['full'])
@@ -613,6 +613,7 @@ class DashElectrumX(ElectrumX):
                 mn_info['lastpaidblock'] = mn_data[6]
                 mn_info['ip'] = mn_data[7]
                 mn_info['paymentposition'] = get_payment_position(mn_payment_queue, mn_info['payee'])
+                mn_info['inselection'] = mn_info['paymentposition'] < len(mn_payment_queue) // 10
                 balance = await self.controller.address_get_balance(mn_info['payee'])
                 mn_info['balance'] = sum(balance.values()) / self.controller.coin.VALUE_PER_COIN
                 mn_list.append(mn_info)
@@ -625,6 +626,8 @@ class DashElectrumX(ElectrumX):
                 result = [mn for mn in self.controller.mn_cache for address in payees if mn['payee'] == address]
         else:
             result = self.controller.mn_cache
+
+        result = sorted(result, key=lambda x: x['paymentposition'])
         return result
 
     async def masternode_info(self, address):
