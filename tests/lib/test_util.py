@@ -176,11 +176,11 @@ def test_protocol_tuple():
     assert util.protocol_tuple("0.10") == (0, 10)
     assert util.protocol_tuple("2.5.3") == (2, 5, 3)
 
-def test_protocol_version_string():
-    assert util.protocol_version_string(()) == "0.0"
-    assert util.protocol_version_string((1, )) == "1.0"
-    assert util.protocol_version_string((1, 2)) == "1.2"
-    assert util.protocol_version_string((1, 3, 2)) == "1.3.2"
+def test_version_string():
+    assert util.version_string(()) == "0.0"
+    assert util.version_string((1, )) == "1.0"
+    assert util.version_string((1, 2)) == "1.2"
+    assert util.version_string((1, 3, 2)) == "1.3.2"
 
 def test_protocol_version():
     assert util.protocol_version(None, "1.0", "1.0") == (1, 0)
