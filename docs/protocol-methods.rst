@@ -1069,11 +1069,11 @@ Whenever a masternode comes online or a client is syncing, they will send this m
 
   * *signmnb*
 
-    Masternode announce message.
+    Signed masternode broadcast message.
   
 **Result**
 
-  True if the announce was broadcasted succesfully otherwise False.
+  True if the message was broadcasted succesfully otherwise False.
 
 masternode.subscribe
 --------------
@@ -1082,20 +1082,28 @@ Returns the status of masternode.
 
 **Signature**
 
-  .. function:: masternode.subscribe(vin)
+  .. function:: masternode.subscribe(collateral)
 
-  * *vin*
+  * *collateral*
 
-    Masternode collateral.
+    A masternode collateral is a transaction with a specific amount of coins, it's also known as a masternode identifier.
+
+    i.e. for DASH the required amount is 1,000 DASH or for $PAC is 500,000 $PAC.
 
 **Result**
 
   As this is a subcription, the client will receive a notification when the masternode status changes.
 
+  The status depends on the server the masternode is hosted, the internet connection, the offline time and even the collateral amount, so this subscription notice these changes to the user.
+
+**Example Results**::
+
+  {'method': 'masternode.subscribe', u'jsonrpc': u'2.0', u'result': u'ENABLED', 'params': ['8c59133e714797650cf69043d05e409bbf45670eed7c4e4a386e52c46f1b5e24-0'], u'id': 19}
+
 masternode.list
 --------------
 
-Returns the list of masternodes.
+Returns the list of masternodes sorted by payment position.
 
 **Signature**
 

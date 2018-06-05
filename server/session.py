@@ -517,7 +517,7 @@ class DashElectrumX(ElectrumX):
         '''Pass through the masternode announce message to be broadcast
         by the daemon.
 
-        signmnb: masternode announce message.'''
+        signmnb: signed masternode broadcast message.'''
         try:
             return await self.daemon.masternode_broadcast(['relay', signmnb])
         except DaemonError as e:
@@ -527,20 +527,20 @@ class DashElectrumX(ElectrumX):
             raise RPCError(BAD_REQUEST, 'the masternode broadcast was '
                            f'rejected.\n\n{message}\n[{signmnb}]')
 
-    async def masternode_subscribe(self, vin):
+    async def masternode_subscribe(self, collateral):
         '''Returns the status of masternode.
     
-        vin: masternode collateral.
+        collateral: masternode collateral.
         '''
-        result = await self.daemon.masternode_list(['status', vin])
+        result = await self.daemon.masternode_list(['status', collateral])
         if result is not None:
-            self.mns.add(vin)
-            return result.get(vin)
+            self.mns.add(collateral)
+            return result.get(collateral)
         return None
 
     async def masternode_list(self, payees):
         '''
-        Returns the list of masternodes.
+        Returns the list of masternodes sorted by payment position.
 
         payees: a list of masternode payee addresses.
         '''
