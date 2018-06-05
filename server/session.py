@@ -598,7 +598,7 @@ class DashElectrumX(ElectrumX):
             self.controller.mn_cache.clear()
             full_mn_list = await self.daemon.masternode_list(['full'])
             mn_payment_queue = get_masternode_payment_queue(full_mn_list)
-            mn_payment_count = len(mn_payment_queue)
+            #mn_payment_count = len(mn_payment_queue)
             mn_list = []
             for key, value in full_mn_list.items():
                 mn_data = value.split()
@@ -613,7 +613,7 @@ class DashElectrumX(ElectrumX):
                 mn_info['lastpaidblock'] = mn_data[6]
                 mn_info['ip'] = mn_data[7]
                 mn_info['paymentposition'] = get_payment_position(mn_payment_queue, mn_info['payee'])
-                mn_info['inselection'] = mn_info['paymentposition'] < mn_payment_count // 10
+                #mn_info['inselection'] = mn_info['paymentposition'] < mn_payment_count // 10
                 balance = await self.controller.address_get_balance(mn_info['payee'])
                 mn_info['balance'] = sum(balance.values()) / self.controller.coin.VALUE_PER_COIN
                 mn_list.append(mn_info)
