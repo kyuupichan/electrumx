@@ -496,8 +496,7 @@ class DashElectrumX(ElectrumX):
             'masternode.announce.broadcast':
             self.masternode_announce_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
-            'masternode.list': self.masternode_list,
-            'masternode.info': self.masternode_info,
+            'masternode.list': self.masternode_list
         })
 
     async def notify_masternodes_async(self):
@@ -518,7 +517,7 @@ class DashElectrumX(ElectrumX):
         '''Pass through the masternode announce message to be broadcast
         by the daemon.
 
-        signmnb: masternode announce message.'''
+        signmnb: signed masternode broadcast message.'''
         try:
             return await self.daemon.masternode_broadcast(['relay', signmnb])
         except DaemonError as e:
@@ -528,22 +527,22 @@ class DashElectrumX(ElectrumX):
             raise RPCError(BAD_REQUEST, 'the masternode broadcast was '
                            f'rejected.\n\n{message}\n[{signmnb}]')
 
-    async def masternode_subscribe(self, vin):
+    async def masternode_subscribe(self, collateral):
         '''Returns the status of masternode.
     
-        vin: masternode collateral.
+        collateral: masternode collateral.
         '''
-        result = await self.daemon.masternode_list(['status', vin])
+        result = await self.daemon.masternode_list(['status', collateral])
         if result is not None:
-            self.mns.add(vin)
-            return result.get(vin)
+            self.mns.add(collateral)
+            return result.get(collateral)
         return None
 
-    async def masternode_list(self, payees=[]):
+    async def masternode_list(self, payees):
         '''
-        Returns the list of masternodes.
+        Returns the list of masternodes sorted by payment position.
 
-        payees: a single string or an array of masternode payee addresses.
+        payees: a list of masternode payee addresses.
         '''
         result = []
 
@@ -594,7 +593,7 @@ class DashElectrumX(ElectrumX):
 
         # Accordingly with the masternode payment queue, a custom list with 
         # the masternode information including the payment position is returned.
-        if self.controller.cache_mn_height != self.height():
+        if self.controller.cache_mn_height != self.height() or not self.controller.mn_cache:
             self.controller.cache_mn_height = self.height()
             self.controller.mn_cache.clear()
             full_mn_list = await self.daemon.masternode_list(['full'])
@@ -613,27 +612,18 @@ class DashElectrumX(ElectrumX):
                 mn_info['lastpaidblock'] = mn_data[6]
                 mn_info['ip'] = mn_data[7]
                 mn_info['paymentposition'] = get_payment_position(mn_payment_queue, mn_info['payee'])
+                mn_info['inselection'] = mn_info['paymentposition'] < len(mn_payment_queue) // 10
                 balance = await self.controller.address_get_balance(mn_info['payee'])
                 mn_info['balance'] = sum(balance.values()) / self.controller.coin.VALUE_PER_COIN
                 mn_list.append(mn_info)
             self.controller.mn_cache = mn_list
 
+        # If payees is an empty list the whole masternode list is returned
         if payees:
-            if type(payees) is str:
-                result = [mn for mn in self.controller.mn_cache if mn['payee'] == payees]
-            else:
-                result = [mn for mn in self.controller.mn_cache for address in payees if mn['payee'] == address]
+            result = [mn for mn in self.controller.mn_cache 
+            for address in payees if mn['payee'] == address]
         else:
             result = self.controller.mn_cache
+
+        result = sorted(result, key=lambda x: x['paymentposition'])
         return result
-
-    async def masternode_info(self, address):
-        '''
-        Returns the full info of masternode.
-
-        address: masternode payee address.
-        '''
-        result = []
-        address_list = ''.join(address.split()).split(',')
-        result = await self.masternode_list(address_list)
-        return result 
