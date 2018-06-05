@@ -626,5 +626,4 @@ class DashElectrumX(ElectrumX):
         else:
             result = self.controller.mn_cache
 
-        #result = sorted(result, key=lambda x: x['paymentposition'])
         return result
