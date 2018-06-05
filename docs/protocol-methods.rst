@@ -1103,7 +1103,7 @@ Returns the status of masternode.
 masternode.list
 --------------
 
-Returns the list of masternodes sorted by payment position.
+Returns the list of masternodes.
 
 **Signature**
 

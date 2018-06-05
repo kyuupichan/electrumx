@@ -540,7 +540,7 @@ class DashElectrumX(ElectrumX):
 
     async def masternode_list(self, payees):
         '''
-        Returns the list of masternodes sorted by payment position.
+        Returns the list of masternodes.
 
         payees: a list of masternode payee addresses.
         '''
