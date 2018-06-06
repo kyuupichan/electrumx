@@ -402,9 +402,9 @@ class HOdlcoin(Coin):
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
     SHORTNAME = "BCC"
-    TX_COUNT = 243631085
-    TX_COUNT_HEIGHT = 479636
-    TX_PER_BLOCK = 50
+    TX_COUNT = 246362688
+    TX_COUNT_HEIGHT = 511484
+    TX_PER_BLOCK = 400
     PEERS = [
         'electroncash.cascharia.com s50002',
         'bch.arihanc.com t52001 s52002',
@@ -1727,16 +1727,16 @@ class Pac(Coin):
     NAME = "PAC"
     SHORTNAME = "PAC"
     NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("0488B21E") 
-    XPRV_VERBYTES = bytes.fromhex("0488ADE4") 
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
     GENESIS_HASH = ('00000354655ff039a51273fe61d3b493'
                     'bd2897fe6c16f732dbc4ae19f04b789e')
     P2PKH_VERBYTE = bytes.fromhex("37")
     P2SH_VERBYTES = [bytes.fromhex("0A")]
     WIF_BYTE = bytes.fromhex("CC")
-    TX_COUNT_HEIGHT = 14939 
-    TX_COUNT = 23708 
-    TX_PER_BLOCK = 2 
+    TX_COUNT_HEIGHT = 14939
+    TX_COUNT = 23708
+    TX_PER_BLOCK = 2
     RPC_PORT = 7111
     PEERS = [
         'electrum.paccoin.io s t',
@@ -1766,4 +1766,4 @@ class PacTestnet(Pac):
     TX_COUNT_HEIGHT = 16275
     TX_COUNT = 16275
     TX_PER_BLOCK = 1
-    RPC_PORT = 17111 
+    RPC_PORT = 17111
