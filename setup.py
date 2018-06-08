@@ -12,7 +12,7 @@ setuptools.setup(
     # "tribus_hash" package is required to sync Denarius network.
     # "blake256" package is required to sync Decred network.
     # "xevan_hash" package is required to sync Xuez network.
-    install_requires=['aiorpcX >= 0.5.5', 'plyvel', 'pylru', 'aiohttp >= 1'],
+    install_requires=['aiorpcX >= 0.5.6', 'plyvel', 'pylru', 'aiohttp >= 1'],
     packages=setuptools.find_packages(exclude=['tests']),
     description='ElectrumX Server',
     author='Neil Booth',
