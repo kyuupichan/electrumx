@@ -350,7 +350,7 @@ class ElectrumX(SessionBase):
                 with codecs.open(banner_file, 'r', 'utf-8') as f:
                     banner = f.read()
             except Exception as e:
-                self.loggererror(f'reading banner file {banner_file}: {e}')
+                self.logger.error(f'reading banner file {banner_file}: {e}')
             else:
                 banner = await self.replaced_banner(banner)
 
@@ -529,7 +529,7 @@ class DashElectrumX(ElectrumX):
 
     async def masternode_subscribe(self, collateral):
         '''Returns the status of masternode.
-    
+
         collateral: masternode collateral.
         '''
         result = await self.daemon.masternode_list(['status', collateral])
@@ -547,9 +547,8 @@ class DashElectrumX(ElectrumX):
         result = []
 
         def get_masternode_payment_queue(mns):
-            ''' 
-            Returns the calculated position in the payment queue for all the valid 
-            masterernodes in the given mns list.
+            '''Returns the calculated position in the payment queue for all the
+            valid masterernodes in the given mns list.
 
             mns: a list of masternodes information.
             '''
@@ -591,7 +590,7 @@ class DashElectrumX(ElectrumX):
                     break
             return position
 
-        # Accordingly with the masternode payment queue, a custom list with 
+        # Accordingly with the masternode payment queue, a custom list with
         # the masternode information including the payment position is returned.
         if self.controller.cache_mn_height != self.height() or not self.controller.mn_cache:
             self.controller.cache_mn_height = self.height()
@@ -621,7 +620,7 @@ class DashElectrumX(ElectrumX):
 
         # If payees is an empty list the whole masternode list is returned
         if payees:
-            result = [mn for mn in self.controller.mn_cache 
+            result = [mn for mn in self.controller.mn_cache
             for address in payees if mn['payee'] == address]
         else:
             result = self.controller.mn_cache
