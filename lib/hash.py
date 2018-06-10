@@ -74,8 +74,9 @@ def hash_to_hex_str(x):
     '''
     return bytes(reversed(x)).hex()
 
-# Temporary
-hash_to_str = hash_to_hex_str
+
+hash_to_str = hash_to_hex_str   # Temporary
+
 
 def hex_str_to_hash(x):
     '''Convert a displayed hex string to a binary hash.'''

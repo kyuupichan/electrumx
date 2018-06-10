@@ -28,7 +28,7 @@ install:
 # command to run tests
 script:
   - pytest --cov=server --cov=lib --cov=wallet
-  - pycodestyle server/*.py
+  - pycodestyle server/*.py lib/*.py
 # Dont report coverage from nightly
 after_success:
   - if [[ $(python3 -V 2>&1) == *"Python 3.6"* ]]; then

@@ -260,16 +260,16 @@ class DeserializerAuxPow(Deserializer):
         if version & self.VERSION_AUXPOW:
             # We are going to calculate the block size then read it as bytes
             self.cursor = start
-            self.cursor += static_header_size # Block normal header
-            self.read_tx() # AuxPow transaction
-            self.cursor += 32 # Parent block hash
+            self.cursor += static_header_size  # Block normal header
+            self.read_tx()  # AuxPow transaction
+            self.cursor += 32  # Parent block hash
             merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size # Merkle branch
-            self.cursor += 4 # Index
+            self.cursor += 32 * merkle_size  # Merkle branch
+            self.cursor += 4  # Index
             merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size # Chain merkle branch
-            self.cursor += 4 # Chain index
-            self.cursor += 80 # Parent block header
+            self.cursor += 32 * merkle_size  # Chain merkle branch
+            self.cursor += 4  # Chain index
+            self.cursor += 80  # Parent block header
             header_end = self.cursor
         else:
             header_end = static_header_size
@@ -315,7 +315,7 @@ class DeserializerZcash(DeserializerEquihash):
             self._read_le_uint32()  # versionGroupId
         else:
             version = header
-        base_tx =  TxJoinSplit(
+        base_tx = TxJoinSplit(
             version,
             self._read_inputs(),    # inputs
             self._read_outputs(),   # outputs
@@ -326,9 +326,9 @@ class DeserializerZcash(DeserializerEquihash):
         if base_tx.version >= 2:
             joinsplit_size = self._read_varint()
             if joinsplit_size > 0:
-                self.cursor += joinsplit_size * 1802 # JSDescription
-                self.cursor += 32 # joinSplitPubKey
-                self.cursor += 64 # joinSplitSig
+                self.cursor += joinsplit_size * 1802  # JSDescription
+                self.cursor += 32  # joinSplitPubKey
+                self.cursor += 64  # joinSplitSig
         return base_tx
 
 
@@ -343,11 +343,11 @@ class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
 class DeserializerTxTime(Deserializer):
     def read_tx(self):
         return TxTime(
-            self._read_le_int32(),  # version
-            self._read_le_uint32(), # time
-            self._read_inputs(),    # inputs
-            self._read_outputs(),   # outputs
-            self._read_le_uint32(), # locktime
+            self._read_le_int32(),   # version
+            self._read_le_uint32(),  # time
+            self._read_inputs(),     # inputs
+            self._read_outputs(),    # outputs
+            self._read_le_uint32(),  # locktime
         )
 
 
@@ -408,7 +408,7 @@ class DeserializerBitcoinAtom(DeserializerSegWit):
         '''Return the block header bytes'''
         header_len = static_header_size
         if height >= self.FORK_BLOCK_HEIGHT:
-            header_len += 4 # flags
+            header_len += 4  # flags
         return self._read_nbytes(header_len)
 
 
@@ -511,4 +511,4 @@ class DeserializerDecred(Deserializer):
             locktime,
             expiry,
             witness
-        ), DeserializerDecred.blake256(no_witness_tx)        
+        ), DeserializerDecred.blake256(no_witness_tx)
