@@ -87,8 +87,8 @@ class Controller(ServerBase):
         self.mn_cache = pylru.lrucache(256)
         env.max_send = max(350000, env.max_send)
         # Set up the RPC request handlers
-        cmds = ('add_peer daemon_url disconnect getinfo groups log peers reorg '
-                'sessions stop'.split())
+        cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
+                'reorg sessions stop'.split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
 
         self.loop = asyncio.get_event_loop()

@@ -294,7 +294,7 @@ class ElectrumX(SessionBase):
         start_height = self.controller.non_negative_integer(start_height)
         count = self.controller.non_negative_integer(count)
         count = min(count, self.MAX_CHUNK_SIZE)
-        hex_str, n =  self.controller.block_headers(start_height, count)
+        hex_str, n = self.controller.block_headers(start_height, count)
         return {'hex': hex_str, 'count': n, 'max': self.MAX_CHUNK_SIZE}
 
     def block_get_chunk(self, index):
@@ -304,7 +304,7 @@ class ElectrumX(SessionBase):
         index = self.controller.non_negative_integer(index)
         chunk_size = self.controller.coin.CHUNK_SIZE
         start_height = index * chunk_size
-        hex_str, n =  self.controller.block_headers(start_height, chunk_size)
+        hex_str, n = self.controller.block_headers(start_height, chunk_size)
         return hex_str
 
     def is_tor(self):
@@ -503,14 +503,13 @@ class DashElectrumX(ElectrumX):
         for masternode in self.mns:
             status = await self.daemon.masternode_list(['status', masternode])
             self.send_notification('masternode.subscribe',
-                                    [masternode, status.get(masternode)])
+                                   [masternode, status.get(masternode)])
 
     def notify(self, height, touched):
         '''Notify the client about changes in masternode list.'''
         result = super().notify(height, touched)
         self.controller.create_task(self.notify_masternodes_async())
         return result
-
 
     # Masternode command handlers
     async def masternode_announce_broadcast(self, signmnb):
@@ -553,7 +552,7 @@ class DashElectrumX(ElectrumX):
             mns: a list of masternodes information.
             '''
             now = int(datetime.datetime.utcnow().strftime("%s"))
-            mn_queue=[]
+            mn_queue = []
 
             # Only ENABLED masternodes are considered for the list.
             for line in mns:
@@ -590,9 +589,11 @@ class DashElectrumX(ElectrumX):
                     break
             return position
 
-        # Accordingly with the masternode payment queue, a custom list with
-        # the masternode information including the payment position is returned.
-        if self.controller.cache_mn_height != self.height() or not self.controller.mn_cache:
+        # Accordingly with the masternode payment queue, a custom list
+        # with the masternode information including the payment
+        # position is returned.
+        if (self.controller.cache_mn_height != self.height()
+                or not self.controller.mn_cache):
             self.controller.cache_mn_height = self.height()
             self.controller.mn_cache.clear()
             full_mn_list = await self.daemon.masternode_list(['full'])
@@ -611,17 +612,21 @@ class DashElectrumX(ElectrumX):
                 mn_info['lastpaidtime'] = mn_data[5]
                 mn_info['lastpaidblock'] = mn_data[6]
                 mn_info['ip'] = mn_data[7]
-                mn_info['paymentposition'] = get_payment_position(mn_payment_queue, mn_info['payee'])
-                mn_info['inselection'] = mn_info['paymentposition'] < mn_payment_count // 10
-                balance = await self.controller.address_get_balance(mn_info['payee'])
-                mn_info['balance'] = sum(balance.values()) / self.controller.coin.VALUE_PER_COIN
+                mn_info['paymentposition'] = get_payment_position(
+                    mn_payment_queue, mn_info['payee'])
+                mn_info['inselection'] = (
+                    mn_info['paymentposition'] < mn_payment_count // 10)
+                balance = await self.controller.address_get_balance(
+                    mn_info['payee'])
+                mn_info['balance'] = (sum(balance.values())
+                                      / self.controller.coin.VALUE_PER_COIN)
                 mn_list.append(mn_info)
             self.controller.mn_cache = mn_list
 
         # If payees is an empty list the whole masternode list is returned
         if payees:
             result = [mn for mn in self.controller.mn_cache
-            for address in payees if mn['payee'] == address]
+                      for address in payees if mn['payee'] == address]
         else:
             result = self.controller.mn_cache
 

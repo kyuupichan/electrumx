@@ -17,6 +17,7 @@ install:
   - pip install aiorpcX
   - pip install ecdsa
   - pip install plyvel
+  - pip install pycodestyle
   - pip install pyrocksdb
   - pip install tribus-hash
   - pip install pytest-cov
@@ -25,7 +26,9 @@ install:
   - pip install x11_hash
   - pip install xevan_hash
 # command to run tests
-script: pytest --cov=server --cov=lib --cov=wallet
+script:
+  - pytest --cov=server --cov=lib --cov=wallet
+  - pycodestyle server/*.py
 # Dont report coverage from nightly
 after_success:
   - if [[ $(python3 -V 2>&1) == *"Python 3.6"* ]]; then

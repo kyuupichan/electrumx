@@ -232,8 +232,8 @@ class PeerManager(object):
         self.loop = controller.loop
 
         # Our clearnet and Tor Peers, if any
-        self.myselves =  [Peer(ident.host, controller.server_features(), 'env')
-                          for ident in env.identities]
+        self.myselves = [Peer(ident.host, controller.server_features(), 'env')
+                         for ident in env.identities]
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the
