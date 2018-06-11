@@ -543,6 +543,9 @@ class DashElectrumX(ElectrumX):
 
         payees: a list of masternode payee addresses.
         '''
+        if not isinstance(payees, list):
+            raise RPCError(BAD_REQUEST, 'expected a list of payees')
+            
         result = []
 
         def get_masternode_payment_queue(mns):
