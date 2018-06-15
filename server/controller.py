@@ -722,7 +722,7 @@ class Controller(ServerBase):
             # bytes when encoded as JSON.  This limits resource usage
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
-            limit = self.env.max_send // 97
+            limit = 1000
             return list(self.bp.get_history(hashX, limit=limit))
 
         history = await self.run_in_executor(job)
