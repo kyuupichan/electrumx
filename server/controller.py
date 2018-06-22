@@ -845,7 +845,11 @@ class Controller(ServerBase):
         verbose: passed on to the daemon
         '''
         self.assert_tx_hash(tx_hash)
-        return await self.daemon_request('getrawtransaction', tx_hash, verbose)
+        result = await self.daemon_request('getrawtransaction', tx_hash, verbose)
+        if verbose is True:
+            del result['vin']
+            del result['vout']
+        return result
 
     async def transaction_get_1_0(self, tx_hash, height=None):
         '''Return the serialized raw transaction given its hash
