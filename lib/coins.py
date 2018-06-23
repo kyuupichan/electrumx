@@ -457,7 +457,9 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
     RPC_PORT = 8338
     PEERS = [
         'electrumx-eu.bitcoingold.org s50002 t50001',
-        'electrumx-us.bitcoingold.org s50002 t50001'
+        'electrumx-us.bitcoingold.org s50002 t50001',
+        'electrumx-eu.btcgpu.org s50002 t50001',
+        'electrumx-us.btcgpu.org s50002 t50001'
     ]
 
     @classmethod
@@ -504,7 +506,10 @@ class BitcoinGoldTestnet(BitcoinGold):
     PEERS = [
         'test-node1.bitcoingold.org s50002',
         'test-node2.bitcoingold.org s50002',
-        'test-node3.bitcoingold.org s50002'
+        'test-node3.bitcoingold.org s50002',
+        'test-node1.btcgpu.org s50002',
+        'test-node2.btcgpu.org s50002',
+        'test-node3.btcgpu.org s50002'
     ]
 
 
@@ -522,6 +527,7 @@ class BitcoinGoldRegtest(BitcoinGold):
     RPC_PORT = 18444
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
                     'bf5beb436012afca590b1a11466e2206')
+    PEERS = []
 
 
 class Emercoin(Coin):
