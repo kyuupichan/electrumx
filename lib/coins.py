@@ -821,6 +821,7 @@ class DashTestnet(Dash):
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     PEERS = [
         'electrum.dash.siampm.com s t',
+        'dasht.random.re s54002 t54001',
     ]
 
 
