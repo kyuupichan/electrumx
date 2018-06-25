@@ -217,8 +217,8 @@ class Daemon(object):
                     # probably because we did not provide arguments
                     available = True
                 else:
-                    self.logger.warning('unexpected error (code {:d}: {}) when '
-                                        'testing RPC availability of method {}'
+                    self.logger.warning('error (code {:d}: {}) when testing '
+                                        'RPC availability of method {}'
                                         .format(error_code, err.get("message"),
                                                 method))
                     available = False
@@ -264,7 +264,8 @@ class Daemon(object):
 
     async def getrawtransaction(self, hex_hash, verbose=False):
         '''Return the serialized raw transaction with the given hash.'''
-        return await self._send_single('getrawtransaction', (hex_hash, int(verbose)))
+        return await self._send_single('getrawtransaction',
+                                       (hex_hash, int(verbose)))
 
     async def getrawtransactions(self, hex_hashes, replace_errs=True):
         '''Return the serialized raw transactions with the given hashes.
@@ -305,7 +306,7 @@ class DashDaemon(Daemon):
         '''Broadcast a transaction to the network.'''
         return await self._send_single('masternodebroadcast', params)
 
-    async def masternode_list(self, params ):
+    async def masternode_list(self, params):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
@@ -350,13 +351,14 @@ class LegacyRPCDaemon(Daemon):
         pbh = b.get('previousblockhash')
         if pbh is None:
             pbh = '0' * 64
-        header = pack('<L', b.get('version')) \
-                 + hex_str_to_hash(pbh) \
-                 + hex_str_to_hash(b.get('merkleroot')) \
-                 + pack('<L', self.timestamp_safe(b['time'])) \
-                 + pack('<L', int(b.get('bits'), 16)) \
-                 + pack('<L', int(b.get('nonce')))
-        return header
+        return b''.join([
+            pack('<L', b.get('version')),
+            hex_str_to_hash(pbh),
+            hex_str_to_hash(b.get('merkleroot')),
+            pack('<L', self.timestamp_safe(b['time'])),
+            pack('<L', int(b.get('bits'), 16)),
+            pack('<L', int(b.get('nonce')))
+        ])
 
     async def make_raw_block(self, b):
         '''Construct a raw block'''

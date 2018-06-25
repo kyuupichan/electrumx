@@ -132,8 +132,10 @@ class Env(EnvBase):
                 result = getattr(clearnet, port_kind)
             return result or getattr(self, port_kind)
 
-        tcp_port = self.integer('REPORT_TCP_PORT_TOR', port('tcp_port')) or None
-        ssl_port = self.integer('REPORT_SSL_PORT_TOR', port('ssl_port')) or None
+        tcp_port = self.integer('REPORT_TCP_PORT_TOR',
+                                port('tcp_port')) or None
+        ssl_port = self.integer('REPORT_SSL_PORT_TOR',
+                                port('ssl_port')) or None
         if tcp_port == ssl_port:
             raise self.Error('REPORT_TCP_PORT_TOR and REPORT_SSL_PORT_TOR '
                              'both resolve to {}'.format(tcp_port))

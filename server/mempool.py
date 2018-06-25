@@ -176,7 +176,8 @@ class MemPool(object):
                     txin_pairs, txout_pairs, tx_fee, tx_size = item
                     fee_rate = tx_fee // tx_size
                     fee_hist[fee_rate] += tx_size
-                    for hashX, value in itertools.chain(txin_pairs, txout_pairs):
+                    for hashX, value in itertools.chain(txin_pairs,
+                                                        txout_pairs):
                         touched.add(hashX)
                         hashXs[hashX].add(hex_hash)
 
@@ -380,12 +381,12 @@ class MemPool(object):
         # [fee_(n-1), fee_n)], and fee_(n-1) > fee_n. Fee intervals
         # are chosen so as to create tranches that contain at least
         # 100kb of transactions
-        l = list(reversed(sorted(self.fee_histogram.items())))
+        items = list(reversed(sorted(self.fee_histogram.items())))
         out = []
         size = 0
         r = 0
         binsize = 100000
-        for fee, s in l:
+        for fee, s in items:
             size += s
             if size + r > binsize:
                 out.append((fee, size))

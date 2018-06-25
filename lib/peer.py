@@ -230,7 +230,7 @@ class Peer(object):
     def _protocol_version_string(self, key):
         version_str = self.features.get(key)
         ptuple = util.protocol_tuple(version_str)
-        return util.protocol_version_string(ptuple)
+        return util.version_string(ptuple)
 
     @cachedproperty
     def protocol_min(self):

@@ -16,7 +16,7 @@ import time
 from collections import defaultdict, Counter
 from functools import partial
 
-from aiorpcx import ClientSession, RPCError, SOCKSProxy
+from aiorpcx import ClientSession, RPCError, SOCKSProxy, ConnectionError
 
 from lib.peer import Peer
 from lib.util import ConnectionLogger
@@ -73,7 +73,7 @@ class PeerSession(ClientSession):
     def is_good(self, request, instance):
         try:
             result = request.result()
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, ConnectionError):
             return False
         except asyncio.TimeoutError as e:
             self.fail(request, str(e))
@@ -232,8 +232,8 @@ class PeerManager(object):
         self.loop = controller.loop
 
         # Our clearnet and Tor Peers, if any
-        self.myselves =  [Peer(ident.host, controller.server_features(), 'env')
-                          for ident in env.identities]
+        self.myselves = [Peer(ident.host, controller.server_features(), 'env')
+                         for ident in env.identities]
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the

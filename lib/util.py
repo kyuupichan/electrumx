@@ -249,7 +249,11 @@ def address_string(address):
 # See http://stackoverflow.com/questions/2532053/validate-a-hostname-string
 # Note underscores are valid in domain names, but strictly invalid in host
 # names.  We ignore that distinction.
-SEGMENT_REGEX = re.compile("(?!-)[A-Z_\d-]{1,63}(?<!-)$", re.IGNORECASE)
+
+
+SEGMENT_REGEX = re.compile("(?!-)[A-Z_\\d-]{1,63}(?<!-)$", re.IGNORECASE)
+
+
 def is_valid_hostname(hostname):
     if len(hostname) > 255:
         return False
@@ -257,6 +261,7 @@ def is_valid_hostname(hostname):
     if hostname and hostname[-1] == ".":
         hostname = hostname[:-1]
     return all(SEGMENT_REGEX.match(x) for x in hostname.split("."))
+
 
 def protocol_tuple(s):
     '''Converts a protocol version number, such as "1.0" to a tuple (1, 0).
@@ -267,12 +272,14 @@ def protocol_tuple(s):
     except Exception:
         return (0, )
 
-def protocol_version_string(ptuple):
+
+def version_string(ptuple):
     '''Convert a version tuple such as (1, 2) to "1.2".
     There is always at least one dot, so (1, ) becomes "1.0".'''
     while len(ptuple) < 2:
         ptuple += (0, )
     return '.'.join(str(p) for p in ptuple)
+
 
 def protocol_version(client_req, server_min, server_max):
     '''Given a client protocol request, return the protocol version
@@ -297,6 +304,7 @@ def protocol_version(client_req, server_min, server_max):
         result = None
 
     return result
+
 
 unpack_int32_from = Struct('<i').unpack_from
 unpack_int64_from = Struct('<q').unpack_from

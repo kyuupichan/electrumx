@@ -1055,3 +1055,120 @@ Identify the client to the server and negotiate the protocol version.
 
   ["ElectrumX 1.2.1", "1.2"]
   "ElectrumX 1.2.1"
+
+masternode.announce.broadcast
+--------------
+
+Pass through the masternode announce message to be broadcast by the daemon.
+
+Whenever a masternode comes online or a client is syncing, they will send this message which describes the masternode entry and how to validate messages from it.
+
+**Signature**
+
+  .. function:: masternode.announce.broadcast(signmnb)
+
+  * *signmnb*
+
+    Signed masternode broadcast message in hexadecimal format.
+  
+**Result**
+
+  True if the message was broadcasted succesfully otherwise False.
+  
+**Examples**::
+
+  masternode.announce.broadcast("012b825a65a24e2eb8edadbe27c4716dab993bf1046a66da77268ec87dbdd9dfc80100000000ffffffff00000000000000000000ffff22db1fec42d82103bfc9e296bcf4d63eced97b204df8f7b2b90131d452abd2b50909fa2ce6f66d752103bfc9e296bcf4d63eced97b204df8f7b2b90131d452abd2b50909fa2ce6f66d754120e95f74e9c242776df88a586bd52d2bd1838b600e5f3ce9d45d04865ff39a994632d617e810a4480ce24c882980746bc517a92be027d2ea70e4baece33a763608b1f91e5b00000000451201002b825a65a24e2eb8edadbe27c4716dab993bf1046a66da77268ec87dbdd9dfc80100000000ffffffff57280bc007121a0db854998f72e9a9fd2a690f38abffbd9aa94256330c020000b0f91e5b00000000412027c03b1531ee14db6160a62a0cc8b1a7e93ae122bbc6f2dffec721e0ae308b0e19e68523dd429450612bda3a616b56411b4e35d098e25b7c83f19fd2d8537e970000000000000000")
+
+**Example Results**::
+
+  True
+
+masternode.subscribe
+--------------
+
+Returns the status of masternode.
+
+**Signature**
+
+  .. function:: masternode.subscribe(collateral)
+
+  * *collateral*
+
+    The txId and the index of the collateral.
+    
+    A masternode collateral is a transaction with a specific amount of coins, it's also known as a masternode identifier.
+
+    i.e. for DASH the required amount is 1,000 DASH or for $PAC is 500,000 $PAC.
+
+**Result**
+
+  As this is a subcription, the client will receive a notification when the masternode status changes.
+
+  The status depends on the server the masternode is hosted, the internet connection, the offline time and even the collateral amount, so this subscription notice these changes to the user.
+  
+**Example**::
+
+  masternode.subscribe("8c59133e714797650cf69043d05e409bbf45670eed7c4e4a386e52c46f1b5e24-0")
+
+**Example Results**::
+
+  {'method': 'masternode.subscribe', u'jsonrpc': u'2.0', u'result': u'ENABLED', 'params': ['8c59133e714797650cf69043d05e409bbf45670eed7c4e4a386e52c46f1b5e24-0'], u'id': 19}
+
+masternode.list
+--------------
+
+Returns the list of masternodes.
+
+**Signature**
+
+  .. function:: masternode.list(payees)
+  
+  * *payees*
+
+    An array of masternode payee addresses.
+
+**Result**
+
+  An array with the masternodes information.
+  
+**Examples**::
+
+  masternode.list("['PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE',
+  'PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcF']")
+
+**Example Results**::
+    
+    [
+      {
+        "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ab",
+        "status": "ENABLED",
+        "protocol": 70213,
+        "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcE",
+        "lastseen": "2018-04-01 12:34",
+        "activeseconds": 1258000,
+        "lastpaidtime": "2018-03-10 12:29",
+        "lastpaidblock": 1234,
+        "ip": "1.0.0.1",
+        "paymentposition": 184,
+        "inselection": true,
+        "balance": 510350
+      },
+      {
+        "vin": "9d298c00dae8b491d6801f50cab2e0037852cb556c5619ddb07c50421x9a31ac",
+        "status": "ENABLED",
+        "protocol": 70213,
+        "payee": "PDFHmjKLvSGdnWgDJSJX49Rrh0SJtRANcF",
+        "lastseen": "2018-04-01 12:34",
+        "activeseconds": 1258000,
+        "lastpaidtime": "2018-03-15 05:29",
+        "lastpaidblock": 1234,
+        "ip": "1.0.0.2",
+        "paymentposition": 3333,
+        "inselection": false,
+        "balance": 520700
+      },
+      ...,
+      ...,
+      ...,
+      ...
+    ]

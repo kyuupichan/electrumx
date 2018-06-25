@@ -227,7 +227,7 @@ class DB(object):
         headers_concat, headers_count = self.read_headers(height, count)
         if headers_count != count:
             raise self.DBError('only got {:,d} headers starting at {:,d}, not '
-                               '{:,d}'.format(headers_count, start, count))
+                               '{:,d}'.format(headers_count, height, count))
         offset = 0
         headers = []
         for n in range(count):

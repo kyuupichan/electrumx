@@ -19,7 +19,7 @@ from functools import partial
 
 import pylru
 
-from aiorpcx import RPCError, TaskSet, _version
+from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
 from lib.hash import double_sha256, hash_to_str, hex_str_to_hash, HASHX_LEN
 from lib.peer import Peer
 from lib.server_base import ServerBase
@@ -29,6 +29,7 @@ from server.mempool import MemPool
 from server.peers import PeerManager
 from server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
 from server.version import VERSION
+version_string = util.version_string
 
 
 class SessionGroup(object):
@@ -49,15 +50,18 @@ class Controller(ServerBase):
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
     PROTOCOL_MIN = '1.1'
     PROTOCOL_MAX = '1.2'
+    AIORPCX_MIN = (0, 5, 6)
     VERSION = VERSION
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
         super().__init__(env)
-        if _version < (0, 5, 5):
-            raise RuntimeError('ElectrumX requires aiorpcX 0.5.5')
+        if aiorpcx_version < self.AIORPCX_MIN:
+            raise RuntimeError('ElectrumX requires aiorpcX >= '
+                               f'{version_string(self.AIORPCX_MIN)}')
 
         self.logger.info(f'software version: {self.VERSION}')
+        self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
         self.logger.info(f'supported protocol versions: '
                          f'{self.PROTOCOL_MIN}-{self.PROTOCOL_MAX}')
         self.logger.info(f'event loop policy: {env.loop_policy}')
@@ -79,10 +83,12 @@ class Controller(ServerBase):
         self.history_cache = pylru.lrucache(256)
         self.header_cache = pylru.lrucache(8)
         self.cache_height = 0
+        self.cache_mn_height = 0
+        self.mn_cache = pylru.lrucache(256)
         env.max_send = max(350000, env.max_send)
         # Set up the RPC request handlers
-        cmds = ('add_peer daemon_url disconnect getinfo groups log peers reorg '
-                'sessions stop'.split())
+        cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
+                'reorg sessions stop'.split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
 
         self.loop = asyncio.get_event_loop()
@@ -591,7 +597,7 @@ class Controller(ServerBase):
 
     def rpc_stop(self):
         '''Shut down the server cleanly.'''
-        self.shutdown_event.set()
+        self.loop.call_soon(self.shutdown_event.set)
         return 'stopping'
 
     def rpc_getinfo(self):
