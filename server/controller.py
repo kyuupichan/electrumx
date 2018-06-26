@@ -852,6 +852,9 @@ class Controller(ServerBase):
         verbose: passed on to the daemon
         '''
         self.assert_tx_hash(tx_hash)
+        if verbose not in (True, False):
+            raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
+
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
     async def transaction_get_merkle(self, tx_hash, height):
