@@ -265,13 +265,13 @@ class Daemon(object):
     async def getrawtransaction(self, hex_hash, verbose=False):
         '''Return the serialized raw transaction with the given hash.'''
         return await self._send_single('getrawtransaction',
-                                       (hex_hash, int(verbose)))
+                                       (hex_hash, verbose))
 
     async def getrawtransactions(self, hex_hashes, replace_errs=True):
         '''Return the serialized raw transactions with the given hashes.
 
         Replaces errors with None by default.'''
-        params_iterable = ((hex_hash, 0) for hex_hash in hex_hashes)
+        params_iterable = ((hex_hash, False) for hex_hash in hex_hashes)
         txs = await self._send_vector('getrawtransaction', params_iterable,
                                       replace_errs=replace_errs)
         # Convert hex strings to bytes
