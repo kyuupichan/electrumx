@@ -8,52 +8,67 @@
 '''Class for server environment configuration and defaults.'''
 
 
+import logging
 from os import environ
 
-import lib.util as lib_util
 
-
-class EnvBase(lib_util.LoggedClass):
+class EnvBase(object):
     '''Wraps environment configuration.'''
 
     class Error(Exception):
         pass
 
     def __init__(self):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.allow_root = self.boolean('ALLOW_ROOT', False)
         self.host = self.default('HOST', 'localhost')
         self.rpc_host = self.default('RPC_HOST', 'localhost')
         self.loop_policy = self.event_loop_policy()
 
-    def default(self, envvar, default):
+    @classmethod
+    def default(cls, envvar, default):
         return environ.get(envvar, default)
 
-    def boolean(self, envvar, default):
+    @classmethod
+    def boolean(cls, envvar, default):
         default = 'Yes' if default else ''
-        return bool(self.default(envvar, default).strip())
+        return bool(cls.default(envvar, default).strip())
 
-    def required(self, envvar):
+    @classmethod
+    def required(cls, envvar):
         value = environ.get(envvar)
         if value is None:
-            raise self.Error('required envvar {} not set'.format(envvar))
+            raise cls.Error('required envvar {} not set'.format(envvar))
         return value
 
-    def integer(self, envvar, default):
+    @classmethod
+    def integer(cls, envvar, default):
         value = environ.get(envvar)
         if value is None:
             return default
         try:
             return int(value)
         except Exception:
-            raise self.Error('cannot convert envvar {} value {} to an integer'
-                             .format(envvar, value))
+            raise cls.Error('cannot convert envvar {} value {} to an integer'
+                            .format(envvar, value))
 
-    def obsolete(self, envvars):
+    @classmethod
+    def custom(cls, envvar, default, parse):
+        value = environ.get(envvar)
+        if value is None:
+            return default
+        try:
+            return parse(value)
+        except Exception as e:
+            raise cls.Error('cannot parse envvar {} value {}'
+                            .format(envvar, value)) from e
+
+    @classmethod
+    def obsolete(cls, envvars):
         bad = [envvar for envvar in envvars if environ.get(envvar)]
         if bad:
-            raise self.Error('remove obsolete environment variables {}'
-                             .format(bad))
+            raise cls.Error('remove obsolete environment variables {}'
+                            .format(bad))
 
     def event_loop_policy(self):
         policy = self.default('EVENT_LOOP_POLICY', None)

@@ -2,6 +2,7 @@
 
 import os
 import random
+import re
 
 import pytest
 
@@ -92,6 +93,16 @@ def test_COIN_NET():
     os.environ['NET'] = 'testnet'
     e = Env()
     assert e.coin == lib_coins.LitecoinTestnet
+    os.environ.pop('NET')
+    os.environ['COIN'] = ' BitcoinGold '
+    e = Env()
+    assert e.coin == lib_coins.BitcoinGold
+    os.environ['NET'] = 'testnet'
+    e = Env()
+    assert e.coin == lib_coins.BitcoinGoldTestnet
+    os.environ['NET'] = 'regtest'
+    e = Env()
+    assert e.coin == lib_coins.BitcoinGoldRegtest
 
 def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)
@@ -330,3 +341,13 @@ def test_tor_identity():
     assert ident.host == tor_host
     assert ident.tcp_port == 234
     assert ident.ssl_port == 432
+
+def test_ban_versions():
+    e = Env()
+    assert e.drop_client is None
+    ban_re = '1\.[0-2]\.\d+?[_\w]*'
+    os.environ['DROP_CLIENT'] = ban_re
+    e = Env()
+    assert e.drop_client == re.compile(ban_re)
+    assert e.drop_client.match("1.2.3_buggy_client")
+    assert e.drop_client.match("1.3.0_good_client") is None

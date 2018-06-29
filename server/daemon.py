@@ -10,24 +10,24 @@ daemon.'''
 
 import asyncio
 import json
+import logging
 import time
-import traceback
 from calendar import timegm
 from struct import pack
 from time import strptime
 
 import aiohttp
 
-from lib.util import LoggedClass, int_to_varint, hex_to_bytes
+from lib.util import int_to_varint, hex_to_bytes
 from lib.hash import hex_str_to_hash
-from lib.jsonrpc import JSONRPC
+from aiorpcx import JSONRPC
 
 
 class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
 
-class Daemon(LoggedClass):
+class Daemon(object):
     '''Handles connections to a daemon at the given URL.'''
 
     WARMING_UP = -28
@@ -37,7 +37,7 @@ class Daemon(LoggedClass):
         '''Raised when the daemon returns an error in its results.'''
 
     def __init__(self, env):
-        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.coin = env.coin
         self.set_urls(env.coin.daemon_urls(env.daemon_url))
         self._height = None
@@ -151,8 +151,8 @@ class Daemon(LoggedClass):
                 log_error('starting up checking blocks.')
             except (asyncio.CancelledError, DaemonError):
                 raise
-            except Exception:
-                self.log_error(traceback.format_exc())
+            except Exception as e:
+                self.logger.exception(f'uncaught exception: {e}')
 
             await asyncio.sleep(secs)
             secs = min(max_secs, secs * 2, 1)
@@ -262,9 +262,9 @@ class Daemon(LoggedClass):
         network_info = await self.getnetworkinfo()
         return network_info['relayfee']
 
-    async def getrawtransaction(self, hex_hash):
+    async def getrawtransaction(self, hex_hash, verbose=False):
         '''Return the serialized raw transaction with the given hash.'''
-        return await self._send_single('getrawtransaction', (hex_hash, 0))
+        return await self._send_single('getrawtransaction', (hex_hash, int(verbose)))
 
     async def getrawtransactions(self, hex_hashes, replace_errs=True):
         '''Return the serialized raw transactions with the given hashes.
