@@ -1855,6 +1855,7 @@ class Polis(Coin):
         import x11_hash
         return x11_hash.getPoWHash(header)
 
+
 class ColossusXT(Coin):
     NAME = "ColossusXT"
     SHORTNAME = "COLX"
@@ -1883,6 +1884,7 @@ class ColossusXT(Coin):
         import quark_hash
         return quark_hash.getPoWHash(header)
 
+
 class GoByte(Coin):
         NAME = "GoByte"
         SHORTNAME = "GBX"
@@ -1910,6 +1912,7 @@ class GoByte(Coin):
             '''Given a header return the hash.'''
             import neoscrypt
             return neoscrypt.getPoWHash(header)
+
 
 class Monoeci(Coin):
             NAME = "Monoeci"
