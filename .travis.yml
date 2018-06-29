@@ -25,6 +25,8 @@ install:
   - pip install blake256
   - pip install x11_hash
   - pip install xevan_hash
+  - pip install quark_hash
+  - git clone https://github.com/goacoincore/neoscrypt && cd neoscrypt && python setup.py install
 # command to run tests
 script:
   - pytest --cov=server --cov=lib --cov=wallet
