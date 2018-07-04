@@ -698,11 +698,27 @@ class Viacoin(AuxPowMixin, Coin):
     REORG_LIMIT = 5000
     DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
     PEERS = [
-        'vialectrum.bitops.me s t',
+        'viax2.bitops.me s t',
         'server.vialectrum.org s t',
         'vialectrum.viacoin.net s t',
         'viax1.bitops.me s t',
+        'viax3.bitops.me s t',
+        'viax4.bitops.me s t',
+        '4ws35lg5lkekpjjp.onion s t',
     ]
+
+    # Auxpow is redundant in SPV, truncate it from headers
+    @classmethod
+    def block_header(cls, block, height):
+        return super().block_header(block, height)[:cls.BASIC_HEADER_SIZE]
+
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        full_header = super().block_header(raw_block, height)
+        header = full_header[:cls.BASIC_HEADER_SIZE]
+        txs = cls.DESERIALIZER(raw_block, start=len(full_header)).read_tx_block()
+        return Block(raw_block, header, txs)
 
 
 class ViacoinTestnet(Viacoin):
