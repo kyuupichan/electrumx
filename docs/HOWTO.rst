@@ -1,4 +1,4 @@
-. _HOWTO:
+.. _HOWTO:
 
 =====
 HOWTO
