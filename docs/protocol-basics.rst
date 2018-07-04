@@ -192,4 +192,5 @@ transaction has at least one unconfirmed input, and ``0`` if all
 inputs are confirmed.
 
 4. The :dfn:`status` of the script hash is the :func:`sha256` hash of the
-full string expressed as a hexadecimal string.
+full string expressed as a hexadecimal string, or :const:`null` if the
+string is empty because there are no transactions.
