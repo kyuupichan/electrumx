@@ -1634,60 +1634,6 @@ class BitcoinAtom(Coin):
         return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
-class Decred(Coin):
-    NAME = "Decred"
-    SHORTNAME = "DCR"
-    NET = "mainnet"
-    XPUB_VERBYTES = bytes('dpub', 'utf-8')
-    XPRV_VERBYTES = bytes('dprv', 'utf-8')
-    P2PKH_VERBYTE = bytes('Ds', 'utf-8')
-    P2SH_VERBYTES = [bytes('Dc', 'utf-8')]
-    WIF_BYTE = bytes('Pm', 'utf-8')
-    GENESIS_HASH = ('298e5cc3d985bfe7f81dc135f360abe089ed'
-                    'd4396b86d2de66b0cef42b21d980')
-    DESERIALIZER = lib_tx.DeserializerDecred
-    ENCODE_CHECK = partial(Base58.encode_check,
-                           hash_fn=lib_tx.DeserializerDecred.blake256)
-    DECODE_CHECK = partial(Base58.decode_check,
-                           hash_fn=lib_tx.DeserializerDecred.blake256)
-    HEADER_HASH = lib_tx.DeserializerDecred.blake256
-    BASIC_HEADER_SIZE = 180
-    ALLOW_ADVANCING_ERRORS = True
-    TX_COUNT = 217380620
-    TX_COUNT_HEIGHT = 218875
-    TX_PER_BLOCK = 1000
-    RPC_PORT = 9109
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        return cls.HEADER_HASH(header)
-
-    @classmethod
-    def block(cls, raw_block, height):
-        '''Return a Block namedtuple given a raw block and its height.'''
-        if height > 0:
-            return super().block(raw_block, height)
-        else:
-            return Block(raw_block, cls.block_header(raw_block, height), [])
-
-
-class DecredTestnet(Decred):
-    NAME = "Decred"
-    NET = "testnet"
-    XPUB_VERBYTES = bytes('tpub', 'utf-8')
-    XPRV_VERBYTES = bytes('tprv', 'utf-8')
-    P2PKH_VERBYTE = bytes('Ts', 'utf-8')
-    P2SH_VERBYTES = [bytes('Tc', 'utf-8')]
-    WIF_BYTE = bytes('Pt', 'utf-8')
-    GENESIS_HASH = ('4261602a9d07d80ad47621a64ba6a0'
-                    '7754902e496777edc4ff581946bd7bc29c')
-    TX_COUNT = 3176305
-    TX_COUNT_HEIGHT = 254198
-    TX_PER_BLOCK = 1000
-    RPC_PORT = 19109
-
-
 class Axe(Dash):
     NAME = "Axe"
     SHORTNAME = "AXE"
