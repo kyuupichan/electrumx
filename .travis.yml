@@ -19,10 +19,12 @@ install:
   - pip install ecdsa
   - pip install plyvel
   - pip install pycodestyle
-  - pip install pyrocksdb
-  - pip install tribus-hash
-  - pip install pytest-cov
   - pip install pylru
+  - pip install pyrocksdb
+  - pip install pytest-cov
+  - pip install Sphinx
+# hashes
+  - pip install tribus-hash
   - pip install blake256
   - pip install x11_hash
   - pip install xevan_hash
