@@ -11,6 +11,8 @@ before_install:
   - pushd leveldb-1.20 && make && sudo mv out-shared/libleveldb.* /usr/local/lib && sudo cp -R include/leveldb /usr/local/include && sudo ldconfig && popd
 python:
   - "3.6"
+  - "3.6-dev"
+  - "3.7-dev"
   - "nightly"
 # command to install dependencies
 install:
