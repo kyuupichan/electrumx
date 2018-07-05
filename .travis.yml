@@ -5,7 +5,7 @@ before_install:
   - sudo add-apt-repository -y ppa:giskou/librocksdb
   - sudo apt-get -qq update
   - sudo apt-get install -yq libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev
-  - sudo apt-get install -yq --allow-unauthenticated librocksdb 
+  - sudo apt-get install -yq --allow-unauthenticated librocksdb
   - wget https://launchpad.net/ubuntu/+archive/primary/+files/leveldb_1.20.orig.tar.gz
   - tar -xzvf leveldb_1.20.orig.tar.gz
   - pushd leveldb-1.20 && make && sudo mv out-shared/libleveldb.* /usr/local/lib && sudo cp -R include/leveldb /usr/local/include && sudo ldconfig && popd
@@ -19,19 +19,22 @@ install:
   - pip install ecdsa
   - pip install plyvel
   - pip install pycodestyle
-  - pip install pyrocksdb
-  - pip install tribus-hash
-  - pip install pytest-cov
   - pip install pylru
+  - pip install pyrocksdb
+  - pip install pytest-cov
+  - pip install Sphinx
+# hashes
+  - pip install tribus-hash
   - pip install blake256
   - pip install x11_hash
   - pip install xevan_hash
   - pip install quark_hash
-  - pip install  git+https://github.com/goacoincore/neoscrypt 
+  - pip install git+https://github.com/goacoincore/neoscrypt
 # command to run tests
 script:
   - pytest --cov=server --cov=lib --cov=wallet
   - pycodestyle server/*.py lib/*.py
+  - sh -c "cd docs && make html"
 # Dont report coverage from nightly
 after_success:
   - if [[ $(python3 -V 2>&1) == *"Python 3.6"* ]]; then
