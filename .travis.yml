@@ -32,8 +32,8 @@ install:
   - pip install git+https://github.com/goacoincore/neoscrypt
 # command to run tests
 script:
-  - pytest --cov=server --cov=lib --cov=wallet
-  - pycodestyle server/*.py lib/*.py
+  - pytest --cov=electrumx
+  - pycodestyle electrumx/server/*.py electrumx/lib/*.py
   - sh -c "cd docs && make html"
 # Dont report coverage from nightly
 after_success:

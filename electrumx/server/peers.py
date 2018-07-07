@@ -18,8 +18,8 @@ from functools import partial
 
 from aiorpcx import ClientSession, RPCError, SOCKSProxy, ConnectionError
 
-from lib.peer import Peer
-from lib.util import ConnectionLogger
+from electrumx.lib.peer import Peer
+from electrumx.lib.util import ConnectionLogger
 
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)

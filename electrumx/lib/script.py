@@ -30,8 +30,8 @@
 import struct
 from collections import namedtuple
 
-from lib.enum import Enumeration
-from lib.hash import hash160
+from electrumx.lib.enum import Enumeration
+from electrumx.lib.hash import hash160
 
 
 class ScriptError(Exception):

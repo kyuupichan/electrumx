@@ -15,9 +15,9 @@ from functools import partial
 
 from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
 
-from lib.hash import sha256, hash_to_str
-import lib.util as util
-from server.daemon import DaemonError
+from electrumx.lib.hash import sha256, hash_to_str
+import electrumx.lib.util as util
+from electrumx.server.daemon import DaemonError
 
 BAD_REQUEST = 1
 DAEMON_ERROR = 2

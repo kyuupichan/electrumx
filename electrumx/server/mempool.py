@@ -13,9 +13,9 @@ import logging
 import time
 from collections import defaultdict
 
-from lib.hash import hash_to_str, hex_str_to_hash
-from server.daemon import DaemonError
-from server.db import UTXO
+from electrumx.lib.hash import hash_to_str, hex_str_to_hash
+from electrumx.server.daemon import DaemonError
+from electrumx.server.db import UTXO
 
 
 class MemPool(object):

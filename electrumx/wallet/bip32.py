@@ -13,9 +13,9 @@ import ecdsa
 import ecdsa.ellipticcurve as EC
 import ecdsa.numbertheory as NT
 
-from lib.coins import Coin
-from lib.hash import Base58, hmac_sha512, hash160
-from lib.util import cachedproperty, bytes_to_int, int_to_bytes
+from electrumx.lib.coins import Coin
+from electrumx.lib.hash import Base58, hmac_sha512, hash160
+from electrumx.lib.util import cachedproperty, bytes_to_int, int_to_bytes
 
 
 class DerivationError(Exception):

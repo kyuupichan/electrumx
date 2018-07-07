@@ -8,7 +8,7 @@
 '''Class for handling environment configuration and defaults.'''
 
 
-from lib.env_base import EnvBase
+from electrumx.lib.env_base import EnvBase
 
 
 class Env(EnvBase):

@@ -16,8 +16,8 @@ from functools import partial
 import logging
 from struct import pack, unpack
 
-import lib.util as util
-from lib.hash import hash_to_str, HASHX_LEN
+import electrumx.lib.util as util
+from electrumx.lib.hash import hash_to_str, HASHX_LEN
 
 
 class History(object):

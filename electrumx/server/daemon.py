@@ -18,8 +18,8 @@ from time import strptime
 
 import aiohttp
 
-from lib.util import int_to_varint, hex_to_bytes
-from lib.hash import hex_str_to_hash
+from electrumx.lib.util import int_to_varint, hex_to_bytes
+from electrumx.lib.hash import hex_str_to_hash
 from aiorpcx import JSONRPC
 
 

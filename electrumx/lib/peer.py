@@ -27,8 +27,8 @@
 
 from ipaddress import ip_address
 
-from lib.util import cachedproperty
-import lib.util as util
+from electrumx.lib.util import cachedproperty
+import electrumx.lib.util as util
 
 
 class Peer(object):

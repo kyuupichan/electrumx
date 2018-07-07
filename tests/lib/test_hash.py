@@ -5,7 +5,7 @@ from functools import partial
 
 import pytest
 
-import lib.hash as lib_hash
+import electrumx.lib.hash as lib_hash
 
 
 def test_sha256():

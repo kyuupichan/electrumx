@@ -30,8 +30,8 @@
 
 from collections import namedtuple
 
-from lib.hash import double_sha256, hash_to_str
-from lib.util import (cachedproperty, unpack_int32_from, unpack_int64_from,
+from electrumx.lib.hash import double_sha256, hash_to_str
+from electrumx.lib.util import (cachedproperty, unpack_int32_from, unpack_int64_from,
                       unpack_uint16_from, unpack_uint32_from,
                       unpack_uint64_from)
 

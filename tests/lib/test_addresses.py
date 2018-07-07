@@ -26,8 +26,8 @@
 
 import pytest
 
-from lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin, BitcoinGold
-from lib.hash import Base58
+from electrumx.lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin, BitcoinGold
+from electrumx.lib.hash import Base58
 
 addresses = [
     (BitcoinCash, "13xDKJbjh4acmLpNVr6Lc9hFcXRr9fyt4x",

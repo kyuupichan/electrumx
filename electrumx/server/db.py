@@ -17,10 +17,10 @@ from struct import pack, unpack
 from bisect import bisect_right
 from collections import namedtuple
 
-import lib.util as util
-from lib.hash import hash_to_str, HASHX_LEN
-from server.storage import db_class
-from server.history import History
+import electrumx.lib.util as util
+from electrumx.lib.hash import hash_to_str, HASHX_LEN
+from electrumx.server.storage import db_class
+from electrumx.server.history import History
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
