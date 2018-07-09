@@ -16,10 +16,10 @@ from struct import pack, unpack
 import time
 from functools import partial
 
-from server.daemon import DaemonError
-from lib.hash import hash_to_str, HASHX_LEN
-from lib.util import chunks, formatted_time
-import server.db
+from electrumx.server.daemon import DaemonError
+from electrumx.lib.hash import hash_to_str, HASHX_LEN
+from electrumx.lib.util import chunks, formatted_time
+import electrumx.server.db
 
 
 class Prefetcher(object):
@@ -132,7 +132,7 @@ class ChainError(Exception):
     '''Raised on error processing blocks.'''
 
 
-class BlockProcessor(server.db.DB):
+class BlockProcessor(electrumx.server.db.DB):
     '''Process blocks and update the DB state to match.
 
     Employ a prefetcher to prefetch blocks in batches for processing.

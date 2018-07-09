@@ -20,15 +20,16 @@ from functools import partial
 import pylru
 
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
-from lib.hash import double_sha256, hash_to_str, hex_str_to_hash, HASHX_LEN
-from lib.peer import Peer
-from lib.server_base import ServerBase
-import lib.util as util
-from server.daemon import DaemonError
-from server.mempool import MemPool
-from server.peers import PeerManager
-from server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
-from server.version import VERSION
+from electrumx.lib.hash import double_sha256, hash_to_str, hex_str_to_hash
+from electrumx.lib.hash import HASHX_LEN
+from electrumx.lib.peer import Peer
+from electrumx.lib.server_base import ServerBase
+import electrumx.lib.util as util
+from electrumx.server.daemon import DaemonError
+from electrumx.server.mempool import MemPool
+from electrumx.server.peers import PeerManager
+from electrumx.server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
+from electrumx.server.version import VERSION
 version_string = util.version_string
 
 

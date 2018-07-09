@@ -1,5 +1,5 @@
 import setuptools
-from server.version import VERSION
+from electrumx.server.version import VERSION
 
 
 setuptools.setup(
@@ -13,7 +13,7 @@ setuptools.setup(
     # "blake256" package is required to sync Decred network.
     # "xevan_hash" package is required to sync Xuez network.
     install_requires=['aiorpcX >= 0.5.6', 'plyvel', 'pylru', 'aiohttp >= 1'],
-    packages=setuptools.find_packages(exclude=['tests']),
+    packages=setuptools.find_packages(include=('electrumx.*',)),
     description='ElectrumX Server',
     author='Neil Booth',
     author_email='kyuupichan@gmail.com',

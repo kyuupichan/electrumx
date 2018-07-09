@@ -6,8 +6,8 @@ import re
 
 import pytest
 
-from server.env import Env, NetIdentity
-import lib.coins as lib_coins
+from electrumx.server.env import Env, NetIdentity
+import electrumx.lib.coins as lib_coins
 
 
 BASE_DAEMON_URL = 'http://username:password@hostname:321/'

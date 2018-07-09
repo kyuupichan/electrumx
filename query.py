@@ -15,9 +15,9 @@ Not currently documented; might become easier to use in future.
 
 import sys
 
-from server.env import Env
-from server.db import DB
-from lib.hash import hash_to_str
+from electrumx.server.env import Env
+from electrumx.server.db import DB
+from electrumx.lib.hash import hash_to_str
 
 
 def count_entries(hist_db, utxo_db):

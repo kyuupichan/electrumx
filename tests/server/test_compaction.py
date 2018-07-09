@@ -6,9 +6,9 @@ from os import environ, urandom
 from struct import pack
 import random
 
-from lib.hash import hash_to_str, HASHX_LEN
-from server.env import Env
-from server.db import DB
+from electrumx.lib.hash import hash_to_str, HASHX_LEN
+from electrumx.server.env import Env
+from electrumx.server.db import DB
 
 
 def create_histories(history, hashX_count=100):

@@ -38,13 +38,14 @@ from hashlib import sha256
 from functools import partial
 import base64
 
-import lib.util as util
-from lib.hash import Base58, hash160, double_sha256, hash_to_str, HASHX_LEN
-from lib.script import ScriptPubKey, OpCodes
-import lib.tx as lib_tx
-from server.block_processor import BlockProcessor
-import server.daemon as daemon
-from server.session import ElectrumX, DashElectrumX
+import electrumx.lib.util as util
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_str
+from electrumx.lib.hash import HASHX_LEN
+from electrumx.lib.script import ScriptPubKey, OpCodes
+import electrumx.lib.tx as lib_tx
+from electrumx.server.block_processor import BlockProcessor
+import electrumx.server.daemon as daemon
+from electrumx.server.session import ElectrumX, DashElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
