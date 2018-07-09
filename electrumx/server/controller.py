@@ -20,7 +20,8 @@ from functools import partial
 import pylru
 
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
-from electrumx.lib.hash import double_sha256, hash_to_str, hex_str_to_hash, HASHX_LEN
+from electrumx.lib.hash import double_sha256, hash_to_str, hex_str_to_hash
+from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.peer import Peer
 from electrumx.lib.server_base import ServerBase
 import electrumx.lib.util as util
