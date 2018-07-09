@@ -36,7 +36,7 @@ class ServerBase(object):
         '''Save the environment, perform basic sanity checks, and set the
         event loop policy.
         '''
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__).getChild(self.__class__.__name__)
         self.env = env
 
         # Sanity checks
