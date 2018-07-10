@@ -37,7 +37,7 @@ class Env(EnvBase):
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
         if coin is not None:
-            assert isinstance(coin, Coin)
+            assert issubclass(coin, Coin)
             self.coin = coin
         else:
             coin_name = self.required('COIN').strip()
