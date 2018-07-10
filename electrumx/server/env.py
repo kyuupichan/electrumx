@@ -22,7 +22,10 @@ NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
 class Env(EnvBase):
-    '''Wraps environment configuration.'''
+    '''Wraps environment configuration. Optionally, accepts a Coin class
+       as first argument to have ElectrumX serve custom coins not part of
+       the standard distribution.
+    '''
 
     # Peer discovery
     PD_OFF, PD_SELF, PD_ON = range(3)
@@ -34,6 +37,7 @@ class Env(EnvBase):
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
         if coin is not None:
+            assert isinstance(coin, Coin)
             self.coin = coin
         else:
             coin_name = self.required('COIN').strip()
