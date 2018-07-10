@@ -36,7 +36,7 @@ import sys
 import traceback
 from os import environ
 
-from electrumx.server.env import Env
+from electrumx import Env
 from electrumx.server.db import DB
 
 
