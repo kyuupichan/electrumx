@@ -351,3 +351,7 @@ def test_ban_versions():
     assert e.drop_client == re.compile(ban_re)
     assert e.drop_client.match("1.2.3_buggy_client")
     assert e.drop_client.match("1.3.0_good_client") is None
+
+def test_coin_class_provided():
+    e = Env(lib_coins.BitcoinCash)
+    assert e.coin == lib_coins.BitcoinCash
