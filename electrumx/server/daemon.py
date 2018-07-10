@@ -37,7 +37,8 @@ class Daemon(object):
         '''Raised when the daemon returns an error in its results.'''
 
     def __init__(self, env):
-        self.logger = logging.getLogger(__name__).getChild(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__)\
+            .getChild(self.__class__.__name__)
         self.coin = env.coin
         self.set_urls(env.coin.daemon_urls(env.daemon_url))
         self._height = None

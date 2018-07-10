@@ -224,7 +224,8 @@ class PeerManager(object):
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
     def __init__(self, env, controller):
-        self.logger = logging.getLogger(__name__).getChild(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__)\
+            .getChild(self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
