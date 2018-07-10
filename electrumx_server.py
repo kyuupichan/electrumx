@@ -12,8 +12,7 @@
 import logging
 import traceback
 
-from electrumx.server.env import Env
-from electrumx.server.controller import Controller
+from electrumx import Controller, Env
 
 
 def main():

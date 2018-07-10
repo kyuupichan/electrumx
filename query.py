@@ -15,7 +15,7 @@ Not currently documented; might become easier to use in future.
 
 import sys
 
-from electrumx.server.env import Env
+from electrumx import Env
 from electrumx.server.db import DB
 from electrumx.lib.hash import hash_to_str
 

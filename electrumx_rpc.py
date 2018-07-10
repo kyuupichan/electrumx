@@ -17,7 +17,7 @@ from os import environ
 
 from aiorpcx import ClientSession
 
-from electrumx.server.controller import Controller
+from electrumx import Controller
 
 
 def main():

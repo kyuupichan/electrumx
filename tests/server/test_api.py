@@ -2,8 +2,7 @@ import asyncio
 from unittest import mock
 
 from aiorpcx import RPCError
-from electrumx.server.env import Env
-from electrumx.server.controller import Controller
+from electrumx import Controller, Env
 
 loop = asyncio.get_event_loop()
 
