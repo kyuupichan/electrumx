@@ -26,7 +26,8 @@ class Prefetcher(object):
     '''Prefetches blocks (in the forward direction only).'''
 
     def __init__(self, bp):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__)\
+            .getChild(self.__class__.__name__)
         self.bp = bp
         self.caught_up = False
         # Access to fetched_height should be protected by the semaphore

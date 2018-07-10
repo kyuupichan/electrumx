@@ -25,7 +25,8 @@ class History(object):
     DB_VERSIONS = [0]
 
     def __init__(self):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__)\
+            .getChild(self.__class__.__name__)
         # For history compaction
         self.max_hist_row_entries = 12500
         self.unflushed = defaultdict(partial(array.array, 'I'))

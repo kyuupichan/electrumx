@@ -33,7 +33,8 @@ class MemPool(object):
     '''
 
     def __init__(self, bp, controller):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__)\
+            .getChild(self.__class__.__name__)
         self.daemon = bp.daemon
         self.controller = controller
         self.coin = bp.coin

@@ -42,7 +42,8 @@ class DB(object):
         '''Raised on general DB errors generally indicating corruption.'''
 
     def __init__(self, env):
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(__name__)\
+            .getChild(self.__class__.__name__)
         self.env = env
         self.coin = env.coin
 
