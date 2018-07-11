@@ -22,20 +22,27 @@ NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
 
 
 class Env(EnvBase):
-    '''Wraps environment configuration.'''
+    '''Wraps environment configuration. Optionally, accepts a Coin class
+       as first argument to have ElectrumX serve custom coins not part of
+       the standard distribution.
+    '''
 
     # Peer discovery
     PD_OFF, PD_SELF, PD_ON = range(3)
 
-    def __init__(self):
+    def __init__(self, coin=None):
         super().__init__()
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
         self.db_dir = self.required('DB_DIRECTORY')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
-        coin_name = self.required('COIN').strip()
-        network = self.default('NET', 'mainnet').strip()
-        self.coin = Coin.lookup_coin_class(coin_name, network)
+        if coin is not None:
+            assert issubclass(coin, Coin)
+            self.coin = coin
+        else:
+            coin_name = self.required('COIN').strip()
+            network = self.default('NET', 'mainnet').strip()
+            self.coin = Coin.lookup_coin_class(coin_name, network)
         self.cache_MB = self.integer('CACHE_MB', 1200)
         self.host = self.default('HOST', 'localhost')
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
