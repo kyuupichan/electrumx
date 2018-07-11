@@ -5,7 +5,7 @@ from electrumx.server.version import VERSION
 setuptools.setup(
     name='electrumx',
     version=VERSION,
-    scripts=['electrumx_server.py', 'electrumx_rpc.py'],
+    scripts=['electrumx_server', 'electrumx_rpc'],
     python_requires='>=3.6',
     # via environment variables, in which case I've tested with 15.0.4
     # "x11_hash" package (1.4) is required to sync DASH network.

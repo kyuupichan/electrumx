@@ -3,12 +3,12 @@ RPC Interface
 
 You can query the status of a running server, and affect its behaviour
 by sending **JSON RPC** commands to the LocalRPC port it is listening
-on.  This is best done using the :file:`electrumx_rpc.py` script
+on.  This is best done using the :file:`electrumx_rpc` script
 provided.
 
 The general form of invocation is::
 
-  electrumx_rpc.py [-p PORT] <command> [arg1 [arg2...]]
+  electrumx_rpc [-p PORT] <command> [arg1 [arg2...]]
 
 The port to send the commands to can be specified on the command line,
 otherwise the environment variable :envvar:`RPC_PORT` is used, and if
@@ -23,7 +23,7 @@ Add a peer to the peers list.  ElectrumX will schdule an immediate
 connection attempt.  This command takes a single argument: the peer's
 "real name" as it used to advertise itself on IRC::
 
-  $ ./electrumx_rpc.py add_peer "ecdsa.net v1.0 s110 t"
+  $ ./electrumx_rpc add_peer "ecdsa.net v1.0 s110 t"
   "peer 'ecdsa.net v1.0 s110 t' added"
 
 daemon_url
@@ -48,7 +48,7 @@ disconnect
 Disconnect the given session IDs.  Session IDs can be seen in the logs
 or with the `sessions`_ RPC command::
 
-  $ ./electrumx_rpc.py disconnect 2 3
+  $ ./electrumx_rpc disconnect 2 3
   [
       "disconnected 2",
       "disconnected 3"
@@ -64,7 +64,7 @@ getinfo
 Return a summary of server state.  This command takes no arguments.
 A typical result is as follows (with annotated comments)::
 
-  $ electrumx_rpc.py getinfo
+  $ electrumx_rpc getinfo
   {
     "closing": 1,                  # The number of sessions being closed down
     "daemon": "192.168.0.2:8332/", # The daemon URL without auth info
@@ -128,7 +128,7 @@ Toggle logging of the given session IDs.  All incoming requests for a
 logged session are written to the server log.  Session IDs can be seen
 in the logs or with the `sessions`_ RPC command::
 
-  $ electrumx_rpc.py log 0 1 2 3 4 5
+  $ electrumx_rpc log 0 1 2 3 4 5
   [
       "log 0: False",
       "log 1: False",
@@ -153,7 +153,7 @@ This command takes no arguments.
 Peer data is obtained via a peer discovery protocol documented
 :ref:`here <Peer Discovery>`::
 
-  $ electrumx_rpc.py peers
+  $ electrumx_rpc peers
   Host                           Status   TCP   SSL Server             Min  Max  Pruning   Last Good    Last Try Tries               Source IP Address
   bch.tedy.pw                    good   50001 50002 ElectrumX 1.2.1    0.9  1.2          07h 29m 23s 07h 30m 40s     0                 peer 185.215.224.26
   shsmithgoggryfbx.onion         good   60001 60002 ElectrumX 1.2.1    0.9  1.2          07h 30m 34s 07h 30m 38s     0                 peer
