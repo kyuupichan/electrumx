@@ -102,6 +102,9 @@ class Controller(ServerBase):
         self.mempool = MemPool(self.bp, self)
         self.peer_mgr = PeerManager(env, self)
 
+        # Event triggered when electrumx is listening for incoming requests.
+        self.server_listening = asyncio.Event()
+
     @classmethod
     def short_version(cls):
         '''Return e.g. "1.2" for ElectrumX 1.2'''
@@ -292,6 +295,7 @@ class Controller(ServerBase):
             sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self.start_server('SSL', host, env.ssl_port, ssl=sslc)
+        self.server_listening.set()
 
     def notify_sessions(self, touched):
         '''Notify sessions about height changes and touched addresses.'''
