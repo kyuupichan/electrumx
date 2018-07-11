@@ -15,7 +15,8 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-from electrumx.server.version import VERSION
+#from electrumx.server.version import VERSION
+VERSION="1.4.4p2"
 
 # -- Project information -----------------------------------------------------
 
