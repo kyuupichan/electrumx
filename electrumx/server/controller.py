@@ -50,7 +50,7 @@ class Controller(ServerBase):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
     PROTOCOL_MIN = '1.1'
-    PROTOCOL_MAX = '1.2'
+    PROTOCOL_MAX = '1.3'
     AIORPCX_MIN = (0, 5, 6)
     VERSION = VERSION
 

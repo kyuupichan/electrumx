@@ -82,3 +82,17 @@ Deprecated methods
   * :func:`blockchain.address.subscribe`.  Switch to
     :func:`blockchain.scripthash.subscribe`.
   * :func:`blockchain.headers.subscribe` with *raw* other than :const:`True`.
+
+Version 1.3
+===========
+
+New methods
+-----------
+
+  * :func:`blockchain.block.header`
+
+Deprecated methods
+------------------
+
+  * :func:`blockchain.block.get_header`.  Switch to
+    :func:`blockchain.block.header`.

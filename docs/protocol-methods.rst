@@ -1,8 +1,9 @@
-Protocol Methods
-================
+==================
+ Protocol Methods
+==================
 
 blockchain.address.get_balance
-------------------------------
+==============================
 
 Return the confirmed and unconfirmed balances of a bitcoin address.
 
@@ -20,7 +21,7 @@ Return the confirmed and unconfirmed balances of a bitcoin address.
   See :func:`blockchain.scripthash.get_balance`.
 
 blockchain.address.get_history
-------------------------------
+==============================
 
 Return the confirmed and unconfirmed history of a bitcoin address.
 
@@ -38,7 +39,7 @@ Return the confirmed and unconfirmed history of a bitcoin address.
   As for :func:`blockchain.scripthash.get_history`.
 
 blockchain.address.get_mempool
-------------------------------
+==============================
 
 Return the unconfirmed transactions of a bitcoin address.
 
@@ -56,7 +57,7 @@ Return the unconfirmed transactions of a bitcoin address.
   As for :func:`blockchain.scripthash.get_mempool`.
 
 blockchain.address.listunspent
-------------------------------
+==============================
 
 Return an ordered list of UTXOs sent to a bitcoin address.
 
@@ -74,7 +75,7 @@ Return an ordered list of UTXOs sent to a bitcoin address.
   As for :func:`blockchain.scripthash.listunspent`.
 
 blockchain.address.subscribe
-----------------------------
+============================
 
 Subscribe to a bitcoin address.
 
@@ -100,7 +101,7 @@ Subscribe to a bitcoin address.
   .. function:: blockchain.address.subscribe(address, status)
 
 blockchain.block.get_header
----------------------------
+===========================
 
 Return the :ref:`deserialized header <deserialized header>` of the
 block at the given height.
@@ -108,6 +109,7 @@ block at the given height.
 **Signature**
 
   .. function:: blockchain.block.get_header(height)
+  .. deprecated:: 1.3
 
   *height*
 
@@ -132,7 +134,7 @@ block at the given height.
   }
 
 blockchain.block.get_chunk
---------------------------
+==========================
 
 Return a concatenated chunk of block headers from the main chain.
 Typically, a chunk consists of a fixed number of block headers over
@@ -161,8 +163,31 @@ bandwidth-intensive request.
     implied starting height will be returned; this may range from zero
     to the coin-specific chunk size.
 
+blockchain.block.header
+=======================
+
+Return the block header at the given height.
+
+**Signature**
+
+  .. function:: blockchain.block.header(height)
+
+  *height*
+
+    The height of the block, an integer.
+
+**Result**
+
+  The raw block header as a hexadecimal string.
+
+**Example Result**
+
+::
+
+   "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477"
+
 blockchain.block.headers
-------------------------
+========================
 
 Return a concatenated chunk of block headers from the main chain.
 
@@ -211,7 +236,7 @@ Return a concatenated chunk of block headers from the main chain.
   }
 
 blockchain.estimatefee
-----------------------
+======================
 
 Return the estimated transaction fee per kilobyte for a transaction to
 be confirmed within a certain number of blocks.
@@ -237,7 +262,7 @@ be confirmed within a certain number of blocks.
   0.00101079
 
 blockchain.headers.subscribe
-----------------------------
+============================
 
 Subscribe to receive block headers when a new block is found.
 
@@ -313,7 +338,7 @@ Subscribe to receive block headers when a new block is found.
 
 
 blockchain.numblocks.subscribe
-------------------------------
+==============================
 
 Subscribe to receive the block height when a new block is found.
 
@@ -335,7 +360,7 @@ Subscribe to receive the block height when a new block is found.
     .. function:: blockchain.numblocks.subscribe(height)
 
 blockchain.relayfee
--------------------
+===================
 
 Return the minimum fee a low-priority transaction must pay in order to
 be accepted to the daemon's memory pool.
@@ -360,7 +385,7 @@ be accepted to the daemon's memory pool.
    0.0
 
 blockchain.scripthash.get_balance
----------------------------------
+=================================
 
 Return the confirmed and unconfirmed balances of a :ref:`script hash
 <script hashes>`.
@@ -389,7 +414,7 @@ Return the confirmed and unconfirmed balances of a :ref:`script hash
   }
 
 blockchain.scripthash.get_history
----------------------------------
+=================================
 
 Return the confirmed and unconfirmed history of a :ref:`script hash
 <script hashes>`.
@@ -447,7 +472,7 @@ Return the confirmed and unconfirmed history of a :ref:`script hash
   ]
 
 blockchain.scripthash.get_mempool
----------------------------------
+=================================
 
 Return the unconfirmed transactions of a :ref:`script hash <script
 hashes>`.
@@ -491,7 +516,7 @@ hashes>`.
   ]
 
 blockchain.scripthash.listunspent
----------------------------------
+=================================
 
 Return an ordered list of UTXOs sent to a script hash.
 
@@ -550,7 +575,7 @@ Return an ordered list of UTXOs sent to a script hash.
   ]
 
 blockchain.scripthash.subscribe
--------------------------------
+===============================
 
 Subscribe to a script hash.
 
@@ -576,7 +601,7 @@ Subscribe to a script hash.
   .. function:: blockchain.scripthash.subscribe(scripthash, status)
 
 blockchain.transaction.broadcast
---------------------------------
+================================
 
 Broadcast a transaction to the network.
 
@@ -614,7 +639,7 @@ Protocol version 1.0 returning an error as the result:
   "258: txn-mempool-conflict"
 
 blockchain.transaction.get
---------------------------
+==========================
 
 Return a raw transaction.
 
@@ -690,7 +715,7 @@ When *verbose* is :const:`True`::
               "value": 0.1360904}]}
 
 blockchain.transaction.get_merkle
----------------------------------
+=================================
 
 Return the markle branch to a confirmed transaction given its hash
 and height.
@@ -750,7 +775,7 @@ and height.
   }
 
 blockchain.utxo.get_address
----------------------------
+===========================
 
 Return the address paid to by a UTXO.
 
@@ -776,7 +801,7 @@ Return the address paid to by a UTXO.
   spent :const:`null` *may* be returned.
 
 mempool.get_fee_histogram
--------------------------
+=========================
 
 Return a histogram of the fee rates paid by transactions in the memory
 pool, weighted by transaction size.
@@ -807,7 +832,7 @@ pool, weighted by transaction size.
 
 
 server.add_peer
----------------
+===============
 
 A newly-started server uses this call to get itself into other servers'
 peers lists.  It sould not be used by wallet clients.
@@ -831,7 +856,7 @@ peers lists.  It sould not be used by wallet clients.
 
 
 server.banner
--------------
+=============
 
 Return a banner to be shown in the Electrum console.
 
@@ -851,7 +876,7 @@ Return a banner to be shown in the Electrum console.
 
 
 server.donation_address
------------------------
+=======================
 
 Return a server donation address.
 
@@ -871,7 +896,7 @@ Return a server donation address.
 
 
 server.features
----------------
+===============
 
 Return a list of features and services supported by the server.
 
@@ -955,7 +980,7 @@ Return a list of features and services supported by the server.
 
 
 server.peers.subscribe
-----------------------
+======================
 
 Return a list of peer servers.  Despite the name this is not a
 subscription and the server must send no notifications.
@@ -983,7 +1008,7 @@ subscription and the server must send no notifications.
   missing then the server does not support that transport.
 
 server.ping
------------
+===========
 
 Ping the server to ensure it is responding, and to keep the session
 alive.  The server may disconnect clients that have sent no requests
@@ -999,7 +1024,7 @@ for roughly 10 minutes.
   Returns :const:`null`.
 
 server.version
---------------
+==============
 
 Identify the client to the server and negotiate the protocol version.
 
@@ -1057,7 +1082,7 @@ Identify the client to the server and negotiate the protocol version.
   "ElectrumX 1.2.1"
 
 masternode.announce.broadcast
------------------------------
+=============================
 
 Pass through the masternode announce message to be broadcast by the daemon.
 
@@ -1084,7 +1109,7 @@ Whenever a masternode comes online or a client is syncing, they will send this m
   True
 
 masternode.subscribe
---------------------
+====================
 
 Returns the status of masternode.
 
@@ -1115,7 +1140,7 @@ Returns the status of masternode.
   {'method': 'masternode.subscribe', u'jsonrpc': u'2.0', u'result': u'ENABLED', 'params': ['8c59133e714797650cf69043d05e409bbf45670eed7c4e4a386e52c46f1b5e24-0'], u'id': 19}
 
 masternode.list
----------------
+===============
 
 Returns the list of masternodes.
 

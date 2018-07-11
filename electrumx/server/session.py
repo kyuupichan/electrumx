@@ -284,6 +284,14 @@ class ElectrumX(SessionBase):
         hashX = self.controller.scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
+    def block_header(self, height):
+        '''Return a raw block header as a hexadecimal string.
+
+        height: the header's height'''
+        height = self.controller.non_negative_integer(height)
+        raw_header = self.controller.raw_header(height)
+        return raw_header.hex()
+
     def block_headers(self, start_height, count):
         '''Return count concatenated block headers as hex for the main chain;
         starting at start_height.
@@ -460,6 +468,11 @@ class ElectrumX(SessionBase):
                 controller.mempool_get_fee_histogram,
                 'blockchain.block.headers': self.block_headers,
                 'server.ping': self.ping,
+            })
+
+        if ptuple >= (1, 3):
+            handlers.update({
+                'blockchain.block.header': self.block_header,
             })
 
         self.electrumx_handlers = handlers
