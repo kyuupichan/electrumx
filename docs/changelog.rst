@@ -129,48 +129,10 @@ For Bitcoin (BitcoinSegwit/mainnet) you can download a leveldb database
 synced up to block 490153 using this bittorrent magnet
 `link (~24GB) <magnet:?xt=urn:btih:caa804f48a319b061be3884ac011656c27121a6f&dn=electrumx_1.2_btc_leveldb_490153>`_.
 
-Version 1.1.2
-=============
-
-- PEER_DISCOVERY environment variable is now tri-state (fixes
-  `#287`_).  Please check your setting as its meaning has changed
-  slightly.
-- fix listunspent protocol methods to remove in-mempool spends (fixes
-  `#277`_).
-- improved environment variable handling
-- EMC2 update (cipig), Monacoin update (cryptocoin-junkey),
-  Canada Ecoin (koad)
-- typo fixes, Bitcoin testnet peers updates (SomberNight)
-
-Version 1.1.1
-=============
-
-- various refactorings, improvement of env var handling
-- update docs to match
-- various optimizations mainly affecting initial sync (Justin Arthur)
-- Dash fixes (cipig)
-- Add ALLOW_ROOT option (Luke Childs)
-- Add BitZeny support, update Monacoin (cryptocoin-junkey)
-
-Version 1.1
-===========
-
-See the changelogs below for recent changes.  The most important is
-that for mainnet bitcoin **NET** must now be *mainnet* and you must
-choose a **COIN** from *BitcoinCash* and *BitcoinSegwit*.  Similarly
-for testnets.  These coins will likely diverge further in future so
-it's best they become separate coins now.
-
-- no longer persist peers, rediscover on restart
-- onion peers only reported if can connect; hard-coded exception removed
-- small fix for blockchain.transaction.broadcast
-
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 
-.. _#277: https://github.com/kyuupichan/electrumx/issues/277
-.. _#287: https://github.com/kyuupichan/electrumx/issues/287
 .. _#301: https://github.com/kyuupichan/electrumx/issues/301
 .. _#302: https://github.com/kyuupichan/electrumx/issues/302
 .. _#414: https://github.com/kyuupichan/electrumx/issues/414
