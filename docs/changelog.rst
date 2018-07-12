@@ -10,6 +10,10 @@
 Version 1.5
 ===========
 
+.. note:: The two main scripts, :file:`electrumx_server` and
+   :file:`electrumx_rpc` were renamed to drop the `.py` suffix.  You
+   will probably need to update your run script accordingly.
+
 * support :ref:`version 1.3` of the protocol
 * increase minimum supported protocol version to :ref:`version 1.1`
 * split out history handling in preparation for new DB format
