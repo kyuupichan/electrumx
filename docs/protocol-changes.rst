@@ -13,6 +13,8 @@ Deprecated methods
   * :func:`blockchain.utxo.get_address`
   * :func:`blockchain.numblocks.subscribe`
 
+.. _version 1.1:
+
 Version 1.1
 ===========
 
