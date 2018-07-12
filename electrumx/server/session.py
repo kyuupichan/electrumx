@@ -217,12 +217,16 @@ class ElectrumX(SessionBase):
             return {'hex': raw_header.hex(), 'height': height}
         return self.controller.electrum_header(height)
 
-    def headers_subscribe(self, raw=False):
+    def headers_subscribe(self, raw=True):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
         self.subscribe_headers_raw = self.assert_boolean(raw)
         self.notified_height = self.height()
         return self.subscribe_headers_result(self.height())
+
+    def headers_subscribe_old(self, raw=False):
+        '''Subscribe to get headers of new blocks; raw defaults to False.'''
+        return self.headers_subscribe(raw)
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
@@ -433,7 +437,6 @@ class ElectrumX(SessionBase):
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.block.get_header': controller.block_get_header,
             'blockchain.estimatefee': controller.estimatefee,
-            'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.relayfee': controller.relayfee,
             'blockchain.scripthash.get_balance':
             controller.scripthash_get_balance,
@@ -468,9 +471,11 @@ class ElectrumX(SessionBase):
         if ptuple >= (1, 3):
             handlers.update({
                 'blockchain.block.header': self.block_header,
+                'blockchain.headers.subscribe': self.headers_subscribe,
             })
         else:
             handlers.update({
+                'blockchain.headers.subscribe': self.headers_subscribe_old,
                 'blockchain.address.get_balance':
                 controller.address_get_balance,
                 'blockchain.address.get_history':

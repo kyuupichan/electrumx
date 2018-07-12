@@ -86,6 +86,17 @@ Deprecated methods
 Version 1.3
 ===========
 
+Changes
+-------
+
+  * :func:`blockchain.headers.subscribe` argument *raw* switches default to
+    :const:`True`
+
+New methods
+-----------
+
+  * :func:`blockchain.block.header`
+
 Removed methods
 ---------------
 
@@ -94,11 +105,6 @@ Removed methods
   * :func:`blockchain.address.get_mempool`
   * :func:`blockchain.address.listunspent`
   * :func:`blockchain.address.subscribe`
-
-New methods
------------
-
-  * :func:`blockchain.block.header`
 
 Deprecated methods
 ------------------

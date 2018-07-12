@@ -2,104 +2,6 @@
  Protocol Methods
 ==================
 
-blockchain.address.get_balance
-==============================
-
-Return the confirmed and unconfirmed balances of a bitcoin address.
-
-**Signature**
-
-  .. function:: blockchain.address.get_balance(address)
-  .. deprecated:: 1.2
-
-  * *address*
-
-    The address as a Base58 string.
-
-**Result**
-
-  See :func:`blockchain.scripthash.get_balance`.
-
-blockchain.address.get_history
-==============================
-
-Return the confirmed and unconfirmed history of a bitcoin address.
-
-**Signature**
-
-  .. function:: blockchain.address.get_history(address)
-  .. deprecated:: 1.2
-
-  * *address*
-
-    The address as a Base58 string.
-
-**Result**
-
-  As for :func:`blockchain.scripthash.get_history`.
-
-blockchain.address.get_mempool
-==============================
-
-Return the unconfirmed transactions of a bitcoin address.
-
-**Signature**
-
-  .. function:: blockchain.address.get_mempool(address)
-  .. deprecated:: 1.2
-
-  * *address*
-
-    The address as a Base58 string.
-
-**Result**
-
-  As for :func:`blockchain.scripthash.get_mempool`.
-
-blockchain.address.listunspent
-==============================
-
-Return an ordered list of UTXOs sent to a bitcoin address.
-
-**Signature**
-
-  .. function:: blockchain.address.listunspent(address)
-  .. deprecated:: 1.2
-
-  * *address*
-
-    The address as a Base58 string.
-
-**Result**
-
-  As for :func:`blockchain.scripthash.listunspent`.
-
-blockchain.address.subscribe
-============================
-
-Subscribe to a bitcoin address.
-
-**Signature**
-
-  .. function:: blockchain.address.subscribe(address)
-  .. deprecated:: 1.2
-
-  *address*
-
-    The address as a Base58 string.
-
-**Result**
-
-  The :ref:`status <status>` of the address.
-
-**Notifications**
-
-  As this is a subcription, the client will receive a notification
-  when the :ref:`status <status>` of the address changes.  Its
-  signature is
-
-  .. function:: blockchain.address.subscribe(address, status)
-
 blockchain.block.get_header
 ===========================
 
@@ -171,6 +73,7 @@ Return the block header at the given height.
 **Signature**
 
   .. function:: blockchain.block.header(height)
+  .. versionadded:: 1.3
 
   *height*
 
@@ -268,9 +171,11 @@ Subscribe to receive block headers when a new block is found.
 
 **Signature**
 
-  .. function:: blockchain.headers.subscribe(raw=False)
+  .. function:: blockchain.headers.subscribe(raw=True)
   .. versionchanged:: 1.2
-     Optional *raw* parameter added.
+     Optional *raw* parameter added, defaulting to :const:`False`.
+  .. versionchanged:: 1.3
+     *raw* parameter deafults to :const:`True`.
 
   * *raw*
 
