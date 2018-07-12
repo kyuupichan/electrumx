@@ -11,14 +11,13 @@
 
 import array
 import asyncio
-import logging
 from struct import pack, unpack
 import time
 from functools import partial
 
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_str, HASHX_LEN
-from electrumx.lib.util import chunks, formatted_time
+from electrumx.lib.util import chunks, formatted_time, class_logger
 import electrumx.server.db
 
 
@@ -26,8 +25,7 @@ class Prefetcher(object):
     '''Prefetches blocks (in the forward direction only).'''
 
     def __init__(self, bp):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = class_logger(__name__, self.__class__.__name__)
         self.bp = bp
         self.caught_up = False
         # Access to fetched_height should be protected by the semaphore

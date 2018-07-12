@@ -11,7 +11,6 @@
 
 import array
 import ast
-import logging
 import os
 from struct import pack, unpack
 from bisect import bisect_right
@@ -42,8 +41,7 @@ class DB(object):
         '''Raised on general DB errors generally indicating corruption.'''
 
     def __init__(self, env):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.env = env
         self.coin = env.coin
 

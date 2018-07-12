@@ -6,12 +6,13 @@
 # and warranty status of this software.
 
 import asyncio
-import logging
 import os
 import signal
 import sys
 import time
 from functools import partial
+
+from electrumx.lib.util import class_logger
 
 
 class ServerBase(object):
@@ -36,8 +37,7 @@ class ServerBase(object):
         '''Save the environment, perform basic sanity checks, and set the
         event loop policy.
         '''
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = class_logger(__name__, self.__class__.__name__)
         self.env = env
 
         # Sanity checks

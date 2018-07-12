@@ -8,8 +8,9 @@
 '''Class for server environment configuration and defaults.'''
 
 
-import logging
 from os import environ
+
+from electrumx.lib.util import class_logger
 
 
 class EnvBase(object):
@@ -19,8 +20,7 @@ class EnvBase(object):
         pass
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = class_logger(__name__, self.__class__.__name__)
         self.allow_root = self.boolean('ALLOW_ROOT', False)
         self.host = self.default('HOST', 'localhost')
         self.rpc_host = self.default('RPC_HOST', 'localhost')

@@ -13,7 +13,6 @@ import ast
 import bisect
 from collections import defaultdict
 from functools import partial
-import logging
 from struct import pack, unpack
 
 import electrumx.lib.util as util
@@ -25,8 +24,7 @@ class History(object):
     DB_VERSIONS = [0]
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = util.class_logger(__name__, self.__class__.__name__)
         # For history compaction
         self.max_hist_row_entries = 12500
         self.unflushed = defaultdict(partial(array.array, 'I'))

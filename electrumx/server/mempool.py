@@ -9,11 +9,11 @@
 
 import asyncio
 import itertools
-import logging
 import time
 from collections import defaultdict
 
 from electrumx.lib.hash import hash_to_str, hex_str_to_hash
+from electrumx.lib.util import class_logger
 from electrumx.server.daemon import DaemonError
 from electrumx.server.db import UTXO
 
@@ -33,8 +33,7 @@ class MemPool(object):
     '''
 
     def __init__(self, bp, controller):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = class_logger(__name__, self.__class__.__name__)
         self.daemon = bp.daemon
         self.controller = controller
         self.coin = bp.coin

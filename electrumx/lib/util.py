@@ -38,6 +38,7 @@ from struct import pack, Struct
 
 # Logging utilities
 
+
 class ConnectionLogger(logging.LoggerAdapter):
     '''Prepends a connection identifier to a logging message.'''
     def process(self, msg, kwargs):
@@ -53,11 +54,18 @@ class CompactFormatter(logging.Formatter):
 
 
 def make_logger(name, *, handler, level):
+    '''Return the root ElectrumX logger.'''
     logger = logging.getLogger(name)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False
     return logger
+
+
+def class_logger(path, classname):
+    '''Return a hierarchical logger for a class.'''
+    return logging.getLogger(path).getChild(classname)
+
 
 # Method decorator.  To be used for calculations that will always
 # deliver the same result.  The method cannot take any arguments

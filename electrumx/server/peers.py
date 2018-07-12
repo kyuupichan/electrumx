@@ -8,7 +8,6 @@
 '''Peer management.'''
 
 import asyncio
-import logging
 import random
 import socket
 import ssl
@@ -19,7 +18,7 @@ from functools import partial
 from aiorpcx import ClientSession, RPCError, SOCKSProxy, ConnectionError
 
 from electrumx.lib.peer import Peer
-from electrumx.lib.util import ConnectionLogger
+from electrumx.lib.util import ConnectionLogger, class_logger
 
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
@@ -224,8 +223,7 @@ class PeerManager(object):
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
     def __init__(self, env, controller):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env

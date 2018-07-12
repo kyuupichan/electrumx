@@ -10,7 +10,6 @@ daemon.'''
 
 import asyncio
 import json
-import logging
 import time
 from calendar import timegm
 from struct import pack
@@ -18,7 +17,7 @@ from time import strptime
 
 import aiohttp
 
-from electrumx.lib.util import int_to_varint, hex_to_bytes
+from electrumx.lib.util import int_to_varint, hex_to_bytes, class_logger
 from electrumx.lib.hash import hex_str_to_hash
 from aiorpcx import JSONRPC
 
@@ -37,8 +36,7 @@ class Daemon(object):
         '''Raised when the daemon returns an error in its results.'''
 
     def __init__(self, env):
-        self.logger = logging.getLogger(__name__)\
-            .getChild(self.__class__.__name__)
+        self.logger = class_logger(__name__, self.__class__.__name__)
         self.coin = env.coin
         self.set_urls(env.coin.daemon_urls(env.daemon_url))
         self._height = None
