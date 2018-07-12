@@ -36,6 +36,7 @@ import sys
 from collections import Container, Mapping
 from struct import pack, Struct
 
+# Logging utilities
 
 class ConnectionLogger(logging.LoggerAdapter):
     '''Prepends a connection identifier to a logging message.'''
@@ -43,6 +44,20 @@ class ConnectionLogger(logging.LoggerAdapter):
         conn_id = self.extra.get('conn_id', 'unknown')
         return f'[{conn_id}] {msg}', kwargs
 
+
+class CompactFormatter(logging.Formatter):
+    '''Strips the module from the logger name to leave the class only.'''
+    def format(self, record):
+        record.name = record.name.rpartition('.')[-1]
+        return super().format(record)
+
+
+def make_logger(name, *, handler, level):
+    logger = logging.getLogger(name)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return logger
 
 # Method decorator.  To be used for calculations that will always
 # deliver the same result.  The method cannot take any arguments
