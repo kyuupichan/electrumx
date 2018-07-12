@@ -86,6 +86,15 @@ Deprecated methods
 Version 1.3
 ===========
 
+Removed methods
+---------------
+
+  * :func:`blockchain.address.get_balance`
+  * :func:`blockchain.address.get_history`
+  * :func:`blockchain.address.get_mempool`
+  * :func:`blockchain.address.listunspent`
+  * :func:`blockchain.address.subscribe`
+
 New methods
 -----------
 

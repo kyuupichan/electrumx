@@ -430,11 +430,6 @@ class ElectrumX(SessionBase):
 
         controller = self.controller
         handlers = {
-            'blockchain.address.get_balance': controller.address_get_balance,
-            'blockchain.address.get_history': controller.address_get_history,
-            'blockchain.address.get_mempool': controller.address_get_mempool,
-            'blockchain.address.listunspent': controller.address_listunspent,
-            'blockchain.address.subscribe': self.address_subscribe,
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.block.get_header': controller.block_get_header,
             'blockchain.estimatefee': controller.estimatefee,
@@ -473,6 +468,18 @@ class ElectrumX(SessionBase):
         if ptuple >= (1, 3):
             handlers.update({
                 'blockchain.block.header': self.block_header,
+            })
+        else:
+            handlers.update({
+                'blockchain.address.get_balance':
+                controller.address_get_balance,
+                'blockchain.address.get_history':
+                controller.address_get_history,
+                'blockchain.address.get_mempool':
+                controller.address_get_mempool,
+                'blockchain.address.listunspent':
+                controller.address_listunspent,
+                'blockchain.address.subscribe': self.address_subscribe,
             })
 
         self.electrumx_handlers = handlers
