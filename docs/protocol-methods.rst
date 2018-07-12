@@ -242,28 +242,6 @@ Subscribe to receive block headers when a new block is found.
   block headers to acquire a consistent view of the chain state.
 
 
-blockchain.numblocks.subscribe
-==============================
-
-Subscribe to receive the block height when a new block is found.
-
-**Signature**
-
-  .. function:: blockchain.numblocks.subscribe()
-
-  *Removed in version 1.1.*
-
-**Result**
-
-  The height of the current block, an integer.
-
-**Notifications**
-
-  As this is a subcription, the client will receive a notification
-  when a new block is found.  The notification's signature is:
-
-    .. function:: blockchain.numblocks.subscribe(height)
-
 blockchain.relayfee
 ===================
 
@@ -678,32 +656,6 @@ and height.
     "block_height": 450538,
     "pos": 710
   }
-
-blockchain.utxo.get_address
-===========================
-
-Return the address paid to by a UTXO.
-
-**Signature**
-
-  .. function:: blockchain.utxo.get_address(tx_hash, index)
-
-  *Optional in version 1.0.  Removed in version 1.1.*
-
-  *tx_hash*
-
-    The transaction hash as a hexadecimal string.
-
-  *index*
-
-    The zero-based index of the UTXO in the transaction.
-
-**Result**
-
-  A Base58 address string, or :const:`null`.  If the transaction
-  doesn't exist, the index is out of range, or the output is not paid
-  to an address, :const:`null` must be returned.  If the output is
-  spent :const:`null` *may* be returned.
 
 mempool.get_fee_histogram
 =========================
