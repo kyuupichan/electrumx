@@ -24,7 +24,7 @@ Changes
   * :func:`blockchain.transaction.get` no longer takes the *height*
     argument that was ignored anyway.
   * :func:`blockchain.transaction.broadcast` returns errors like any
-    other JS RPC call.  A transaction hash result is only returned on
+    other JSON RPC call.  A transaction hash result is only returned on
     success.
 
 New methods
@@ -83,6 +83,8 @@ Deprecated methods
     :func:`blockchain.scripthash.subscribe`.
   * :func:`blockchain.headers.subscribe` with *raw* other than :const:`True`.
 
+.. _version 1.3:
+
 Version 1.3
 ===========
 
@@ -111,3 +113,24 @@ Deprecated methods
 
   * :func:`blockchain.block.get_header`.  Switch to
     :func:`blockchain.block.header`.
+
+.. _version 1.4:
+
+Version 1.4
+===========
+
+This documents the current intent for protocol version 1.4 which is
+not yet implemented.  It removes all support for :ref:`deserialized
+headers <deserialized header>`.
+
+Changes
+-------
+
+  * The only valid value for :func:`blockchain.headers.subscribe`
+    argument *raw* is :const:`True`
+
+Removed methods
+---------------
+
+  * :func:`blockchain.block.get_header`
+  * :func:`blockchain.block.get_chunk`
