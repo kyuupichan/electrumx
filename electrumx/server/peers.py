@@ -18,7 +18,7 @@ from functools import partial
 from aiorpcx import ClientSession, RPCError, SOCKSProxy, ConnectionError
 
 from electrumx.lib.peer import Peer
-from electrumx.lib.util import ConnectionLogger, class_logger
+from electrumx.lib.util import ConnectionLogger, class_logger, protocol_tuple
 
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
@@ -101,20 +101,18 @@ class PeerSession(ClientSession):
 
     def on_version(self, request):
         '''Handle the response to the version message.'''
-        if not self.is_good(request, (list, str)):
+        if not self.is_good(request, list):
             return
 
         result = request.result()
-        if isinstance(result, str):
-            version = result
-        else:
-            # Protocol version 1.1 returns a pair with the version first
-            if len(result) < 2 or not isinstance(result[0], str):
-                self.fail(request, 'result array bad format')
-                return
-            version = result[0]
+        # Protocol version 1.1 returns a pair with the version first
+        if len(result) != 2 or not all(isinstance(x, str) for x in result):
+            self.fail(request, 'result array bad format')
+            return
+        version = result[0]
         self.peer.server_version = version
         self.peer.features['server_version'] = version
+        self.ptuple = protocol_tuple(result[1])
 
         for method, on_done in [
             ('blockchain.headers.subscribe', self.on_height),
@@ -146,7 +144,10 @@ class PeerSession(ClientSession):
         result = request.result()
         controller = self.peer_mgr.controller
         our_height = controller.bp.db_height
-        their_height = result.get('block_height')
+        if self.ptuple < (1, 3):
+            their_height = result.get('block_height')
+        else:
+            their_height = result.get('height')
         if not isinstance(their_height, int):
             self.bad('invalid height {}'.format(their_height))
             return
