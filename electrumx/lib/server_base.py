@@ -38,6 +38,7 @@ class ServerBase(object):
         event loop policy.
         '''
         self.logger = class_logger(__name__, self.__class__.__name__)
+        self.logger.info(f'Python version: {sys.version}')
         self.env = env
 
         # Sanity checks
