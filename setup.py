@@ -1,6 +1,5 @@
 import setuptools
-from electrumx.server.version import VERSION
-version = VERSION.rpartition(' ')[-1]
+version = '1.5'
 
 setuptools.setup(
     name='electrumX-kyuupichan',
