@@ -37,8 +37,8 @@ class PeerSession(ClientSession):
         self.peer_mgr = peer_mgr
         self.kind = kind
         self.timeout = 20 if self.peer.is_tor else 10
-        context = {'conn_id': f'{host}'}
-        self.logger = ConnectionLogger(self.logger, context)
+        self.logger = class_logger(__name__, self.__class__.__name__)
+        self.logger = ConnectionLogger(self.logger, {'conn_id': f'{host}'})
 
     def connection_made(self, transport):
         super().connection_made(transport)

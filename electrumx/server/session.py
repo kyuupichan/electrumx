@@ -51,6 +51,7 @@ class SessionBase(ServerSession):
 
     def __init__(self, controller, kind):
         super().__init__(rpc_protocol=JSONRPCAutoDetect)
+        self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.kind = kind  # 'RPC', 'TCP' etc.
         self.controller = controller
         self.bp = controller.bp
