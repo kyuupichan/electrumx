@@ -409,14 +409,14 @@ class BitcoinCash(BitcoinMixin, Coin):
     TX_PER_BLOCK = 400
     PEERS = [
         'electroncash.cascharia.com s50002',
-        'bch.arihanc.com t52001 s52002',
+        'bch.electrumx.cash s t',
         'bccarihace4jdcnt.onion t52001 s52002',
-        'jelectrum-cash.1209k.com s t',
-        'abc.vom-stausee.de t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
         'electroncash.checksum0.com s t',
-        'electron.jns.im s t',
         'electrumx-cash.1209k.com s t',
+        'electrum.leblancnet.us t50011 s50012',
+        'electroncash.dk s t',
+        'electrum.imaginary.cash s t',
     ]
 
 
