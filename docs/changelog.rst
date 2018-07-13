@@ -7,6 +7,16 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.5.1
+=============
+
+Fixes a couple of issues found in 1.5 after release:
+
+* update peer discovery code for :ref:`version 1.3` of the protocol
+* setup.py would not run in a clean environment (e.g. virtualenv)
+* logging via aiorpcX didn't work with the logging hierarchy updates
+* log Python interpreter version on startup
+
 Version 1.5
 ===========
 

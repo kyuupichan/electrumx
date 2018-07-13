@@ -1,5 +1,5 @@
 import setuptools
-version = '1.5'
+version = '1.5.1'
 
 setuptools.setup(
     name='electrumX-kyuupichan',
