@@ -121,7 +121,8 @@ class Merkle(object):
         return [root(hashes[n: n + size], depth_higher)
                 for n in range(0, len(hashes), size)]
 
-    def branch_from_level(self, level, leaf_hashes, index, depth_higher):
+    def branch_and_root_from_level(self, level, leaf_hashes, index,
+                                   depth_higher):
         '''Return a (merkle branch, merkle_root) pair when a merkle-tree has a
         level cached.
 
@@ -142,7 +143,7 @@ class Merkle(object):
         if not isinstance(level, list):
             raise TypeError("level must be a list")
         if not isinstance(leaf_hashes, list):
-            raise TypeError("level must be a list")
+            raise TypeError("leaf_hashes must be a list")
         leaf_index = (index >> depth_higher) << depth_higher
         leaf_branch, leaf_root = self.branch_and_root(
             leaf_hashes, index - leaf_index, depth_higher)
@@ -152,3 +153,79 @@ class Merkle(object):
         if leaf_root != level[index]:
             raise ValueError('leaf hashes inconsistent with level')
         return leaf_branch + level_branch, root
+
+
+class MerkleCache(object):
+    '''A cache to calculate merkle branches efficiently.'''
+
+    def __init__(self, merkle, source, length):
+        '''Initialise a cache of length hashes taken from source.'''
+        self.merkle = merkle
+        self.source = source
+        self.length = length
+        self.depth_higher = merkle.tree_depth(length) // 2
+        self.level = self._level(source.hashes(0, length))
+
+    def _segment_length(self):
+        return 1 << self.depth_higher
+
+    def _leaf_start(self, index):
+        '''Given a level's depth higher and a hash index, return the leaf
+        index and leaf hash count needed to calculate a merkle branch.
+        '''
+        depth_higher = self.depth_higher
+        return (index >> depth_higher) << depth_higher
+
+    def _level(self, hashes):
+        return self.merkle.level(hashes, self.depth_higher)
+
+    def _extend_to(self, length):
+        '''Extend the length of the cache if necessary.'''
+        if length <= self.length:
+            return
+        # Start from the beginning of any final partial segment.
+        # Retain the value of depth_higher; in practice this is fine
+        start = self._leaf_start(self.length)
+        hashes = self.source.hashes(start, length - start)
+        self.level[start >> self.depth_higher] = self._level(hashes)
+        self.length = length
+
+    def _level_for(self, length):
+        '''Return a (level_length, final_hash) pair for a truncation
+        of the hashes to the given length.  Length may be an extension,
+        in which case extra hashes are requested from the source.'''
+        if length > self.length:
+            hashes = self.source.hashes(self.length, length - self.length)
+            return self.level + self._level(hashes)
+        if length < self.length:
+            level = self.level[:length >> self.depth_higher]
+            leaf_start = self._leaf_start(length)
+            count = min(self._segment_length(), length - leaf_start)
+            hashes = self.source.hashes(leaf_start, count)
+            level += self._level(hashes)
+            return level
+        return self.level
+
+    def branch_and_root(self, length, index):
+        '''Return a merkle branch and root.  Length is the number of
+        hashes used to calculate the merkle root, index is the position
+        of the hash to calculate the branch of.
+
+        index must be less than length, which must be at least 1.'''
+        if not isinstance(length, int):
+            raise TypeError('length must be an integer')
+        if not isinstance(index, int):
+            raise TypeError('index must be an integer')
+        if length <= 0:
+            raise ValueError('length must be positive')
+        if index >= length:
+            raise ValueError('index must be less than length')
+        self._extend_to(length)
+        leaf_start = self._leaf_start(index)
+        count = min(self._segment_length(), length - leaf_start)
+        leaf_hashes = self.source.hashes(leaf_start, count)
+        if length < self._segment_length():
+            return self.merkle.branch_and_root(leaf_hashes, index)
+        level = self._level_for(length)
+        return self.merkle.branch_and_root_from_level(
+            level, leaf_hashes, index, self.depth_higher)
