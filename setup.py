@@ -1,8 +1,8 @@
 import setuptools
-version = '1.5.1'
+version = '1.5.2'
 
 setuptools.setup(
-    name='electrumX-kyuupichan',
+    name='electrumX',
     version=version,
     scripts=['electrumx_server', 'electrumx_rpc'],
     python_requires='>=3.6',

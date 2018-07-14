@@ -15,7 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-VERSION="1.5.1"
+VERSION="1.5.2"
 
 # -- Project information -----------------------------------------------------
 
