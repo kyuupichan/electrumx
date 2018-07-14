@@ -15,7 +15,7 @@ from functools import partial
 
 from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
 
-from electrumx.lib.hash import sha256, hash_to_str
+from electrumx.lib.hash import sha256, hash_to_hex_str
 import electrumx.lib.util as util
 from electrumx.server.daemon import DaemonError
 
@@ -248,7 +248,7 @@ class ElectrumX(SessionBase):
         history = await self.controller.get_history(hashX)
         mempool = await self.controller.mempool_transactions(hashX)
 
-        status = ''.join('{}:{:d}:'.format(hash_to_str(tx_hash), height)
+        status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
                          for tx_hash, height in history)
         status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
                           for hex_hash, tx_fee, unconfirmed in mempool)

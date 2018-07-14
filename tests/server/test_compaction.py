@@ -6,7 +6,7 @@ from os import environ, urandom
 from struct import pack
 import random
 
-from electrumx.lib.hash import hash_to_str, HASHX_LEN
+from electrumx.lib.hash import HASHX_LEN
 from electrumx.server.env import Env
 from electrumx.server.db import DB
 

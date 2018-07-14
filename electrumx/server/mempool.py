@@ -12,7 +12,7 @@ import itertools
 import time
 from collections import defaultdict
 
-from electrumx.lib.hash import hash_to_str, hex_str_to_hash
+from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger
 from electrumx.server.daemon import DaemonError
 from electrumx.server.db import UTXO
@@ -230,7 +230,7 @@ class MemPool(object):
                            for txout in tx.outputs]
 
             # Convert the tx inputs to ([prev_hex_hash, prev_idx) pairs
-            txin_pairs = [(hash_to_str(txin.prev_hash), txin.prev_idx)
+            txin_pairs = [(hash_to_hex_str(txin.prev_hash), txin.prev_idx)
                           for txin in tx.inputs]
 
             pending.append((tx_hash, txin_pairs, txout_pairs, tx_size))
@@ -309,7 +309,7 @@ class MemPool(object):
                 continue
             tx_fee = item[2]
             tx = deserializer(raw_tx).read_tx()
-            unconfirmed = any(hash_to_str(txin.prev_hash) in self.txs
+            unconfirmed = any(hash_to_hex_str(txin.prev_hash) in self.txs
                               for txin in tx.inputs)
             result.append((hex_hash, tx_fee, unconfirmed))
         return result

@@ -16,7 +16,7 @@ from functools import partial
 from struct import pack, unpack
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import hash_to_str, HASHX_LEN
+from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 
 
 class History(object):
@@ -230,8 +230,8 @@ class History(object):
         if nrows > 4:
             self.logger.info('hashX {} is large: {:,d} entries across '
                              '{:,d} rows'
-                             .format(hash_to_str(hashX), len(full_hist) // 4,
-                                     nrows))
+                             .format(hash_to_hex_str(hashX),
+                                     len(full_hist) // 4, nrows))
 
         # Find what history needs to be written, and what keys need to
         # be deleted.  Start by assuming all keys are to be deleted,

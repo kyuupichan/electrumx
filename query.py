@@ -17,7 +17,7 @@ import sys
 
 from electrumx import Env
 from electrumx.server.db import DB
-from electrumx.lib.hash import hash_to_str
+from electrumx.lib.hash import hash_to_hex_str
 
 
 def count_entries(hist_db, utxo_db):
@@ -58,11 +58,11 @@ def main():
 
         for n, (tx_hash, height) in enumerate(bp.get_history(hashX, limit)):
             print('History #{:d}: hash: {} height: {:d}'
-                  .format(n + 1, hash_to_str(tx_hash), height))
+                  .format(n + 1, hash_to_hex_str(tx_hash), height))
         n = None
         for n, utxo in enumerate(bp.get_utxos(hashX, limit)):
             print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
-                  .format(n + 1, hash_to_str(utxo.tx_hash),
+                  .format(n + 1, hash_to_hex_str(utxo.tx_hash),
                           utxo.tx_pos, utxo.height, utxo.value))
         if n is None:
             print('No UTXOs')

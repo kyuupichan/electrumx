@@ -17,7 +17,7 @@ from bisect import bisect_right
 from collections import namedtuple
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import hash_to_str, HASHX_LEN
+from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -133,7 +133,7 @@ class DB(object):
         self.logger.info('coin: {}'.format(self.coin.NAME))
         self.logger.info('network: {}'.format(self.coin.NET))
         self.logger.info('height: {:,d}'.format(self.db_height))
-        self.logger.info('tip: {}'.format(hash_to_str(self.db_tip)))
+        self.logger.info('tip: {}'.format(hash_to_hex_str(self.db_tip)))
         self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
         if self.first_sync:
             self.logger.info('sync time so far: {}'
@@ -380,7 +380,7 @@ class DB(object):
         db_value = self.utxo_db.get(key)
         if not db_value:
             raise self.DBError('UTXO {} / {:,d} in one table only'
-                               .format(hash_to_str(tx_hash), tx_idx))
+                               .format(hash_to_hex_str(tx_hash), tx_idx))
         value, = unpack('<Q', db_value)
         return hashX, value
 

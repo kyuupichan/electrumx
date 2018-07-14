@@ -39,7 +39,7 @@ from functools import partial
 import base64
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_str
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
@@ -121,7 +121,7 @@ class Coin(object):
         Return the block less its unspendable coinbase.
         '''
         header = cls.block_header(block, 0)
-        header_hex_hash = hash_to_str(cls.header_hash(header))
+        header_hex_hash = hash_to_hex_str(cls.header_hash(header))
         if header_hex_hash != cls.GENESIS_HASH:
             raise CoinError('genesis block has hash {} expected {}'
                             .format(header_hex_hash, cls.GENESIS_HASH))
@@ -293,8 +293,8 @@ class Coin(object):
         return {
             'block_height': height,
             'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
             'timestamp': timestamp,
             'bits': bits,
             'nonce': nonce,
@@ -330,11 +330,11 @@ class EquihashMixin(object):
         return {
             'block_height': height,
             'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
             'timestamp': timestamp,
             'bits': bits,
-            'nonce': hash_to_str(header[108:140]),
+            'nonce': hash_to_hex_str(header[108:140]),
         }
 
     @classmethod
@@ -477,13 +477,13 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
         h = dict(
             block_height=height,
             version=struct.unpack('<I', header[:4])[0],
-            prev_block_hash=hash_to_str(header[4:36]),
-            merkle_root=hash_to_str(header[36:68]),
+            prev_block_hash=hash_to_hex_str(header[4:36]),
+            merkle_root=hash_to_hex_str(header[36:68]),
             timestamp=struct.unpack('<I', header[100:104])[0],
-            reserved=hash_to_str(header[72:100]),
+            reserved=hash_to_hex_str(header[72:100]),
             bits=struct.unpack('<I', header[104:108])[0],
-            nonce=hash_to_str(header[108:140]),
-            solution=hash_to_str(header[140:])
+            nonce=hash_to_hex_str(header[108:140]),
+            solution=hash_to_hex_str(header[140:])
         )
 
         return h
@@ -936,9 +936,9 @@ class FairCoin(Coin):
         return {
             'block_height': height,
             'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
-            'payload_hash': hash_to_str(header[68:100]),
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
+            'payload_hash': hash_to_hex_str(header[68:100]),
             'timestamp': timestamp,
             'creatorId': creatorId,
         }
@@ -1000,12 +1000,12 @@ class SnowGem(EquihashMixin, Coin):
         return {
             'block_height': height,
             'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
-            'hash_reserved': hash_to_str(header[68:100]),
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
+            'hash_reserved': hash_to_hex_str(header[68:100]),
             'timestamp': timestamp,
             'bits': bits,
-            'nonce': hash_to_str(header[108:140]),
+            'nonce': hash_to_hex_str(header[108:140]),
             'n_solution': base64.b64encode(lib_tx.Deserializer(
                 header, start=140)._read_varbytes()).decode('utf8')
         }
@@ -1717,8 +1717,8 @@ class Xuez(Coin):
             return {
                 'block_height': height,
                 'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
+                'prev_block_hash': hash_to_hex_str(header[4:36]),
+                'merkle_root': hash_to_hex_str(header[36:68]),
                 'timestamp': timestamp,
                 'bits': bits,
                 'nonce': nonce,
@@ -1727,12 +1727,12 @@ class Xuez(Coin):
             return {
                 'block_height': height,
                 'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
+                'prev_block_hash': hash_to_hex_str(header[4:36]),
+                'merkle_root': hash_to_hex_str(header[36:68]),
                 'timestamp': timestamp,
                 'bits': bits,
                 'nonce': nonce,
-                'nAccumulatorCheckpoint': hash_to_str(header[80:112]),
+                'nAccumulatorCheckpoint': hash_to_hex_str(header[80:112]),
             }
 
 
