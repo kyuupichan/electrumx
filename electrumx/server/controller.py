@@ -22,6 +22,7 @@ import pylru
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
 from electrumx.lib.hash import double_sha256, hash_to_str, hex_str_to_hash
 from electrumx.lib.hash import HASHX_LEN
+from electrumx.lib.merkle import Merkle
 from electrumx.lib.peer import Peer
 from electrumx.lib.server_base import ServerBase
 import electrumx.lib.util as util
@@ -30,7 +31,10 @@ from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
 from electrumx.server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
 from electrumx.server.version import VERSION
+
+
 version_string = util.version_string
+merkle = Merkle()
 
 
 class SessionGroup(object):
@@ -686,31 +690,6 @@ class Controller(ServerBase):
                                f'{self.max_subs:,d} reached')
         self.subs_room -= 1
 
-    async def tx_merkle(self, tx_hash, height):
-        '''tx_hash is a hex string.'''
-        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
-        block = await self.daemon_request('deserialised_block', hex_hashes[0])
-        tx_hashes = block['tx']
-        try:
-            pos = tx_hashes.index(tx_hash)
-        except ValueError:
-            raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
-                           f'block {hex_hashes[0]} at height {height:,d}')
-
-        idx = pos
-        hashes = [hex_str_to_hash(txh) for txh in tx_hashes]
-        merkle_branch = []
-        while len(hashes) > 1:
-            if len(hashes) & 1:
-                hashes.append(hashes[-1])
-            idx = idx - 1 if (idx & 1) else idx + 1
-            merkle_branch.append(hash_to_str(hashes[idx]))
-            idx //= 2
-            hashes = [double_sha256(hashes[n] + hashes[n + 1])
-                      for n in range(0, len(hashes), 2)]
-
-        return {"block_height": height, "merkle": merkle_branch, "pos": pos}
-
     async def get_balance(self, hashX):
         utxos = await self.get_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
@@ -871,4 +850,18 @@ class Controller(ServerBase):
         '''
         self.assert_tx_hash(tx_hash)
         height = self.non_negative_integer(height)
-        return await self.tx_merkle(tx_hash, height)
+
+        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
+        block_hash = hex_hashes[0]
+        block = await self.daemon_request('deserialised_block', block_hash)
+        tx_hashes = block['tx']
+        try:
+            pos = tx_hashes.index(tx_hash)
+        except ValueError:
+            raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
+                           f'block {block_hash} at height {height:,d}')
+
+        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
+        branch = [hash_to_str(hash) for hash in merkle.branch(hashes, pos)]
+
+        return {"block_height": height, "merkle": branch, "pos": pos}
