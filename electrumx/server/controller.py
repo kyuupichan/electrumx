@@ -20,7 +20,7 @@ from functools import partial
 import pylru
 
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
-from electrumx.lib.hash import double_sha256, hash_to_str, hex_str_to_hash
+from electrumx.lib.hash import double_sha256, hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.merkle import Merkle
 from electrumx.lib.peer import Peer
@@ -723,7 +723,7 @@ class Controller(ServerBase):
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
         history = await self.get_history(hashX)
-        conf = [{'tx_hash': hash_to_str(tx_hash), 'height': height}
+        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)
 
@@ -785,7 +785,8 @@ class Controller(ServerBase):
         utxos.extend(self.mempool.get_utxos(hashX))
         spends = await self.mempool.potential_spends(hashX)
 
-        return [{'tx_hash': hash_to_str(utxo.tx_hash), 'tx_pos': utxo.tx_pos,
+        return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                 'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
@@ -862,6 +863,7 @@ class Controller(ServerBase):
                            f'block {block_hash} at height {height:,d}')
 
         hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch = [hash_to_str(hash) for hash in merkle.branch(hashes, pos)]
+        branch, root = merkle.branch_and_root(hashes, pos)
+        branch = [hash_to_hex_str(hash) for hash in branch]
 
         return {"block_height": height, "merkle": branch, "pos": pos}

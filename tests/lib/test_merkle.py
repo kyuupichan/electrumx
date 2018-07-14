@@ -55,7 +55,7 @@ def test_root_bad():
 def test_branch_and_root_from_proof():
     for n in range(len(hashes)):
         for m in range(n + 1):
-            branch, root = Merkle.branch(hashes[:n + 1], m)
+            branch, root = Merkle.branch_and_root(hashes[:n + 1], m)
             assert root == roots[n]
             root = Merkle.root_from_proof(hashes[m], branch, m)
             assert root == roots[n]
@@ -63,20 +63,20 @@ def test_branch_and_root_from_proof():
 
 def test_branch_bad():
     with pytest.raises(TypeError):
-        Merkle.branch(0, 0)
+        Merkle.branch_and_root(0, 0)
     with pytest.raises(ValueError):
-        Merkle.branch([], 0)
+        Merkle.branch_and_root([], 0)
     with pytest.raises(TypeError):
-        Merkle.branch(hashes, 0.0)
+        Merkle.branch_and_root(hashes, 0.0)
     with pytest.raises(ValueError):
-        Merkle.branch(hashes[:2], -1)
+        Merkle.branch_and_root(hashes[:2], -1)
     with pytest.raises(ValueError):
-        Merkle.branch(hashes[:2], 2)
-    Merkle.branch(hashes, 0, 3)
+        Merkle.branch_and_root(hashes[:2], 2)
+    Merkle.branch_and_root(hashes, 0, 3)
     with pytest.raises(TypeError):
-        Merkle.branch(hashes, 0, 3.0)
+        Merkle.branch_and_root(hashes, 0, 3.0)
     with pytest.raises(ValueError):
-        Merkle.branch(hashes, 0, 2)
+        Merkle.branch_and_root(hashes, 0, 2)
 
 
 def test_root_from_proof_bad():
@@ -115,7 +115,7 @@ def test_branch_from_level():
                 leaf_index = (index >> depth_higher) << depth_higher
                 leaf_hashes = part[leaf_index:
                                    leaf_index + (1 << depth_higher)]
-                branch = Merkle.branch(part, index)
+                branch = Merkle.branch_and_root(part, index)
                 branch2 = Merkle.branch_from_level(level, leaf_hashes,
                                                    index, depth_higher)
                 assert branch == branch2

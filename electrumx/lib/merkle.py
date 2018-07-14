@@ -53,7 +53,7 @@ class Merkle(object):
             raise ValueError('hash_count must be at least 1')
         return ceil(log(hash_count, 2))
 
-    def branch(self, hashes, index, length=None):
+    def branch_and_root(self, hashes, index, length=None):
         '''Return a (merkle branch, merkle_root) pair given hashes, and the
         index of one of those hashes.
         '''
@@ -86,7 +86,7 @@ class Merkle(object):
 
     def root(self, hashes, length=None):
         '''Return the merkle root of a non-empty iterable of binary hashes.'''
-        branch, root = self.branch(hashes, 0, length)
+        branch, root = self.branch_and_root(hashes, 0, length)
         return root
 
     def root_from_proof(self, hash, branch, index):
@@ -144,10 +144,10 @@ class Merkle(object):
         if not isinstance(leaf_hashes, list):
             raise TypeError("level must be a list")
         leaf_index = (index >> depth_higher) << depth_higher
-        leaf_branch, leaf_root = self.branch(leaf_hashes, index - leaf_index,
-                                             depth_higher)
+        leaf_branch, leaf_root = self.branch_and_root(
+            leaf_hashes, index - leaf_index, depth_higher)
         index >>= depth_higher
-        level_branch, root = self.branch(level, index)
+        level_branch, root = self.branch_and_root(level, index)
         # Check last so that we know index is in-range
         if leaf_root != level[index]:
             raise ValueError('leaf hashes inconsistent with level')
