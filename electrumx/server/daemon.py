@@ -271,7 +271,7 @@ class Daemon(object):
         '''Return the serialized raw transactions with the given hashes.
 
         Replaces errors with None by default.'''
-        params_iterable = ((hex_hash, False) for hex_hash in hex_hashes)
+        params_iterable = ((hex_hash, 0) for hex_hash in hex_hashes)
         txs = await self._send_vector('getrawtransaction', params_iterable,
                                       replace_errs=replace_errs)
         # Convert hex strings to bytes
