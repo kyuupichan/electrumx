@@ -129,6 +129,7 @@ Changes
 
   * The argument *raw* removed from :func:`blockchain.headers.subscribe`,
     only raw headers can be subscribed to.
+  * Only the first :func:`server.version` message is accepted.
   * Optional *cp_height* argument added to
     :func:`blockchain.block.header` and :func:`blockchain.block.headers`
 

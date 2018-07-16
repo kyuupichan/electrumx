@@ -59,7 +59,6 @@ class SessionBase(ServerSession):
         self.env = controller.env
         self.daemon = self.bp.daemon
         self.client = 'unknown'
-        self.client_version = (1, )
         self.anon_logs = self.env.anon_logs
         self.txs_sent = 0
         self.log_me = False
@@ -142,6 +141,7 @@ class ElectrumX(SessionBase):
         self.max_response_size = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
+        self.sv_seen = False
         self.mempool_statuses = {}
         self.protocol_version = None
         self.set_protocol_handlers((1, 1))
@@ -416,24 +416,24 @@ class ElectrumX(SessionBase):
         '''
         return None
 
-    def server_version(self, client_name=None, protocol_version=None):
+    def server_version(self, client_name='', protocol_version=None):
         '''Returns the server version as a string.
 
         client_name: a string identifying the client
         protocol_version: the protocol version spoken by the client
         '''
+        if self.sv_seen and self.protocol_tuple >= (1, 4):
+            raise RPCError(BAD_REQUEST, f'server.version already sent')
+        self.sv_seen = True
+
         if client_name:
+            client_name = str(client_name)
             if self.env.drop_client is not None and \
                     self.env.drop_client.match(client_name):
                 self.close_after_send = True
                 raise RPCError(BAD_REQUEST,
                                f'unsupported client: {client_name}')
-            self.client = str(client_name)[:17]
-            try:
-                self.client_version = tuple(int(part) for part
-                                            in self.client.split('.'))
-            except Exception:
-                pass
+            self.client = client_name[:17]
 
         # Find the highest common protocol version.  Disconnect if
         # that protocol version in unsupported.

@@ -907,6 +907,8 @@ Identify the client to the server and negotiate the protocol version.
   .. versionchanged:: 1.2
      Use :func:`server.ping` rather than sending version requests as a
      ping mechanism.
+  .. versionchanged:: 1.4
+     Only the first :func:`server.version` message is accepted.
 
   * *client_name*
 
