@@ -297,29 +297,31 @@ class ElectrumX(SessionBase):
         hashX = self.controller.scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
-    def block_header(self, height, cp_height=0):
-        '''Return a raw block header as a hexadecimal string.
+    def _merkle_proof(self, cp_height, height):
+        max_height = self.height()
+        if not height <= cp_height <= max_height:
+            raise RPCError(BAD_REQUEST,
+                           f'require header height {height:,d} <= '
+                           f'cp_height {cp_height:,d} <= '
+                           f'chain height {max_height:,d}')
+        branch, root = self.controller.header_mc.branch_and_root(
+            cp_height + 1, height)
+        return {
+            'branch': [hash_to_hex_str(elt) for elt in branch],
+            'root': hash_to_hex_str(root),
+        }
 
-        height: the header's height'''
+    def block_header(self, height, cp_height=0):
+        '''Return a raw block header as a hexadecimal string, or as a
+        dictionary with a merkle proof.'''
         height = self.controller.non_negative_integer(height)
         cp_height = self.controller.non_negative_integer(cp_height)
         raw_header_hex = self.controller.raw_header(height).hex()
         if cp_height == 0:
             return raw_header_hex
-        if height > cp_height:
-            raise RPCError(BAD_REQUEST,
-                           f'height {height:,d} > cp_height {cp_height:,d}')
-        max_height = self.height()
-        if cp_height > max_height:
-            raise RPCError(BAD_REQUEST, f'cp_height {cp_height:,d} > '
-                           f'max height {max_height:,d}')
-        header_mc = self.controller.header_mc
-        branch, root = header_mc.branch_and_root(cp_height + 1, height)
-        return {
-            'branch': [hash_to_hex_str(elt) for elt in branch],
-            'header': raw_header_hex,
-            'root': hash_to_hex_str(root),
-        }
+        result = {'header': raw_header_hex}
+        result.update(self._merkle_proof(cp_height, height))
+        return result
 
     def block_header_13(self, height):
         '''Return a raw block header as a hexadecimal string.
@@ -327,7 +329,7 @@ class ElectrumX(SessionBase):
         height: the header's height'''
         return self.block_header(height)
 
-    def block_headers(self, start_height, count):
+    def block_headers(self, start_height, count, cp_height=0):
         '''Return count concatenated block headers as hex for the main chain;
         starting at start_height.
 
@@ -336,9 +338,18 @@ class ElectrumX(SessionBase):
         '''
         start_height = self.controller.non_negative_integer(start_height)
         count = self.controller.non_negative_integer(count)
+        cp_height = self.controller.non_negative_integer(cp_height)
+
         count = min(count, self.MAX_CHUNK_SIZE)
-        hex_str, n = self.controller.block_headers(start_height, count)
-        return {'hex': hex_str, 'count': n, 'max': self.MAX_CHUNK_SIZE}
+        hex_str, count = self.controller.block_headers(start_height, count)
+        result = {'hex': hex_str, 'count': count, 'max': self.MAX_CHUNK_SIZE}
+        if count and cp_height:
+            last_height = start_height + count - 1
+            result.update(self._merkle_proof(cp_height, last_height))
+        return result
+
+    def block_headers_12(self, start_height, count):
+        return self.block_headers(start_height, count)
 
     def block_get_chunk(self, index):
         '''Return a chunk of block headers as a hexadecimal string.
@@ -495,13 +506,14 @@ class ElectrumX(SessionBase):
             handlers.update({
                 'mempool.get_fee_histogram':
                 controller.mempool_get_fee_histogram,
-                'blockchain.block.headers': self.block_headers,
+                'blockchain.block.headers': self.block_headers_12,
                 'server.ping': self.ping,
             })
 
         if ptuple >= (1, 4):
             handlers.update({
                 'blockchain.block.header': self.block_header,
+                'blockchain.block.headers': self.block_headers,
                 'blockchain.headers.subscribe': self.headers_subscribe,
             })
         elif ptuple >= (1, 3):

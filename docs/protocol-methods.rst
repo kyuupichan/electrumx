@@ -56,6 +56,8 @@ With *cp_height* zero:
 
    "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477"
 
+.. _cp_height example:
+
 With *cp_height* 8 on the Bitcoin Cash chain::
 
   {
@@ -134,6 +136,9 @@ Return a concatenated chunk of block headers from the main chain.
 
 
 **Example Response**
+
+See :ref:`here <cp_height example>` for an example of *root* and
+*branch* keys.
 
 ::
 
