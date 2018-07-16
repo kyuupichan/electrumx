@@ -218,16 +218,24 @@ class ElectrumX(SessionBase):
             return {'hex': raw_header.hex(), 'height': height}
         return self.controller.electrum_header(height)
 
-    def headers_subscribe(self, raw=True):
+    def _headers_subscribe(self, raw):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
         self.subscribe_headers_raw = self.assert_boolean(raw)
         self.notified_height = self.height()
         return self.subscribe_headers_result(self.height())
 
-    def headers_subscribe_old(self, raw=False):
-        '''Subscribe to get headers of new blocks; raw defaults to False.'''
-        return self.headers_subscribe(raw)
+    def headers_subscribe(self):
+        '''Subscribe to get raw headers of new blocks.'''
+        return self._headers_subscribe(True)
+
+    def headers_subscribe_True(self, raw=True):
+        '''Subscribe to get headers of new blocks.'''
+        return self._headers_subscribe(raw)
+
+    def headers_subscribe_False(self, raw=False):
+        '''Subscribe to get headers of new blocks.'''
+        return self._headers_subscribe(raw)
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
@@ -472,11 +480,11 @@ class ElectrumX(SessionBase):
         if ptuple >= (1, 3):
             handlers.update({
                 'blockchain.block.header': self.block_header,
-                'blockchain.headers.subscribe': self.headers_subscribe,
+                'blockchain.headers.subscribe': self.headers_subscribe_True,
             })
         else:
             handlers.update({
-                'blockchain.headers.subscribe': self.headers_subscribe_old,
+                'blockchain.headers.subscribe': self.headers_subscribe_False,
                 'blockchain.address.get_balance':
                 controller.address_get_balance,
                 'blockchain.address.get_history':
@@ -486,6 +494,11 @@ class ElectrumX(SessionBase):
                 'blockchain.address.listunspent':
                 controller.address_listunspent,
                 'blockchain.address.subscribe': self.address_subscribe,
+            })
+
+        if ptuple >= (1, 4):
+            handlers.update({
+                `'blockchain.headers.subscribe': self.headers_subscribe,
             })
 
         self.electrumx_handlers = handlers

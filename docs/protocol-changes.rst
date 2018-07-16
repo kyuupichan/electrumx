@@ -127,8 +127,8 @@ This version removes all support for :ref:`deserialized headers
 Changes
 -------
 
-  * The only valid value for :func:`blockchain.headers.subscribe`
-    argument *raw* is :const:`True`
+  * The argument *raw* removed from :func:`blockchain.headers.subscribe`,
+    only raw headers can be subscribed to.
   * Optional *cp_height* argument added to
     :func:`blockchain.block.header` and :func:`blockchain.block.headers`
 
