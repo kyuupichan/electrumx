@@ -297,13 +297,35 @@ class ElectrumX(SessionBase):
         hashX = self.controller.scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
-    def block_header(self, height):
+    def block_header(self, height, cp_height=0):
         '''Return a raw block header as a hexadecimal string.
 
         height: the header's height'''
         height = self.controller.non_negative_integer(height)
-        raw_header = self.controller.raw_header(height)
-        return raw_header.hex()
+        cp_height = self.controller.non_negative_integer(cp_height)
+        raw_header_hex = self.controller.raw_header(height).hex()
+        if cp_height == 0:
+            return raw_header_hex
+        if height > cp_height:
+            raise RPCError(BAD_REQUEST,
+                           f'height {height:,d} > cp_height {cp_height:,d}')
+        max_height = self.height()
+        if cp_height > max_height:
+            raise RPCError(BAD_REQUEST, f'cp_height {cp_height:,d} > '
+                           f'max height {max_height:,d}')
+        header_mc = self.controller.header_mc
+        branch, root = header_mc.branch_and_root(cp_height + 1, height)
+        return {
+            'branch': [hash_to_hex_str(elt) for elt in branch],
+            'header': raw_header_hex,
+            'root': hash_to_hex_str(root),
+        }
+
+    def block_header_13(self, height):
+        '''Return a raw block header as a hexadecimal string.
+
+        height: the header's height'''
+        return self.block_header(height)
 
     def block_headers(self, start_height, count):
         '''Return count concatenated block headers as hex for the main chain;
@@ -477,9 +499,14 @@ class ElectrumX(SessionBase):
                 'server.ping': self.ping,
             })
 
-        if ptuple >= (1, 3):
+        if ptuple >= (1, 4):
             handlers.update({
                 'blockchain.block.header': self.block_header,
+                'blockchain.headers.subscribe': self.headers_subscribe,
+            })
+        elif ptuple >= (1, 3):
+            handlers.update({
+                'blockchain.block.header': self.block_header_13,
                 'blockchain.headers.subscribe': self.headers_subscribe_True,
             })
         else:
@@ -494,11 +521,6 @@ class ElectrumX(SessionBase):
                 'blockchain.address.listunspent':
                 controller.address_listunspent,
                 'blockchain.address.subscribe': self.address_subscribe,
-            })
-
-        if ptuple >= (1, 4):
-            handlers.update({
-                `'blockchain.headers.subscribe': self.headers_subscribe,
             })
 
         self.electrumx_handlers = handlers

@@ -34,6 +34,10 @@ Return the block header at the given height.
   proof that the given header is present in the blockchain; presumably
   the client has the merkle root hard-coded as a checkpoint.
 
+  * *branch*
+
+    The merkle branch of *header* up to *root*, deepest pairing first.
+
   * *header*
 
     The raw block header as a hexadecimal string.
@@ -43,17 +47,27 @@ Return the block header at the given height.
     The merkle root of all blockchain headers up to and including
     *cp_height*.
 
-  * *branch*
-
-    The merkle branch of *header* up to *root*, deepest pairing first.
-
 
 **Example Result**
+
+With *cp_height* zero:
 
 ::
 
    "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477"
 
+With *cp_height* 8 on the Bitcoin Cash chain::
+
+  {
+    "branch": [
+       "000000004ebadb55ee9096c9a2f8880e09da59c0d68b1c228da88e48844a1485",
+       "96cbbc84783888e4cc971ae8acf86dd3c1a419370336bb3c634c97695a8c5ac9",
+       "965ac94082cebbcffe458075651e9cc33ce703ab0115c72d9e8b1a9906b2b636",
+       "89e5daa6950b895190716dd26054432b564ccdc2868188ba1da76de8e1dc7591"
+       ],
+    "header": "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477",
+    "root": "e347b1c43fd9b5415bf0d92708db8284b78daf4d0e24f9c3405f45feb85e25db"
+  }
 
 blockchain.block.headers
 ========================

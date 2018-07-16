@@ -149,10 +149,10 @@ class Source(object):
     def __init__(self, length):
         self._hashes = [os.urandom(32) for _ in range(length)]
 
-    def hashes(self, start, length):
+    def hashes(self, start, count):
         assert start >= 0
-        assert start + length <= len(self._hashes)
-        return self._hashes[start: start + length]
+        assert start + count <= len(self._hashes)
+        return self._hashes[start: start + count]
 
 
 def test_merkle_cache():

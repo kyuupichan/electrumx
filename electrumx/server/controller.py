@@ -20,9 +20,9 @@ from functools import partial
 import pylru
 
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
-from electrumx.lib.hash import double_sha256, hash_to_hex_str, hex_str_to_hash
+from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.hash import HASHX_LEN
-from electrumx.lib.merkle import Merkle
+from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.peer import Peer
 from electrumx.lib.server_base import ServerBase
 import electrumx.lib.util as util
@@ -35,6 +35,12 @@ from electrumx.server.version import VERSION
 
 version_string = util.version_string
 merkle = Merkle()
+
+
+class HeaderSource(object):
+
+    def __init__(self, db):
+        self.hashes = db.fs_block_hashes
 
 
 class SessionGroup(object):
@@ -54,7 +60,7 @@ class Controller(ServerBase):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
     PROTOCOL_MIN = '1.1'
-    PROTOCOL_MAX = '1.3'
+    PROTOCOL_MAX = '1.4'
     AIORPCX_MIN = (0, 5, 6)
     VERSION = VERSION
 
@@ -236,6 +242,10 @@ class Controller(ServerBase):
         synchronize, then kick off server background processes.'''
         await self.bp.caught_up_event.wait()
         self.logger.info('block processor has caught up')
+        length = max(1, self.bp.db_height - self.env.reorg_limit)
+        source = HeaderSource(self.bp)
+        self.header_mc = MerkleCache(merkle, source, length)
+        self.logger.info('populated header merkle cache')
         self.create_task(self.mempool.main_loop())
         await self.mempool.synchronized_event.wait()
         self.create_task(self.peer_mgr.main_loop())
