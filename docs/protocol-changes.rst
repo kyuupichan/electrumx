@@ -121,15 +121,16 @@ Deprecated methods
 Version 1.4
 ===========
 
-This documents the current intent for protocol version 1.4 which is
-not yet implemented.  It removes all support for :ref:`deserialized
-headers <deserialized header>`.
+This version removes all support for :ref:`deserialized headers
+<deserialized header>`.
 
 Changes
 -------
 
   * The only valid value for :func:`blockchain.headers.subscribe`
     argument *raw* is :const:`True`
+  * Optional *cp_height* argument added to
+    :func:`blockchain.block.header` and :func:`blockchain.block.headers`
 
 Removed methods
 ---------------

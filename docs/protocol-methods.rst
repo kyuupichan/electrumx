@@ -2,69 +2,6 @@
  Protocol Methods
 ==================
 
-blockchain.block.get_header
-===========================
-
-Return the :ref:`deserialized header <deserialized header>` of the
-block at the given height.
-
-**Signature**
-
-  .. function:: blockchain.block.get_header(height)
-  .. deprecated:: 1.3
-
-  *height*
-
-    The height of the block, an integer.
-
-**Result**
-
-  The coin-specific :ref:`deserialized header <deserialized header>`.
-
-**Example Result**
-
-::
-
-  {
-    "bits": 392292856,
-    "block_height": 510000,
-    "merkle_root": "297cfcc6a66e063692b20650d21cc0ac7a2a80f7277ebd7c5d6c7010a070d25c",
-    "nonce": 3347656422,
-    "prev_block_hash": "0000000000000000002292de0d9f03dfa15a04dbf09102d5d4552117b717fa86",
-    "timestamp": 1519083654,
-    "version": 536870912
-  }
-
-blockchain.block.get_chunk
-==========================
-
-Return a concatenated chunk of block headers from the main chain.
-Typically, a chunk consists of a fixed number of block headers over
-which difficulty is constant, and at the end of which difficulty is
-retargeted.
-
-In the case of Bitcoin a chunk is 2,016 headers, each of 80 bytes, so
-chunk 5 consists of the block headers from height 10,080 to 12,095
-inclusive.  When encoded as hexadecimal, the result string is twice as
-long, so for Bitcoin it takes 322,560 bytes, making this a
-bandwidth-intensive request.
-
-**Signature**
-
-  .. function:: blockchain.block.get_chunk(index)
-  .. deprecated:: 1.2
-
-  *index*
-
-    The zero-based index of the chunk, an integer.
-
-**Result**
-
-    The binary block headers as hexadecimal strings, in-order and
-    concatenated together.  As many as headers as are available at the
-    implied starting height will be returned; this may range from zero
-    to the coin-specific chunk size.
-
 blockchain.block.header
 =======================
 
@@ -72,22 +9,51 @@ Return the block header at the given height.
 
 **Signature**
 
-  .. function:: blockchain.block.header(height)
+  .. function:: blockchain.block.header(height, cp_height=0)
   .. versionadded:: 1.3
+  .. versionchanged:: 1.4
+     *cp_height* parameter added
 
   *height*
 
-    The height of the block, an integer.
+    The height of the block, a non-negative integer.
+
+  *cp_height*
+
+    Checkpoint height, a non-negative integer.  Ignored if zero,
+    otherwise the following must hold:
+
+      *height* <= *cp_height*
 
 **Result**
 
-  The raw block header as a hexadecimal string.
+  If *cp_height* is zero, the raw block header as a hexadecimal
+  string.
+
+  Otherwise a dictionary with the following keys.  This provides a
+  proof that the given header is present in the blockchain; presumably
+  the client has the merkle root hard-coded as a checkpoint.
+
+  * *header*
+
+    The raw block header as a hexadecimal string.
+
+  * *root*
+
+    The merkle root of all blockchain headers up to and including
+    *cp_height*.
+
+  * *branch*
+
+    The merkle branch of *header* up to *root*, deepest pairing first.
+
 
 **Example Result**
 
 ::
 
    "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477"
+
 
 blockchain.block.headers
 ========================
@@ -96,8 +62,10 @@ Return a concatenated chunk of block headers from the main chain.
 
 **Signature**
 
-  .. function:: blockchain.block.headers(start_height, count)
+  .. function:: blockchain.block.headers(start_height, count, cp_height=0)
   .. versionadded:: 1.2
+  .. versionchanged:: 1.4
+     *cp_height* parameter added
 
   *start_height*
 
@@ -106,6 +74,13 @@ Return a concatenated chunk of block headers from the main chain.
   *count*
 
     The number of headers requested, a non-negative integer.
+
+  *cp_height*
+
+    Checkpoint height, a non-negative integer.  Ignored if zero,
+    otherwise the following must hold:
+
+      *start_height* + (*count* - 1) <= *cp_height*
 
 **Result**
 
@@ -128,6 +103,22 @@ Return a concatenated chunk of block headers from the main chain.
     The maximum number of headers the server will return in a single
     request.
 
+  The dictionary additionally has the following keys if *count* and
+  *cp_height* are not zero.  This provides a proof that all the given
+  headers are present in the blockchain; presumably the client has the
+  merkle root hard-coded as a checkpoint.
+
+  * *root*
+
+    The merkle root of all blockchain headers up to and including
+    *cp_height*.
+
+  * *branch*
+
+    The merkle branch of the last returned header up to *root*,
+    deepest pairing first.
+
+
 **Example Response**
 
 ::
@@ -135,7 +126,7 @@ Return a concatenated chunk of block headers from the main chain.
   {
     "count": 2,
     "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299"
-     "max": 2016
+    "max": 2016
   }
 
 blockchain.estimatefee
@@ -600,7 +591,7 @@ When *verbose* is :const:`True`::
 blockchain.transaction.get_merkle
 =================================
 
-Return the markle branch to a confirmed transaction given its hash
+Return the merkle branch to a confirmed transaction given its hash
 and height.
 
 **Signature**
