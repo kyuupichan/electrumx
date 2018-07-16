@@ -202,6 +202,18 @@ class MerkleCache(object):
         level += self._level(hashes)
         return level
 
+    def truncate(self, length):
+        '''Truncate the cache so it is no longer than length.'''
+        if not isinstance(length, int):
+            raise TypeError('length must be an integer')
+        if length <= 0:
+            raise ValueError('length must be positive')
+        if length >= self.length:
+            return
+        length = self._leaf_start(length)
+        self.length = length
+        self.level[length >> self.depth_higher:] = []
+
     def branch_and_root(self, length, index):
         '''Return a merkle branch and root.  Length is the number of
         hashes used to calculate the merkle root, index is the position

@@ -187,6 +187,41 @@ def test_merkle_cache_extension():
                 assert root == root2
 
 
+def test_merkle_cache_truncation():
+    max_length = 33
+    source = Source(max_length)
+    for length in range(max_length - 2, max_length + 1):
+        for trunc_length in range(1, 20, 3):
+            cache = MerkleCache(merkle, source, length)
+            cache.truncate(trunc_length)
+            assert cache.length <= trunc_length
+            for cp_length in range(1, length + 1, 3):
+                cp_hashes = source.hashes(0, cp_length)
+                # All possible indices
+                for index in range(cp_length):
+                    # Compare correct answer with cache
+                    branch, root = merkle.branch_and_root(cp_hashes, index)
+                    branch2, root2 = cache.branch_and_root(cp_length, index)
+                    assert branch == branch2
+                    assert root == root2
+
+    # Truncation is a no-op if longer
+    cache = MerkleCache(merkle, source, 10)
+    level = cache.level.copy()
+    for length in range(10, 13):
+        cache.truncate(length)
+        assert cache.level == level
+        assert cache.length == 10
+
+def test_truncation_bad():
+    cache = MerkleCache(merkle, Source(10), 10)
+    with pytest.raises(TypeError):
+        cache.truncate(1.0)
+    for n in (-1, 0):
+        with pytest.raises(ValueError):
+            cache.truncate(n)
+
+
 def test_markle_cache_bad():
     length = 23
     source = Source(length)
@@ -206,7 +241,7 @@ def test_bad_extension():
     length = 5
     source = Source(length)
     cache = MerkleCache(merkle, source, length)
-    level = cache.level
+    level = cache.level.copy()
     with pytest.raises(AssertionError):
         cache.branch_and_root(8, 0)
     # The bad extension should not destroy the cache
