@@ -7,6 +7,12 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.6
+===========
+
+* implement :ref:`version 1.4` of the protocol, with benefit for light
+  clients, particularly mobile
+
 Version 1.5.2
 =============
 

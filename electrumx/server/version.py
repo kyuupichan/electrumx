@@ -1,1 +1,1 @@
-VERSION = 'ElectrumX 1.5.2'
+VERSION = 'ElectrumX 1.6'
