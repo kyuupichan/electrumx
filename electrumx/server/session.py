@@ -15,6 +15,7 @@ from functools import partial
 
 from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
 
+import electrumx
 from electrumx.lib.hash import sha256, hash_to_hex_str
 import electrumx.lib.util as util
 from electrumx.server.daemon import DaemonError
@@ -378,8 +379,8 @@ class ElectrumX(SessionBase):
         revision //= 100
         daemon_version = '{:d}.{:d}.{:d}'.format(major, minor, revision)
         for pair in [
-                ('$SERVER_VERSION', self.controller.short_version()),
-                ('$SERVER_SUBVERSION', self.controller.VERSION),
+                ('$SERVER_VERSION', electrumx.version_short),
+                ('$SERVER_SUBVERSION', electrumx.version),
                 ('$DAEMON_VERSION', daemon_version),
                 ('$DAEMON_SUBVERSION', network_info['subversion']),
                 ('$DONATION_ADDRESS', self.env.donation_address),
@@ -448,7 +449,7 @@ class ElectrumX(SessionBase):
 
         self.set_protocol_handlers(ptuple)
 
-        return (self.controller.VERSION, self.protocol_version)
+        return (electrumx.version, self.protocol_version)
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.

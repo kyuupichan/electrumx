@@ -223,7 +223,7 @@ provided for the final header - the *prev_hash* links in the headers
 are sufficient to prove the others valid.
 
 Using this feature client software only needs to download the headers
-it is interested in up to the checkpoint.  HHeaders after the
+it is interested in up to the checkpoint.  Headers after the
 checkpoint must all be downloaded and validated as before.  The RPC
 calls return the merkle root, so to embed a checkpoint in a client
 simply make an RPC request to a couple of trusted servers for the

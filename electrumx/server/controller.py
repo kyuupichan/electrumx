@@ -20,6 +20,7 @@ from functools import partial
 import pylru
 
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
+import electrumx
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.merkle import Merkle, MerkleCache
@@ -30,7 +31,6 @@ from electrumx.server.daemon import DaemonError
 from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
 from electrumx.server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
-from electrumx.server.version import VERSION
 
 
 version_string = util.version_string
@@ -62,7 +62,6 @@ class Controller(ServerBase):
     PROTOCOL_MIN = '1.1'
     PROTOCOL_MAX = '1.4'
     AIORPCX_MIN = (0, 5, 6)
-    VERSION = VERSION
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
@@ -71,7 +70,7 @@ class Controller(ServerBase):
             raise RuntimeError('ElectrumX requires aiorpcX >= '
                                f'{version_string(self.AIORPCX_MIN)}')
 
-        self.logger.info(f'software version: {self.VERSION}')
+        self.logger.info(f'software version: {electrumx.version}')
         self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
         self.logger.info(f'supported protocol versions: '
                          f'{self.PROTOCOL_MIN}-{self.PROTOCOL_MAX}')
@@ -115,17 +114,12 @@ class Controller(ServerBase):
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = asyncio.Event()
 
-    @classmethod
-    def short_version(cls):
-        '''Return e.g. "1.2" for ElectrumX 1.2'''
-        return cls.VERSION.split()[-1]
-
     def server_features(self):
         '''Return the server features dictionary.'''
         return {
             'hosts': self.env.hosts_dict(),
             'pruning': None,
-            'server_version': self.VERSION,
+            'server_version': electrumx.version,
             'protocol_min': self.PROTOCOL_MIN,
             'protocol_max': self.PROTOCOL_MAX,
             'genesis_hash': self.coin.GENESIS_HASH,
@@ -134,7 +128,7 @@ class Controller(ServerBase):
 
     def server_version_args(self):
         '''The arguments to a server.version RPC call to a peer.'''
-        return [self.VERSION, [self.PROTOCOL_MIN, self.PROTOCOL_MAX]]
+        return [electrumx.version, [self.PROTOCOL_MIN, self.PROTOCOL_MAX]]
 
     def protocol_tuple(self, client_protocol_str):
         '''Given a client's protocol version string, return the negotiated
@@ -421,7 +415,7 @@ class Controller(ServerBase):
         '''A one-line summary of server state.'''
         group_map = self._group_map()
         return {
-            'version': VERSION,
+            'version': electrumx.version,
             'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.bp.db_height,

@@ -15,6 +15,7 @@ from struct import pack, unpack
 import time
 from functools import partial
 
+import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, formatted_time, class_logger
@@ -216,7 +217,7 @@ class BlockProcessor(electrumx.server.db.DB):
         self.first_sync = False
         await self.controller.run_in_executor(self.flush, True)
         if self.utxo_db.for_sync:
-            self.logger.info(f'{self.controller.VERSION} synced to '
+            self.logger.info(f'{electrumx.version} synced to '
                              f'height {self.height:,d}')
         self.open_dbs()
         self.caught_up_event.set()
