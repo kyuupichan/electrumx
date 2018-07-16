@@ -440,8 +440,6 @@ class ElectrumX(SessionBase):
         ptuple = self.controller.protocol_tuple(protocol_version)
 
         if ptuple is None:
-            self.logger.info('unsupported protocol version request {}'
-                             .format(protocol_version))
             self.close_after_send = True
             raise RPCError(BAD_REQUEST,
                            f'unsupported protocol version: {protocol_version}')

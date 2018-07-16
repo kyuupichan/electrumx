@@ -122,12 +122,17 @@ class Controller(ServerBase):
         '''The arguments to a server.version RPC call to a peer.'''
         return [electrumx.version, [self.PROTOCOL_MIN, self.PROTOCOL_MAX]]
 
-    def protocol_tuple(self, client_protocol_str):
-        '''Given a client's protocol version string, return the negotiated
-        protocol version tuple, or None if unsupported.
+    def protocol_tuple(self, request):
+        '''Given a client's protocol version request, return the negotiated
+        protocol tuple.  If the request is unsupported return None.
         '''
-        return util.protocol_version(client_protocol_str,
-                                     self.PROTOCOL_MIN, self.PROTOCOL_MAX)
+        ptuple, client_min = util.protocol_version(request, self.PROTOCOL_MIN,
+                                                   self.PROTOCOL_MAX)
+        if not ptuple and client_min > util.protocol_tuple(self.PROTOCOL_MIN):
+            version = version_string(client_min)
+            self.logger.info(f'client requested future protocol version '
+                             f'{version} - is your software out of date?')
+        return ptuple
 
     async def start_servers(self):
         '''Start the RPC server and schedule the external servers to be

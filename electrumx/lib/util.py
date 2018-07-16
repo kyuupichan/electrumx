@@ -305,6 +305,15 @@ def version_string(ptuple):
 
 
 def protocol_version(client_req, server_min, server_max):
+    '''Given a client's protocol version string, return a pair of
+    protocol tuples:
+
+           (negotiated version, client min request)
+
+    If the request is unsupported, the negotiated protocol tuple is
+    None.
+
+    '''
     '''Given a client protocol request, return the protocol version
     to use as a tuple.
 
@@ -326,7 +335,7 @@ def protocol_version(client_req, server_min, server_max):
     if result < max(client_min, server_min) or result == (0, ):
         result = None
 
-    return result
+    return result, client_min
 
 
 unpack_int32_from = Struct('<i').unpack_from
