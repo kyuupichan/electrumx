@@ -172,7 +172,7 @@ def test_merkle_cache():
                 assert root == root2
 
 
-def merkle_cache_extension():
+def test_merkle_cache_extension():
     source = Source(64)
     for length in range(14, 18):
         for cp_length in range(30, 36):
@@ -200,6 +200,7 @@ def test_markle_cache_bad():
         cache.branch_and_root(0, -1)
     with pytest.raises(ValueError):
         cache.branch_and_root(3, 3)
+
 
 def test_bad_extension():
     length = 5
