@@ -181,16 +181,20 @@ Subscribe to receive block headers when a new block is found.
 
 **Signature**
 
-  .. function:: blockchain.headers.subscribe(raw=True)
+  .. function:: blockchain.headers.subscribe()
   .. versionchanged:: 1.2
      Optional *raw* parameter added, defaulting to :const:`False`.
   .. versionchanged:: 1.3
      *raw* parameter deafults to :const:`True`.
+  .. versionchanged:: 1.4
+     *raw* parameter removed; responses and notifications pass raw
+     headers.
 
   * *raw*
 
-    :const:`False` or :const:`True`.  The value :const:`False` is
-    deprecated.
+    This single boolean argument exists in protocol versions 1.2
+    (defaulting to :const:`False`) and 1.3 (defaulting to
+    :const:`True`) only.
 
 **Result**
 
