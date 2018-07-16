@@ -23,7 +23,6 @@ from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
 import electrumx
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.hash import HASHX_LEN
-from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.peer import Peer
 from electrumx.lib.server_base import ServerBase
 import electrumx.lib.util as util
@@ -34,13 +33,6 @@ from electrumx.server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
 
 
 version_string = util.version_string
-merkle = Merkle()
-
-
-class HeaderSource(object):
-
-    def __init__(self, db):
-        self.hashes = db.fs_block_hashes
 
 
 class SessionGroup(object):
@@ -235,11 +227,6 @@ class Controller(ServerBase):
         '''Wait for the block processor to catch up, and for the mempool to
         synchronize, then kick off server background processes.'''
         await self.bp.caught_up_event.wait()
-        self.logger.info('block processor has caught up')
-        length = max(1, self.bp.db_height - self.env.reorg_limit)
-        source = HeaderSource(self.bp)
-        self.header_mc = MerkleCache(merkle, source, length)
-        self.logger.info('populated header merkle cache')
         self.create_task(self.mempool.main_loop())
         await self.mempool.synchronized_event.wait()
         self.create_task(self.peer_mgr.main_loop())
@@ -867,7 +854,7 @@ class Controller(ServerBase):
                            f'block {block_hash} at height {height:,d}')
 
         hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch, root = merkle.branch_and_root(hashes, pos)
+        branch, root = self.bp.merkle.branch_and_root(hashes, pos)
         branch = [hash_to_hex_str(hash) for hash in branch]
 
         return {"block_height": height, "merkle": branch, "pos": pos}

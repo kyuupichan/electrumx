@@ -18,6 +18,7 @@ from functools import partial
 import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import chunks, formatted_time, class_logger
 import electrumx.server.db
 
@@ -128,6 +129,12 @@ class Prefetcher(object):
         return True
 
 
+class HeaderSource(object):
+
+    def __init__(self, db):
+        self.hashes = db.fs_block_hashes
+
+
 class ChainError(Exception):
     '''Raised on error processing blocks.'''
 
@@ -165,6 +172,10 @@ class BlockProcessor(electrumx.server.db.DB):
         self.last_flush = time.time()
         self.last_flush_tx_count = self.tx_count
         self.touched = set()
+
+        # Header merkle cache
+        self.merkle = Merkle()
+        self.header_mc = None
 
         # Caches of unflushed items.
         self.headers = []
@@ -220,6 +231,12 @@ class BlockProcessor(electrumx.server.db.DB):
             self.logger.info(f'{electrumx.version} synced to '
                              f'height {self.height:,d}')
         self.open_dbs()
+        self.logger.info(f'caught up to height {self.height:,d}')
+        length = max(1, self.height - self.env.reorg_limit)
+        self.header_mc = MerkleCache(self.merkle, HeaderSource(self), length)
+        self.logger.info('populated header merkle cache')
+
+        # Reorgs use header_mc so safest to set this after initializing it
         self.caught_up_event.set()
 
     async def check_and_advance_blocks(self, raw_blocks, first):
@@ -291,6 +308,8 @@ class BlockProcessor(electrumx.server.db.DB):
         for hex_hashes in chunks(hashes, 50):
             blocks = await self.daemon.raw_blocks(hex_hashes)
             await self.controller.run_in_executor(self.backup_blocks, blocks)
+        # Truncate header_mc: header count is 1 more than the height
+        self.header_mc.truncate(self.height + 1)
         await self.prefetcher.reset_height()
 
     async def reorg_hashes(self, count):

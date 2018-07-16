@@ -305,8 +305,7 @@ class ElectrumX(SessionBase):
                            f'require header height {height:,d} <= '
                            f'cp_height {cp_height:,d} <= '
                            f'chain height {max_height:,d}')
-        branch, root = self.controller.header_mc.branch_and_root(
-            cp_height + 1, height)
+        branch, root = self.bp.header_mc.branch_and_root(cp_height + 1, height)
         return {
             'branch': [hash_to_hex_str(elt) for elt in branch],
             'root': hash_to_hex_str(root),

@@ -203,7 +203,8 @@ class MerkleCache(object):
         return level
 
     def truncate(self, length):
-        '''Truncate the cache so it is no longer than length.'''
+        '''Truncate the cache so it covers no more than length underlying
+        hashes.'''
         if not isinstance(length, int):
             raise TypeError('length must be an integer')
         if length <= 0:
