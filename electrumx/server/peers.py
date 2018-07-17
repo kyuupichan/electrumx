@@ -156,12 +156,31 @@ class PeerSession(ClientSession):
             return
         # Check prior header too in case of hard fork.
         check_height = min(our_height, their_height)
-        expected_header = controller.electrum_header(check_height)
-        self.send_request('blockchain.block.get_header', [check_height],
-                          partial(self.on_header, expected_header),
-                          timeout=self.timeout)
+        raw_header = controller.raw_header(check_height)
+        if self.ptuple >= (1, 4):
+            self.send_request('blockchain.block.header', [check_height],
+                              partial(self.on_header, raw_header.hex()),
+                              timeout=self.timeout)
+        else:
+            expected_header = self.peer_mgr.env.coin.electrum_header(
+                raw_header, check_height)
+            self.send_request('blockchain.block.get_header', [check_height],
+                              partial(self.on_legacy_header, expected_header),
+                              timeout=self.timeout)
 
-    def on_header(self, expected_header, request):
+    def on_header(self, ours, request):
+        '''Handle the response to blockchain.block.get_header message.
+        Compare hashes of prior header in attempt to determine if forked.'''
+        if not self.is_good(request, str):
+            return
+
+        theirs = request.result()
+        if ours == theirs:
+            self.maybe_close()
+        else:
+            self.bad('our header {} and theirs {} differ'.format(ours, theirs))
+
+    def on_legacy_header(self, expected_header, request):
         '''Handle the response to blockchain.block.get_header message.
         Compare hashes of prior header in attempt to determine if forked.'''
         if not self.is_good(request, dict):
