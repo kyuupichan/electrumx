@@ -733,10 +733,17 @@ class ElectrumX(SessionBase):
 
         return status
 
+    async def get_utxos(self, hashX):
+        '''Get UTXOs asynchronously to reduce latency.'''
+        def job():
+            return list(self.bp.get_utxos(hashX, limit=None))
+
+        return await self.controller.run_in_executor(job)
+
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash, including mempool
         effects.'''
-        utxos = await self.controller.get_utxos(hashX)
+        utxos = await self.get_utxos(hashX)
         utxos = sorted(utxos)
         utxos.extend(self.controller.mempool.get_utxos(hashX))
         spends = await self.controller.mempool.potential_spends(hashX)
@@ -793,7 +800,7 @@ class ElectrumX(SessionBase):
         return await self.hashX_subscribe(hashX, address)
 
     async def get_balance(self, hashX):
-        utxos = await self.controller.get_utxos(hashX)
+        utxos = await self.get_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = self.controller.mempool_value(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}

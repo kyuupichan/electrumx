@@ -156,8 +156,6 @@ class Controller(ServerBase):
                                                                   height)
         return self.header_cache[height]
 
-    # Helpers for RPC "blockchain" command handlers
-
     async def get_history(self, hashX):
         '''Get history asynchronously to reduce latency.'''
         if hashX in self.history_cache:
@@ -174,10 +172,3 @@ class Controller(ServerBase):
         history = await self.run_in_executor(job)
         self.history_cache[hashX] = history
         return history
-
-    async def get_utxos(self, hashX):
-        '''Get UTXOs asynchronously to reduce latency.'''
-        def job():
-            return list(self.bp.get_utxos(hashX, limit=None))
-
-        return await self.run_in_executor(job)
