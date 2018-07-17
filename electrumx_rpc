@@ -15,9 +15,9 @@ import asyncio
 import json
 from os import environ
 
-from aiorpcx import ClientSession
+import electrumx.lib.text as text
 
-from electrumx import Controller
+from aiorpcx import ClientSession
 
 
 def main():
@@ -46,7 +46,7 @@ def main():
         async with ClientSession('localhost', port) as session:
             result = await session.send_request(method, params, timeout=15)
             if method in ('groups', 'peers', 'sessions'):
-                lines_func = getattr(Controller, f'{method}_text_lines')
+                lines_func = getattr(text, f'{method}_lines')
                 for line in lines_func(result):
                     print(line)
             else:
