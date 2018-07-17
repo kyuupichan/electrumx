@@ -22,7 +22,6 @@ import pylru
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
 import electrumx
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
-from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.peer import Peer
 from electrumx.lib.server_base import ServerBase
 import electrumx.lib.util as util
@@ -30,9 +29,6 @@ from electrumx.server.daemon import DaemonError
 from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
 from electrumx.server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
-
-
-version_string = util.version_string
 
 
 class SessionGroup(object):
@@ -57,6 +53,7 @@ class Controller(ServerBase):
         '''Initialize everything that doesn't require the event loop.'''
         super().__init__(env)
 
+        version_string = util.version_string
         if aiorpcx_version < self.AIORPCX_MIN:
             raise RuntimeError('ElectrumX requires aiorpcX >= '
                                f'{version_string(self.AIORPCX_MIN)}')
@@ -611,15 +608,6 @@ class Controller(ServerBase):
             pass
         raise RPCError(BAD_REQUEST, f'{address} is not a valid address')
 
-    def scripthash_to_hashX(self, scripthash):
-        try:
-            bin_hash = hex_str_to_hash(scripthash)
-            if len(bin_hash) == 32:
-                return bin_hash[:HASHX_LEN]
-        except Exception:
-            pass
-        raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')
-
     def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction
         hash.'''
@@ -719,29 +707,14 @@ class Controller(ServerBase):
         hashX = self.address_to_hashX(address)
         return await self.get_balance(hashX)
 
-    async def scripthash_get_balance(self, scripthash):
-        '''Return the confirmed and unconfirmed balance of a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
-        return await self.get_balance(hashX)
-
     async def address_get_history(self, address):
         '''Return the confirmed and unconfirmed history of an address.'''
         hashX = self.address_to_hashX(address)
         return await self.confirmed_and_unconfirmed_history(hashX)
 
-    async def scripthash_get_history(self, scripthash):
-        '''Return the confirmed and unconfirmed history of a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
-        return await self.confirmed_and_unconfirmed_history(hashX)
-
     async def address_get_mempool(self, address):
         '''Return the mempool transactions touching an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.unconfirmed_history(hashX)
-
-    async def scripthash_get_mempool(self, scripthash):
-        '''Return the mempool transactions touching a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
 
     async def hashX_listunspent(self, hashX):
@@ -761,11 +734,6 @@ class Controller(ServerBase):
     async def address_listunspent(self, address):
         '''Return the list of UTXOs of an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.hashX_listunspent(hashX)
-
-    async def scripthash_listunspent(self, scripthash):
-        '''Return the list of UTXOs of a scripthash.'''
-        hashX = self.scripthash_to_hashX(scripthash)
         return await self.hashX_listunspent(hashX)
 
     def block_get_header(self, height):

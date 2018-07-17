@@ -16,12 +16,24 @@ from functools import partial
 from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
 
 import electrumx
-from electrumx.lib.hash import sha256, hash_to_hex_str
+from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
+                                HASHX_LEN)
 import electrumx.lib.util as util
 from electrumx.server.daemon import DaemonError
 
+
 BAD_REQUEST = 1
 DAEMON_ERROR = 2
+
+
+def scripthash_to_hashX(scripthash):
+    try:
+        bin_hash = hex_str_to_hash(scripthash)
+        if len(bin_hash) == 32:
+            return bin_hash[:HASHX_LEN]
+    except Exception:
+        pass
+    raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')
 
 
 class Semaphores(object):
@@ -320,11 +332,31 @@ class ElectrumX(SessionBase):
         hashX = self.controller.address_to_hashX(address)
         return await self.hashX_subscribe(hashX, address)
 
+    async def scripthash_get_balance(self, scripthash):
+        '''Return the confirmed and unconfirmed balance of a scripthash.'''
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.controller.get_balance(hashX)
+
+    async def scripthash_get_history(self, scripthash):
+        '''Return the confirmed and unconfirmed history of a scripthash.'''
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.controller.confirmed_and_unconfirmed_history(hashX)
+
+    async def scripthash_get_mempool(self, scripthash):
+        '''Return the mempool transactions touching a scripthash.'''
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.controller.unconfirmed_history(hashX)
+
+    async def scripthash_listunspent(self, scripthash):
+        '''Return the list of UTXOs of a scripthash.'''
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.controller.hashX_listunspent(hashX)
+
     async def scripthash_subscribe(self, scripthash):
         '''Subscribe to a script hash.
 
         scripthash: the SHA256 hash of the script to subscribe to'''
-        hashX = self.controller.scripthash_to_hashX(scripthash)
+        hashX = scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
     def _merkle_proof(self, cp_height, height):
@@ -507,14 +539,10 @@ class ElectrumX(SessionBase):
             'blockchain.block.get_header': controller.block_get_header,
             'blockchain.estimatefee': controller.estimatefee,
             'blockchain.relayfee': controller.relayfee,
-            'blockchain.scripthash.get_balance':
-            controller.scripthash_get_balance,
-            'blockchain.scripthash.get_history':
-            controller.scripthash_get_history,
-            'blockchain.scripthash.get_mempool':
-            controller.scripthash_get_mempool,
-            'blockchain.scripthash.listunspent':
-            controller.scripthash_listunspent,
+            'blockchain.scripthash.get_balance': self.scripthash_get_balance,
+            'blockchain.scripthash.get_history': self.scripthash_get_history,
+            'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
+            'blockchain.scripthash.listunspent': self.scripthash_listunspent,
             'blockchain.scripthash.subscribe': self.scripthash_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': controller.transaction_get,
