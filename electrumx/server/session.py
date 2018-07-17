@@ -56,6 +56,17 @@ def non_negative_integer(value):
                    f'{value} should be a non-negative integer')
 
 
+def assert_tx_hash(value):
+    '''Raise an RPCError if the value is not a valid transaction
+    hash.'''
+    try:
+        if len(util.hex_to_bytes(value)) == 32:
+            return
+    except Exception:
+        pass
+    raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
+
+
 class Semaphores(object):
     '''For aiorpcX's semaphore handling.'''
 
@@ -588,6 +599,13 @@ class ElectrumX(SessionBase):
     def protocol_version_string(self):
         return util.version_string(self.protocol_tuple)
 
+    async def daemon_request(self, method, *args):
+        '''Catch a DaemonError and convert it to an RPCError.'''
+        try:
+            return await getattr(self.controller.daemon, method)(*args)
+        except DaemonError as e:
+            raise RPCError(DAEMON_ERROR, f'daemon error: {e}')
+
     def sub_count(self):
         return len(self.hashX_subs)
 
@@ -902,7 +920,7 @@ class ElectrumX(SessionBase):
         return peer_address and peer_address[0] == peername[0]
 
     async def replaced_banner(self, banner):
-        network_info = await self.controller.daemon_request('getnetworkinfo')
+        network_info = await self.daemon_request('getnetworkinfo')
         ni_version = network_info['version']
         major, minor = divmod(ni_version, 1000000)
         minor, revision = divmod(minor, 10000)
@@ -948,7 +966,7 @@ class ElectrumX(SessionBase):
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
-        return await self.controller.daemon_request('relayfee')
+        return await self.daemon_request('relayfee')
 
     async def estimatefee(self, number):
         '''The estimated transaction fee per kilobyte to be paid for a
@@ -957,7 +975,7 @@ class ElectrumX(SessionBase):
         number: the number of blocks
         '''
         number = non_negative_integer(number)
-        return await self.controller.daemon_request('estimatefee', [number])
+        return await self.daemon_request('estimatefee', [number])
 
     def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
@@ -1018,10 +1036,55 @@ class ElectrumX(SessionBase):
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
 
+    async def transaction_get(self, tx_hash, verbose=False):
+        '''Return the serialized raw transaction given its hash
+
+        tx_hash: the transaction hash as a hexadecimal string
+        verbose: passed on to the daemon
+        '''
+        assert_tx_hash(tx_hash)
+        if verbose not in (True, False):
+            raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
+
+        return await self.daemon_request('getrawtransaction', tx_hash, verbose)
+
+    async def block_hash_and_tx_hashes(self, height):
+        '''Returns a pair (block_hash, tx_hashes) for the main chain block at
+        the given height.
+
+        block_hash is a hexadecimal string, and tx_hashes is an
+        ordered list of hexadecimal strings.
+        '''
+        height = non_negative_integer(height)
+        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
+        block_hash = hex_hashes[0]
+        block = await self.daemon_request('deserialised_block', block_hash)
+        return block_hash, block['tx']
+
+    async def transaction_merkle(self, tx_hash, height):
+        '''Return the markle tree to a confirmed transaction given its hash
+        and height.
+
+        tx_hash: the transaction hash as a hexadecimal string
+        height: the height of the block it is in
+        '''
+        assert_tx_hash(tx_hash)
+        block_hash, tx_hashes = await self.block_hash_and_tx_hashes(height)
+        try:
+            pos = tx_hashes.index(tx_hash)
+        except ValueError:
+            raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
+                           f'block {block_hash} at height {height:,d}')
+
+        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
+        branch, root = self.bp.merkle.branch_and_root(hashes, pos)
+        branch = [hash_to_hex_str(hash) for hash in branch]
+
+        return {"block_height": height, "merkle": branch, "pos": pos}
+
     def set_protocol_handlers(self, ptuple):
         self.protocol_tuple = ptuple
 
-        controller = self.controller
         handlers = {
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.block.get_header': self.block_get_header,
@@ -1033,9 +1096,8 @@ class ElectrumX(SessionBase):
             'blockchain.scripthash.listunspent': self.scripthash_listunspent,
             'blockchain.scripthash.subscribe': self.scripthash_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
-            'blockchain.transaction.get': controller.transaction_get,
-            'blockchain.transaction.get_merkle':
-            controller.transaction_get_merkle,
+            'blockchain.transaction.get': self.transaction_get,
+            'blockchain.transaction.get_merkle': self.transaction_merkle,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
