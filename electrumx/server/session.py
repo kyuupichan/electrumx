@@ -328,6 +328,20 @@ class ElectrumX(SessionBase):
 
         return status
 
+    async def hashX_listunspent(self, hashX):
+        '''Return the list of UTXOs of a script hash, including mempool
+        effects.'''
+        utxos = await self.controller.get_utxos(hashX)
+        utxos = sorted(utxos)
+        utxos.extend(self.controller.mempool.get_utxos(hashX))
+        spends = await self.controller.mempool.potential_spends(hashX)
+
+        return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in utxos
+                if (utxo.tx_hash, utxo.tx_pos) not in spends]
+
     async def hashX_subscribe(self, hashX, alias):
         # First check our limit.
         if len(self.hashX_subs) >= self.max_subs:
@@ -364,7 +378,7 @@ class ElectrumX(SessionBase):
     async def address_listunspent(self, address):
         '''Return the list of UTXOs of an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.controller.hashX_listunspent(hashX)
+        return await self.hashX_listunspent(hashX)
 
     async def address_subscribe(self, address):
         '''Subscribe to an address.
@@ -411,7 +425,7 @@ class ElectrumX(SessionBase):
     async def scripthash_listunspent(self, scripthash):
         '''Return the list of UTXOs of a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.controller.hashX_listunspent(hashX)
+        return await self.hashX_listunspent(hashX)
 
     async def scripthash_subscribe(self, scripthash):
         '''Subscribe to a script hash.
@@ -462,9 +476,10 @@ class ElectrumX(SessionBase):
         count = non_negative_integer(count)
         cp_height = non_negative_integer(cp_height)
 
-        count = min(count, self.MAX_CHUNK_SIZE)
-        hex_str, count = self.controller.block_headers(start_height, count)
-        result = {'hex': hex_str, 'count': count, 'max': self.MAX_CHUNK_SIZE}
+        max_size = self.MAX_CHUNK_SIZE
+        count = min(count, max_size)
+        headers, count = self.bp.read_headers(start_height, count)
+        result = {'hex': headers.hex(), 'count': count, 'max': max_size}
         if count and cp_height:
             last_height = start_height + count - 1
             result.update(self._merkle_proof(cp_height, last_height))
@@ -480,8 +495,8 @@ class ElectrumX(SessionBase):
         index = non_negative_integer(index)
         chunk_size = self.coin.CHUNK_SIZE
         start_height = index * chunk_size
-        hex_str, n = self.controller.block_headers(start_height, chunk_size)
-        return hex_str
+        headers, count = self.bp.read_headers(start_height, chunk_size)
+        return headers.hex()
 
     def block_get_header(self, height):
         '''The deserialized header at a given height.
@@ -538,6 +553,15 @@ class ElectrumX(SessionBase):
                 banner = await self.replaced_banner(banner)
 
         return banner
+
+    def mempool_get_fee_histogram(self):
+        '''Memory pool fee histogram.'''
+        return self.controller.mempool.get_fee_histogram()
+
+    async def relayfee(self):
+        '''The minimum fee a low-priority tx must pay in order to be accepted
+        to the daemon's memory pool.'''
+        return await self.controller.daemon_request('relayfee')
 
     async def estimatefee(self, number):
         '''The estimated transaction fee per kilobyte to be paid for a
@@ -615,7 +639,7 @@ class ElectrumX(SessionBase):
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.block.get_header': self.block_get_header,
             'blockchain.estimatefee': self.estimatefee,
-            'blockchain.relayfee': controller.relayfee,
+            'blockchain.relayfee': self.relayfee,
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
             'blockchain.scripthash.get_history': self.scripthash_get_history,
             'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
@@ -636,8 +660,7 @@ class ElectrumX(SessionBase):
         if ptuple >= (1, 2):
             # New handler as of 1.2
             handlers.update({
-                'mempool.get_fee_histogram':
-                controller.mempool_get_fee_histogram,
+                'mempool.get_fee_histogram': self.mempool_get_fee_histogram,
                 'blockchain.block.headers': self.block_headers_12,
                 'server.ping': self.ping,
             })
