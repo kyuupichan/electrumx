@@ -533,7 +533,7 @@ class Controller(ServerBase):
                  session.flags(),
                  session.peer_address_str(for_log=for_log),
                  session.client,
-                 session.protocol_version,
+                 session.protocol_version_string(),
                  session.count_pending_items(),
                  session.txs_sent,
                  session.sub_count(),
