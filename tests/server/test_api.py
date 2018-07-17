@@ -10,6 +10,7 @@ loop = asyncio.get_event_loop()
 def set_env():
     env = mock.create_autospec(Env)
     env.coin = mock.Mock()
+    env.coin.SESSIONCLS.protocol_min_max_strings = lambda : ["1.1", "1.4"]
     env.loop_policy = None
     env.max_sessions = 0
     env.max_subs = 0

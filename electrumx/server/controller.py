@@ -61,11 +61,10 @@ class Controller(ServerBase):
             raise RuntimeError('ElectrumX requires aiorpcX >= '
                                f'{version_string(self.AIORPCX_MIN)}')
 
-        sclass = env.coin.SESSIONCLS
+        min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
         self.logger.info(f'software version: {electrumx.version}')
         self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
-        self.logger.info(f'supported protocol versions: '
-                         f'{sclass.PROTOCOL_MIN}-{sclass.PROTOCOL_MAX}')
+        self.logger.info(f'supported protocol versions: {min_str}-{max_str}')
         self.logger.info(f'event loop policy: {env.loop_policy}')
 
         self.coin = env.coin

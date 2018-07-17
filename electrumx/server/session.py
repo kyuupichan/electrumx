@@ -133,8 +133,8 @@ class SessionBase(ServerSession):
 class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
-    PROTOCOL_MIN = '1.1'
-    PROTOCOL_MAX = '1.4'
+    PROTOCOL_MIN = (1, 1)
+    PROTOCOL_MAX = (1, 4)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,17 +146,23 @@ class ElectrumX(SessionBase):
         self.hashX_subs = {}
         self.sv_seen = False
         self.mempool_statuses = {}
-        self.set_protocol_handlers(util.protocol_tuple(self.PROTOCOL_MIN))
+        self.set_protocol_handlers(self.PROTOCOL_MIN)
+
+    @classmethod
+    def protocol_min_max_strings(cls):
+        return [util.version_string(ver)
+                for ver in (cls.PROTOCOL_MIN, cls.PROTOCOL_MAX)]
 
     @classmethod
     def server_features(cls, env):
         '''Return the server features dictionary.'''
+        min_str, max_str = cls.protocol_min_max_strings()
         return {
             'hosts': env.hosts_dict(),
             'pruning': None,
             'server_version': electrumx.version,
-            'protocol_min': cls.PROTOCOL_MIN,
-            'protocol_max': cls.PROTOCOL_MAX,
+            'protocol_min': min_str,
+            'protocol_max': max_str,
             'genesis_hash': env.coin.GENESIS_HASH,
             'hash_function': 'sha256',
         }
@@ -164,7 +170,7 @@ class ElectrumX(SessionBase):
     @classmethod
     def server_version_args(cls):
         '''The arguments to a server.version RPC call to a peer.'''
-        return [electrumx.version, [cls.PROTOCOL_MIN, cls.PROTOCOL_MAX]]
+        return [electrumx.version, cls.protocol_min_max_strings()]
 
     def protocol_version_string(self):
         return util.version_string(self.protocol_tuple)
@@ -463,9 +469,9 @@ class ElectrumX(SessionBase):
         ptuple, client_min = util.protocol_version(
             protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
         if ptuple is None:
-            if client_min > util.protocol_tuple(self.PROTOCOL_MIN):
+            if client_min > self.PROTOCOL_MIN:
                 self.logger.info(f'client requested future protocol version '
-                                 f'{version_string(client_min)} '
+                                 f'{util.version_string(client_min)} '
                                  f'- is your software out of date?')
             self.close_after_send = True
             raise RPCError(BAD_REQUEST,
