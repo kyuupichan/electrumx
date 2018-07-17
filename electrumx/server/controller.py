@@ -638,19 +638,6 @@ class Controller(ServerBase):
                                f'{self.max_subs:,d} reached')
         self.subs_room -= 1
 
-    async def get_balance(self, hashX):
-        utxos = await self.get_utxos(hashX)
-        confirmed = sum(utxo.value for utxo in utxos)
-        unconfirmed = self.mempool_value(hashX)
-        return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
-
-    async def unconfirmed_history(self, hashX):
-        # Note unconfirmed history is unordered in electrum-server
-        # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = await self.mempool_transactions(hashX)
-        return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
-                for tx_hash, fee, unconfirmed in mempool]
-
     async def get_history(self, hashX):
         '''Get history asynchronously to reduce latency.'''
         if hashX in self.history_cache:
@@ -667,13 +654,6 @@ class Controller(ServerBase):
         history = await self.run_in_executor(job)
         self.history_cache[hashX] = history
         return history
-
-    async def confirmed_and_unconfirmed_history(self, hashX):
-        # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.get_history(hashX)
-        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
-                for tx_hash, height in history]
-        return conf + await self.unconfirmed_history(hashX)
 
     async def get_utxos(self, hashX):
         '''Get UTXOs asynchronously to reduce latency.'''

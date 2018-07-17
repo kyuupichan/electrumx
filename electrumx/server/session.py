@@ -336,17 +336,17 @@ class ElectrumX(SessionBase):
     async def address_get_balance(self, address):
         '''Return the confirmed and unconfirmed balance of an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.controller.get_balance(hashX)
+        return await self.get_balance(hashX)
 
     async def address_get_history(self, address):
         '''Return the confirmed and unconfirmed history of an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.controller.confirmed_and_unconfirmed_history(hashX)
+        return await self.confirmed_and_unconfirmed_history(hashX)
 
     async def address_get_mempool(self, address):
         '''Return the mempool transactions touching an address.'''
         hashX = self.address_to_hashX(address)
-        return await self.controller.unconfirmed_history(hashX)
+        return await self.unconfirmed_history(hashX)
 
     async def address_listunspent(self, address):
         '''Return the list of UTXOs of an address.'''
@@ -360,20 +360,40 @@ class ElectrumX(SessionBase):
         hashX = self.address_to_hashX(address)
         return await self.hashX_subscribe(hashX, address)
 
+    async def get_balance(self, hashX):
+        utxos = await self.controller.get_utxos(hashX)
+        confirmed = sum(utxo.value for utxo in utxos)
+        unconfirmed = self.controller.mempool_value(hashX)
+        return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
+
     async def scripthash_get_balance(self, scripthash):
         '''Return the confirmed and unconfirmed balance of a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.controller.get_balance(hashX)
+        return await self.get_balance(hashX)
+
+    async def unconfirmed_history(self, hashX):
+        # Note unconfirmed history is unordered in electrum-server
+        # Height is -1 if unconfirmed txins, otherwise 0
+        mempool = await self.controller.mempool_transactions(hashX)
+        return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
+                for tx_hash, fee, unconfirmed in mempool]
+
+    async def confirmed_and_unconfirmed_history(self, hashX):
+        # Note history is ordered but unconfirmed is unordered in e-s
+        history = await self.controller.get_history(hashX)
+        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
+                for tx_hash, height in history]
+        return conf + await self.unconfirmed_history(hashX)
 
     async def scripthash_get_history(self, scripthash):
         '''Return the confirmed and unconfirmed history of a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.controller.confirmed_and_unconfirmed_history(hashX)
+        return await self.confirmed_and_unconfirmed_history(hashX)
 
     async def scripthash_get_mempool(self, scripthash):
         '''Return the mempool transactions touching a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.controller.unconfirmed_history(hashX)
+        return await self.unconfirmed_history(hashX)
 
     async def scripthash_listunspent(self, scripthash):
         '''Return the list of UTXOs of a scripthash.'''
@@ -773,8 +793,7 @@ class DashElectrumX(ElectrumX):
                     mn_payment_queue, mn_info['payee'])
                 mn_info['inselection'] = (
                     mn_info['paymentposition'] < mn_payment_count // 10)
-                balance = await self.controller.address_get_balance(
-                    mn_info['payee'])
+                balance = await self.address_get_balance(mn_info['payee'])
                 mn_info['balance'] = (sum(balance.values())
                                       / self.coin.VALUE_PER_COIN)
                 mn_list.append(mn_info)
