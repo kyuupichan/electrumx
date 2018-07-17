@@ -36,6 +36,19 @@ def scripthash_to_hashX(scripthash):
     raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')
 
 
+def non_negative_integer(value):
+    '''Return param value it is or can be converted to a non-negative
+    integer, otherwise raise an RPCError.'''
+    try:
+        value = int(value)
+        if value >= 0:
+            return value
+    except ValueError:
+        pass
+    raise RPCError(BAD_REQUEST,
+                   f'{value} should be a non-negative integer')
+
+
 class Semaphores(object):
 
     def __init__(self, semaphores):
@@ -423,8 +436,8 @@ class ElectrumX(SessionBase):
     def block_header(self, height, cp_height=0):
         '''Return a raw block header as a hexadecimal string, or as a
         dictionary with a merkle proof.'''
-        height = self.controller.non_negative_integer(height)
-        cp_height = self.controller.non_negative_integer(cp_height)
+        height = non_negative_integer(height)
+        cp_height = non_negative_integer(cp_height)
         raw_header_hex = self.controller.raw_header(height).hex()
         if cp_height == 0:
             return raw_header_hex
@@ -445,9 +458,9 @@ class ElectrumX(SessionBase):
         start_height and count must be non-negative integers.  At most
         MAX_CHUNK_SIZE headers will be returned.
         '''
-        start_height = self.controller.non_negative_integer(start_height)
-        count = self.controller.non_negative_integer(count)
-        cp_height = self.controller.non_negative_integer(cp_height)
+        start_height = non_negative_integer(start_height)
+        count = non_negative_integer(count)
+        cp_height = non_negative_integer(cp_height)
 
         count = min(count, self.MAX_CHUNK_SIZE)
         hex_str, count = self.controller.block_headers(start_height, count)
@@ -464,11 +477,18 @@ class ElectrumX(SessionBase):
         '''Return a chunk of block headers as a hexadecimal string.
 
         index: the chunk index'''
-        index = self.controller.non_negative_integer(index)
+        index = non_negative_integer(index)
         chunk_size = self.coin.CHUNK_SIZE
         start_height = index * chunk_size
         hex_str, n = self.controller.block_headers(start_height, chunk_size)
         return hex_str
+
+    def block_get_header(self, height):
+        '''The deserialized header at a given height.
+
+        height: the header's height'''
+        height = non_negative_integer(height)
+        return self.controller.electrum_header(height)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
@@ -518,6 +538,15 @@ class ElectrumX(SessionBase):
                 banner = await self.replaced_banner(banner)
 
         return banner
+
+    async def estimatefee(self, number):
+        '''The estimated transaction fee per kilobyte to be paid for a
+        transaction to be included within a certain number of blocks.
+
+        number: the number of blocks
+        '''
+        number = non_negative_integer(number)
+        return await self.controller.daemon_request('estimatefee', [number])
 
     def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
@@ -584,8 +613,8 @@ class ElectrumX(SessionBase):
         controller = self.controller
         handlers = {
             'blockchain.block.get_chunk': self.block_get_chunk,
-            'blockchain.block.get_header': controller.block_get_header,
-            'blockchain.estimatefee': controller.estimatefee,
+            'blockchain.block.get_header': self.block_get_header,
+            'blockchain.estimatefee': self.estimatefee,
             'blockchain.relayfee': controller.relayfee,
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
             'blockchain.scripthash.get_history': self.scripthash_get_history,

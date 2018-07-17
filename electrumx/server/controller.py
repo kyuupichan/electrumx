@@ -28,7 +28,8 @@ import electrumx.lib.util as util
 from electrumx.server.daemon import DaemonError
 from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
-from electrumx.server.session import LocalRPC, BAD_REQUEST, DAEMON_ERROR
+from electrumx.server.session import (LocalRPC, BAD_REQUEST, DAEMON_ERROR,
+                                      non_negative_integer)
 
 
 class SessionGroup(object):
@@ -594,7 +595,7 @@ class Controller(ServerBase):
 
         count: number of blocks to reorg (default 3)
         '''
-        count = self.non_negative_integer(count)
+        count = non_negative_integer(count)
         if not self.bp.force_chain_reorg(count):
             raise RPCError(BAD_REQUEST, 'still catching up with daemon')
         return 'scheduled a reorg of {:,d} blocks'.format(count)
@@ -610,18 +611,6 @@ class Controller(ServerBase):
         except Exception:
             pass
         raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
-
-    def non_negative_integer(self, value):
-        '''Return param value it is or can be converted to a non-negative
-        integer, otherwise raise an RPCError.'''
-        try:
-            value = int(value)
-            if value >= 0:
-                return value
-        except ValueError:
-            pass
-        raise RPCError(BAD_REQUEST,
-                       f'{value} should be a non-negative integer')
 
     async def daemon_request(self, method, *args):
         '''Catch a DaemonError and convert it to an RPCError.'''
@@ -689,22 +678,6 @@ class Controller(ServerBase):
                 for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
-    def block_get_header(self, height):
-        '''The deserialized header at a given height.
-
-        height: the header's height'''
-        height = self.non_negative_integer(height)
-        return self.electrum_header(height)
-
-    async def estimatefee(self, number):
-        '''The estimated transaction fee per kilobyte to be paid for a
-        transaction to be included within a certain number of blocks.
-
-        number: the number of blocks
-        '''
-        number = self.non_negative_integer(number)
-        return await self.daemon_request('estimatefee', [number])
-
     def mempool_get_fee_histogram(self):
         '''Memory pool fee histogram.
 
@@ -738,7 +711,7 @@ class Controller(ServerBase):
         height: the height of the block it is in
         '''
         self.assert_tx_hash(tx_hash)
-        height = self.non_negative_integer(height)
+        height = non_negative_integer(height)
 
         hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
         block_hash = hex_hashes[0]
