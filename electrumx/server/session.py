@@ -1068,6 +1068,17 @@ class ElectrumX(SessionBase):
         block = await self.daemon_request('deserialised_block', block_hash)
         return block_hash, block['tx']
 
+    def _get_merkle_branch(self, tx_hashes, tx_pos):
+        '''Return a merkle branch to a transaction.
+
+        tx_hashes: ordered list of hex strings of tx hashes in a block
+        tx_pos: index of transaction in tx_hashes to create branch for
+        '''
+        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
+        branch, root = self.bp.merkle.branch_and_root(hashes, tx_pos)
+        branch = [hash_to_hex_str(hash) for hash in branch]
+        return branch
+
     async def transaction_merkle(self, tx_hash, height):
         '''Return the markle tree to a confirmed transaction given its hash
         and height.
@@ -1082,12 +1093,29 @@ class ElectrumX(SessionBase):
         except ValueError:
             raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
                            f'block {block_hash} at height {height:,d}')
-
-        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch, root = self.bp.merkle.branch_and_root(hashes, pos)
-        branch = [hash_to_hex_str(hash) for hash in branch]
-
+        branch = self._get_merkle_branch(tx_hashes, pos)
         return {"block_height": height, "merkle": branch, "pos": pos}
+
+    async def transaction_id_from_pos(self, height, tx_pos, merkle=False):
+        '''Return the txid and optionally a merkle proof, given
+        a block height and position in the block.
+        '''
+        tx_pos = non_negative_integer(tx_pos)
+        if merkle not in (True, False):
+            raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
+
+        block_hash, tx_hashes = await self.block_hash_and_tx_hashes(height)
+        try:
+            tx_hash = tx_hashes[tx_pos]
+        except IndexError:
+            raise RPCError(BAD_REQUEST, f'no tx at position {tx_pos:,d} in '
+                           f'block {block_hash} at height {height:,d}')
+        branch = self._get_merkle_branch(tx_hashes, tx_pos)
+
+        if merkle:
+            return {"tx_hash": tx_hash, "merkle": branch}
+        else:
+            return tx_hash
 
     def set_protocol_handlers(self, ptuple):
         self.protocol_tuple = ptuple
@@ -1126,6 +1154,8 @@ class ElectrumX(SessionBase):
                 'blockchain.block.header': self.block_header,
                 'blockchain.block.headers': self.block_headers,
                 'blockchain.headers.subscribe': self.headers_subscribe,
+                'blockchain.transaction.id_from_pos':
+                    self.transaction_id_from_pos,
             })
         elif ptuple >= (1, 3):
             handlers.update({
