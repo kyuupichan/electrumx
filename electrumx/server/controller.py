@@ -13,14 +13,11 @@ import pylru
 
 from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
 import electrumx
-from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.server_base import ServerBase
-import electrumx.lib.util as util
-from electrumx.server.daemon import DaemonError
+from electrumx.lib.util import version_string
 from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
-from electrumx.server.session import (BAD_REQUEST, DAEMON_ERROR,
-                                      SessionManager, non_negative_integer)
+from electrumx.server.session import BAD_REQUEST, SessionManager
 
 
 class Controller(ServerBase):
@@ -36,7 +33,6 @@ class Controller(ServerBase):
         '''Initialize everything that doesn't require the event loop.'''
         super().__init__(env)
 
-        version_string = util.version_string
         if aiorpcx_version < self.AIORPCX_MIN:
             raise RuntimeError('ElectrumX requires aiorpcX >= '
                                f'{version_string(self.AIORPCX_MIN)}')
@@ -162,23 +158,6 @@ class Controller(ServerBase):
 
     # Helpers for RPC "blockchain" command handlers
 
-    def assert_tx_hash(self, value):
-        '''Raise an RPCError if the value is not a valid transaction
-        hash.'''
-        try:
-            if len(util.hex_to_bytes(value)) == 32:
-                return
-        except Exception:
-            pass
-        raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
-
-    async def daemon_request(self, method, *args):
-        '''Catch a DaemonError and convert it to an RPCError.'''
-        try:
-            return await getattr(self.daemon, method)(*args)
-        except DaemonError as e:
-            raise RPCError(DAEMON_ERROR, f'daemon error: {e}')
-
     async def get_history(self, hashX):
         '''Get history asynchronously to reduce latency.'''
         if hashX in self.history_cache:
@@ -202,41 +181,3 @@ class Controller(ServerBase):
             return list(self.bp.get_utxos(hashX, limit=None))
 
         return await self.run_in_executor(job)
-
-    async def transaction_get(self, tx_hash, verbose=False):
-        '''Return the serialized raw transaction given its hash
-
-        tx_hash: the transaction hash as a hexadecimal string
-        verbose: passed on to the daemon
-        '''
-        self.assert_tx_hash(tx_hash)
-        if verbose not in (True, False):
-            raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
-
-        return await self.daemon_request('getrawtransaction', tx_hash, verbose)
-
-    async def transaction_get_merkle(self, tx_hash, height):
-        '''Return the markle tree to a confirmed transaction given its hash
-        and height.
-
-        tx_hash: the transaction hash as a hexadecimal string
-        height: the height of the block it is in
-        '''
-        self.assert_tx_hash(tx_hash)
-        height = non_negative_integer(height)
-
-        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
-        block_hash = hex_hashes[0]
-        block = await self.daemon_request('deserialised_block', block_hash)
-        tx_hashes = block['tx']
-        try:
-            pos = tx_hashes.index(tx_hash)
-        except ValueError:
-            raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
-                           f'block {block_hash} at height {height:,d}')
-
-        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch, root = self.bp.merkle.branch_and_root(hashes, pos)
-        branch = [hash_to_hex_str(hash) for hash in branch]
-
-        return {"block_height": height, "merkle": branch, "pos": pos}
