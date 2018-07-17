@@ -133,6 +133,9 @@ class SessionBase(ServerSession):
 class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
+    PROTOCOL_MIN = '1.1'
+    PROTOCOL_MAX = '1.4'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
@@ -143,8 +146,25 @@ class ElectrumX(SessionBase):
         self.hashX_subs = {}
         self.sv_seen = False
         self.mempool_statuses = {}
-        self.set_protocol_handlers(util.protocol_tuple(
-            self.controller.PROTOCOL_MIN))
+        self.set_protocol_handlers(util.protocol_tuple(self.PROTOCOL_MIN))
+
+    @classmethod
+    def server_features(cls, env):
+        '''Return the server features dictionary.'''
+        return {
+            'hosts': env.hosts_dict(),
+            'pruning': None,
+            'server_version': electrumx.version,
+            'protocol_min': cls.PROTOCOL_MIN,
+            'protocol_max': cls.PROTOCOL_MAX,
+            'genesis_hash': env.coin.GENESIS_HASH,
+            'hash_function': 'sha256',
+        }
+
+    @classmethod
+    def server_version_args(cls):
+        '''The arguments to a server.version RPC call to a peer.'''
+        return [electrumx.version, [cls.PROTOCOL_MIN, cls.PROTOCOL_MAX]]
 
     def protocol_version_string(self):
         return util.version_string(self.protocol_tuple)
@@ -440,8 +460,13 @@ class ElectrumX(SessionBase):
 
         # Find the highest common protocol version.  Disconnect if
         # that protocol version in unsupported.
-        ptuple = self.controller.protocol_tuple(protocol_version)
+        ptuple, client_min = util.protocol_version(
+            protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
         if ptuple is None:
+            if client_min > util.protocol_tuple(self.PROTOCOL_MIN):
+                self.logger.info(f'client requested future protocol version '
+                                 f'{version_string(client_min)} '
+                                 f'- is your software out of date?')
             self.close_after_send = True
             raise RPCError(BAD_REQUEST,
                            f'unsupported protocol version: {protocol_version}')
@@ -492,7 +517,7 @@ class ElectrumX(SessionBase):
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
-            'server.features': self.controller.server_features,
+            'server.features': partial(self.server_features, self.env),
             'server.peers.subscribe': self.peers_subscribe,
             'server.version': self.server_version,
         }

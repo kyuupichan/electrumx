@@ -51,21 +51,21 @@ class Controller(ServerBase):
     '''
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
-    PROTOCOL_MIN = '1.1'
-    PROTOCOL_MAX = '1.4'
     AIORPCX_MIN = (0, 5, 6)
 
     def __init__(self, env):
         '''Initialize everything that doesn't require the event loop.'''
         super().__init__(env)
+
         if aiorpcx_version < self.AIORPCX_MIN:
             raise RuntimeError('ElectrumX requires aiorpcX >= '
                                f'{version_string(self.AIORPCX_MIN)}')
 
+        sclass = env.coin.SESSIONCLS
         self.logger.info(f'software version: {electrumx.version}')
         self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
         self.logger.info(f'supported protocol versions: '
-                         f'{self.PROTOCOL_MIN}-{self.PROTOCOL_MAX}')
+                         f'{sclass.PROTOCOL_MIN}-{sclass.PROTOCOL_MAX}')
         self.logger.info(f'event loop policy: {env.loop_policy}')
 
         self.coin = env.coin
@@ -105,34 +105,6 @@ class Controller(ServerBase):
 
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = asyncio.Event()
-
-    def server_features(self):
-        '''Return the server features dictionary.'''
-        return {
-            'hosts': self.env.hosts_dict(),
-            'pruning': None,
-            'server_version': electrumx.version,
-            'protocol_min': self.PROTOCOL_MIN,
-            'protocol_max': self.PROTOCOL_MAX,
-            'genesis_hash': self.coin.GENESIS_HASH,
-            'hash_function': 'sha256',
-        }
-
-    def server_version_args(self):
-        '''The arguments to a server.version RPC call to a peer.'''
-        return [electrumx.version, [self.PROTOCOL_MIN, self.PROTOCOL_MAX]]
-
-    def protocol_tuple(self, request):
-        '''Given a client's protocol version request, return the negotiated
-        protocol tuple.  If the request is unsupported return None.
-        '''
-        ptuple, client_min = util.protocol_version(request, self.PROTOCOL_MIN,
-                                                   self.PROTOCOL_MAX)
-        if not ptuple and client_min > util.protocol_tuple(self.PROTOCOL_MIN):
-            version = version_string(client_min)
-            self.logger.info(f'client requested future protocol version '
-                             f'{version} - is your software out of date?')
-        return ptuple
 
     async def start_servers(self):
         '''Start the RPC server and schedule the external servers to be

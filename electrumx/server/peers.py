@@ -51,8 +51,7 @@ class PeerSession(ClientSession):
                 self.peer.ip_addr = address[0]
 
         # Send server.version first
-        controller = self.peer_mgr.controller
-        self.send_request('server.version', controller.server_version_args(),
+        self.send_request('server.version', self.peer_mgr.server_version_args,
                           self.on_version, timeout=self.timeout)
 
     def connection_lost(self, exc):
@@ -232,8 +231,10 @@ class PeerManager(object):
         self.loop = controller.loop
 
         # Our clearnet and Tor Peers, if any
-        self.myselves = [Peer(ident.host, controller.server_features(), 'env')
+        sclass = env.coin.SESSIONCLS
+        self.myselves = [Peer(ident.host, sclass.server_features(env), 'env')
                          for ident in env.identities]
+        self.server_version_args = sclass.server_version_args()
         self.retry_event = asyncio.Event()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the
