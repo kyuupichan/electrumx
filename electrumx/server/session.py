@@ -69,6 +69,7 @@ class SessionBase(ServerSession):
         self.controller = controller
         self.bp = controller.bp
         self.env = controller.env
+        self.coin = self.env.coin
         self.daemon = self.bp.daemon
         self.client = 'unknown'
         self.anon_logs = self.env.anon_logs
@@ -325,11 +326,38 @@ class ElectrumX(SessionBase):
         self.hashX_subs[hashX] = alias
         return await self.address_status(hashX)
 
+    def address_to_hashX(self, address):
+        try:
+            return self.coin.address_to_hashX(address)
+        except Exception:
+            pass
+        raise RPCError(BAD_REQUEST, f'{address} is not a valid address')
+
+    async def address_get_balance(self, address):
+        '''Return the confirmed and unconfirmed balance of an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.controller.get_balance(hashX)
+
+    async def address_get_history(self, address):
+        '''Return the confirmed and unconfirmed history of an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.controller.confirmed_and_unconfirmed_history(hashX)
+
+    async def address_get_mempool(self, address):
+        '''Return the mempool transactions touching an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.controller.unconfirmed_history(hashX)
+
+    async def address_listunspent(self, address):
+        '''Return the list of UTXOs of an address.'''
+        hashX = self.address_to_hashX(address)
+        return await self.controller.hashX_listunspent(hashX)
+
     async def address_subscribe(self, address):
         '''Subscribe to an address.
 
         address: the address to subscribe to'''
-        hashX = self.controller.address_to_hashX(address)
+        hashX = self.address_to_hashX(address)
         return await self.hashX_subscribe(hashX, address)
 
     async def scripthash_get_balance(self, scripthash):
@@ -417,7 +445,7 @@ class ElectrumX(SessionBase):
 
         index: the chunk index'''
         index = self.controller.non_negative_integer(index)
-        chunk_size = self.controller.coin.CHUNK_SIZE
+        chunk_size = self.coin.CHUNK_SIZE
         start_height = index * chunk_size
         hex_str, n = self.controller.block_headers(start_height, chunk_size)
         return hex_str
@@ -579,14 +607,10 @@ class ElectrumX(SessionBase):
         else:
             handlers.update({
                 'blockchain.headers.subscribe': self.headers_subscribe_False,
-                'blockchain.address.get_balance':
-                controller.address_get_balance,
-                'blockchain.address.get_history':
-                controller.address_get_history,
-                'blockchain.address.get_mempool':
-                controller.address_get_mempool,
-                'blockchain.address.listunspent':
-                controller.address_listunspent,
+                'blockchain.address.get_balance': self.address_get_balance,
+                'blockchain.address.get_history': self.address_get_history,
+                'blockchain.address.get_mempool': self.address_get_mempool,
+                'blockchain.address.listunspent': self.address_listunspent,
                 'blockchain.address.subscribe': self.address_subscribe,
             })
 
@@ -752,7 +776,7 @@ class DashElectrumX(ElectrumX):
                 balance = await self.controller.address_get_balance(
                     mn_info['payee'])
                 mn_info['balance'] = (sum(balance.values())
-                                      / self.controller.coin.VALUE_PER_COIN)
+                                      / self.coin.VALUE_PER_COIN)
                 mn_list.append(mn_info)
             self.controller.mn_cache = mn_list
 

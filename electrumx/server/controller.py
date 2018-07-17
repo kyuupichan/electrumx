@@ -563,7 +563,7 @@ class Controller(ServerBase):
         '''Replace the daemon URL.'''
         daemon_url = daemon_url or self.env.daemon_url
         try:
-            self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
+            self.daemon.set_urls(self.coin.daemon_urls(daemon_url))
         except Exception as e:
             raise RPCError(BAD_REQUEST, f'an error occured: {e}')
         return 'now using daemon at {}'.format(self.daemon.logged_url())
@@ -600,13 +600,6 @@ class Controller(ServerBase):
         return 'scheduled a reorg of {:,d} blocks'.format(count)
 
     # Helpers for RPC "blockchain" command handlers
-
-    def address_to_hashX(self, address):
-        try:
-            return self.coin.address_to_hashX(address)
-        except Exception:
-            pass
-        raise RPCError(BAD_REQUEST, f'{address} is not a valid address')
 
     def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction
@@ -702,21 +695,6 @@ class Controller(ServerBase):
 
     # Client RPC "blockchain" command handlers
 
-    async def address_get_balance(self, address):
-        '''Return the confirmed and unconfirmed balance of an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.get_balance(hashX)
-
-    async def address_get_history(self, address):
-        '''Return the confirmed and unconfirmed history of an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.confirmed_and_unconfirmed_history(hashX)
-
-    async def address_get_mempool(self, address):
-        '''Return the mempool transactions touching an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.unconfirmed_history(hashX)
-
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash, including mempool
         effects.'''
@@ -730,11 +708,6 @@ class Controller(ServerBase):
                  'height': utxo.height, 'value': utxo.value}
                 for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
-
-    async def address_listunspent(self, address):
-        '''Return the list of UTXOs of an address.'''
-        hashX = self.address_to_hashX(address)
-        return await self.hashX_listunspent(hashX)
 
     def block_get_header(self, height):
         '''The deserialized header at a given height.
