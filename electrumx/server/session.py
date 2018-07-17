@@ -249,7 +249,7 @@ class SessionManager(object):
             'pid': os.getpid(),
             'peers': peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
-            'sessions': self._session_count(),
+            'sessions': self.session_count(),
             'subs': self._sub_count(),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
