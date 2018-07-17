@@ -1921,7 +1921,7 @@ class DeepOnion(Coin):
         '''
         Given a header return the hash for DeepOnion.
         Need to download `x13_hash` module
-        Source code: https://github.com/MaruCoinOfficial/x13-hash"
+        Source code: https://github.com/MaruCoinOfficial/x13-hash
         '''
         import x13_hash
         return x13_hash.getPoWHash(header)
