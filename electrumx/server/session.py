@@ -98,6 +98,7 @@ class SessionManager(object):
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
     def __init__(self, env, tasks, chain_state, peer_mgr):
+        env.max_send = max(350000, env.max_send)
         self.env = env
         self.tasks = tasks
         self.chain_state = chain_state
@@ -713,8 +714,7 @@ class ElectrumX(SessionBase):
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
-        peer_mgr = self.peer_mgr
-        return await peer_mgr.on_add_peer(features, self.peer_address())
+        return await self.peer_mgr.on_add_peer(features, self.peer_address())
 
     def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''

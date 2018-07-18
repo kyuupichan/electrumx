@@ -6,6 +6,7 @@
 # and warranty status of this software.
 
 from aiorpcx import _version as aiorpcx_version
+
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.tasks import Tasks
@@ -37,8 +38,6 @@ class Controller(ServerBase):
         self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
         self.logger.info(f'supported protocol versions: {min_str}-{max_str}')
         self.logger.info(f'event loop policy: {env.loop_policy}')
-
-        env.max_send = max(350000, env.max_send)
 
         self.tasks = Tasks()
         self.chain_state = ChainState(env, self.tasks, self.shutdown_event)
