@@ -310,23 +310,37 @@ class BlockProcessor(electrumx.server.db.DB):
         if count is None:
             self.logger.info('chain reorg detected')
         else:
-            self.logger.info('faking a reorg of {:,d} blocks'.format(count))
+            self.logger.info(f'faking a reorg of {count:,d} blocks')
         await self.tasks.run_in_thread(self.flush, True)
 
-        hashes = await self.reorg_hashes(count)
+        async def get_raw_blocks(last_height, hex_hashes):
+            heights = range(last_height, last_height - len(hex_hashes), -1)
+            try:
+                blocks = [self.read_raw_block(height) for height in heights]
+                self.logger.info(f'read {len(blocks)} blocks from disk')
+                return blocks
+            except Exception:
+                return await self.daemon.raw_blocks(hex_hashes)
+
+        start, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
+        last = start + count - 1
         for hex_hashes in chunks(hashes, 50):
-            blocks = await self.daemon.raw_blocks(hex_hashes)
-            await self.tasks.run_in_thread(self.backup_blocks, blocks)
+            raw_blocks = await get_raw_blocks(last, hex_hashes)
+            await self.tasks.run_in_thread(self.backup_blocks, raw_blocks)
+            last -= len(raw_blocks)
         # Truncate header_mc: header count is 1 more than the height
         self.header_mc.truncate(self.height + 1)
         await self.prefetcher.reset_height()
 
     async def reorg_hashes(self, count):
-        '''Return the list of hashes to back up beacuse of a reorg.
+        '''Return a pair (start, hashes) of blocks to back up during a
+        reorg.
 
-        The hashes are returned in order of increasing height.'''
+        The hashes are returned in order of increasing height.  Start
+        is the height of the first hash.
+        '''
 
         def diff_pos(hashes1, hashes2):
             '''Returns the index of the first difference in the hash lists.
@@ -360,7 +374,7 @@ class BlockProcessor(electrumx.server.db.DB):
                          'heights {:,d}-{:,d}'
                          .format(count, s, start, start + count - 1))
 
-        return self.fs_block_hashes(start, count)
+        return start, self.fs_block_hashes(start, count)
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
@@ -527,6 +541,7 @@ class BlockProcessor(electrumx.server.db.DB):
             undo_info = self.advance_txs(block.transactions)
             if height >= min_height:
                 self.undo_infos.append((undo_info, height))
+                self.write_raw_block(block.raw, height)
 
         headers = [block.header for block in blocks]
         self.height = height

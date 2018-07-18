@@ -12,9 +12,10 @@
 import array
 import ast
 import os
-from struct import pack, unpack
 from bisect import bisect_right
 from collections import namedtuple
+from glob import glob
+from struct import pack, unpack
 
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
@@ -265,6 +266,29 @@ class DB(object):
         for undo_info, height in undo_infos:
             batch_put(self.undo_key(height), b''.join(undo_info))
 
+    def raw_block_prefix(self):
+        return 'meta/block'
+
+    def raw_block_path(self, height):
+        return f'{self.raw_block_prefix()}{height:d}'
+
+    def read_raw_block(self, height):
+        '''Returns a raw block read from disk.  Raises FileNotFoundError
+        if the block isn't on-disk.'''
+        with util.open_file(self.raw_block_path(height)) as f:
+            return f.read(-1)
+
+    def write_raw_block(self, block, height):
+        '''Write a raw block to disk.'''
+        with util.open_truncate(self.raw_block_path(height)) as f:
+            f.write(block)
+        # Delete old blocks to prevent them accumulating
+        try:
+            del_height = self.min_undo_height(height) - 1
+            os.remove(self.raw_block_path(del_height))
+        except FileNotFoundError:
+            pass
+
     def clear_excess_undo_info(self):
         '''Clear excess undo info.  Only most recent N are kept.'''
         prefix = b'U'
@@ -280,8 +304,20 @@ class DB(object):
             with self.utxo_db.write_batch() as batch:
                 for key in keys:
                     batch.delete(key)
-            self.logger.info('deleted {:,d} stale undo entries'
-                             .format(len(keys)))
+            self.logger.info(f'deleted {len(keys):,d} stale undo entries')
+
+        # delete old block files
+        prefix = self.raw_block_prefix()
+        paths = [path for path in glob(f'{prefix}[0-9]*')
+                 if len(path) > len(prefix)
+                 and int(path[len(prefix):]) < min_height]
+        if paths:
+            for path in paths:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
+            self.logger.info(f'deleted {len(paths):,d} stale block files')
 
     # -- UTXO database
 
