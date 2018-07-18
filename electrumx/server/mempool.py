@@ -32,13 +32,13 @@ class MemPool(object):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, bp, controller):
+    def __init__(self, db, daemon, tasks, notify_sessions):
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.daemon = bp.daemon
-        self.controller = controller
-        self.notify_sessions = controller.session_mgr.notify_sessions
-        self.coin = bp.coin
-        self.db = bp
+        self.db = db
+        self.daemon = daemon
+        self.tasks = tasks
+        self.notify_sessions = notify_sessions
+        self.coin = db.coin
         self.touched = set()
         self.stop = False
         self.txs = {}
@@ -47,6 +47,7 @@ class MemPool(object):
         self.fee_histogram = defaultdict(int)
         self.compact_fee_histogram = []
         self.histogram_time = 0
+        db.add_new_block_callback(self.on_new_block)
 
     def _resync_daemon_hashes(self, unprocessed, unfetched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
@@ -165,7 +166,7 @@ class MemPool(object):
                 deferred = pending
                 pending = []
 
-            result, deferred = await self.controller.run_in_executor(
+            result, deferred = await self.tasks.run_in_thread(
                 self.process_raw_txs, raw_txs, deferred)
 
             pending.extend(deferred)

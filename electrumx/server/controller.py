@@ -5,12 +5,10 @@
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-from aiorpcx import TaskSet, _version as aiorpcx_version
+from aiorpcx import _version as aiorpcx_version
 import electrumx
 from electrumx.lib.server_base import ServerBase
+from electrumx.lib.tasks import Tasks
 from electrumx.lib.util import version_string
 from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
@@ -40,28 +38,23 @@ class Controller(ServerBase):
         self.logger.info(f'supported protocol versions: {min_str}-{max_str}')
         self.logger.info(f'event loop policy: {env.loop_policy}')
 
-        self.coin = env.coin
-        self.tasks = TaskSet()
         env.max_send = max(350000, env.max_send)
 
-        self.loop = asyncio.get_event_loop()
-        self.executor = ThreadPoolExecutor()
-        self.loop.set_default_executor(self.executor)
-
-        # The complex objects.  Note PeerManager references self.loop (ugh)
-        self.session_mgr = SessionManager(env, self)
-        self.daemon = self.coin.DAEMON(env)
-        self.bp = self.coin.BLOCK_PROCESSOR(env, self, self.daemon)
-        self.mempool = MemPool(self.bp, self)
-        self.peer_mgr = PeerManager(env, self)
+        self.tasks = Tasks()
+        self.session_mgr = SessionManager(env, self.tasks, self)
+        self.daemon = env.coin.DAEMON(env)
+        self.bp = env.coin.BLOCK_PROCESSOR(env, self.tasks, self.daemon)
+        self.mempool = MemPool(self.bp, self.daemon, self.tasks,
+                               self.session_mgr.notify_sessions)
+        self.peer_mgr = PeerManager(env, self.tasks, self.session_mgr, self.bp)
 
     async def start_servers(self):
         '''Start the RPC server and schedule the external servers to be
         started once the block processor has caught up.
         '''
         await self.session_mgr.start_rpc_server()
-        self.create_task(self.bp.main_loop())
-        self.create_task(self.wait_for_bp_catchup())
+        self.tasks.create_task(self.bp.main_loop())
+        self.tasks.create_task(self.wait_for_bp_catchup())
 
     async def shutdown(self):
         '''Perform the shutdown sequence.'''
@@ -69,8 +62,8 @@ class Controller(ServerBase):
         self.tasks.cancel_all()
         await self.session_mgr.shutdown()
         await self.tasks.wait()
-        # Finally shut down the block processor and executor
-        self.bp.shutdown(self.executor)
+        # Finally shut down the block processor and executor (FIXME)
+        self.bp.shutdown(self.tasks.executor)
 
     async def mempool_transactions(self, hashX):
         '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
@@ -87,34 +80,12 @@ class Controller(ServerBase):
         '''
         return self.mempool.value(hashX)
 
-    async def run_in_executor(self, func, *args):
-        '''Wait whilst running func in the executor.'''
-        return await self.loop.run_in_executor(None, func, *args)
-
-    def schedule_executor(self, func, *args):
-        '''Schedule running func in the executor, return a task.'''
-        return self.create_task(self.run_in_executor(func, *args))
-
-    def create_task(self, coro, callback=None):
-        '''Schedule the coro to be run.'''
-        task = self.tasks.create_task(coro)
-        task.add_done_callback(callback or self.check_task_exception)
-        return task
-
-    def check_task_exception(self, task):
-        '''Check a task for exceptions.'''
-        try:
-            if not task.cancelled():
-                task.result()
-        except Exception as e:
-            self.logger.exception(f'uncaught task exception: {e}')
-
     async def wait_for_bp_catchup(self):
         '''Wait for the block processor to catch up, and for the mempool to
         synchronize, then kick off server background processes.'''
         await self.bp.caught_up_event.wait()
-        self.create_task(self.mempool.main_loop())
+        self.tasks.create_task(self.mempool.main_loop())
         await self.mempool.synchronized_event.wait()
-        self.create_task(self.peer_mgr.main_loop())
-        self.create_task(self.session_mgr.start_serving())
-        self.create_task(self.session_mgr.housekeeping())
+        self.tasks.create_task(self.peer_mgr.main_loop())
+        self.tasks.create_task(self.session_mgr.start_serving())
+        self.tasks.create_task(self.session_mgr.housekeeping())

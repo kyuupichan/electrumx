@@ -98,8 +98,9 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, controller):
+    def __init__(self, env, tasks, controller):
         self.env = env
+        self.tasks = tasks
         self.controller = controller
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
@@ -416,13 +417,12 @@ class SessionManager(object):
 
         # Height notifications are synchronous.  Those sessions with
         # touched addresses are scheduled for asynchronous completion
-        create_task = self.controller.create_task
         for session in self.sessions:
             if isinstance(session, LocalRPC):
                 continue
             session_touched = session.notify(height, touched)
             if session_touched is not None:
-                create_task(session.notify_async(session_touched))
+                self.tasks.create_task(session.notify_async(session_touched))
 
     def raw_header(self, height):
         '''Return the binary header at the given height.'''
@@ -442,12 +442,18 @@ class SessionManager(object):
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
             limit = self.env.max_send // 97
-            return list(controller.bp.get_history(hashX, limit=limit))
+            return list(self.controller.bp.get_history(hashX, limit=limit))
 
-        controller = self.controller
-        history = await controller.run_in_executor(job)
+        history = await self.tasks.run_in_thread(job)
         self.history_cache[hashX] = history
         return history
+
+    async def get_utxos(self, hashX):
+        '''Get UTXOs asynchronously to reduce latency.'''
+        def job():
+            return list(self.controller.bp.get_utxos(hashX, limit=None))
+
+        return await self.tasks.run_in_thread(job)
 
     async def housekeeping(self):
         '''Regular housekeeping checks.'''
@@ -776,17 +782,10 @@ class ElectrumX(SessionBase):
 
         return status
 
-    async def get_utxos(self, hashX):
-        '''Get UTXOs asynchronously to reduce latency.'''
-        def job():
-            return list(self.bp.get_utxos(hashX, limit=None))
-
-        return await self.controller.run_in_executor(job)
-
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash, including mempool
         effects.'''
-        utxos = await self.get_utxos(hashX)
+        utxos = await self.session_mgr.get_utxos(hashX)
         utxos = sorted(utxos)
         utxos.extend(self.controller.mempool.get_utxos(hashX))
         spends = await self.controller.mempool.potential_spends(hashX)
@@ -843,7 +842,7 @@ class ElectrumX(SessionBase):
         return await self.hashX_subscribe(hashX, address)
 
     async def get_balance(self, hashX):
-        utxos = await self.get_utxos(hashX)
+        utxos = await self.session_mgr.get_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = self.controller.mempool_value(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
@@ -1263,7 +1262,9 @@ class DashElectrumX(ElectrumX):
     def notify(self, height, touched):
         '''Notify the client about changes in masternode list.'''
         result = super().notify(height, touched)
-        self.controller.create_task(self.notify_masternodes_async())
+        # FIXME: the notifications should be done synchronously and the
+        # master node list fetched once asynchronously
+        self.session_mgr.tasks.create_task(self.notify_masternodes_async())
         return result
 
     # Masternode command handlers
