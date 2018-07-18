@@ -420,12 +420,18 @@ class SessionManager(object):
             if session_touched is not None:
                 create_task(session.notify_async(session_touched))
 
+    def raw_header(self, height):
+        '''Return the binary header at the given height.'''
+        header, n = self.controller.bp.read_headers(height, 1)
+        if n != 1:
+            raise RPCError(BAD_REQUEST, f'height {height:,d} out of range')
+        return header
+
     async def get_history(self, hashX):
         '''Get history asynchronously to reduce latency.'''
         if hashX in self.history_cache:
             return self.history_cache[hashX]
 
-        controller = self.controller
         def job():
             # History DoS limit.  Each element of history is about 99
             # bytes when encoded as JSON.  This limits resource usage
@@ -434,6 +440,7 @@ class SessionManager(object):
             limit = self.env.max_send // 97
             return list(controller.bp.get_history(hashX, limit=limit))
 
+        controller = self.controller
         history = await controller.run_in_executor(job)
         self.history_cache[hashX] = history
         return history
@@ -701,13 +708,13 @@ class ElectrumX(SessionBase):
 
     def electrum_header(self, height):
         '''Return the deserialized header at the given height.'''
-        raw_header = self.controller.raw_header(height)
+        raw_header = self.session_mgr.raw_header(height)
         return self.coin.electrum_header(raw_header, height)
 
     def subscribe_headers_result(self, height):
         '''The result of a header subscription for the given height.'''
         if self.subscribe_headers_raw:
-            raw_header = self.controller.raw_header(height)
+            raw_header = self.session_mgr.raw_header(height)
             return {'hex': raw_header.hex(), 'height': height}
         return self.electrum_header(height)
 
@@ -896,7 +903,7 @@ class ElectrumX(SessionBase):
         dictionary with a merkle proof.'''
         height = non_negative_integer(height)
         cp_height = non_negative_integer(cp_height)
-        raw_header_hex = self.controller.raw_header(height).hex()
+        raw_header_hex = self.session_mgr.raw_header(height).hex()
         if cp_height == 0:
             return raw_header_hex
         result = {'header': raw_header_hex}

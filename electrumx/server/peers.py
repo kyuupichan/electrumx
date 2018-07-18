@@ -156,7 +156,7 @@ class PeerSession(ClientSession):
             return
         # Check prior header too in case of hard fork.
         check_height = min(our_height, their_height)
-        raw_header = controller.raw_header(check_height)
+        raw_header = controller.session_mgr.raw_header(check_height)
         if self.ptuple >= (1, 4):
             self.send_request('blockchain.block.header', [check_height],
                               partial(self.on_header, raw_header.hex()),

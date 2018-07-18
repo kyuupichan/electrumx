@@ -123,10 +123,3 @@ class Controller(ServerBase):
         self.create_task(self.peer_mgr.main_loop())
         self.create_task(self.session_mgr.start_serving())
         self.create_task(self.session_mgr.housekeeping())
-
-    def raw_header(self, height):
-        '''Return the binary header at the given height.'''
-        header, n = self.bp.read_headers(height, 1)
-        if n != 1:
-            raise RPCError(BAD_REQUEST, f'height {height:,d} out of range')
-        return header
