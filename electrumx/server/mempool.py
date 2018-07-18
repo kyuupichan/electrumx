@@ -36,6 +36,7 @@ class MemPool(object):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.daemon = bp.daemon
         self.controller = controller
+        self.notify_sessions = controller.session_mgr.notify_sessions
         self.coin = bp.coin
         self.db = bp
         self.touched = set()
@@ -104,7 +105,7 @@ class MemPool(object):
         while True:
             # Avoid double notifications if processing a block
             if self.touched and not self.processing_new_block():
-                self.controller.notify_sessions(self.touched)
+                self.notify_sessions(self.touched)
                 self.touched.clear()
 
             # Log progress / state
@@ -192,7 +193,7 @@ class MemPool(object):
         # Minor race condition here with mempool processor thread
         touched.update(self.touched)
         self.touched.clear()
-        self.controller.notify_sessions(touched)
+        self.notify_sessions(touched)
 
     def processing_new_block(self):
         '''Return True if we're processing a new block.'''

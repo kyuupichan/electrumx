@@ -45,9 +45,6 @@ class Controller(ServerBase):
 
         self.coin = env.coin
         self.tasks = TaskSet()
-        self.history_cache = pylru.lrucache(256)
-        self.header_cache = pylru.lrucache(8)
-        self.cache_height = 0
         self.cache_mn_height = 0
         self.mn_cache = pylru.lrucache(256)
         env.max_send = max(350000, env.max_send)
@@ -127,48 +124,9 @@ class Controller(ServerBase):
         self.create_task(self.session_mgr.start_serving())
         self.create_task(self.session_mgr.housekeeping())
 
-    def notify_sessions(self, touched):
-        '''Notify sessions about height changes and touched addresses.'''
-        # Invalidate caches
-        hc = self.history_cache
-        for hashX in set(hc).intersection(touched):
-            del hc[hashX]
-
-        height = self.bp.db_height
-        if height != self.cache_height:
-            self.cache_height = height
-            self.header_cache.clear()
-
-        self.session_mgr.notify(height, touched)
-
     def raw_header(self, height):
         '''Return the binary header at the given height.'''
         header, n = self.bp.read_headers(height, 1)
         if n != 1:
             raise RPCError(BAD_REQUEST, f'height {height:,d} out of range')
         return header
-
-    def electrum_header(self, height):
-        '''Return the deserialized header at the given height.'''
-        if height not in self.header_cache:
-            raw_header = self.raw_header(height)
-            self.header_cache[height] = self.coin.electrum_header(raw_header,
-                                                                  height)
-        return self.header_cache[height]
-
-    async def get_history(self, hashX):
-        '''Get history asynchronously to reduce latency.'''
-        if hashX in self.history_cache:
-            return self.history_cache[hashX]
-
-        def job():
-            # History DoS limit.  Each element of history is about 99
-            # bytes when encoded as JSON.  This limits resource usage
-            # on bloated history requests, and uses a smaller divisor
-            # so large requests are logged before refusing them.
-            limit = self.env.max_send // 97
-            return list(self.bp.get_history(hashX, limit=limit))
-
-        history = await self.run_in_executor(job)
-        self.history_cache[hashX] = history
-        return history

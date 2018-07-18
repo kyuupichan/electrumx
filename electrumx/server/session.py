@@ -18,6 +18,7 @@ import time
 from collections import defaultdict
 from functools import partial
 
+import pylru
 from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
 
 import electrumx
@@ -111,6 +112,7 @@ class SessionManager(object):
         self.state = self.CATCHING_UP
         self.txs_sent = 0
         self.start_time = time.time()
+        self.history_cache = pylru.lrucache(256)
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
         # Event triggered when electrumx is listening for incoming requests.
@@ -400,7 +402,14 @@ class SessionManager(object):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
-    def notify(self, height, touched):
+    def notify_sessions(self, touched):
+        '''Notify sessions about height changes and touched addresses.'''
+        height = self.controller.bp.db_height
+        # Invalidate caches
+        hc = self.history_cache
+        for hashX in set(hc).intersection(touched):
+            del hc[hashX]
+
         # Height notifications are synchronous.  Those sessions with
         # touched addresses are scheduled for asynchronous completion
         create_task = self.controller.create_task
@@ -410,6 +419,24 @@ class SessionManager(object):
             session_touched = session.notify(height, touched)
             if session_touched is not None:
                 create_task(session.notify_async(session_touched))
+
+    async def get_history(self, hashX):
+        '''Get history asynchronously to reduce latency.'''
+        if hashX in self.history_cache:
+            return self.history_cache[hashX]
+
+        controller = self.controller
+        def job():
+            # History DoS limit.  Each element of history is about 99
+            # bytes when encoded as JSON.  This limits resource usage
+            # on bloated history requests, and uses a smaller divisor
+            # so large requests are logged before refusing them.
+            limit = self.env.max_send // 97
+            return list(controller.bp.get_history(hashX, limit=limit))
+
+        history = await controller.run_in_executor(job)
+        self.history_cache[hashX] = history
+        return history
 
     async def housekeeping(self):
         '''Regular housekeeping checks.'''
@@ -672,12 +699,17 @@ class ElectrumX(SessionBase):
             return value
         raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
 
+    def electrum_header(self, height):
+        '''Return the deserialized header at the given height.'''
+        raw_header = self.controller.raw_header(height)
+        return self.coin.electrum_header(raw_header, height)
+
     def subscribe_headers_result(self, height):
         '''The result of a header subscription for the given height.'''
         if self.subscribe_headers_raw:
             raw_header = self.controller.raw_header(height)
             return {'hex': raw_header.hex(), 'height': height}
-        return self.controller.electrum_header(height)
+        return self.electrum_header(height)
 
     def _headers_subscribe(self, raw):
         '''Subscribe to get headers of new blocks.'''
@@ -714,7 +746,7 @@ class ElectrumX(SessionBase):
         '''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.controller.get_history(hashX)
+        history = await self.session_mgr.get_history(hashX)
         mempool = await self.controller.mempool_transactions(hashX)
 
         status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
@@ -819,7 +851,7 @@ class ElectrumX(SessionBase):
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.controller.get_history(hashX)
+        history = await self.session_mgr.get_history(hashX)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)
@@ -915,7 +947,7 @@ class ElectrumX(SessionBase):
 
         height: the header's height'''
         height = non_negative_integer(height)
-        return self.controller.electrum_header(height)
+        return self.electrum_header(height)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
