@@ -1,4 +1,4 @@
-FROM python:3.6-alpine3.6
+FROM python:3.7-alpine3.8
 
 RUN apk add --no-cache build-base openssl && \
     apk add --no-cache --repository http://nl.alpinelinux.org/alpine/edge/testing leveldb-dev && \
