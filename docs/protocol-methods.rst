@@ -183,9 +183,9 @@ Subscribe to receive block headers when a new block is found.
 
   .. function:: blockchain.headers.subscribe()
   .. versionchanged:: 1.2
-     Optional *raw* parameter added, defaulting to :const:`False`.
+     Optional *raw* parameter added, defaulting to :const:`false`.
   .. versionchanged:: 1.3
-     *raw* parameter deafults to :const:`True`.
+     *raw* parameter deafults to :const:`true`.
   .. versionchanged:: 1.4
      *raw* parameter removed; responses and notifications pass raw
      headers.
@@ -193,13 +193,13 @@ Subscribe to receive block headers when a new block is found.
   * *raw*
 
     This single boolean argument exists in protocol versions 1.2
-    (defaulting to :const:`False`) and 1.3 (defaulting to
-    :const:`True`) only.
+    (defaulting to :const:`false`) and 1.3 (defaulting to
+    :const:`true`) only.
 
 **Result**
 
   The header of the current block chain tip.  If *raw* is
-  :const:`True` the result is a dictionary with two members:
+  :const:`true` the result is a dictionary with two members:
 
   * *hex*
 
@@ -209,12 +209,12 @@ Subscribe to receive block headers when a new block is found.
 
     The height of the header, an integer.
 
-  If *raw* is :const:`False` the result is the coin-specific
+  If *raw* is :const:`false` the result is the coin-specific
   :ref:`deserialized header <deserialized header>`.
 
 **Example Result**
 
-  With *raw* :const:`False`::
+  With *raw* :const:`false`::
 
    {
      "bits": 402858285,
@@ -226,7 +226,7 @@ Subscribe to receive block headers when a new block is found.
      "version": 536870912
    }
 
-  With *raw* :const:`True`::
+  With *raw* :const:`true`::
 
    {
      "height": 520481,
@@ -542,7 +542,7 @@ Return a raw transaction.
 
 **Signature**
 
-  .. function:: blockchain.transaction.get(tx_hash, verbose=False)
+  .. function:: blockchain.transaction.get(tx_hash, verbose=false)
   .. versionchanged:: 1.1
      ignored argument *height* removed
   .. versionchanged:: 1.2
@@ -558,14 +558,14 @@ Return a raw transaction.
 
 **Result**
 
-    If *verbose* is :const:`False`, the raw transaction as a
-    hexadecimal string.  If :const:`True`, the result is coin-specific
+    If *verbose* is :const:`false`, the raw transaction as a
+    hexadecimal string.  If :const:`true`, the result is coin-specific
     and whatever the coin daemon returns when asked for a verbose form
     of the raw transaction.
 
 **Example Results**
 
-When *verbose* is :const:`False`::
+When *verbose* is :const:`false`::
 
   "01000000015bb9142c960a838329694d3fe9ba08c2a6421c5158d8f7044cb7c48006c1b48"
   "4000000006a4730440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a824"
@@ -575,7 +575,7 @@ When *verbose* is :const:`False`::
   "4fe5f88ac50a8cf00000000001976a91445dac110239a7a3814535c15858b939211f85298"
   "88ac61ee0700"
 
-When *verbose* is :const:`True`::
+When *verbose* is :const:`true`::
 
  {
    "blockhash": "0000000000000000015a4f37ece911e5e3549f988e855548ce7494a0a08b2ad6",
@@ -680,7 +680,7 @@ given a block height and a position in the block.
 **Signature**
 
   .. function:: blockchain.transaction.id_from_pos(height, tx_pos,
-                merkle=False)
+                merkle=false)
   .. versionadded:: 1.4
 
   *height*
@@ -697,8 +697,8 @@ given a block height and a position in the block.
 
 **Result**
 
-  If *merkle* is :const:`False`, the transaction hash as a hexadecimal string.
-  If :const:`True`, a dictionary with the following keys:
+  If *merkle* is :const:`false`, the transaction hash as a hexadecimal string.
+  If :const:`true`, a dictionary with the following keys:
 
   * *tx_hash*
 
@@ -712,11 +712,11 @@ given a block height and a position in the block.
 
 **Example Results**
 
-When *merkle* is :const:`False`::
+When *merkle* is :const:`false`::
 
   "fc12dfcb4723715a456c6984e298e00c479706067da81be969e8085544b0ba08"
 
-When *merkle* is :const:`True`::
+When *merkle* is :const:`true`::
 
   {
     "tx_hash": "fc12dfcb4723715a456c6984e298e00c479706067da81be969e8085544b0ba08",
@@ -1043,8 +1043,8 @@ validate messages from it.
 
 **Result**
 
-  :const:`True` if the message was broadcasted succesfully otherwise
-  :const:`False`.
+  :const:`true` if the message was broadcasted succesfully otherwise
+  :const:`false`.
 
 **Example**::
 
@@ -1052,7 +1052,7 @@ validate messages from it.
 
 **Example Result**::
 
-  True
+  true
 
 masternode.subscribe
 ====================
