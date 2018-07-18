@@ -10,16 +10,16 @@ import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.tasks import Tasks
 from electrumx.lib.util import version_string
-from electrumx.server.mempool import MemPool
+from electrumx.server.chain_state import ChainState
 from electrumx.server.peers import PeerManager
 from electrumx.server.session import SessionManager
 
 
 class Controller(ServerBase):
-    '''Manages the client servers, a mempool, and a block processor.
+    '''Manages server initialisation and stutdown.
 
-    Servers are started immediately the block processor first catches
-    up with the daemon.
+    Servers are started once the mempool is synced after the block
+    processor first catches up with the daemon.
     '''
 
     AIORPCX_MIN = (0, 5, 6)
@@ -41,20 +41,20 @@ class Controller(ServerBase):
         env.max_send = max(350000, env.max_send)
 
         self.tasks = Tasks()
-        self.session_mgr = SessionManager(env, self.tasks, self)
-        self.daemon = env.coin.DAEMON(env)
-        self.bp = env.coin.BLOCK_PROCESSOR(env, self.tasks, self.daemon)
-        self.mempool = MemPool(self.bp, self.daemon, self.tasks,
-                               self.session_mgr.notify_sessions)
-        self.peer_mgr = PeerManager(env, self.tasks, self.session_mgr, self.bp)
+        self.chain_state = ChainState(env, self.tasks, self.shutdown_event)
+        self.peer_mgr = PeerManager(env, self.tasks, self.chain_state)
+        self.session_mgr = SessionManager(env, self.tasks, self.chain_state,
+                                          self.peer_mgr)
 
     async def start_servers(self):
-        '''Start the RPC server and schedule the external servers to be
-        started once the block processor has caught up.
+        '''Start the RPC server and wait for the mempool to synchronize.  Then
+        start the peer manager and serving external clients.
         '''
         await self.session_mgr.start_rpc_server()
-        self.tasks.create_task(self.bp.main_loop())
-        self.tasks.create_task(self.wait_for_bp_catchup())
+        await self.chain_state.wait_for_mempool()
+        self.tasks.create_task(self.peer_mgr.main_loop())
+        self.tasks.create_task(self.session_mgr.start_serving())
+        self.tasks.create_task(self.session_mgr.housekeeping())
 
     async def shutdown(self):
         '''Perform the shutdown sequence.'''
@@ -63,29 +63,4 @@ class Controller(ServerBase):
         await self.session_mgr.shutdown()
         await self.tasks.wait()
         # Finally shut down the block processor and executor (FIXME)
-        self.bp.shutdown(self.tasks.executor)
-
-    async def mempool_transactions(self, hashX):
-        '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hashX.
-
-        unconfirmed is True if any txin is unconfirmed.
-        '''
-        return await self.mempool.transactions(hashX)
-
-    def mempool_value(self, hashX):
-        '''Return the unconfirmed amount in the mempool for hashX.
-
-        Can be positive or negative.
-        '''
-        return self.mempool.value(hashX)
-
-    async def wait_for_bp_catchup(self):
-        '''Wait for the block processor to catch up, and for the mempool to
-        synchronize, then kick off server background processes.'''
-        await self.bp.caught_up_event.wait()
-        self.tasks.create_task(self.mempool.main_loop())
-        await self.mempool.synchronized_event.wait()
-        self.tasks.create_task(self.peer_mgr.main_loop())
-        self.tasks.create_task(self.session_mgr.start_serving())
-        self.tasks.create_task(self.session_mgr.housekeeping())
+        self.chain_state.bp.shutdown(self.tasks.executor)

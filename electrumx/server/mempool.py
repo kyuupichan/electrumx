@@ -15,7 +15,7 @@ from collections import defaultdict
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger
 from electrumx.server.daemon import DaemonError
-from electrumx.server.db import UTXO
+from electrumx.server.db import UTXO, DB
 
 
 class MemPool(object):
@@ -32,13 +32,11 @@ class MemPool(object):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, db, daemon, tasks, notify_sessions):
+    def __init__(self, coin, chain_state, tasks, add_new_block_callback):
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.db = db
-        self.daemon = daemon
+        self.coin = coin
+        self.chain_state = chain_state
         self.tasks = tasks
-        self.notify_sessions = notify_sessions
-        self.coin = db.coin
         self.touched = set()
         self.stop = False
         self.txs = {}
@@ -47,7 +45,7 @@ class MemPool(object):
         self.fee_histogram = defaultdict(int)
         self.compact_fee_histogram = []
         self.histogram_time = 0
-        db.add_new_block_callback(self.on_new_block)
+        add_new_block_callback(self.on_new_block)
 
     def _resync_daemon_hashes(self, unprocessed, unfetched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
@@ -60,7 +58,7 @@ class MemPool(object):
         touched = self.touched
         fee_hist = self.fee_histogram
 
-        hashes = self.daemon.cached_mempool_hashes()
+        hashes = self.chain_state.cached_mempool_hashes()
         gone = set(txs).difference(hashes)
         for hex_hash in gone:
             unfetched.discard(hex_hash)
@@ -99,13 +97,13 @@ class MemPool(object):
 
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
-        await self.daemon.mempool_refresh_event.wait()
+        await self.chain_state.mempool_refresh_event.wait()
         next_log = 0
         loops = -1  # Zero during initial catchup
 
         while True:
             # Avoid double notifications if processing a block
-            if self.touched and not self.processing_new_block():
+            if self.touched and not self.chain_state.processing_new_block():
                 self.notify_sessions(self.touched)
                 self.touched.clear()
 
@@ -127,10 +125,10 @@ class MemPool(object):
 
             try:
                 if not todo:
-                    await self.daemon.mempool_refresh_event.wait()
+                    await self.chain_state.mempool_refresh_event.wait()
 
                 self._resync_daemon_hashes(unprocessed, unfetched)
-                self.daemon.mempool_refresh_event.clear()
+                self.chain_state.mempool_refresh_event.clear()
 
                 if unfetched:
                     count = min(len(unfetched), fetch_size)
@@ -196,13 +194,9 @@ class MemPool(object):
         self.touched.clear()
         self.notify_sessions(touched)
 
-    def processing_new_block(self):
-        '''Return True if we're processing a new block.'''
-        return self.daemon.cached_height() > self.db.db_height
-
     async def fetch_raw_txs(self, hex_hashes):
         '''Fetch a list of mempool transactions.'''
-        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
+        raw_txs = await self.chain_state.getrawtransactions(hex_hashes)
 
         # Skip hashes the daemon has dropped.  Either they were
         # evicted or they got in a block.
@@ -218,7 +212,6 @@ class MemPool(object):
         '''
         script_hashX = self.coin.hashX_from_script
         deserializer = self.coin.DESERIALIZER
-        db_utxo_lookup = self.db.db_utxo_lookup
         txs = self.txs
 
         # Deserialize each tx and put it in a pending list
@@ -240,6 +233,7 @@ class MemPool(object):
         # Now process what we can
         result = {}
         deferred = []
+        utxo_lookup = self.chain_state.utxo_lookup
 
         for item in pending:
             if self.stop:
@@ -264,8 +258,8 @@ class MemPool(object):
                         txin_pairs.append(tx_info[1][prev_idx])
                     elif not mempool_missing:
                         prev_hash = hex_str_to_hash(prev_hex_hash)
-                        txin_pairs.append(db_utxo_lookup(prev_hash, prev_idx))
-            except (self.db.MissingUTXOError, self.db.DBError):
+                        txin_pairs.append(utxo_lookup(prev_hash, prev_idx))
+            except (DB.MissingUTXOError, DB.DBError):
                 # DBError can happen when flushing a newly processed
                 # block.  MissingUTXOError typically happens just
                 # after the daemon has accepted a new block and the
@@ -293,7 +287,7 @@ class MemPool(object):
             return []
 
         hex_hashes = self.hashXs[hashX]
-        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
+        raw_txs = await self.chain_state.getrawtransactions(hex_hashes)
         return zip(hex_hashes, raw_txs)
 
     async def transactions(self, hashX):

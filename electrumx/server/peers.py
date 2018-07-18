@@ -141,7 +141,7 @@ class PeerSession(ClientSession):
             return
 
         result = request.result()
-        our_height = self.peer_mgr.bp.db_height
+        our_height = self.peer_mgr.chain_state.db_height()
         if self.ptuple < (1, 3):
             their_height = result.get('block_height')
         else:
@@ -155,7 +155,7 @@ class PeerSession(ClientSession):
             return
         # Check prior header too in case of hard fork.
         check_height = min(our_height, their_height)
-        raw_header = self.peer_mgr.session_mgr.raw_header(check_height)
+        raw_header = self.peer_mgr.chain_state.raw_header(check_height)
         if self.ptuple >= (1, 4):
             self.send_request('blockchain.block.header', [check_height],
                               partial(self.on_header, raw_header.hex()),
@@ -240,14 +240,13 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
-    def __init__(self, env, tasks, session_mgr, bp):
+    def __init__(self, env, tasks, chain_state):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
         self.tasks = tasks
-        self.session_mgr = session_mgr
-        self.bp = bp
+        self.chain_state = chain_state
         self.loop = tasks.loop
 
         # Our clearnet and Tor Peers, if any
