@@ -671,6 +671,70 @@ and height.
     "pos": 710
   }
 
+blockchain.transaction.id_from_pos
+==================================
+
+Return a transaction hash and optionally a merkle proof,
+given a block height and a position in the block.
+
+**Signature**
+
+  .. function:: blockchain.transaction.id_from_pos(height, tx_pos, merkle=False)
+  .. versionadded:: 1.4
+
+  *height*
+
+    A block height in the main chain, an integer.
+
+  *tx_pos*
+
+    A zero-based index of the transaction in the given block, an integer.
+
+  *merkle*
+
+    Whether a merkle proof should also be returned, a boolean.
+
+**Result**
+
+  If *merkle* is :const:`False`, the transaction hash as a hexadecimal string.
+  If :const:`True`, a dictionary with the following keys:
+
+  * *tx_hash*
+
+    The transaction hash as a hexadecimal string.
+
+  * *merkle*
+
+    A list of transaction hashes the current hash is paired with,
+    recursively, in order to trace up to obtain merkle root of the
+    block, deepest pairing first.
+
+**Example Results**
+
+When *merkle* is :const:`False`::
+
+  "fc12dfcb4723715a456c6984e298e00c479706067da81be969e8085544b0ba08"
+
+When *merkle* is :const:`True`::
+
+  {
+    "tx_hash": "fc12dfcb4723715a456c6984e298e00c479706067da81be969e8085544b0ba08",
+    "merkle":
+    [
+      "928c4275dfd6270349e76aa5a49b355eefeb9e31ffbe95dd75fed81d219a23f8",
+      "5f35bfb3d5ef2ba19e105dcd976928e675945b9b82d98a93d71cbad0e714d04e",
+      "f136bcffeeed8844d54f90fc3ce79ce827cd8f019cf1d18470f72e4680f99207",
+      "6539b8ab33cedf98c31d4e5addfe40995ff96c4ea5257620dfbf86b34ce005ab",
+      "7ecc598708186b0b5bd10404f5aeb8a1a35fd91d1febbb2aac2d018954885b1e",
+      "a263aae6c470b9cde03b90675998ff6116f3132163911fafbeeb7843095d3b41",
+      "c203983baffe527edb4da836bc46e3607b9a36fa2c6cb60c1027f0964d971b29",
+      "306d89790df94c4632d652d142207f53746729a7809caa1c294b895a76ce34a9",
+      "c0b4eff21eea5e7974fe93c62b5aab51ed8f8d3adad4583c7a84a98f9e428f04",
+      "f0bd9d2d4c4cf00a1dd7ab3b48bbbb4218477313591284dcc2d7ca0aaa444e8d",
+      "503d3349648b985c1b571f59059e4da55a57b0163b08cc50379d73be80c4c8f3"
+    ]
+  }
+
 mempool.get_fee_histogram
 =========================
 

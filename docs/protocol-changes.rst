@@ -133,6 +133,11 @@ Changes
   * Optional *cp_height* argument added to
     :func:`blockchain.block.header` and :func:`blockchain.block.headers`
 
+New methods
+-----------
+
+  * :func:`blockchain.transaction.id_from_pos`
+
 Removed methods
 ---------------
 
