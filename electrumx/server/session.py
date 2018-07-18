@@ -115,6 +115,10 @@ class SessionManager(object):
         self.history_cache = pylru.lrucache(256)
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
+        # Masternode stuff only for such coins
+        if issubclass(env.coin.SESSIONCLS, DashElectrumX):
+            self.mn_cache_height = 0
+            self.mn_cache = []
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = asyncio.Event()
         # Set up the RPC request handlers
@@ -1297,8 +1301,6 @@ class DashElectrumX(ElectrumX):
         if not isinstance(payees, list):
             raise RPCError(BAD_REQUEST, 'expected a list of payees')
 
-        result = []
-
         def get_masternode_payment_queue(mns):
             '''Returns the calculated position in the payment queue for all the
             valid masterernodes in the given mns list.
@@ -1346,10 +1348,8 @@ class DashElectrumX(ElectrumX):
         # Accordingly with the masternode payment queue, a custom list
         # with the masternode information including the payment
         # position is returned.
-        if (self.controller.cache_mn_height != self.height()
-                or not self.controller.mn_cache):
-            self.controller.cache_mn_height = self.height()
-            self.controller.mn_cache.clear()
+        cache = self.session_mgr.mn_cache
+        if not cache or self.session_mgr.mn_cache_height != self.height():
             full_mn_list = await self.daemon.masternode_list(['full'])
             mn_payment_queue = get_masternode_payment_queue(full_mn_list)
             mn_payment_count = len(mn_payment_queue)
@@ -1374,13 +1374,12 @@ class DashElectrumX(ElectrumX):
                 mn_info['balance'] = (sum(balance.values())
                                       / self.coin.VALUE_PER_COIN)
                 mn_list.append(mn_info)
-            self.controller.mn_cache = mn_list
+            cache.clear()
+            cache.extend(mn_list)
+            self.session_mgr.mn_cache_height = self.height()
 
         # If payees is an empty list the whole masternode list is returned
         if payees:
-            result = [mn for mn in self.controller.mn_cache
-                      for address in payees if mn['payee'] == address]
+            return [mn for mn in cache if mn['payee'] in payees]
         else:
-            result = self.controller.mn_cache
-
-        return result
+            return cache

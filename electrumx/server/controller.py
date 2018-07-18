@@ -6,18 +6,15 @@
 # and warranty status of this software.
 
 import asyncio
-import traceback
 from concurrent.futures import ThreadPoolExecutor
 
-import pylru
-
-from aiorpcx import RPCError, TaskSet, _version as aiorpcx_version
+from aiorpcx import TaskSet, _version as aiorpcx_version
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
 from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
-from electrumx.server.session import BAD_REQUEST, SessionManager
+from electrumx.server.session import SessionManager
 
 
 class Controller(ServerBase):
@@ -45,8 +42,6 @@ class Controller(ServerBase):
 
         self.coin = env.coin
         self.tasks = TaskSet()
-        self.cache_mn_height = 0
-        self.mn_cache = pylru.lrucache(256)
         env.max_send = max(350000, env.max_send)
 
         self.loop = asyncio.get_event_loop()
