@@ -1055,7 +1055,7 @@ class ElectrumX(SessionBase):
 
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
-    async def block_hash_and_tx_hashes(self, height):
+    async def _block_hash_and_tx_hashes(self, height):
         '''Returns a pair (block_hash, tx_hashes) for the main chain block at
         the given height.
 
@@ -1080,14 +1080,14 @@ class ElectrumX(SessionBase):
         return branch
 
     async def transaction_merkle(self, tx_hash, height):
-        '''Return the markle tree to a confirmed transaction given its hash
+        '''Return the markle branch to a confirmed transaction given its hash
         and height.
 
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
         '''
         assert_tx_hash(tx_hash)
-        block_hash, tx_hashes = await self.block_hash_and_tx_hashes(height)
+        block_hash, tx_hashes = await self._block_hash_and_tx_hashes(height)
         try:
             pos = tx_hashes.index(tx_hash)
         except ValueError:
@@ -1104,15 +1104,15 @@ class ElectrumX(SessionBase):
         if merkle not in (True, False):
             raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
 
-        block_hash, tx_hashes = await self.block_hash_and_tx_hashes(height)
+        block_hash, tx_hashes = await self._block_hash_and_tx_hashes(height)
         try:
             tx_hash = tx_hashes[tx_pos]
         except IndexError:
             raise RPCError(BAD_REQUEST, f'no tx at position {tx_pos:,d} in '
                            f'block {block_hash} at height {height:,d}')
-        branch = self._get_merkle_branch(tx_hashes, tx_pos)
 
         if merkle:
+            branch = self._get_merkle_branch(tx_hashes, tx_pos)
             return {"tx_hash": tx_hash, "merkle": branch}
         else:
             return tx_hash

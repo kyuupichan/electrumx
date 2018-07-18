@@ -127,16 +127,19 @@ This version removes all support for :ref:`deserialized headers
 Changes
 -------
 
-  * The argument *raw* removed from :func:`blockchain.headers.subscribe`,
-    only raw headers can be subscribed to.
+  * Deserialized headers are no longer available, so removed argument
+    *raw* from :func:`blockchain.headers.subscribe`.
   * Only the first :func:`server.version` message is accepted.
   * Optional *cp_height* argument added to
     :func:`blockchain.block.header` and :func:`blockchain.block.headers`
+    to return merkle proofs of the header to a given checkpoint.
 
 New methods
 -----------
 
-  * :func:`blockchain.transaction.id_from_pos`
+  * :func:`blockchain.transaction.id_from_pos` to return a transaction
+    hash, and optionally a merkle proof, given a block height and
+    position in the block.
 
 Removed methods
 ---------------

@@ -679,12 +679,13 @@ given a block height and a position in the block.
 
 **Signature**
 
-  .. function:: blockchain.transaction.id_from_pos(height, tx_pos, merkle=False)
+  .. function:: blockchain.transaction.id_from_pos(height, tx_pos,
+                merkle=False)
   .. versionadded:: 1.4
 
   *height*
 
-    A block height in the main chain, an integer.
+    The main chain block height, a non-negative integer.
 
   *tx_pos*
 
