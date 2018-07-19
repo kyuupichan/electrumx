@@ -795,6 +795,32 @@ class DogecoinTestnet(Dogecoin):
                     '4d7049f45189db5664f3c4d07350559e')
 
 
+# Source: https://github.com/motioncrypto/motion
+class Motion(Coin):
+    NAME = "Motion"
+    SHORTNAME = "XMN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('000001e9dc60dd2618e91f7b90141349'
+                    '22c374496b61c1a272519b1c39979d78')
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("12")]
+    WIF_BYTE = bytes.fromhex("80")
+    TX_COUNT_HEIGHT = 54353
+    TX_COUNT = 92701
+    TX_PER_BLOCK = 4
+    RPC_PORT = 3385
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
+
+
 # Source: https://github.com/dashpay/dash
 class Dash(Coin):
     NAME = "Dash"
