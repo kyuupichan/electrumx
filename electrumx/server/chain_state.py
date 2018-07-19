@@ -21,7 +21,8 @@ class ChainState(object):
         self.tasks = tasks
         self.shutdown_event = shutdown_event
         self.daemon = env.coin.DAEMON(env)
-        self.bp = env.coin.BLOCK_PROCESSOR(env, tasks, self.daemon)
+        BlockProcessor = env.coin.BLOCK_PROCESSOR
+        self.bp = BlockProcessor(env, tasks, self.daemon)
         self.mempool = MemPool(env.coin, self, self.tasks,
                                self.bp.add_new_block_callback)
         self.history_cache = pylru.lrucache(256)
