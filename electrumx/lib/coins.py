@@ -1900,7 +1900,7 @@ class Monoeci(Coin):
 
 class MinexcoinMixin(object):
     STATIC_BLOCK_HEADERS = True
-    BASIC_HEADER_SIZE = 209 # Excluding Equihash solution
+    BASIC_HEADER_SIZE = 209
     DESERIALIZER = lib_tx.DeserializerEquihash
 
     @classmethod
