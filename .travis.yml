@@ -30,7 +30,7 @@ install:
   - pip install xevan_hash
   - pip install quark_hash
   - pip install git+https://github.com/goacoincore/neoscrypt
-  - pip install git+https://github.com/brian112358/x16r_hash
+  - pip install git+https://github.com/motioncrypto/x16r_hash
 # command to run tests
 script:
   - pytest --cov=electrumx
