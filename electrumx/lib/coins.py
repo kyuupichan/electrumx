@@ -39,7 +39,7 @@ from functools import partial
 import base64
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str, hash_to_str
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
@@ -1911,12 +1911,12 @@ class MinexcoinMixin(object):
         return {
             'block_height': height,
             'version': version,
-            'prev_block_hash': hash_to_str(header[4:36]),
-            'merkle_root': hash_to_str(header[36:68]),
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
             'timestamp': timestamp,
             'bits': bits,
-            'nonce': hash_to_str(header[108:140]),
-            'solution': hash_to_str(header[140:209]),
+            'nonce': hash_to_hex_str(header[108:140]),
+            'solution': hash_to_hex_str(header[140:209]),
         }
 
     @classmethod
