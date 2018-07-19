@@ -1897,3 +1897,50 @@ class Monoeci(Coin):
                 '''Given a header return the hash.'''
                 import x11_hash
                 return x11_hash.getPoWHash(header)
+
+class MinexcoinMixin(object):
+    STATIC_BLOCK_HEADERS = True
+    BASIC_HEADER_SIZE = 209 # Excluding Equihash solution
+    DESERIALIZER = lib_tx.DeserializerEquihash
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits = struct.unpack('<II', header[100:108])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_str(header[4:36]),
+            'merkle_root': hash_to_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': hash_to_str(header[108:140]),
+            'solution': hash_to_str(header[140:209]),
+        }
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+return deserializer.read_header(height, 140)
+
+class Minexcoin(MinexcoinMixin, Coin):
+    NAME = "Minexcoin"
+    SHORTNAME = "MNX"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("4b")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('490a36d9451a55ed197e34aca7414b35'
+                    'd775baa4a8e896f1c577f65ce2d214cb')
+    DESERIALIZER = lib_tx.DeserializerEquihash
+    TX_COUNT = 327963
+    TX_COUNT_HEIGHT = 74495
+    TX_PER_BLOCK = 5
+    RPC_PORT = 8022
+    CHUNK_SIZE = 960
+    PEERS = [
+        'elex01-ams.turinex.eu s t',
+        'eu.minexpool.nl s t'
+]
