@@ -107,7 +107,6 @@ class ChainState(object):
         self.tasks.loop.call_soon(self.shutdown_event.set)
 
     async def wait_for_mempool(self):
-        self.tasks.create_task(self.bp.main_loop())
-        await self.bp.caught_up_event.wait()
+        await self.bp.catch_up_to_daemon()
         self.tasks.create_task(self.mempool.main_loop())
         await self.mempool.synchronized_event.wait()
