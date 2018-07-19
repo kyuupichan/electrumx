@@ -7,11 +7,25 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
-Version 1.6
-===========
+Version 1.7  (in progress)
+==========================
+
+Version 1.6.1  (in progress)
+============================
+
+Version 1.6  (19 July 2018)
+===========================
 
 * implement :ref:`version 1.4` of the protocol, with benefit for light
   clients, particularly mobile
+* implement header proofs and merkle caches
+* implement :func:`blockchain.transaction.id_from_pos` (ghost43)
+* large refactoring of session and controller classes
+* recent blocks are now stored on disk.  When backing up in a reorg
+  ElectrumX uses these rather than asking the daemon for the blocks --
+  some daemon's cannot correctly handle orphaned block requests after
+  a reorg.  Fixes `#258`_, `#315`_, `#479`_
+* minor fixes: nijel
 
 Version 1.5.2
 =============
@@ -120,48 +134,18 @@ Version 1.3
 * Minor fixes and improvements: duckartes, blin00, bauerj,
   erasmospunk, SomberNight, romanz.
 
-Version 1.2.1
-=============
-
-- remove IRC support.  Most coins had empty IRC channels.  Those that
-  don't have peers populated.
-- use estimatesmartfee RPC call if available (SomberNight)
-- new/updated coins: Emercoin (Sergii Vakula), Bitcoin Gold (erasmospunk),
-  Monacoin testnet (Wakiyama P), sibcoin (53r63rn4r), Komodo and Monaize
-  (cipig), Hush (Duke Leto)
-- doc updates (fr3aker)
-- issues fixed: `#302`_
-
-Version 1.2
-===========
-
-.. note:: version 1.2 changes script hash indexing in the database, so
-  you will need to rebuild your databases from scratch.  Running this
-  version will refuse to open the DB and not corrupt it, so you can
-  revert to 1.1.x if you wish.  The initial synchronisation process
-  should be around 10-15% faster than 1.1, owing to this change and
-  Justin Arthur's optimisations from 1.1.1.
-
-- separate P2PKH from P2PK entries in the history and UTXO databases.
-  These were previously amalgamated by address as that is what
-  electrum-server used to do.  However Electrum didn't handle P2PK
-  spends correctly and now the protocol admits subscriptions by script
-  hash there is no need to have these merged any more.
-
-For Bitcoin (BitcoinSegwit/mainnet) you can download a leveldb database
-synced up to block 490153 using this bittorrent magnet
-`link (~24GB) <magnet:?xt=urn:btih:caa804f48a319b061be3884ac011656c27121a6f&dn=electrumx_1.2_btc_leveldb_490153>`_.
-
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 
+.. _#258: https://github.com/kyuupichan/electrumx/issues/258
 .. _#301: https://github.com/kyuupichan/electrumx/issues/301
-.. _#302: https://github.com/kyuupichan/electrumx/issues/302
+.. _#315: https://github.com/kyuupichan/electrumx/issues/315
 .. _#414: https://github.com/kyuupichan/electrumx/issues/414
 .. _#442: https://github.com/kyuupichan/electrumx/issues/442
 .. _#443: https://github.com/kyuupichan/electrumx/issues/443
 .. _#455: https://github.com/kyuupichan/electrumx/issues/455
+.. _#479: https://github.com/kyuupichan/electrumx/issues/479
 .. _#480: https://github.com/kyuupichan/electrumx/issues/480
 .. _#485: https://github.com/kyuupichan/electrumx/issues/485
 .. _#502: https://github.com/kyuupichan/electrumx/issues/50
