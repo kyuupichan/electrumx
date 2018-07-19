@@ -1898,6 +1898,7 @@ class Monoeci(Coin):
                 import x11_hash
                 return x11_hash.getPoWHash(header)
 
+
 class MinexcoinMixin(object):
     STATIC_BLOCK_HEADERS = True
     BASIC_HEADER_SIZE = 209
@@ -1924,6 +1925,7 @@ class MinexcoinMixin(object):
         '''Return the block header bytes'''
         deserializer = cls.DESERIALIZER(block)
         return deserializer.read_header(height, 140)
+
 
 class Minexcoin(MinexcoinMixin, Coin):
     NAME = "Minexcoin"
