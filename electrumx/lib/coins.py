@@ -1923,7 +1923,7 @@ class MinexcoinMixin(object):
     def block_header(cls, block, height):
         '''Return the block header bytes'''
         deserializer = cls.DESERIALIZER(block)
-return deserializer.read_header(height, 140)
+        return deserializer.read_header(height, 140)
 
 class Minexcoin(MinexcoinMixin, Coin):
     NAME = "Minexcoin"
@@ -1943,4 +1943,4 @@ class Minexcoin(MinexcoinMixin, Coin):
     PEERS = [
         'elex01-ams.turinex.eu s t',
         'eu.minexpool.nl s t'
-]
+    ]
