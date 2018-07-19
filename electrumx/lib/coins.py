@@ -794,6 +794,7 @@ class DogecoinTestnet(Dogecoin):
     GENESIS_HASH = ('bb0a78264637406b6360aad926284d54'
                     '4d7049f45189db5664f3c4d07350559e')
 
+
 # Source: https://github.com/motioncrypto/motion
 class Motion(Coin):
     NAME = "Motion"
@@ -818,6 +819,7 @@ class Motion(Coin):
         '''Given a header return the hash.'''
         import x16r_hash
         return x16r_hash.getPoWHash(header)
+
 
 # Source: https://github.com/dashpay/dash
 class Dash(Coin):
