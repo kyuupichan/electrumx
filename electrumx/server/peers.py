@@ -334,8 +334,9 @@ class PeerManager(object):
         retry = False
         new_peers = []
         for peer in peers:
-            if not peer.is_public:
+            if not peer.is_public or (peer.is_tor and not self.proxy):
                 continue
+
             matches = peer.matches(self.peers)
             if not matches:
                 new_peers.append(peer)
@@ -499,16 +500,16 @@ class PeerManager(object):
           3) Retrying old peers at regular intervals.
         '''
         self.import_peers()
-        await self.maybe_detect_proxy()
 
         try:
             while True:
+                await self.maybe_detect_proxy()
+                await self.retry_peers()
                 timeout = self.loop.call_later(WAKEUP_SECS,
                                                self.retry_event.set)
                 await self.retry_event.wait()
                 self.retry_event.clear()
                 timeout.cancel()
-                await self.retry_peers()
         finally:
             for session in list(PeerSession.sessions):
                 session.abort()
@@ -536,9 +537,6 @@ class PeerManager(object):
             return peer.last_try < now - WAKEUP_SECS * 2 ** peer.try_count
 
         peers = [peer for peer in self.peers if should_retry(peer)]
-
-        if self.env.force_proxy or any(peer.is_tor for peer in peers):
-            await self.maybe_detect_proxy()
 
         for peer in peers:
             peer.try_count += 1

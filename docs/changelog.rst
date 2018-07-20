@@ -14,6 +14,7 @@ Version 1.6.1  (in progress)
 ============================
 
 * cleaner shutdown process with clear guarantees
+* onion peers are ignored if no tor proxy is available
 * add Motion coin (ocruzv)
 
 Version 1.6  (19 July 2018)
