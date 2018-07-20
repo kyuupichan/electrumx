@@ -49,11 +49,10 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start the peer manager and serving external clients.
         '''
-        await self.session_mgr.start_rpc_server()
+        self.session_mgr.start_rpc_server()
         await self.chain_state.wait_for_mempool()
-        self.tasks.create_task(self.peer_mgr.main_loop())
-        self.tasks.create_task(self.session_mgr.start_serving())
-        self.tasks.create_task(self.session_mgr.housekeeping())
+        self.peer_mgr.start_peer_discovery()
+        self.session_mgr.start_serving()
 
     async def shutdown(self):
         '''Perform the shutdown sequence.'''

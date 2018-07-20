@@ -483,20 +483,21 @@ class PeerManager(object):
         None.'''
         return self.proxy.peername if self.proxy else None
 
-    async def main_loop(self):
+    def start_peer_discovery(self):
+        if self.env.peer_discovery == self.env.PD_ON:
+            self.logger.info(f'beginning peer discovery. Force use of '
+                             f'proxy: {self.env.force_proxy}')
+            self.tasks.create_task(self.peer_discovery_loop())
+        else:
+            self.logger.info('peer discovery is disabled')
+
+    async def peer_discovery_loop(self):
         '''Main loop performing peer maintenance.  This includes
 
           1) Forgetting unreachable peers.
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
         '''
-        if self.env.peer_discovery != self.env.PD_ON:
-            self.logger.info('peer discovery is disabled')
-            return
-
-        self.logger.info('beginning peer discovery. Force use of proxy: {}'
-                         .format(self.env.force_proxy))
-
         self.import_peers()
         await self.maybe_detect_proxy()
 

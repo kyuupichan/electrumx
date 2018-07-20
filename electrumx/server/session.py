@@ -175,6 +175,30 @@ class SessionManager(object):
             if server:
                 server.close()
 
+    async def _housekeeping(self):
+        '''Regular housekeeping checks.'''
+        n = 0
+        while True:
+            n += 1
+            await asyncio.sleep(15)
+            if n % 10 == 0:
+                self._clear_stale_sessions()
+
+            # Start listening for incoming connections if paused and
+            # session count has fallen
+            if (self.state == self.PAUSED and
+                    len(self.sessions) <= self.low_watermark):
+                await self._start_external_servers()
+
+            # Periodically log sessions
+            if self.env.log_sessions and time.time() > self.next_log_sessions:
+                if self.next_log_sessions:
+                    data = self._session_data(for_log=True)
+                    for line in text.sessions_lines(data):
+                        self.logger.info(line)
+                    self.logger.info(json.dumps(self._get_info()))
+                self.next_log_sessions = time.time() + self.env.log_sessions
+
     def _group_map(self):
         group_map = defaultdict(list)
         for session in self.sessions:
@@ -368,7 +392,13 @@ class SessionManager(object):
 
     # --- External Interface
 
-    async def start_serving(self):
+    def start_rpc_server(self):
+        '''Start the RPC server if enabled.'''
+        if self.env.rpc_port is not None:
+            self.tasks.create_task(self._start_server(
+                'RPC', self.env.cs_host(for_rpc=True), self.env.rpc_port))
+
+    def start_serving(self):
         '''Start TCP and SSL servers.'''
         self.logger.info('max session count: {:,d}'.format(self.max_sessions))
         self.logger.info('session timeout: {:,d} seconds'
@@ -384,12 +414,8 @@ class SessionManager(object):
         if self.env.drop_client is not None:
             self.logger.info('drop clients matching: {}'
                              .format(self.env.drop_client.pattern))
-        await self._start_external_servers()
-
-    async def start_rpc_server(self):
-        if self.env.rpc_port is not None:
-            await self._start_server('RPC', self.env.cs_host(for_rpc=True),
-                                     self.env.rpc_port)
+        self.tasks.create_task(self._start_external_servers())
+        self.tasks.create_task(self._housekeeping())
 
     async def shutdown(self):
         '''Close servers and sessions.'''
@@ -416,30 +442,6 @@ class SessionManager(object):
             session_touched = session.notify(height, touched)
             if session_touched is not None:
                 self.tasks.create_task(session.notify_async(session_touched))
-
-    async def housekeeping(self):
-        '''Regular housekeeping checks.'''
-        n = 0
-        while True:
-            n += 1
-            await asyncio.sleep(15)
-            if n % 10 == 0:
-                self._clear_stale_sessions()
-
-            # Start listening for incoming connections if paused and
-            # session count has fallen
-            if (self.state == self.PAUSED and
-                    len(self.sessions) <= self.low_watermark):
-                await self._start_external_servers()
-
-            # Periodically log sessions
-            if self.env.log_sessions and time.time() > self.next_log_sessions:
-                if self.next_log_sessions:
-                    data = self._session_data(for_log=True)
-                    for line in text.sessions_lines(data):
-                        self.logger.info(line)
-                    self.logger.info(json.dumps(self._get_info()))
-                self.next_log_sessions = time.time() + self.env.log_sessions
 
     def add_session(self, session):
         self.sessions.add(session)
