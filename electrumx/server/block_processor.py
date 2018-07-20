@@ -188,10 +188,6 @@ class BlockProcessor(electrumx.server.db.DB):
         self.state_lock = asyncio.Lock()
         self.worker_task = None
 
-    def add_task(self, task):
-        '''Add the task to our task queue.'''
-        self.task_queue.put_nowait(task)
-
     def add_new_block_callback(self, callback):
         '''Add a function called when a new block is found.
 

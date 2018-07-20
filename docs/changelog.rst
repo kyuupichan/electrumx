@@ -26,7 +26,7 @@ Version 1.6  (19 July 2018)
 * large refactoring of session and controller classes
 * recent blocks are now stored on disk.  When backing up in a reorg
   ElectrumX uses these rather than asking the daemon for the blocks --
-  some daemon's cannot correctly handle orphaned block requests after
+  some daemons cannot correctly handle orphaned block requests after
   a reorg.  Fixes `#258`_, `#315`_, `#479`_
 * minor fixes: nijel
 
