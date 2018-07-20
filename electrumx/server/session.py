@@ -124,7 +124,7 @@ class SessionManager(object):
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = asyncio.Event()
         # FIXME
-        chain_state.mempool.notify_sessions = self.notify_sessions
+        chain_state._mempool.notify_sessions = self.notify_sessions
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
                 'reorg sessions stop'.split())
@@ -488,7 +488,7 @@ class SessionBase(ServerSession):
         self.chain_state = chain_state
         self.peer_mgr = peer_mgr
         self.kind = kind  # 'RPC', 'TCP' etc.
-        self.env = chain_state.env
+        self.env = session_mgr.env
         self.coin = self.env.coin
         self.client = 'unknown'
         self.anon_logs = self.env.anon_logs

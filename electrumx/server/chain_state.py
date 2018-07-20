@@ -18,42 +18,43 @@ class ChainState(object):
     '''
 
     def __init__(self, env, tasks):
-        self.env = env
-        self.tasks = tasks
-        self.daemon = env.coin.DAEMON(env)
+        self._env = env
+        self._tasks = tasks
+        self._daemon = env.coin.DAEMON(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
-        self.bp = BlockProcessor(env, tasks, self.daemon)
-        self.mempool = MemPool(env.coin, self, self.tasks,
-                               self.bp.add_new_block_callback)
-        self.history_cache = pylru.lrucache(256)
+        self._bp = BlockProcessor(env, tasks, self._daemon)
+        self._mempool = MemPool(env.coin, self, tasks,
+                               self._bp.add_new_block_callback)
+        self._history_cache = pylru.lrucache(256)
+
         # External interface: pass-throughs for mempool.py
-        self.cached_mempool_hashes = self.daemon.cached_mempool_hashes
-        self.getrawtransactions = self.daemon.getrawtransactions
-        self.utxo_lookup = self.bp.db_utxo_lookup
+        self.cached_mempool_hashes = self._daemon.cached_mempool_hashes
+        self.getrawtransactions = self._daemon.getrawtransactions
+        self.utxo_lookup = self._bp.db_utxo_lookup
         # External interface pass-throughs for session.py
-        self.force_chain_reorg = self.bp.force_chain_reorg
-        self.mempool_fee_histogram = self.mempool.get_fee_histogram
-        self.mempool_get_utxos = self.mempool.get_utxos
-        self.mempool_potential_spends = self.mempool.potential_spends
-        self.mempool_transactions = self.mempool.transactions
-        self.mempool_value = self.mempool.value
-        self.tx_branch_and_root = self.bp.merkle.branch_and_root
-        self.read_headers = self.bp.read_headers
+        self.force_chain_reorg = self._bp.force_chain_reorg
+        self.mempool_fee_histogram = self._mempool.get_fee_histogram
+        self.mempool_get_utxos = self._mempool.get_utxos
+        self.mempool_potential_spends = self._mempool.potential_spends
+        self.mempool_transactions = self._mempool.transactions
+        self.mempool_value = self._mempool.value
+        self.tx_branch_and_root = self._bp.merkle.branch_and_root
+        self.read_headers = self._bp.read_headers
 
     async def broadcast_transaction(self, raw_tx):
-        return await self.daemon.sendrawtransaction([raw_tx])
+        return await self._daemon.sendrawtransaction([raw_tx])
 
     async def daemon_request(self, method, args):
-        return await getattr(self.daemon, method)(*args)
+        return await getattr(self._daemon, method)(*args)
 
     def db_height(self):
-        return self.bp.db_height
+        return self._bp.db_height
 
     def get_info(self):
         '''Chain state info for LocalRPC and logs.'''
         return {
-            'daemon': self.daemon.logged_url(),
-            'daemon_height': self.daemon.cached_height(),
+            'daemon': self._daemon.logged_url(),
+            'daemon_height': self._daemon.cached_height(),
             'db_height': self.db_height(),
         }
 
@@ -64,53 +65,53 @@ class ChainState(object):
             # bytes when encoded as JSON.  This limits resource usage
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
-            limit = self.env.max_send // 97
-            return list(self.bp.get_history(hashX, limit=limit))
+            limit = self._env.max_send // 97
+            return list(self._bp.get_history(hashX, limit=limit))
 
-        hc = self.history_cache
+        hc = self._history_cache
         if hashX not in hc:
-            hc[hashX] = await self.tasks.run_in_thread(job)
+            hc[hashX] = await self._tasks.run_in_thread(job)
         return hc[hashX]
 
     async def get_utxos(self, hashX):
         '''Get UTXOs asynchronously to reduce latency.'''
         def job():
-            return list(self.bp.get_utxos(hashX, limit=None))
+            return list(self._bp.get_utxos(hashX, limit=None))
 
-        return await self.tasks.run_in_thread(job)
+        return await self._tasks.run_in_thread(job)
 
     def header_branch_and_root(self, length, height):
-        return self.bp.header_mc.branch_and_root(length, height)
+        return self._bp.header_mc.branch_and_root(length, height)
 
     def invalidate_history_cache(self, touched):
-        hc = self.history_cache
+        hc = self._history_cache
         for hashX in set(hc).intersection(touched):
             del hc[hashX]
 
     def processing_new_block(self):
         '''Return True if we're processing a new block.'''
-        return self.daemon.cached_height() > self.db_height()
+        return self._daemon.cached_height() > self.db_height()
 
     def raw_header(self, height):
         '''Return the binary header at the given height.'''
-        header, n = self.bp.read_headers(height, 1)
+        header, n = self._bp.read_headers(height, 1)
         if n != 1:
             raise IndexError(f'height {height:,d} out of range')
         return header
 
     def set_daemon_url(self, daemon_url):
-        self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
-        return self.daemon.logged_url()
+        self._daemon.set_urls(self._env.coin.daemon_urls(daemon_url))
+        return self._daemon.logged_url()
 
     async def shutdown(self):
         '''Shut down the block processor to flush chain state to disk.'''
-        await self.bp.shutdown()
+        await self._bp.shutdown()
 
     async def wait_for_mempool(self):
-        await self.bp.catch_up_to_daemon()
+        await self._bp.catch_up_to_daemon()
         # Tell the daemon to fetch the mempool going forwards, trigger
         # an initial fetch, and wait for the mempool to synchronize
         mempool_refresh_event = asyncio.Event()
-        self.daemon._mempool_refresh_event = mempool_refresh_event
-        self.tasks.create_task(self.daemon.height())
-        await self.mempool.start_and_wait(mempool_refresh_event)
+        self._daemon._mempool_refresh_event = mempool_refresh_event
+        self._tasks.create_task(self._daemon.height())
+        await self._mempool.start_and_wait(mempool_refresh_event)
