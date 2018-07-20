@@ -96,7 +96,7 @@ class DB(object):
             os.mkdir('meta')
             with util.open_file('COIN', create=True) as f:
                 f.write(f'ElectrumX databases and metadata for '
-                        f'{self.coin.NAME} {self.coin.NET}')
+                        f'{self.coin.NAME} {self.coin.NET}'.encode())
             if not self.coin.STATIC_BLOCK_HEADERS:
                 self.headers_offsets_file.write(0, bytes(8))
         else:
