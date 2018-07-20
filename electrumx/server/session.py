@@ -97,12 +97,13 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, tasks, chain_state, peer_mgr):
+    def __init__(self, env, tasks, chain_state, peer_mgr, shutdown_event):
         env.max_send = max(350000, env.max_send)
         self.env = env
         self.tasks = tasks
         self.chain_state = chain_state
         self.peer_mgr = peer_mgr
+        self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
         self.sessions = set()
@@ -361,7 +362,7 @@ class SessionManager(object):
 
     def rpc_stop(self):
         '''Shut down the server cleanly.'''
-        self.chain_state.shutdown()
+        self.shutdown_event.set()
         return 'stopping'
 
     def rpc_getinfo(self):

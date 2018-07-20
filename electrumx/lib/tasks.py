@@ -26,8 +26,6 @@
 
 '''Concurrency via tasks and threads.'''
 
-from concurrent.futures import ThreadPoolExecutor
-
 from aiorpcx import TaskSet
 
 import electrumx.lib.util as util
@@ -40,12 +38,8 @@ class Tasks(object):
     def __init__(self, *, loop=None):
         self.tasks = TaskSet(loop=loop)
         self.logger = util.class_logger(__name__, self.__class__.__name__)
-        # FIXME: is the executor still needed?
-        self.executor = ThreadPoolExecutor()
-        self.tasks.loop.set_default_executor(self.executor)
         # Pass through until integrated
         self.loop = self.tasks.loop
-        self.cancel_all = self.tasks.cancel_all
         self.wait = self.tasks.wait
 
     async def run_in_thread(self, func, *args):
@@ -65,3 +59,9 @@ class Tasks(object):
                 task.result()
         except Exception as e:
             self.logger.exception(f'uncaught task exception: {e}')
+
+    async def cancel_all(self, wait=True):
+        '''Cancels all tasks and waits for them to complete.'''
+        self.tasks.cancel_all()
+        if wait:
+            await self.tasks.wait()

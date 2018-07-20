@@ -13,6 +13,9 @@ Version 1.7  (in progress)
 Version 1.6.1  (in progress)
 ============================
 
+* cleaner shutdown process with clear guarantees
+* add Motion coin (ocruzv)
+
 Version 1.6  (19 July 2018)
 ===========================
 

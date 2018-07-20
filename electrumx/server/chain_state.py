@@ -16,10 +16,9 @@ class ChainState(object):
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, tasks, shutdown_event):
+    def __init__(self, env, tasks):
         self.env = env
         self.tasks = tasks
-        self.shutdown_event = shutdown_event
         self.daemon = env.coin.DAEMON(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
         self.bp = BlockProcessor(env, tasks, self.daemon)
@@ -103,8 +102,9 @@ class ChainState(object):
         self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
         return self.daemon.logged_url()
 
-    def shutdown(self):
-        self.tasks.loop.call_soon(self.shutdown_event.set)
+    async def shutdown(self):
+        '''Shut down the block processor to flush chain state to disk.'''
+        await self.bp.shutdown()
 
     async def wait_for_mempool(self):
         await self.bp.catch_up_to_daemon()

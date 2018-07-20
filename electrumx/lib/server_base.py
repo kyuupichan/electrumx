@@ -12,6 +12,7 @@ import sys
 import time
 from functools import partial
 
+from electrumx.lib.tasks import Tasks
 from electrumx.lib.util import class_logger
 
 
@@ -37,9 +38,14 @@ class ServerBase(object):
         '''Save the environment, perform basic sanity checks, and set the
         event loop policy.
         '''
+        # First asyncio operation must be to set the event loop policy
+        # as this replaces the event loop
+        asyncio.set_event_loop_policy(env.loop_policy)
+
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.logger.info(f'Python version: {sys.version}')
         self.env = env
+        self.tasks = Tasks()
 
         # Sanity checks
         if sys.version_info < self.PYTHON_MIN_VERSION:
@@ -53,10 +59,6 @@ class ServerBase(object):
                                'To continue as root anyway, restart with '
                                'environment variable ALLOW_ROOT non-empty')
 
-        # First asyncio operation must be to set the event loop policy
-        # as this replaces the event loop
-        asyncio.set_event_loop_policy(self.env.loop_policy)
-
         # Trigger this event to cleanly shutdown
         self.shutdown_event = asyncio.Event()
 
@@ -68,26 +70,6 @@ class ServerBase(object):
     async def shutdown(self):
         '''Override to perform the shutdown sequence, if any.'''
         pass
-
-    async def _wait_for_shutdown_event(self):
-        '''Wait for shutdown to be signalled, and log it.
-
-        Derived classes may want to provide a shutdown() coroutine.'''
-        # Shut down cleanly after waiting for shutdown to be signalled
-        await self.shutdown_event.wait()
-        self.logger.info('shutting down')
-
-        # Wait for the shutdown sequence
-        await self.shutdown()
-
-        # Finally, work around an apparent asyncio bug that causes log
-        # spew on shutdown for partially opened SSL sockets
-        try:
-            del asyncio.sslproto._SSLProtocolTransport.__del__
-        except Exception:
-            pass
-
-        self.logger.info('shutdown complete')
 
     def on_signal(self, signame):
         '''Call on receipt of a signal to cleanly shutdown.'''
@@ -104,7 +86,7 @@ class ServerBase(object):
             return
         loop.default_exception_handler(context)
 
-    def run(self):
+    async def _main(self, loop):
         '''Run the server application:
 
         - record start time
@@ -116,13 +98,32 @@ class ServerBase(object):
         '''
         self.start_time = time.time()
 
-        loop = asyncio.get_event_loop()
-
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
                                     partial(self.on_signal, signame))
         loop.set_exception_handler(self.on_exception)
 
-        loop.run_until_complete(self.start_servers())
-        loop.run_until_complete(self._wait_for_shutdown_event())
+        self.tasks.create_task(self.start_servers())
+
+        # Wait for shutdown to be signalled, and log it.
+        # Derived classes may want to provide a shutdown() coroutine.
+        await self.shutdown_event.wait()
+        self.logger.info('shutting down')
+        await self.shutdown()
+
+        # Let the loop clean itself up; prevents some silly logs
+        await asyncio.sleep(0.001)
+
+        # Finally, work around an apparent asyncio bug that causes log
+        # spew on shutdown for partially opened SSL sockets
+        try:
+            del asyncio.sslproto._SSLProtocolTransport.__del__
+        except Exception:
+            pass
+
+        self.logger.info('shutdown complete')
+
+    def run(self):
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self._main(loop))
         loop.close()
