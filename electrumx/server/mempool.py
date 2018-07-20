@@ -41,11 +41,20 @@ class MemPool(object):
         self.stop = False
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
-        self.synchronized_event = asyncio.Event()
         self.fee_histogram = defaultdict(int)
         self.compact_fee_histogram = []
         self.histogram_time = 0
         add_new_block_callback(self.on_new_block)
+
+    async def start_and_wait(self, mempool_refresh_event):
+        '''Creates the mempool synchronization task, and waits for it to
+        first synchronize before returning.'''
+        self.logger.info('beginning processing of daemon mempool.  '
+                         'This can take some time...')
+        synchronized = asyncio.Event()
+        self.tasks.create_task(self._synchronize(
+            mempool_refresh_event, synchronized))
+        await synchronized.wait()
 
     def _resync_daemon_hashes(self, unprocessed, unfetched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
@@ -83,21 +92,17 @@ class MemPool(object):
         for hex_hash in new:
             txs[hex_hash] = None
 
-    async def main_loop(self):
+    async def _synchronize(self, mempool_refresh_event, synchronized):
         '''Asynchronously maintain mempool status with daemon.
 
-        Processes the mempool each time the daemon's mempool refresh
-        event is signalled.
+        Processes the mempool each time the mempool refresh event is
+        signalled.
         '''
         unprocessed = {}
         unfetched = set()
         txs = self.txs
         fetch_size = 800
         process_some = self._async_process_some(fetch_size // 2)
-
-        self.logger.info('beginning processing of daemon mempool.  '
-                         'This can take some time...')
-        await self.chain_state.mempool_refresh_event.wait()
         next_log = 0
         loops = -1  # Zero during initial catchup
 
@@ -116,7 +121,7 @@ class MemPool(object):
             if not todo:
                 loops += 1
                 if loops > 0:
-                    self.synchronized_event.set()
+                    synchronized.set()
                 now = time.time()
                 if now >= next_log and loops:
                     self.logger.info('{:,d} txs touching {:,d} addresses'
@@ -125,10 +130,10 @@ class MemPool(object):
 
             try:
                 if not todo:
-                    await self.chain_state.mempool_refresh_event.wait()
+                    await mempool_refresh_event.wait()
 
                 self._resync_daemon_hashes(unprocessed, unfetched)
-                self.chain_state.mempool_refresh_event.clear()
+                mempool_refresh_event.clear()
 
                 if unfetched:
                     count = min(len(unfetched), fetch_size)

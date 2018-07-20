@@ -23,12 +23,17 @@ from electrumx.lib.util import chunks, formatted_time, class_logger
 import electrumx.server.db
 
 
+RAW_BLOCKS, PREFETCHER_CAUGHT_UP, REORG_CHAIN = range(3)
+
+
 class Prefetcher(object):
     '''Prefetches blocks (in the forward direction only).'''
 
-    def __init__(self, bp):
+    def __init__(self, daemon, coin, queue):
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.bp = bp
+        self.daemon = daemon
+        self.coin = coin
+        self.queue = queue
         self.caught_up = False
         # Access to fetched_height should be protected by the semaphore
         self.fetched_height = None
@@ -58,18 +63,19 @@ class Prefetcher(object):
         if self.cache_size < self.min_cache_size:
             self.refill_event.set()
 
-    async def reset_height(self):
+    async def reset_height(self, height):
         '''Reset to prefetch blocks from the block processor's height.
 
         Used in blockchain reorganisations.  This coroutine can be
-        called asynchronously to the _prefetch coroutine so we must
-        synchronize with a semaphore.'''
+        called asynchronously to the _prefetch_blocks coroutine so we
+        must synchronize with a semaphore.
+        '''
         async with self.semaphore:
-            self.fetched_height = self.bp.height
+            self.fetched_height = height
             self.refill_event.set()
 
-        daemon_height = await self.bp.daemon.height()
-        behind = daemon_height - self.bp.height
+        daemon_height = await self.daemon.height()
+        behind = daemon_height - height
         if behind > 0:
             self.logger.info('catching up to daemon height {:,d} '
                              '({:,d} blocks behind)'
@@ -83,8 +89,8 @@ class Prefetcher(object):
 
         Repeats until the queue is full or caught up.
         '''
-        daemon = self.bp.daemon
-        daemon_height = await daemon.height(self.bp._caught_up_event.is_set())
+        daemon = self.daemon
+        daemon_height = await daemon.height()
         async with self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
@@ -96,7 +102,7 @@ class Prefetcher(object):
                 if not count:
                     if not self.caught_up:
                         self.caught_up = True
-                        self.bp.on_prefetcher_first_caught_up()
+                        await self.queue.put((PREFETCHER_CAUGHT_UP, ))
                     return False
 
                 first = self.fetched_height + 1
@@ -110,7 +116,7 @@ class Prefetcher(object):
 
                 # Special handling for genesis block
                 if first == 0:
-                    blocks[0] = self.bp.coin.genesis_block(blocks[0])
+                    blocks[0] = self.coin.genesis_block(blocks[0])
                     self.logger.info('verified genesis block with hash {}'
                                      .format(hex_hashes[0]))
 
@@ -121,7 +127,7 @@ class Prefetcher(object):
                 else:
                     self.ave_size = (size + (10 - count) * self.ave_size) // 10
 
-                self.bp.on_prefetched_blocks(blocks, first)
+                await self.queue.put((RAW_BLOCKS, blocks, first))
                 self.cache_size += size
                 self.fetched_height += count
 
@@ -152,9 +158,10 @@ class BlockProcessor(electrumx.server.db.DB):
         self.tasks = tasks
         self.daemon = daemon
 
+        # Work queue
+        self.queue = asyncio.Queue()
         self._caught_up_event = asyncio.Event()
-        self.task_queue = asyncio.Queue()
-        self.prefetcher = Prefetcher(self)
+        self.prefetcher = Prefetcher(daemon, env.coin, self.queue)
 
         # Meta
         self.cache_MB = env.cache_MB
@@ -184,17 +191,6 @@ class BlockProcessor(electrumx.server.db.DB):
     def add_task(self, task):
         '''Add the task to our task queue.'''
         self.task_queue.put_nowait(task)
-
-    def on_prefetched_blocks(self, blocks, first):
-        '''Called by the prefetcher when it has prefetched some blocks.'''
-        self.add_task(partial(self.check_and_advance_blocks, blocks, first))
-
-    def on_prefetcher_first_caught_up(self):
-        '''Called by the prefetcher when it first catches up.'''
-        # Process after prior tasks (blocks) are completed.
-        async def set_event():
-            self._caught_up_event.set()
-        self.add_task(set_event)
 
     def add_new_block_callback(self, callback):
         '''Add a function called when a new block is found.
@@ -247,7 +243,7 @@ class BlockProcessor(electrumx.server.db.DB):
             # just to reset the prefetcher and try again.
             self.logger.warning('daemon blocks do not form a chain; '
                                 'resetting the prefetcher')
-            await self.prefetcher.reset_height()
+            await self.prefetcher.reset_height(self.height)
 
     async def reorg_chain(self, count=None):
         '''Handle a chain reorganisation.
@@ -280,7 +276,7 @@ class BlockProcessor(electrumx.server.db.DB):
             last -= len(raw_blocks)
         # Truncate header_mc: header count is 1 more than the height
         self.header_mc.truncate(self.height + 1)
-        await self.prefetcher.reset_height()
+        await self.prefetcher.reset_height(self.height)
 
     async def reorg_hashes(self, count):
         '''Return a pair (start, hashes) of blocks to back up during a
@@ -760,8 +756,15 @@ class BlockProcessor(electrumx.server.db.DB):
     async def _process_queue(self):
         '''Loop forever processing enqueued work.'''
         while True:
-            task = await self.task_queue.get()
-            await task()
+            work, *args = await self.queue.get()
+            if work == RAW_BLOCKS:
+                raw_blocks, first = args
+                await self.check_and_advance_blocks(raw_blocks, first)
+            elif work == PREFETCHER_CAUGHT_UP:
+                self._caught_up_event.set()
+            elif work == REORG_CHAIN:
+                count, = args
+                await self.reorg_chain(count)
 
     def _on_dbs_opened(self):
         # An incomplete compaction needs to be cancelled otherwise
@@ -790,7 +793,7 @@ class BlockProcessor(electrumx.server.db.DB):
         self._on_dbs_opened()
         # Get the prefetcher running
         self.tasks.create_task(self.prefetcher.main_loop())
-        await self.prefetcher.reset_height()
+        await self.prefetcher.reset_height(self.height)
         # Start our loop that processes blocks as they are fetched
         self.worker_task = self.tasks.create_task(self._process_queue())
         # Wait until caught up
@@ -816,7 +819,7 @@ class BlockProcessor(electrumx.server.db.DB):
         Returns True if a reorg is queued, false if not caught up.
         '''
         if self._caught_up_event.is_set():
-            self.add_task(partial(self.reorg_chain, count=count))
+            self.queue.put_nowait((REORG_CHAIN, count))
             return True
         return False
 

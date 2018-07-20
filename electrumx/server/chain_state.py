@@ -6,6 +6,7 @@
 # and warranty status of this software.
 
 
+import asyncio
 import pylru
 
 from electrumx.server.mempool import MemPool
@@ -108,5 +109,9 @@ class ChainState(object):
 
     async def wait_for_mempool(self):
         await self.bp.catch_up_to_daemon()
-        self.tasks.create_task(self.mempool.main_loop())
-        await self.mempool.synchronized_event.wait()
+        # Tell the daemon to fetch the mempool going forwards, trigger
+        # an initial fetch, and wait for the mempool to synchronize
+        mempool_refresh_event = asyncio.Event()
+        daemon._mempool_refresh_event = mempool_refresh_event
+        self.tasks.create_task(self.daemon.height())
+        await self.mempool.start_and_wait(mempool_refresh_event)
