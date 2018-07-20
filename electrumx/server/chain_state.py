@@ -28,7 +28,6 @@ class ChainState(object):
         self.history_cache = pylru.lrucache(256)
         # External interface: pass-throughs for mempool.py
         self.cached_mempool_hashes = self.daemon.cached_mempool_hashes
-        self.mempool_refresh_event = self.daemon.mempool_refresh_event
         self.getrawtransactions = self.daemon.getrawtransactions
         self.utxo_lookup = self.bp.db_utxo_lookup
         # External interface pass-throughs for session.py
@@ -112,6 +111,6 @@ class ChainState(object):
         # Tell the daemon to fetch the mempool going forwards, trigger
         # an initial fetch, and wait for the mempool to synchronize
         mempool_refresh_event = asyncio.Event()
-        daemon._mempool_refresh_event = mempool_refresh_event
+        self.daemon._mempool_refresh_event = mempool_refresh_event
         self.tasks.create_task(self.daemon.height())
         await self.mempool.start_and_wait(mempool_refresh_event)

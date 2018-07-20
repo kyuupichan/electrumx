@@ -37,6 +37,7 @@ class Controller(ServerBase):
         self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
         self.logger.info(f'supported protocol versions: {min_str}-{max_str}')
         self.logger.info(f'event loop policy: {env.loop_policy}')
+        self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
         self.chain_state = ChainState(env, self.tasks)
         self.peer_mgr = PeerManager(env, self.tasks, self.chain_state)

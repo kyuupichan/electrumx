@@ -58,12 +58,12 @@ class History(object):
             self.comp_cursor = -1
             self.db_version = max(self.DB_VERSIONS)
 
-        self.logger.info(f'flush count: {self.flush_count:,d}')
         self.logger.info(f'history DB version: {self.db_version}')
         if self.db_version not in self.DB_VERSIONS:
             msg = f'this software only handles DB versions {self.DB_VERSIONS}'
             self.logger.error(msg)
             raise RuntimeError(msg)
+        self.logger.info(f'flush count: {self.flush_count:,d}')
 
     def clear_excess(self, utxo_flush_count):
         # < might happen at end of compaction as both DBs cannot be

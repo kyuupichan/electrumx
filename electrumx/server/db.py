@@ -63,7 +63,6 @@ class DB(object):
         self.tx_counts = None
 
         self.logger.info(f'using {self.env.db_engine} for DB backend')
-        self.logger.info(f'reorg limit is {self.env.reorg_limit:,d} blocks')
 
         self.headers_file = util.LogicalFile('meta/headers', 2, 16000000)
         self.tx_counts_file = util.LogicalFile('meta/txcounts', 2, 2000000)
