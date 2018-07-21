@@ -15,6 +15,58 @@ from electrumx.server.peers import PeerManager
 from electrumx.server.session import SessionManager
 
 
+class Notifications(object):
+    # hashX notifications come from two sources: new blocks and
+    # mempool refreshes.  The logic in daemon.py only gets new mempool
+    # hashes after getting the latest height.
+    #
+    # A user with a pending transaction is notified after the block it
+    # gets in is processed.  Block processing can take an extended
+    # time, and any mempool refreshes during that time will not have
+    # the transaction in the mempool any more, which would cause a
+    # redundant notification.  To avoid this, mempool touches are not
+    # notified whilst a block is being processed, but combined with
+    # the block notification when it is made.  We do not pause mempool
+    # processing
+
+    def __init__(self):
+        self._touched_mp = {}
+        self._touched_bp = {}
+        self._highest_block = 0
+
+    async def _maybe_notify(self):
+        tmp, tbp = self._touched_mp, self._touched_bp
+        common = set(tmp).intersection(tbp)
+        if common:
+            height = max(common)
+        elif tmp and max(tmp) == self._highest_block:
+            height = self._highest_block
+        else:
+            # Either we are processing a block and waiting for it to
+            # come in, or we have had no mempool update for the
+            # current block
+            return
+        touched = tmp.pop(height)
+        touched.update(tbp.pop(height, set()))
+        for old in [h for h in tmp if h <= height]:
+            del tmp[old]
+        for old in [h for h in tbp if h <= height]:
+            del tbp[old]
+        await self.notify_sessions(touched, height)
+
+    async def on_mempool(self, touched, height):
+        self._touched_mp[height] = touched
+        await self._maybe_notify()
+
+    async def on_block(self, touched, height):
+        self._touched_bp[height] = touched
+        self._highest_block = height
+        await self._maybe_notify()
+
+    async def notify_sessions(self, touched, height):
+        pass
+
+
 class Controller(ServerBase):
     '''Manages server initialisation and stutdown.
 
@@ -39,10 +91,12 @@ class Controller(ServerBase):
         self.logger.info(f'event loop policy: {env.loop_policy}')
         self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
-        self.chain_state = ChainState(env, self.tasks)
+        notifications = Notifications()
+        self.chain_state = ChainState(env, self.tasks, notifications)
         self.peer_mgr = PeerManager(env, self.tasks, self.chain_state)
         self.session_mgr = SessionManager(env, self.tasks, self.chain_state,
-                                          self.peer_mgr, self.shutdown_event)
+                                          self.peer_mgr, notifications,
+                                          self.shutdown_event)
 
     async def start_servers(self):
         '''Start the RPC server and wait for the mempool to synchronize.  Then

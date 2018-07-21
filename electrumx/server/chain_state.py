@@ -17,18 +17,17 @@ class ChainState(object):
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, tasks):
+    def __init__(self, env, tasks, notifications):
         self._env = env
         self._tasks = tasks
         self._daemon = env.coin.DAEMON(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
-        self._bp = BlockProcessor(env, tasks, self._daemon)
-        self._mempool = MemPool(env.coin, self, tasks,
-                               self._bp.add_new_block_callback)
+        self._bp = BlockProcessor(env, tasks, self._daemon, notifications)
+        self._mempool = MemPool(env.coin, self, tasks, notifications)
         self._history_cache = pylru.lrucache(256)
 
         # External interface: pass-throughs for mempool.py
-        self.cached_mempool_hashes = self._daemon.cached_mempool_hashes
+        self.cached_height = self._daemon.cached_height
         self.getrawtransactions = self._daemon.getrawtransactions
         self.utxo_lookup = self._bp.db_utxo_lookup
         # External interface pass-throughs for session.py
@@ -44,7 +43,7 @@ class ChainState(object):
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
 
-    async def daemon_request(self, method, args):
+    async def daemon_request(self, method, args=()):
         return await getattr(self._daemon, method)(*args)
 
     def db_height(self):
@@ -109,9 +108,4 @@ class ChainState(object):
 
     async def wait_for_mempool(self):
         await self._bp.catch_up_to_daemon()
-        # Tell the daemon to fetch the mempool going forwards, trigger
-        # an initial fetch, and wait for the mempool to synchronize
-        mempool_refresh_event = asyncio.Event()
-        self._daemon._mempool_refresh_event = mempool_refresh_event
-        self._tasks.create_task(self._daemon.height())
-        await self._mempool.start_and_wait(mempool_refresh_event)
+        await self._mempool.start_and_wait_for_sync()

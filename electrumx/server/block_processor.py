@@ -152,11 +152,12 @@ class BlockProcessor(electrumx.server.db.DB):
     Coordinate backing up in case of chain reorganisations.
     '''
 
-    def __init__(self, env, tasks, daemon):
+    def __init__(self, env, tasks, daemon, notifications):
         super().__init__(env)
 
         self.tasks = tasks
         self.daemon = daemon
+        self.notifications = notifications
 
         # Work queue
         self.queue = asyncio.Queue()
@@ -168,7 +169,6 @@ class BlockProcessor(electrumx.server.db.DB):
         self.next_cache_check = 0
         self.last_flush = time.time()
         self.touched = set()
-        self.callbacks = []
 
         # Header merkle cache
         self.merkle = Merkle()
@@ -226,9 +226,9 @@ class BlockProcessor(electrumx.server.db.DB):
                 self.logger.info('processed {:,d} block{} in {:.1f}s'
                                  .format(len(blocks), s,
                                          time.time() - start))
-                for callback in self.callbacks:
-                    callback(self.touched)
-            self.touched.clear()
+            if self._caught_up_event.is_set():
+                await self.notifications.on_block(self.touched, self.height)
+            self.touched = set()
         elif hprevs[0] != chain[0]:
             await self.reorg_chain()
         else:
@@ -758,6 +758,8 @@ class BlockProcessor(electrumx.server.db.DB):
                 await self.check_and_advance_blocks(raw_blocks, first)
             elif work == PREFETCHER_CAUGHT_UP:
                 self._caught_up_event.set()
+                # Initialise the notification framework
+                await self.notifications.on_block(set(), self.height)
             elif work == REORG_CHAIN:
                 count, = args
                 await self.reorg_chain(count)

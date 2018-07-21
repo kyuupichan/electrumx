@@ -40,8 +40,6 @@ class Daemon(object):
         self.coin = env.coin
         self.set_urls(env.coin.daemon_urls(env.daemon_url))
         self._height = None
-        self._mempool_hashes = set()
-        self._mempool_refresh_event = None
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=10)
@@ -275,14 +273,7 @@ class Daemon(object):
     async def height(self):
         '''Query the daemon for its current height.'''
         self._height = await self._send_single('getblockcount')
-        if self._mempool_refresh_event:
-            self._mempool_hashes = set(await self.mempool_hashes())
-            self._mempool_refresh_event.set()
         return self._height
-
-    def cached_mempool_hashes(self):
-        '''Return the cached mempool hashes.'''
-        return self._mempool_hashes
 
     def cached_height(self):
         '''Return the cached daemon height.

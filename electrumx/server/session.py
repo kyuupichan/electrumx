@@ -97,12 +97,14 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, tasks, chain_state, peer_mgr, shutdown_event):
+    def __init__(self, env, tasks, chain_state, peer_mgr, notifications,
+                 shutdown_event):
         env.max_send = max(350000, env.max_send)
         self.env = env
         self.tasks = tasks
         self.chain_state = chain_state
         self.peer_mgr = peer_mgr
+        self.notifications = notifications
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
@@ -123,8 +125,7 @@ class SessionManager(object):
             self.mn_cache = []
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = asyncio.Event()
-        # FIXME
-        chain_state._mempool.notify_sessions = self.notify_sessions
+        notifications.notify_sessions = self.notify_sessions
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
                 'reorg sessions stop'.split())
@@ -431,12 +432,11 @@ class SessionManager(object):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
-    def notify_sessions(self, touched):
+    async def notify_sessions(self, touched, height):
         '''Notify sessions about height changes and touched addresses.'''
         self.chain_state.invalidate_history_cache(touched)
         # Height notifications are synchronous.  Those sessions with
         # touched addresses are scheduled for asynchronous completion
-        height = self.chain_state.db_height()
         for session in self.sessions:
             if isinstance(session, LocalRPC):
                 continue

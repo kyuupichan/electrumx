@@ -14,7 +14,6 @@ from collections import defaultdict
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger
-from electrumx.server.daemon import DaemonError
 from electrumx.server.db import UTXO, DB
 
 
@@ -32,31 +31,91 @@ class MemPool(object):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, coin, chain_state, tasks, add_new_block_callback):
+    def __init__(self, coin, chain_state, tasks, notifications):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.coin = coin
         self.chain_state = chain_state
         self.tasks = tasks
-        self.touched = set()
-        self.stop = False
+        self.notifications = notifications
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
         self.fee_histogram = defaultdict(int)
         self.compact_fee_histogram = []
         self.histogram_time = 0
-        add_new_block_callback(self.on_new_block)
+        self.next_log = 0
 
-    async def start_and_wait(self, mempool_refresh_event):
+    async def start_and_wait_for_sync(self):
         '''Creates the mempool synchronization task, and waits for it to
         first synchronize before returning.'''
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
-        synchronized = asyncio.Event()
-        self.tasks.create_task(self._synchronize(
-            mempool_refresh_event, synchronized))
-        await synchronized.wait()
+        await self._synchronize(True)
+        self.tasks.create_task(self._synchronize_forever())
 
-    def _resync_daemon_hashes(self, unprocessed, unfetched):
+    async def _synchronize_forever(self):
+        while True:
+            await asyncio.sleep(5)
+            await self._synchronize(False)
+
+    async def _refresh_hashes(self):
+        '''Return daemon hashes when we're sure which height they are
+        good for.'''
+        height = self.chain_state.cached_height()
+        daemon_request = self.chain_state.daemon_request
+        while True:
+            hashes = await daemon_request('mempool_hashes')
+            later_height = await daemon_request('height')
+            if height == later_height:
+                return set(hashes), height
+            height = later_height
+
+    async def _synchronize(self, first_time):
+        '''Asynchronously maintain mempool status with daemon.
+
+        Processes the mempool each time the mempool refresh event is
+        signalled.
+        '''
+        unprocessed = {}
+        unfetched = set()
+        touched = set()
+        txs = self.txs
+        next_refresh = 0
+        fetch_size = 800
+        process_some = self._async_process_some(fetch_size // 2)
+
+        while True:
+            now = time.time()
+            # If processing a large mempool, a block being found might
+            # shrink our work considerably, so refresh our view every 20s
+            if now > next_refresh:
+                hashes, height = await self._refresh_hashes()
+                self._resync_hashes(hashes, unprocessed, unfetched, touched)
+                next_refresh = time.time() + 20
+
+            # Log progress of initial sync
+            todo = len(unfetched) + len(unprocessed)
+            if first_time:
+                pct = (len(txs) - todo) * 100 // len(txs) if txs else 0
+                self.logger.info(f'catchup {pct:d}% complete '
+                                 f'({todo:,d} txs left)')
+            if not todo:
+                break
+
+            # FIXME: parallelize
+            if unfetched:
+                count = min(len(unfetched), fetch_size)
+                hex_hashes = [unfetched.pop() for n in range(count)]
+                unprocessed.update(await self.fetch_raw_txs(hex_hashes))
+            if unprocessed:
+                await process_some(unprocessed, touched)
+
+        if now >= self.next_log:
+            self.logger.info('{:,d} txs touching {:,d} addresses'
+                             .format(len(txs), len(self.hashXs)))
+            self.next_log = time.time() + 150
+        await self.notifications.on_mempool(touched, height)
+
+    def _resync_hashes(self, hashes, unprocessed, unfetched, touched):
         '''Re-sync self.txs with the list of hashes in the daemon's mempool.
 
         Additionally, remove gone hashes from unprocessed and
@@ -64,10 +123,7 @@ class MemPool(object):
         '''
         txs = self.txs
         hashXs = self.hashXs
-        touched = self.touched
         fee_hist = self.fee_histogram
-
-        hashes = self.chain_state.cached_mempool_hashes()
         gone = set(txs).difference(hashes)
         for hex_hash in gone:
             unfetched.discard(hex_hash)
@@ -92,69 +148,12 @@ class MemPool(object):
         for hex_hash in new:
             txs[hex_hash] = None
 
-    async def _synchronize(self, mempool_refresh_event, synchronized):
-        '''Asynchronously maintain mempool status with daemon.
-
-        Processes the mempool each time the mempool refresh event is
-        signalled.
-        '''
-        unprocessed = {}
-        unfetched = set()
-        txs = self.txs
-        fetch_size = 800
-        process_some = self._async_process_some(fetch_size // 2)
-        next_log = 0
-        loops = -1  # Zero during initial catchup
-
-        while True:
-            # Avoid double notifications if processing a block
-            if self.touched and not self.chain_state.processing_new_block():
-                self.notify_sessions(self.touched)
-                self.touched.clear()
-
-            # Log progress / state
-            todo = len(unfetched) + len(unprocessed)
-            if loops == 0:
-                pct = (len(txs) - todo) * 100 // len(txs) if txs else 0
-                self.logger.info('catchup {:d}% complete '
-                                 '({:,d} txs left)'.format(pct, todo))
-            if not todo:
-                loops += 1
-                if loops > 0:
-                    synchronized.set()
-                now = time.time()
-                if now >= next_log and loops:
-                    self.logger.info('{:,d} txs touching {:,d} addresses'
-                                     .format(len(txs), len(self.hashXs)))
-                    next_log = now + 150
-
-            try:
-                if not todo:
-                    await mempool_refresh_event.wait()
-
-                self._resync_daemon_hashes(unprocessed, unfetched)
-                mempool_refresh_event.clear()
-
-                if unfetched:
-                    count = min(len(unfetched), fetch_size)
-                    hex_hashes = [unfetched.pop() for n in range(count)]
-                    unprocessed.update(await self.fetch_raw_txs(hex_hashes))
-
-                if unprocessed:
-                    await process_some(unprocessed)
-            except DaemonError as e:
-                self.logger.info('ignoring daemon error: {}'.format(e))
-            except asyncio.CancelledError:
-                # This aids clean shutdowns
-                self.stop = True
-                break
-
     def _async_process_some(self, limit):
         pending = []
         txs = self.txs
         fee_hist = self.fee_histogram
 
-        async def process(unprocessed):
+        async def process(unprocessed, touched):
             nonlocal pending
 
             raw_txs = {}
@@ -174,7 +173,6 @@ class MemPool(object):
 
             pending.extend(deferred)
             hashXs = self.hashXs
-            touched = self.touched
             for hex_hash, item in result.items():
                 if hex_hash in txs:
                     txs[hex_hash] = item
@@ -187,17 +185,6 @@ class MemPool(object):
                         hashXs[hashX].add(hex_hash)
 
         return process
-
-    def on_new_block(self, touched):
-        '''Called after processing one or more new blocks.
-
-        Touched is a set of hashXs touched by the transactions in the
-        block.  Caller must be aware it is modified by this function.
-        '''
-        # Minor race condition here with mempool processor thread
-        touched.update(self.touched)
-        self.touched.clear()
-        self.notify_sessions(touched)
 
     async def fetch_raw_txs(self, hex_hashes):
         '''Fetch a list of mempool transactions.'''
@@ -241,9 +228,6 @@ class MemPool(object):
         utxo_lookup = self.chain_state.utxo_lookup
 
         for item in pending:
-            if self.stop:
-                break
-
             tx_hash, old_txin_pairs, txout_pairs, tx_size = item
             if tx_hash not in txs:
                 continue
