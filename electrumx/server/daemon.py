@@ -48,13 +48,6 @@ class Daemon(object):
         self.down = False
         self.last_error_time = 0
         self.req_id = 0
-        # assignment of asyncio.TimeoutError are essentially ignored
-        if aiohttp.__version__.startswith('1.'):
-            self.ClientHttpProcessingError = aiohttp.ClientHttpProcessingError
-            self.ClientPayloadError = asyncio.TimeoutError
-        else:
-            self.ClientHttpProcessingError = asyncio.TimeoutError
-            self.ClientPayloadError = aiohttp.ClientPayloadError
         self._available_rpcs = {}  # caches results for _is_rpc_available()
 
     def next_req_id(self):
@@ -140,9 +133,7 @@ class Daemon(object):
                 log_error('timeout error.')
             except aiohttp.ServerDisconnectedError:
                 log_error('disconnected.')
-            except self.ClientHttpProcessingError:
-                log_error('HTTP error.')
-            except self.ClientPayloadError:
+            except aiohttp.ClientPayloadError:
                 log_error('payload encoding error.')
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')

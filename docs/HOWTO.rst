@@ -18,11 +18,10 @@ Package          Notes
 Python3          ElectrumX uses asyncio.  Python version >= 3.6 is
                  **required**.
 `aiohttp`_       Python library for asynchronous HTTP.  Version >=
-                 1.0 required; I am using 3.0.1.
-`pylru`_         Python LRU cache package.  I'm using 1.0.9.
-DB Engine        I use `plyvel`_ 0.9, a Python interface to LevelDB.
-                 A database engine package is required but others
-                 are supported (see **Database Engine** below).
+                 2.0 required.
+`pylru`_         Python LRU cache package.
+DB Engine        A database engine package is required; two are
+                 supported (see `Database Engine`_ below).
 ================ ========================
 
 Some coins need an additional package, typically for their block hash
