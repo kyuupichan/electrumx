@@ -22,12 +22,12 @@ class Notifications(object):
     #
     # A user with a pending transaction is notified after the block it
     # gets in is processed.  Block processing can take an extended
-    # time, and any mempool refreshes during that time will not have
-    # the transaction in the mempool any more, which would cause a
-    # redundant notification.  To avoid this, mempool touches are not
-    # notified whilst a block is being processed, but combined with
-    # the block notification when it is made.  We do not pause mempool
-    # processing
+    # time, and the prefetcher might poll the daemon after the mempool
+    # code in any case.  In such cases the transaction will not be in
+    # the mempool after the mempool refresh.  We want to avoid
+    # notifying clients twice - for the mempool refresh and when the
+    # block is done.  This object handles that logic by deferring
+    # notifications appropriately.
 
     def __init__(self):
         self._touched_mp = {}
@@ -43,8 +43,8 @@ class Notifications(object):
             height = self._highest_block
         else:
             # Either we are processing a block and waiting for it to
-            # come in, or we have had no mempool update for the
-            # current block
+            # come in, or we have not yet had a mempool update for the
+            # new block height
             return
         touched = tmp.pop(height)
         touched.update(tbp.pop(height, set()))
