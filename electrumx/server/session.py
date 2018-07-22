@@ -733,7 +733,8 @@ class ElectrumX(SessionBase):
 
         status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
                          for tx_hash, height in history)
-        status += ''.join('{}:{:d}:'.format(hex_hash, -unconfirmed)
+        status += ''.join('{}:{:d}:'.format(hash_to_hex_str(hex_hash),
+                                            -unconfirmed)
                           for hex_hash, tx_fee, unconfirmed in mempool)
         if status:
             status = sha256(status.encode()).hex()
@@ -821,7 +822,8 @@ class ElectrumX(SessionBase):
         # Note unconfirmed history is unordered in electrum-server
         # Height is -1 if unconfirmed txins, otherwise 0
         mempool = await self.mempool.transaction_summaries(hashX)
-        return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
+        return [{'tx_hash': hash_to_hex_str(tx_hash), 'height': -unconfirmed,
+                 'fee': fee}
                 for tx_hash, fee, unconfirmed in mempool]
 
     async def confirmed_and_unconfirmed_history(self, hashX):
