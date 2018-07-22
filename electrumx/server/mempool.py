@@ -14,7 +14,7 @@ from collections import defaultdict
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger
-from electrumx.server.db import UTXO, DB
+from electrumx.server.db import UTXO
 
 
 class MemPool(object):
@@ -31,10 +31,10 @@ class MemPool(object):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, coin, tasks, daemon, notifications, utxo_lookup):
+    def __init__(self, coin, tasks, daemon, notifications, lookup_utxos):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.coin = coin
-        self.utxo_lookup = utxo_lookup
+        self.lookup_utxos = lookup_utxos
         self.tasks = tasks
         self.daemon = daemon
         self.notifications = notifications
@@ -142,7 +142,6 @@ class MemPool(object):
     def _async_process_some(self, limit):
         pending = []
         txs = self.txs
-        fee_hist = self.fee_histogram
 
         async def process(unprocessed, touched):
             nonlocal pending
@@ -159,21 +158,8 @@ class MemPool(object):
                 deferred = pending
                 pending = []
 
-            result, deferred = await self.tasks.run_in_thread(
-                self._process_raw_txs, raw_txs, deferred)
-
+            deferred = await self._process_raw_txs(raw_txs, deferred, touched)
             pending.extend(deferred)
-            hashXs = self.hashXs
-            for hex_hash, item in result.items():
-                if hex_hash in txs:
-                    txs[hex_hash] = item
-                    txin_pairs, txout_pairs, tx_fee, tx_size = item
-                    fee_rate = tx_fee // tx_size
-                    fee_hist[fee_rate] += tx_size
-                    for hashX, value in itertools.chain(txin_pairs,
-                                                        txout_pairs):
-                        touched.add(hashX)
-                        hashXs[hashX].add(hex_hash)
 
         return process
 
@@ -185,22 +171,15 @@ class MemPool(object):
         # evicted or they got in a block.
         return {hh: raw for hh, raw in zip(hex_hashes, raw_txs) if raw}
 
-    def _process_raw_txs(self, raw_tx_map, pending):
+    async def _process_raw_txs(self, raw_tx_map, pending, touched):
         '''Process the dictionary of raw transactions and return a dictionary
         of updates to apply to self.txs.
-
-        This runs in the executor so should not update any member
-        variables it doesn't own.  Atomic reads of self.txs that do
-        not depend on the result remaining the same are fine.
         '''
         script_hashX = self.coin.hashX_from_script
         deserializer = self.coin.DESERIALIZER
-        txs = self.txs
 
         # Deserialize each tx and put it in a pending list
         for tx_hash, raw_tx in raw_tx_map.items():
-            if tx_hash not in txs:
-                continue
             tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
 
             # Convert the tx outputs into (hashX, value) pairs
@@ -213,48 +192,54 @@ class MemPool(object):
 
             pending.append((tx_hash, txin_pairs, txout_pairs, tx_size))
 
-        # Now process what we can
-        result = {}
+        # The transaction inputs can be from other mempool
+        # transactions (which may or may not be processed yet) or are
+        # otherwise presumably in the DB.
+        txs = self.txs
+        db_prevouts = [(hex_str_to_hash(prev_hash), prev_idx)
+                       for item in pending
+                       for (prev_hash, prev_idx) in item[1]
+                       if prev_hash not in txs]
+
+        # If a lookup fails, it returns a None entry
+        db_utxos = await self.lookup_utxos(db_prevouts)
+        db_utxo_map = {(hash_to_hex_str(prev_hash), prev_idx): db_utxo
+                       for (prev_hash, prev_idx), db_utxo
+                       in zip(db_prevouts, db_utxos)}
+
         deferred = []
-        utxo_lookup = self.utxo_lookup
+        hashXs = self.hashXs
+        fee_hist = self.fee_histogram
 
         for item in pending:
-            tx_hash, old_txin_pairs, txout_pairs, tx_size = item
+            tx_hash, previns, txout_pairs, tx_size = item
             if tx_hash not in txs:
                 continue
 
-            mempool_missing = False
             txin_pairs = []
-
             try:
-                for prev_hex_hash, prev_idx in old_txin_pairs:
-                    tx_info = txs.get(prev_hex_hash, 0)
-                    if tx_info is None:
-                        tx_info = result.get(prev_hex_hash)
-                        if not tx_info:
-                            mempool_missing = True
-                            continue
-                    if tx_info:
-                        txin_pairs.append(tx_info[1][prev_idx])
-                    elif not mempool_missing:
-                        prev_hash = hex_str_to_hash(prev_hex_hash)
-                        txin_pairs.append(utxo_lookup(prev_hash, prev_idx))
-            except (DB.MissingUTXOError, DB.DBError):
-                # DBError can happen when flushing a newly processed
-                # block.  MissingUTXOError typically happens just
-                # after the daemon has accepted a new block and the
-                # new mempool has deps on new txs in that block.
+                for previn in previns:
+                    utxo = db_utxo_map.get(previn)
+                    if not utxo:
+                        prev_hash, prev_index = previn
+                        # This can raise a KeyError or TypeError
+                        utxo = txs[prev_hash][1][prev_index]
+                    txin_pairs.append(utxo)
+            except (KeyError, TypeError):
+                deferred.append(item)
                 continue
 
-            if mempool_missing:
-                deferred.append(item)
-            else:
-                # Compute fee
-                tx_fee = (sum(v for hashX, v in txin_pairs) -
-                          sum(v for hashX, v in txout_pairs))
-                result[tx_hash] = (txin_pairs, txout_pairs, tx_fee, tx_size)
+            # Compute fee
+            tx_fee = (sum(v for hashX, v in txin_pairs) -
+                      sum(v for hashX, v in txout_pairs))
+            fee_rate = tx_fee // tx_size
+            fee_hist[fee_rate] += tx_size
+            txs[tx_hash] = (txin_pairs, txout_pairs, tx_fee, tx_size)
+            for hashX, value in itertools.chain(txin_pairs, txout_pairs):
+                touched.add(hashX)
+                hashXs[hashX].add(tx_hash)
 
-        return result, deferred
+        return deferred
 
     async def _raw_transactions(self, hashX):
         '''Returns an iterable of (hex_hash, raw_tx) pairs for all

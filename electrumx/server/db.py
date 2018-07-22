@@ -35,9 +35,6 @@ class DB(object):
 
     DB_VERSIONS = [6]
 
-    class MissingUTXOError(Exception):
-        '''Raised if a mempool tx input UTXO couldn't be found.'''
-
     class DBError(Exception):
         '''Raised on general DB errors generally indicating corruption.'''
 
@@ -399,43 +396,52 @@ class DB(object):
             tx_hash, height = self.fs_tx_hash(tx_num)
             yield UTXO(tx_num, tx_pos, tx_hash, height, value)
 
-    def db_utxo_lookup(self, tx_hash, tx_idx):
-        '''Given a prevout return a (hashX, value) pair.
+    async def lookup_utxos(self, prevouts):
+        '''For each prevout, lookup it up in the DB and return a (hashX,
+        value) pair or None if not found.
 
-        Raises MissingUTXOError if the UTXO is not found.  Used by the
-        mempool code.
+        Used by the mempool code.
         '''
-        idx_packed = pack('<H', tx_idx)
-        hashX, tx_num_packed = self._db_hashX(tx_hash, idx_packed)
-        if not hashX:
-            # This can happen when the daemon is a block ahead of us
-            # and has mempool txs spending outputs from that new block
-            raise self.MissingUTXOError
+        def lookup_hashXs():
+            '''Return (hashX, suffix) pairs, or None if not found,
+            for each prevout.
+            '''
+            def lookup_hashX(tx_hash, tx_idx):
+                idx_packed = pack('<H', tx_idx)
 
-        # Key: b'u' + address_hashX + tx_idx + tx_num
-        # Value: the UTXO value as a 64-bit unsigned integer
-        key = b'u' + hashX + idx_packed + tx_num_packed
-        db_value = self.utxo_db.get(key)
-        if not db_value:
-            raise self.DBError('UTXO {} / {:,d} in one table only'
-                               .format(hash_to_hex_str(tx_hash), tx_idx))
-        value, = unpack('<Q', db_value)
-        return hashX, value
+                # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
+                # Value: hashX
+                prefix = b'h' + tx_hash[:4] + idx_packed
 
-    def _db_hashX(self, tx_hash, idx_packed):
-        '''Return (hashX, tx_num_packed) for the given TXO.
+                # Find which entry, if any, the TX_HASH matches.
+                for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
+                    tx_num_packed = db_key[-4:]
+                    tx_num, = unpack('<I', tx_num_packed)
+                    hash, height = self.fs_tx_hash(tx_num)
+                    if hash == tx_hash:
+                        return hashX, idx_packed + tx_num_packed
+                return None, None
+            return [lookup_hashX(*prevout) for prevout in prevouts]
 
-        Both are None if not found.'''
-        # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
-        # Value: hashX
-        prefix = b'h' + tx_hash[:4] + idx_packed
+        def lookup_utxos(hashX_pairs):
+            def lookup_utxo(hashX, suffix):
+                if not hashX:
+                    # This can happen when the daemon is a block ahead
+                    # of us and has mempool txs spending outputs from
+                    # that new block
+                    return None
+                # Key: b'u' + address_hashX + tx_idx + tx_num
+                # Value: the UTXO value as a 64-bit unsigned integer
+                key = b'u' + hashX + suffix
+                db_value = self.utxo_db.get(key)
+                if not db_value:
+                    # This can happen if the DB was updated between
+                    # getting the hashXs and getting the UTXOs
+                    return None
+                value, = unpack('<Q', db_value)
+                return hashX, value
+            return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 
-        # Find which entry, if any, the TX_HASH matches.
-        for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
-            tx_num_packed = db_key[-4:]
-            tx_num, = unpack('<I', tx_num_packed)
-            hash, height = self.fs_tx_hash(tx_num)
-            if hash == tx_hash:
-                return hashX, tx_num_packed
-
-        return None, None
+        run_in_thread = self.tasks.run_in_thread
+        hashX_pairs = await run_in_thread(lookup_hashXs)
+        return await run_in_thread(lookup_utxos, hashX_pairs)

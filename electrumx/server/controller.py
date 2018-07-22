@@ -99,7 +99,7 @@ class Controller(ServerBase):
         BlockProcessor = env.coin.BLOCK_PROCESSOR
         self.bp = BlockProcessor(env, self.tasks, daemon, notifications)
         self.mempool = MemPool(env.coin, self.tasks, daemon, notifications,
-                               self.bp.db_utxo_lookup)
+                               self.bp.lookup_utxos)
         self.chain_state = ChainState(env, self.tasks, daemon, self.bp,
                                       notifications)
         self.peer_mgr = PeerManager(env, self.tasks, self.chain_state)
