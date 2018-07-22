@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2018, Neil Booth
 #
 # All rights reserved.
 #
@@ -12,9 +12,20 @@ import itertools
 import time
 from collections import defaultdict
 
+import attr
+
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger
 from electrumx.server.db import UTXO
+
+
+@attr.s(slots=True)
+class MemPoolTx(object):
+    hash = attr.ib()
+    in_pairs = attr.ib()
+    out_pairs = attr.ib()
+    fee = attr.ib()
+    size = attr.ib()
 
 
 class MemPool(object):
@@ -25,7 +36,7 @@ class MemPool(object):
 
     To that end we maintain the following maps:
 
-       tx_hash -> (txin_pairs, txout_pairs, tx_fee, tx_size)
+       tx_hash -> MemPoolTx
        hashX   -> set of all tx hashes in which the hashX appears
 
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
@@ -119,15 +130,14 @@ class MemPool(object):
         for hex_hash in gone:
             unfetched.discard(hex_hash)
             unprocessed.pop(hex_hash, None)
-            item = txs.pop(hex_hash)
-            if item:
-                txin_pairs, txout_pairs, tx_fee, tx_size = item
-                fee_rate = tx_fee // tx_size
-                fee_hist[fee_rate] -= tx_size
+            tx = txs.pop(hex_hash)
+            if tx:
+                fee_rate = tx.fee // tx.size
+                fee_hist[fee_rate] -= tx.size
                 if fee_hist[fee_rate] == 0:
                     fee_hist.pop(fee_rate)
-                tx_hashXs = set(hashX for hashX, value in txin_pairs)
-                tx_hashXs.update(hashX for hashX, value in txout_pairs)
+                tx_hashXs = set(hashX for hashX, value in tx.in_pairs)
+                tx_hashXs.update(hashX for hashX, value in tx.out_pairs)
                 for hashX in tx_hashXs:
                     hashXs[hashX].remove(hex_hash)
                     if not hashXs[hashX]:
@@ -191,7 +201,8 @@ class MemPool(object):
                 txin_pairs = [(hash_to_hex_str(txin.prev_hash), txin.prev_idx)
                               for txin in tx.inputs]
 
-                pending.append((tx_hash, txin_pairs, txout_pairs, tx_size))
+                pending.append(MemPoolTx(tx_hash, txin_pairs, txout_pairs,
+                                         0, tx_size))
 
         # Do this potentially slow operation in a thread so as not to
         # block
@@ -202,8 +213,8 @@ class MemPool(object):
         # otherwise presumably in the DB.
         txs = self.txs
         db_prevouts = [(hex_str_to_hash(prev_hash), prev_idx)
-                       for item in pending
-                       for (prev_hash, prev_idx) in item[1]
+                       for tx in pending
+                       for (prev_hash, prev_idx) in tx.in_pairs
                        if prev_hash not in txs]
 
         # If a lookup fails, it returns a None entry
@@ -216,33 +227,33 @@ class MemPool(object):
         hashXs = self.hashXs
         fee_hist = self.fee_histogram
 
-        for item in pending:
-            tx_hash, previns, txout_pairs, tx_size = item
-            if tx_hash not in txs:
+        for tx in pending:
+            if tx.hash not in txs:
                 continue
 
-            txin_pairs = []
+            in_pairs = []
             try:
-                for previn in previns:
+                for previn in tx.in_pairs:
                     utxo = db_utxo_map.get(previn)
                     if not utxo:
                         prev_hash, prev_index = previn
                         # This can raise a KeyError or TypeError
                         utxo = txs[prev_hash][1][prev_index]
-                    txin_pairs.append(utxo)
+                    in_pairs.append(utxo)
             except (KeyError, TypeError):
-                deferred.append(item)
+                deferred.append(tx)
                 continue
 
+            tx.in_pairs = in_pairs
             # Compute fee
-            tx_fee = (sum(v for hashX, v in txin_pairs) -
-                      sum(v for hashX, v in txout_pairs))
-            fee_rate = tx_fee // tx_size
-            fee_hist[fee_rate] += tx_size
-            txs[tx_hash] = (txin_pairs, txout_pairs, tx_fee, tx_size)
-            for hashX, value in itertools.chain(txin_pairs, txout_pairs):
+            tx_fee = (sum(v for hashX, v in tx.in_pairs) -
+                      sum(v for hashX, v in tx.out_pairs))
+            fee_rate = tx.fee // tx.size
+            fee_hist[fee_rate] += tx.size
+            txs[tx.hash] = tx
+            for hashX, value in itertools.chain(tx.in_pairs, tx.out_pairs):
                 touched.add(hashX)
-                hashXs[hashX].add(tx_hash)
+                hashXs[hashX].add(tx.hash)
 
         return deferred
 
@@ -302,9 +313,9 @@ class MemPool(object):
         # hashXs is a defaultdict
         if hashX in self.hashXs:
             for hex_hash in self.hashXs[hashX]:
-                txin_pairs, txout_pairs, tx_fee, tx_size = self.txs[hex_hash]
-                value -= sum(v for h168, v in txin_pairs if h168 == hashX)
-                value += sum(v for h168, v in txout_pairs if h168 == hashX)
+                tx = self.txs[hex_hash]
+                value -= sum(v for h168, v in tx.in_pairs if h168 == hashX)
+                value += sum(v for h168, v in tx.out_pairs if h168 == hashX)
         return value
 
     async def compact_fee_histogram(self):
@@ -342,14 +353,13 @@ class MemPool(object):
         pairs = await self._raw_transactions(hashX)
         result = []
         for hex_hash, raw_tx in pairs:
-            item = self.txs.get(hex_hash)
-            if not item or not raw_tx:
+            mempool_tx = self.txs.get(hex_hash)
+            if not mempool_tx or not raw_tx:
                 continue
-            tx_fee = item[2]
             tx = deserializer(raw_tx).read_tx()
             unconfirmed = any(hash_to_hex_str(txin.prev_hash) in self.txs
                               for txin in tx.inputs)
-            result.append((hex_hash, tx_fee, unconfirmed))
+            result.append((hex_hash, mempool_tx.fee, unconfirmed))
         return result
 
     async def unordered_UTXOs(self, hashX):
@@ -362,11 +372,10 @@ class MemPool(object):
         utxos = []
         # hashXs is a defaultdict, so use get() to query
         for hex_hash in self.hashXs.get(hashX, []):
-            item = self.txs.get(hex_hash)
-            if not item:
+            tx = self.txs.get(hex_hash)
+            if not tx:
                 continue
-            txout_pairs = item[1]
-            for pos, (hX, value) in enumerate(txout_pairs):
+            for pos, (hX, value) in enumerate(tx.out_pairs):
                 if hX == hashX:
                     # Unfortunately UTXO holds a binary hash
                     utxos.append(UTXO(-1, pos, hex_str_to_hash(hex_hash),
