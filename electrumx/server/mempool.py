@@ -56,15 +56,13 @@ class MemPool(object):
             await self._synchronize(False)
 
     async def _refresh_hashes(self):
-        '''Return daemon hashes when we're sure which height they are
-        good for.'''
-        height = self.daemon.cached_height()
+        '''Return a (hash set, height) pair when we're sure which height they
+        are for.'''
         while True:
+            height = self.daemon.cached_height()
             hashes = await self.daemon.mempool_hashes()
-            later_height = await self.daemon.height()
-            if height == later_height:
+            if height == await self.daemon.height():
                 return set(hashes), height
-            height = later_height
 
     async def _synchronize(self, first_time):
         '''Asynchronously maintain mempool status with daemon.
