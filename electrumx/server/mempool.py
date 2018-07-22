@@ -175,22 +175,27 @@ class MemPool(object):
         '''Process the dictionary of raw transactions and return a dictionary
         of updates to apply to self.txs.
         '''
-        script_hashX = self.coin.hashX_from_script
-        deserializer = self.coin.DESERIALIZER
+        def deserialize_txs():
+            script_hashX = self.coin.hashX_from_script
+            deserializer = self.coin.DESERIALIZER
 
-        # Deserialize each tx and put it in a pending list
-        for tx_hash, raw_tx in raw_tx_map.items():
-            tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
+            # Deserialize each tx and put it in a pending list
+            for tx_hash, raw_tx in raw_tx_map.items():
+                tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
 
-            # Convert the tx outputs into (hashX, value) pairs
-            txout_pairs = [(script_hashX(txout.pk_script), txout.value)
-                           for txout in tx.outputs]
+                # Convert the tx outputs into (hashX, value) pairs
+                txout_pairs = [(script_hashX(txout.pk_script), txout.value)
+                               for txout in tx.outputs]
 
-            # Convert the tx inputs to ([prev_hex_hash, prev_idx) pairs
-            txin_pairs = [(hash_to_hex_str(txin.prev_hash), txin.prev_idx)
-                          for txin in tx.inputs]
+                # Convert the tx inputs to ([prev_hex_hash, prev_idx) pairs
+                txin_pairs = [(hash_to_hex_str(txin.prev_hash), txin.prev_idx)
+                              for txin in tx.inputs]
 
-            pending.append((tx_hash, txin_pairs, txout_pairs, tx_size))
+                pending.append((tx_hash, txin_pairs, txout_pairs, tx_size))
+
+        # Do this potentially slow operation in a thread so as not to
+        # block
+        await self.tasks.run_in_thread(deserialize_txs)
 
         # The transaction inputs can be from other mempool
         # transactions (which may or may not be processed yet) or are
