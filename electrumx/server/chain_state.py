@@ -39,6 +39,14 @@ class ChainState(object):
         self.mempool_value = self._mempool.value
         self.tx_branch_and_root = self._bp.merkle.branch_and_root
         self.read_headers = self._bp.read_headers
+        # Cache maintenance
+        notifications.add_callback(self._notify)
+
+    async def _notify(self, height, touched):
+        # Invalidate our history cache for touched hashXs
+        hc = self._history_cache
+        for hashX in set(hc).intersection(touched):
+            del hc[hashX]
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -81,11 +89,6 @@ class ChainState(object):
 
     def header_branch_and_root(self, length, height):
         return self._bp.header_mc.branch_and_root(length, height)
-
-    def invalidate_history_cache(self, touched):
-        hc = self._history_cache
-        for hashX in set(hc).intersection(touched):
-            del hc[hashX]
 
     def processing_new_block(self):
         '''Return True if we're processing a new block.'''

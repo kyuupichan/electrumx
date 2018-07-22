@@ -33,6 +33,7 @@ class Notifications(object):
         self._touched_mp = {}
         self._touched_bp = {}
         self._highest_block = 0
+        self._notify_funcs = set()
 
     async def _maybe_notify(self):
         tmp, tbp = self._touched_mp, self._touched_bp
@@ -52,7 +53,11 @@ class Notifications(object):
             del tmp[old]
         for old in [h for h in tbp if h <= height]:
             del tbp[old]
-        await self.notify_sessions(touched, height)
+        for notify_func in self._notify_funcs:
+            await notify_func(height, touched)
+
+    def add_callback(self, notify_func):
+        self._notify_funcs.add(notify_func)
 
     async def on_mempool(self, touched, height):
         self._touched_mp[height] = touched
@@ -62,9 +67,6 @@ class Notifications(object):
         self._touched_bp[height] = touched
         self._highest_block = height
         await self._maybe_notify()
-
-    async def notify_sessions(self, touched, height):
-        pass
 
 
 class Controller(ServerBase):
