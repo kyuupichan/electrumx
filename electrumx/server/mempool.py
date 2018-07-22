@@ -43,7 +43,12 @@ class MemPool(object):
         self.fee_histogram = defaultdict(int)
         self.cached_compact_histogram = []
         self.histogram_time = 0
-        self.next_log = 0
+
+    async def _log_stats(self):
+        while True:
+            self.logger.info(f'{len(self.txs):,d} txs '
+                             f'touching {len(self.hashXs):,d} addresses')
+            await asyncio.sleep(120)
 
     async def _synchronize_forever(self):
         while True:
@@ -101,10 +106,6 @@ class MemPool(object):
             if unprocessed:
                 await process_some(unprocessed, touched)
 
-        if now >= self.next_log:
-            self.logger.info('{:,d} txs touching {:,d} addresses'
-                             .format(len(txs), len(self.hashXs)))
-            self.next_log = time.time() + 150
         await self.notifications.on_mempool(touched, height)
 
     def _resync_hashes(self, hashes, unprocessed, unfetched, touched):
@@ -301,6 +302,7 @@ class MemPool(object):
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
         await self._synchronize(True)
+        self.tasks.create_task(self._log_stats())
         self.tasks.create_task(self._synchronize_forever())
 
     async def balance_delta(self, hashX):
