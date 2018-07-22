@@ -36,21 +36,14 @@ class MemPool(object):
         self.coin = coin
         self.utxo_lookup = utxo_lookup
         self.tasks = tasks
+        self.daemon = daemon
         self.notifications = notifications
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
         self.fee_histogram = defaultdict(int)
-        self.compact_fee_histogram = []
+        self.cached_compact_histogram = []
         self.histogram_time = 0
         self.next_log = 0
-
-    async def start_and_wait_for_sync(self):
-        '''Creates the mempool synchronization task, and waits for it to
-        first synchronize before returning.'''
-        self.logger.info('beginning processing of daemon mempool.  '
-                         'This can take some time...')
-        await self._synchronize(True)
-        self.tasks.create_task(self._synchronize_forever())
 
     async def _synchronize_forever(self):
         while True:
@@ -63,7 +56,7 @@ class MemPool(object):
         height = self.daemon.cached_height()
         while True:
             hashes = await self.daemon.mempool_hashes()
-            later_height = await daemon.height()
+            later_height = await self.daemon.height()
             if height == later_height:
                 return set(hashes), height
             height = later_height
@@ -104,7 +97,7 @@ class MemPool(object):
             if unfetched:
                 count = min(len(unfetched), fetch_size)
                 hex_hashes = [unfetched.pop() for n in range(count)]
-                unprocessed.update(await self.fetch_raw_txs(hex_hashes))
+                unprocessed.update(await self._fetch_raw_txs(hex_hashes))
             if unprocessed:
                 await process_some(unprocessed, touched)
 
@@ -168,7 +161,7 @@ class MemPool(object):
                 pending = []
 
             result, deferred = await self.tasks.run_in_thread(
-                self.process_raw_txs, raw_txs, deferred)
+                self._process_raw_txs, raw_txs, deferred)
 
             pending.extend(deferred)
             hashXs = self.hashXs
@@ -185,7 +178,7 @@ class MemPool(object):
 
         return process
 
-    async def fetch_raw_txs(self, hex_hashes):
+    async def _fetch_raw_txs(self, hex_hashes):
         '''Fetch a list of mempool transactions.'''
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
 
@@ -193,7 +186,7 @@ class MemPool(object):
         # evicted or they got in a block.
         return {hh: raw for hh, raw in zip(hex_hashes, raw_txs) if raw}
 
-    def process_raw_txs(self, raw_tx_map, pending):
+    def _process_raw_txs(self, raw_tx_map, pending):
         '''Process the dictionary of raw transactions and return a dictionary
         of updates to apply to self.txs.
 
@@ -264,7 +257,7 @@ class MemPool(object):
 
         return result, deferred
 
-    async def raw_transactions(self, hashX):
+    async def _raw_transactions(self, hashX):
         '''Returns an iterable of (hex_hash, raw_tx) pairs for all
         transactions in the mempool that touch hashX.
 
@@ -278,14 +271,85 @@ class MemPool(object):
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         return zip(hex_hashes, raw_txs)
 
-    async def transactions(self, hashX):
-        '''Generate (hex_hash, tx_fee, unconfirmed) tuples for mempool
-        entries for the hashX.
+    def _calc_compact_histogram(self):
+        # For efficiency, get_fees returns a compact histogram with
+        # variable bin size.  The compact histogram is an array of
+        # (fee, vsize) values.  vsize_n is the cumulative virtual size
+        # of mempool transactions with a fee rate in the interval
+        # [fee_(n-1), fee_n)], and fee_(n-1) > fee_n. Fee intervals
+        # are chosen so as to create tranches that contain at least
+        # 100kb of transactions
+        out = []
+        size = 0
+        r = 0
+        binsize = 100000
+        for fee, s in sorted(self.fee_histogram.items(), reverse=True):
+            size += s
+            if size + r > binsize:
+                out.append((fee, size))
+                r += size - binsize
+                size = 0
+                binsize *= 1.1
+        return out
+
+    # External interface
+    async def start_and_wait_for_sync(self):
+        '''Starts the mempool synchronizer.
+
+        Waits for an initial synchronization before returning.
+        '''
+        self.logger.info('beginning processing of daemon mempool.  '
+                         'This can take some time...')
+        await self._synchronize(True)
+        self.tasks.create_task(self._synchronize_forever())
+
+    async def balance_delta(self, hashX):
+        '''Return the unconfirmed amount in the mempool for hashX.
+
+        Can be positive or negative.
+        '''
+        value = 0
+        # hashXs is a defaultdict
+        if hashX in self.hashXs:
+            for hex_hash in self.hashXs[hashX]:
+                txin_pairs, txout_pairs, tx_fee, tx_size = self.txs[hex_hash]
+                value -= sum(v for h168, v in txin_pairs if h168 == hashX)
+                value += sum(v for h168, v in txout_pairs if h168 == hashX)
+        return value
+
+    async def compact_fee_histogram(self):
+        '''Return a compact fee histogram of the current mempool.'''
+        now = time.time()
+        if now > self.histogram_time:
+            self.histogram_time = now + 30
+            self.cached_compact_histogram = self._calc_compact_histogram()
+        return self.cached_compact_histogram
+
+    async def potential_spends(self, hashX):
+        '''Return a set of (prev_hash, prev_idx) pairs from mempool
+        transactions that touch hashX.
+
+        None, some or all of these may be spends of the hashX.
+        '''
+        deserializer = self.coin.DESERIALIZER
+        pairs = await self._raw_transactions(hashX)
+        result = set()
+        for hex_hash, raw_tx in pairs:
+            if not raw_tx:
+                continue
+            tx = deserializer(raw_tx).read_tx()
+            for txin in tx.inputs:
+                result.add((txin.prev_hash, txin.prev_idx))
+        return result
+
+    async def transaction_summaries(self, hashX):
+        '''Return a list of (tx_hex_hash, tx_fee, unconfirmed) tuples for
+        mempool entries for the hashX.
 
         unconfirmed is True if any txin is unconfirmed.
         '''
         deserializer = self.coin.DESERIALIZER
-        pairs = await self.raw_transactions(hashX)
+        pairs = await self._raw_transactions(hashX)
         result = []
         for hex_hash, raw_tx in pairs:
             item = self.txs.get(hex_hash)
@@ -298,7 +362,7 @@ class MemPool(object):
             result.append((hex_hash, tx_fee, unconfirmed))
         return result
 
-    def get_utxos(self, hashX):
+    async def unordered_UTXOs(self, hashX):
         '''Return an unordered list of UTXO named tuples from mempool
         transactions that pay to hashX.
 
@@ -318,63 +382,3 @@ class MemPool(object):
                     utxos.append(UTXO(-1, pos, hex_str_to_hash(hex_hash),
                                       0, value))
         return utxos
-
-    async def potential_spends(self, hashX):
-        '''Return a set of (prev_hash, prev_idx) pairs from mempool
-        transactions that touch hashX.
-
-        None, some or all of these may be spends of the hashX.
-        '''
-        deserializer = self.coin.DESERIALIZER
-        pairs = await self.raw_transactions(hashX)
-        result = set()
-        for hex_hash, raw_tx in pairs:
-            if not raw_tx:
-                continue
-            tx = deserializer(raw_tx).read_tx()
-            for txin in tx.inputs:
-                result.add((txin.prev_hash, txin.prev_idx))
-        return result
-
-    def value(self, hashX):
-        '''Return the unconfirmed amount in the mempool for hashX.
-
-        Can be positive or negative.
-        '''
-        value = 0
-        # hashXs is a defaultdict
-        if hashX in self.hashXs:
-            for hex_hash in self.hashXs[hashX]:
-                txin_pairs, txout_pairs, tx_fee, tx_size = self.txs[hex_hash]
-                value -= sum(v for h168, v in txin_pairs if h168 == hashX)
-                value += sum(v for h168, v in txout_pairs if h168 == hashX)
-        return value
-
-    def get_fee_histogram(self):
-        now = time.time()
-        if now > self.histogram_time + 30:
-            self.update_compact_histogram()
-            self.histogram_time = now
-        return self.compact_fee_histogram
-
-    def update_compact_histogram(self):
-        # For efficiency, get_fees returns a compact histogram with
-        # variable bin size.  The compact histogram is an array of
-        # (fee, vsize) values.  vsize_n is the cumulative virtual size
-        # of mempool transactions with a fee rate in the interval
-        # [fee_(n-1), fee_n)], and fee_(n-1) > fee_n. Fee intervals
-        # are chosen so as to create tranches that contain at least
-        # 100kb of transactions
-        items = list(reversed(sorted(self.fee_histogram.items())))
-        out = []
-        size = 0
-        r = 0
-        binsize = 100000
-        for fee, s in items:
-            size += s
-            if size + r > binsize:
-                out.append((fee, size))
-                r += size - binsize
-                size = 0
-                binsize *= 1.1
-        self.compact_fee_histogram = out

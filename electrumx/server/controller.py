@@ -11,6 +11,7 @@ import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
 from electrumx.server.chain_state import ChainState
+from electrumx.server.mempool import MemPool
 from electrumx.server.peers import PeerManager
 from electrumx.server.session import SessionManager
 
@@ -94,18 +95,25 @@ class Controller(ServerBase):
         self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
         notifications = Notifications()
-        self.chain_state = ChainState(env, self.tasks, notifications)
+        daemon = env.coin.DAEMON(env)
+        BlockProcessor = env.coin.BLOCK_PROCESSOR
+        self.bp = BlockProcessor(env, self.tasks, daemon, notifications)
+        self.mempool = MemPool(env.coin, self.tasks, daemon, notifications,
+                               self.bp.db_utxo_lookup)
+        self.chain_state = ChainState(env, self.tasks, daemon, self.bp,
+                                      notifications)
         self.peer_mgr = PeerManager(env, self.tasks, self.chain_state)
         self.session_mgr = SessionManager(env, self.tasks, self.chain_state,
-                                          self.peer_mgr, notifications,
-                                          self.shutdown_event)
+                                          self.mempool, self.peer_mgr,
+                                          notifications, self.shutdown_event)
 
     async def start_servers(self):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start the peer manager and serving external clients.
         '''
         self.session_mgr.start_rpc_server()
-        await self.chain_state.wait_for_mempool()
+        await self.bp.catch_up_to_daemon()
+        await self.mempool.start_and_wait_for_sync()
         self.peer_mgr.start_peer_discovery()
         self.session_mgr.start_serving()
 

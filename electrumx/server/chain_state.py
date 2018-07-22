@@ -9,31 +9,21 @@
 import asyncio
 import pylru
 
-from electrumx.server.mempool import MemPool
-
 
 class ChainState(object):
     '''Used as an interface by servers to request information about
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, tasks, notifications):
+    def __init__(self, env, tasks, daemon, bp, notifications):
         self._env = env
         self._tasks = tasks
-        self._daemon = env.coin.DAEMON(env)
-        BlockProcessor = env.coin.BLOCK_PROCESSOR
-        self._bp = BlockProcessor(env, tasks, self._daemon, notifications)
-        self._mempool = MemPool(env.coin, tasks, self._daemon, self,
-                                notifications)
+        self._daemon = daemon
+        self._bp = bp
         self._history_cache = pylru.lrucache(256)
 
         # External interface pass-throughs for session.py
         self.force_chain_reorg = self._bp.force_chain_reorg
-        self.mempool_fee_histogram = self._mempool.get_fee_histogram
-        self.mempool_get_utxos = self._mempool.get_utxos
-        self.mempool_potential_spends = self._mempool.potential_spends
-        self.mempool_transactions = self._mempool.transactions
-        self.mempool_value = self._mempool.value
         self.tx_branch_and_root = self._bp.merkle.branch_and_root
         self.read_headers = self._bp.read_headers
         # Cache maintenance
@@ -105,7 +95,3 @@ class ChainState(object):
     async def shutdown(self):
         '''Shut down the block processor to flush chain state to disk.'''
         await self._bp.shutdown()
-
-    async def wait_for_mempool(self):
-        await self._bp.catch_up_to_daemon()
-        await self._mempool.start_and_wait_for_sync()

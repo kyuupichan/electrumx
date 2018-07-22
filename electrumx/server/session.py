@@ -97,12 +97,13 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, tasks, chain_state, peer_mgr, notifications,
-                 shutdown_event):
+    def __init__(self, env, tasks, chain_state, mempool, peer_mgr,
+                 notifications, shutdown_event):
         env.max_send = max(350000, env.max_send)
         self.env = env
         self.tasks = tasks
         self.chain_state = chain_state
+        self.mempool = mempool
         self.peer_mgr = peer_mgr
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
@@ -139,7 +140,7 @@ class SessionManager(object):
         else:
             protocol_class = self.env.coin.SESSIONCLS
         protocol_factory = partial(protocol_class, self, self.chain_state,
-                                   self.peer_mgr, kind)
+                                   self.mempool, self.peer_mgr, kind)
         server = loop.create_server(protocol_factory, *args, **kw_args)
 
         host, port = args[:2]
@@ -476,11 +477,12 @@ class SessionBase(ServerSession):
     MAX_CHUNK_SIZE = 2016
     session_counter = itertools.count()
 
-    def __init__(self, session_mgr, chain_state, peer_mgr, kind):
+    def __init__(self, session_mgr, chain_state, mempool, peer_mgr, kind):
         super().__init__(rpc_protocol=JSONRPCAutoDetect)
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.session_mgr = session_mgr
         self.chain_state = chain_state
+        self.mempool = mempool
         self.peer_mgr = peer_mgr
         self.kind = kind  # 'RPC', 'TCP' etc.
         self.env = session_mgr.env
@@ -727,7 +729,7 @@ class ElectrumX(SessionBase):
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
         history = await self.chain_state.get_history(hashX)
-        mempool = await self.chain_state.mempool_transactions(hashX)
+        mempool = await self.mempool.transaction_summaries(hashX)
 
         status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
                          for tx_hash, height in history)
@@ -750,8 +752,8 @@ class ElectrumX(SessionBase):
         effects.'''
         utxos = await self.chain_state.get_utxos(hashX)
         utxos = sorted(utxos)
-        utxos.extend(self.chain_state.mempool_get_utxos(hashX))
-        spends = await self.chain_state.mempool_potential_spends(hashX)
+        utxos.extend(await self.mempool.unordered_UTXOs(hashX))
+        spends = await self.mempool.potential_spends(hashX)
 
         return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
                  'tx_pos': utxo.tx_pos,
@@ -807,7 +809,7 @@ class ElectrumX(SessionBase):
     async def get_balance(self, hashX):
         utxos = await self.chain_state.get_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
-        unconfirmed = self.chain_state.mempool_value(hashX)
+        unconfirmed = await self.mempool.balance_delta(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
     async def scripthash_get_balance(self, scripthash):
@@ -818,7 +820,7 @@ class ElectrumX(SessionBase):
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
         # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = await self.chain_state.mempool_transactions(hashX)
+        mempool = await self.mempool.transaction_summaries(hashX)
         return [{'tx_hash': tx_hash, 'height': -unconfirmed, 'fee': fee}
                 for tx_hash, fee, unconfirmed in mempool]
 
@@ -971,10 +973,6 @@ class ElectrumX(SessionBase):
                 banner = await self.replaced_banner(banner)
 
         return banner
-
-    def mempool_get_fee_histogram(self):
-        '''Memory pool fee histogram.'''
-        return self.chain_state.mempool_fee_histogram()
 
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
@@ -1150,7 +1148,8 @@ class ElectrumX(SessionBase):
         if ptuple >= (1, 2):
             # New handler as of 1.2
             handlers.update({
-                'mempool.get_fee_histogram': self.mempool_get_fee_histogram,
+                'mempool.get_fee_histogram':
+                self.mempool.compact_fee_histogram,
                 'blockchain.block.headers': self.block_headers_12,
                 'server.ping': self.ping,
             })
