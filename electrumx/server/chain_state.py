@@ -23,13 +23,10 @@ class ChainState(object):
         self._daemon = env.coin.DAEMON(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
         self._bp = BlockProcessor(env, tasks, self._daemon, notifications)
-        self._mempool = MemPool(env.coin, self, tasks, notifications)
+        self._mempool = MemPool(env.coin, tasks, self._daemon, self,
+                                notifications)
         self._history_cache = pylru.lrucache(256)
 
-        # External interface: pass-throughs for mempool.py
-        self.cached_height = self._daemon.cached_height
-        self.getrawtransactions = self._daemon.getrawtransactions
-        self.utxo_lookup = self._bp.db_utxo_lookup
         # External interface pass-throughs for session.py
         self.force_chain_reorg = self._bp.force_chain_reorg
         self.mempool_fee_histogram = self._mempool.get_fee_histogram

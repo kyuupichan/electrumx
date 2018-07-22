@@ -31,10 +31,10 @@ class MemPool(object):
     A pair is a (hashX, value) tuple.  tx hashes are hex strings.
     '''
 
-    def __init__(self, coin, chain_state, tasks, notifications):
+    def __init__(self, coin, tasks, daemon, notifications, utxo_lookup):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.coin = coin
-        self.chain_state = chain_state
+        self.utxo_lookup = utxo_lookup
         self.tasks = tasks
         self.notifications = notifications
         self.txs = {}
@@ -60,11 +60,10 @@ class MemPool(object):
     async def _refresh_hashes(self):
         '''Return daemon hashes when we're sure which height they are
         good for.'''
-        height = self.chain_state.cached_height()
-        daemon_request = self.chain_state.daemon_request
+        height = self.daemon.cached_height()
         while True:
-            hashes = await daemon_request('mempool_hashes')
-            later_height = await daemon_request('height')
+            hashes = await self.daemon.mempool_hashes()
+            later_height = await daemon.height()
             if height == later_height:
                 return set(hashes), height
             height = later_height
@@ -188,7 +187,7 @@ class MemPool(object):
 
     async def fetch_raw_txs(self, hex_hashes):
         '''Fetch a list of mempool transactions.'''
-        raw_txs = await self.chain_state.getrawtransactions(hex_hashes)
+        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
 
         # Skip hashes the daemon has dropped.  Either they were
         # evicted or they got in a block.
@@ -225,7 +224,7 @@ class MemPool(object):
         # Now process what we can
         result = {}
         deferred = []
-        utxo_lookup = self.chain_state.utxo_lookup
+        utxo_lookup = self.utxo_lookup
 
         for item in pending:
             tx_hash, old_txin_pairs, txout_pairs, tx_size = item
@@ -276,7 +275,7 @@ class MemPool(object):
             return []
 
         hex_hashes = self.hashXs[hashX]
-        raw_txs = await self.chain_state.getrawtransactions(hex_hashes)
+        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         return zip(hex_hashes, raw_txs)
 
     async def transactions(self, hashX):
