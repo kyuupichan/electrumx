@@ -50,15 +50,41 @@ class MemPool(object):
         self.notifications = notifications
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
-        self.fee_histogram = defaultdict(int)
         self.cached_compact_histogram = []
-        self.histogram_time = 0
 
     async def _log_stats(self):
         while True:
             self.logger.info(f'{len(self.txs):,d} txs '
                              f'touching {len(self.hashXs):,d} addresses')
             await asyncio.sleep(120)
+
+    def _update_histogram(self):
+        # Build a histogram by fee rate
+        histogram = defaultdict(int)
+        for tx in self.txs.values():
+            histogram[tx.fee // tx.size] += tx.size
+
+        # Now compact it.  For efficiency, get_fees returns a
+        # compact histogram with variable bin size.  The compact
+        # histogram is an array of (fee_rate, vsize) values.
+        # vsize_n is the cumulative virtual size of mempool
+        # transactions with a fee rate in the interval
+        # [rate_(n-1), rate_n)], and rate_(n-1) > rate_n.
+        # Intervals are chosen to create tranches containing at
+        # least 100kb of transactions
+        compact = []
+        cum_size = 0
+        r = 0   # ?
+        bin_size = 100 * 1000
+        for fee_rate, size in sorted(histogram.items(), reverse=True):
+            cum_size += size
+            if cum_size + r > bin_size:
+                compact.append((fee_rate, cum_size))
+                r += cum_size - bin_size
+                cum_size = 0
+                bin_size *= 1.1
+        self.logger.info(f'compact fee histogram: {compact}')
+        self.cached_compact_histogram = compact
 
     def _accept_transactions(self, tx_map, utxo_map, touched):
         '''Accept transactions in tx_map to the mempool if all their inputs
@@ -69,7 +95,6 @@ class MemPool(object):
         '''
         hashXs = self.hashXs
         txs = self.txs
-        fee_hist = self.fee_histogram
         init_count = len(utxo_map)
 
         deferred = {}
@@ -97,8 +122,6 @@ class MemPool(object):
             # Compute fee
             tx_fee = (sum(v for hashX, v in tx.in_pairs) -
                       sum(v for hashX, v in tx.out_pairs))
-            fee_rate = tx.fee // tx.size
-            fee_hist[fee_rate] += tx.size
             txs[hash] = tx
             for hashX, value in itertools.chain(tx.in_pairs, tx.out_pairs):
                 touched.add(hashX)
@@ -111,7 +134,7 @@ class MemPool(object):
         are for.'''
         refresh_event = asyncio.Event()
         loop = self.tasks.loop
-        while True:
+        for loop_count in itertools.count():
             height = self.daemon.cached_height()
             hex_hashes = await self.daemon.mempool_hashes()
             if height != await self.daemon.height():
@@ -120,6 +143,10 @@ class MemPool(object):
             hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
             touched = await self._process_mempool(hashes)
             await self.notifications.on_mempool(touched, height)
+            # Refresh the cached histogram periodically.  Thread it as it
+            # can be expensive.
+            if loop_count % 100 == 0:
+                await self.tasks.run_in_thread(self._update_histogram)
             if single_pass:
                 return
             await refresh_event.wait()
@@ -130,15 +157,10 @@ class MemPool(object):
         txs = self.txs
         hashXs = self.hashXs
         touched = set()
-        fee_hist = self.fee_histogram
 
         # First handle txs that have disappeared
         for tx_hash in set(txs).difference(all_hashes):
             tx = txs.pop(tx_hash)
-            fee_rate = tx.fee // tx.size
-            fee_hist[fee_rate] -= tx.size
-            if fee_hist[fee_rate] == 0:
-                fee_hist.pop(fee_rate)
             tx_hashXs = set(hashX for hashX, value in tx.in_pairs)
             tx_hashXs.update(hashX for hashX, value in tx.out_pairs)
             for hashX in tx_hashXs:
@@ -234,27 +256,6 @@ class MemPool(object):
         raw_txs = await self.daemon.getrawtransactions(hex_hashes)
         return zip(hashes, raw_txs)
 
-    def _calc_compact_histogram(self):
-        # For efficiency, get_fees returns a compact histogram with
-        # variable bin size.  The compact histogram is an array of
-        # (fee, vsize) values.  vsize_n is the cumulative virtual size
-        # of mempool transactions with a fee rate in the interval
-        # [fee_(n-1), fee_n)], and fee_(n-1) > fee_n. Fee intervals
-        # are chosen so as to create tranches that contain at least
-        # 100kb of transactions
-        out = []
-        size = 0
-        r = 0
-        binsize = 100000
-        for fee, s in sorted(self.fee_histogram.items(), reverse=True):
-            size += s
-            if size + r > binsize:
-                out.append((fee, size))
-                r += size - binsize
-                size = 0
-                binsize *= 1.1
-        return out
-
     # External interface
     async def start_and_wait_for_sync(self):
         '''Starts the mempool synchronizer.
@@ -286,10 +287,6 @@ class MemPool(object):
 
     async def compact_fee_histogram(self):
         '''Return a compact fee histogram of the current mempool.'''
-        now = time.time()
-        if now > self.histogram_time:
-            self.histogram_time = now + 30
-            self.cached_compact_histogram = self._calc_compact_histogram()
         return self.cached_compact_histogram
 
     async def potential_spends(self, hashX):
