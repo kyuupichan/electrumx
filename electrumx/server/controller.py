@@ -113,8 +113,8 @@ class Controller(ServerBase):
         '''
         self.session_mgr.start_rpc_server()
         await self.bp.catch_up_to_daemon()
-        await self.mempool.start_and_wait_for_sync()
         self.peer_mgr.start_peer_discovery()
+        await self.mempool.start_and_wait_for_sync()
         self.session_mgr.start_serving()
 
     async def shutdown(self):
