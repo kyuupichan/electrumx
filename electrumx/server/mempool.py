@@ -320,7 +320,6 @@ class MemPool(object):
             if not mempool_tx or not raw_tx:
                 continue
             tx = deserializer(raw_tx).read_tx()
-            # FIXME: use all_hashes not self.txs
             unconfirmed = any(txin.prev_hash in self.txs
                               for txin in tx.inputs)
             result.append((tx_hash, mempool_tx.fee, unconfirmed))
