@@ -1923,3 +1923,31 @@ class Monoeci(Coin):
                 '''Given a header return the hash.'''
                 import x11_hash
                 return x11_hash.getPoWHash(header)
+
+class DeepOnion(Coin):
+    NAME = "DeepOnion"
+    SHORTNAME = "ONION"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1F")
+    P2SH_VERBYTES = [bytes.fromhex("4E")]
+    WIF_BYTE = bytes.fromhex("9f")
+    GENESIS_HASH = ('000004e29458ef4f2e0abab544737b07'
+                    '344e6ff13718f7c2d12926166db07b5e')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1194707
+    TX_COUNT_HEIGHT = 530000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 18580
+    REORG_LIMIT = 200
+    PEERS = []
+
+    @classmethod
+    def header_hash(cls, header):
+        '''
+        Given a header return the hash for DeepOnion.
+        Need to download `x13_hash` module
+        Source code: https://github.com/MaruCoinOfficial/x13-hash
+        '''
+        import x13_hash
+        return x13_hash.getPoWHash(header)
