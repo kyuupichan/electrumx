@@ -120,7 +120,7 @@ class MemPool(object):
             # Convert in_pairs and add the TX to
             tx.in_pairs = in_pairs
             # Compute fee
-            tx_fee = (sum(v for hashX, v in tx.in_pairs) -
+            tx.fee = (sum(v for hashX, v in tx.in_pairs) -
                       sum(v for hashX, v in tx.out_pairs))
             txs[hash] = tx
             for hashX, value in itertools.chain(tx.in_pairs, tx.out_pairs):
