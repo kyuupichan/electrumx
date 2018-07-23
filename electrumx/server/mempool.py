@@ -21,6 +21,7 @@ from electrumx.server.db import UTXO
 
 @attr.s(slots=True)
 class MemPoolTx(object):
+    prevouts = attr.ib()
     in_pairs = attr.ib()
     out_pairs = attr.ib()
     fee = attr.ib()
@@ -35,7 +36,7 @@ class MemPool(object):
 
     To that end we maintain the following maps:
 
-       tx_hash -> MemPoolTx  (in_paris
+       tx_hash -> MemPoolTx
        hashX   -> set of all tx hashes in which the hashX appears
 
     A pair is a (hashX, value) tuple.  tx hashes are binary not strings.
@@ -95,18 +96,17 @@ class MemPool(object):
         '''
         hashXs = self.hashXs
         txs = self.txs
-        init_count = len(utxo_map)
 
         deferred = {}
         unspent = set(utxo_map)
-        # Try to find all previns so we can accept the TX
+        # Try to find all prevouts so we can accept the TX
         for hash, tx in tx_map.items():
             in_pairs = []
             try:
-                for previn in tx.in_pairs:
-                    utxo = utxo_map.get(previn)
+                for prevout in tx.prevouts:
+                    utxo = utxo_map.get(prevout)
                     if not utxo:
-                        prev_hash, prev_index = previn
+                        prev_hash, prev_index = prevout
                         # Raises KeyError if prev_hash is not in txs
                         utxo = txs[prev_hash].out_pairs[prev_index]
                     in_pairs.append(utxo)
@@ -114,12 +114,11 @@ class MemPool(object):
                 deferred[hash] = tx
                 continue
 
-            # Spend the previns
-            unspent.difference_update(tx.in_pairs)
+            # Spend the prevouts
+            unspent.difference_update(tx.prevouts)
 
-            # Convert in_pairs and add the TX to
+            # Save the in_pairs, compute the fee,  and accept the TX
             tx.in_pairs = in_pairs
-            # Compute fee
             tx.fee = (sum(v for hashX, v in tx.in_pairs) -
                       sum(v for hashX, v in tx.out_pairs))
             txs[hash] = tx
@@ -127,7 +126,7 @@ class MemPool(object):
                 touched.add(hashX)
                 hashXs[hashX].add(hash)
 
-        return deferred, {previn: utxo_map[previn] for previn in unspent}
+        return deferred, {prevout: utxo_map[prevout] for prevout in unspent}
 
     async def _refresh_hashes(self, single_pass):
         '''Return a (hash set, height) pair when we're sure which height they
@@ -224,7 +223,8 @@ class MemPool(object):
                 txin_pairs = [(txin.prev_hash, txin.prev_idx)
                               for txin in tx.inputs]
 
-                txs[hash] = MemPoolTx(txin_pairs, txout_pairs, 0, tx_size)
+                txs[hash] = MemPoolTx(txin_pairs, None, txout_pairs,
+                                      0, tx_size)
             return txs
 
         # Thread this potentially slow operation so as not to block
@@ -233,28 +233,14 @@ class MemPool(object):
         # Determine all prevouts not in the mempool, and fetch the
         # UTXO information from the database.  Failed prevout lookups
         # return None - concurrent database updates happen
-        prevouts = [tx_in for tx in tx_map.values()for tx_in in tx.in_pairs
-                    if tx_in[0] not in all_hashes]
+        prevouts = [prevout for tx in tx_map.values()
+                    for prevout in tx.prevouts
+                    if prevout[0] not in all_hashes]
         utxos = await self.lookup_utxos(prevouts)
         utxo_map = {prevout: utxo for prevout, utxo in zip(prevouts, utxos)}
 
         # Attempt to complete processing of txs
         return self._accept_transactions(tx_map, utxo_map, touched)
-
-    async def _raw_transactions(self, hashX):
-        '''Returns an iterable of (hex_hash, raw_tx) pairs for all
-        transactions in the mempool that touch hashX.
-
-        raw_tx can be None if the transaction has left the mempool.
-        '''
-        # hashXs is a defaultdict
-        if hashX not in self.hashXs:
-            return []
-
-        hashes = self.hashXs[hashX]
-        hex_hashes = [hash_to_hex_str(hash) for hash in hashes]
-        raw_txs = await self.daemon.getrawtransactions(hex_hashes)
-        return zip(hashes, raw_txs)
 
     # External interface
     async def start_and_wait_for_sync(self):
@@ -295,15 +281,10 @@ class MemPool(object):
 
         None, some or all of these may be spends of the hashX.
         '''
-        deserializer = self.coin.DESERIALIZER
-        pairs = await self._raw_transactions(hashX)
         result = set()
-        for hash, raw_tx in pairs:
-            if not raw_tx:
-                continue
-            tx = deserializer(raw_tx).read_tx()
-            for txin in tx.inputs:
-                result.add((txin.prev_hash, txin.prev_idx))
+        for tx_hash in self.hashXs.get(hashX, []):
+            tx = self.txs[tx_hash]
+            result.update(tx.prevouts)
         return result
 
     async def transaction_summaries(self, hashX):
@@ -312,17 +293,13 @@ class MemPool(object):
 
         unconfirmed is True if any txin is unconfirmed.
         '''
-        deserializer = self.coin.DESERIALIZER
-        pairs = await self._raw_transactions(hashX)
+        # hashXs is a defaultdict, so use get() to query
         result = []
-        for tx_hash, raw_tx in pairs:
-            mempool_tx = self.txs.get(tx_hash)
-            if not mempool_tx or not raw_tx:
-                continue
-            tx = deserializer(raw_tx).read_tx()
-            unconfirmed = any(txin.prev_hash in self.txs
-                              for txin in tx.inputs)
-            result.append((tx_hash, mempool_tx.fee, unconfirmed))
+        for tx_hash in self.hashXs.get(hashX, []):
+            tx = self.txs[tx_hash]
+            unconfirmed = any(prev_hash in self.txs
+                              for prev_hash, prev_idx in tx.prevouts)
+            result.append((tx_hash, tx.fee, unconfirmed))
         return result
 
     async def unordered_UTXOs(self, hashX):
