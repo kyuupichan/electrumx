@@ -436,7 +436,7 @@ class PeerManager(object):
             else:
                 use_peers = new_peers
             for n, peer in enumerate(use_peers):
-                self.logger.info(f'accepted new peer {n+1}/len(use_peers) '
+                self.logger.info(f'accepted new peer {n+1}/{len(use_peers)} '
                                  f'{peer} from {source}')
             self.peers.update(use_peers)
 
