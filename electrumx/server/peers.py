@@ -344,6 +344,8 @@ class PeerManager(object):
         if isinstance(result, cls):
             self.proxy = result
             self.logger.info(f'detected {self.proxy}')
+        else:
+            self.logger.info('no proxy detected')
 
     async def _peer_discovery_loop(self):
         '''Main loop performing peer maintenance.  This includes
