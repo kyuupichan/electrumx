@@ -113,9 +113,11 @@ class Controller(ServerBase):
         '''
         self.session_mgr.start_rpc_server()
         await self.bp.catch_up_to_daemon()
-        self.peer_mgr.start_peer_discovery()
         await self.mempool.start_and_wait_for_sync()
         self.session_mgr.start_serving()
+        # Peer discovery should start after we start serving because
+        # we connect to ourself
+        self.peer_mgr.start_peer_discovery()
 
     async def shutdown(self):
         '''Perform the shutdown sequence.'''
