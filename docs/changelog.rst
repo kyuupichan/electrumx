@@ -17,7 +17,7 @@ Version 1.6.1  (in progress)
 * cleaner mempool and notification handling
 * aiohttp min version requirement raised to 2.0
 * onion peers are ignored if no tor proxy is available
-* add Motion coin (ocruzv)
+* add Motion coin (ocruzv), MinexCoin (joesixpack)
 
 Version 1.6  (19 July 2018)
 ===========================
