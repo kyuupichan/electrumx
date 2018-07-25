@@ -29,10 +29,9 @@ class BadPeerError(Exception):
     pass
 
 
-def assert_good(request, instance):
-    result = request.result()
+def assert_good(message, result, instance):
     if not isinstance(result, instance):
-        raise BadPeerError(f'{request} returned bad result type '
+        raise BadPeerError(f'{message} returned bad result type '
                            f'{type(result).__name__}')
 
 
@@ -263,10 +262,10 @@ class PeerManager(object):
         timeout = 20 if peer.is_tor else 10
 
         # server.version goes first
-        request = session.send_request(
-            'server.version', self.server_version_args, timeout=timeout)
-        result = await request
-        assert_good(request, list)
+        message = 'server.version'
+        result = await session.send_request(
+            message, self.server_version_args, timeout=timeout)
+        assert_good(message, result, list)
 
         # Protocol version 1.1 returns a pair with the version first
         if len(result) != 2 or not all(isinstance(x, str) for x in result):
@@ -284,10 +283,9 @@ class PeerManager(object):
         await asyncio.gather(*jobs)
 
     async def _send_headers_subscribe(self, session, peer, timeout, ptuple):
-        request = session.send_request('blockchain.headers.subscribe',
-                                       timeout=timeout)
-        result = await request
-        assert_good(request, dict)
+        message = 'blockchain.headers.subscribe'
+        result = await session.send_request(message, timeout=timeout)
+        assert_good(message, result, dict)
 
         our_height = self.chain_state.db_height()
         if ptuple < (1, 3):
@@ -305,29 +303,29 @@ class PeerManager(object):
         raw_header = self.chain_state.raw_header(check_height)
         if ptuple >= (1, 4):
             ours = raw_header.hex()
-            request = session.send_request('blockchain.block.header',
-                                           [check_height], timeout=timeout)
-            theirs = await request
-            assert_good(request, str)
+            message = 'blockchain.block.header'
+            theirs = await session.send_request(message, [check_height],
+                                                timeout=timeout)
+            assert_good(message, theirs, str)
             if ours != theirs:
                 raise BadPeerError(f'our header {ours} and '
                                    f'theirs {theirs} differ')
         else:
             ours = self.env.coin.electrum_header(raw_header, check_height)
-            request = session.send_request('blockchain.block.get_header',
-                                           [check_height], timeout=timeout)
-            result = await request
-            assert_good(request, dict)
-            theirs = result.get('prev_block_hash')
             ours = ours.get('prev_block_hash')
+            message = 'blockchain.block.get_header'
+            theirs = await session.send_request(message, [check_height],
+                                                timeout=timeout)
+            assert_good(message, theirs, dict)
+            theirs = theirs.get('prev_block_hash')
             if ours != theirs:
                 raise BadPeerError(f'our header hash {ours} and '
                                    f'theirs {theirs} differ')
 
     async def _send_server_features(self, session, peer, timeout):
-        request = session.send_request('server.features', timeout=timeout)
-        features = await request
-        assert_good(request, dict)
+        message = 'server.features'
+        features = await session.send_request(message, timeout=timeout)
+        assert_good(message, features, dict)
         hosts = [host.lower() for host in features.get('hosts', {})]
         if self.env.coin.GENESIS_HASH != features.get('genesis_hash'):
             raise BadPeerError('incorrect genesis hash')
@@ -337,10 +335,9 @@ class PeerManager(object):
             raise BadPeerError(f'not listed in own hosts list {hosts}')
 
     async def _send_peers_subscribe(self, session, peer, timeout):
-        request = session.send_request('server.peers.subscribe',
-                                       timeout=timeout)
-        raw_peers = await request
-        assert_good(request, list)
+        message = 'server.peers.subscribe'
+        raw_peers = await session.send_request(message, timeout=timeout)
+        assert_good(message, raw_peers, list)
 
         # Check the peers list we got from a remote peer.
         # Each is expected to be of the form:
@@ -357,10 +354,9 @@ class PeerManager(object):
         if not features:
             return
         self.logger.info(f'registering ourself with {peer}')
-        request = session.send_request('server.add_peer', [features],
-                                       timeout=timeout)
         # We only care to wait for the response
-        await request
+        await session.send_request('server.add_peer', [features],
+                                   timeout=timeout)
 
     def _set_verification_status(self, peer, kind, good):
         '''Called when a verification succeeded or failed.'''
