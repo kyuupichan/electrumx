@@ -7,14 +7,16 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
-Version 1.7  (in progress)
+Version 1.7  (25 Jul 2018)
 ==========================
 
-Version 1.6.1  (in progress)
-============================
-
+* completely overhauled mempool and address notifications
+  implementation.  Cleaner and a lot more efficient, especially for
+  initial synchronization of the mempool.  Mempool handling is fully
+  asynchronous and doesn't hinder client responses or block
+  processing.
+* peer discovery cleaned up, more work remains
 * cleaner shutdown process with clear guarantees
-* cleaner mempool and notification handling
 * aiohttp min version requirement raised to 2.0
 * onion peers are ignored if no tor proxy is available
 * add Motion coin (ocruzv), MinexCoin (joesixpack)
