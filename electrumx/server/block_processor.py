@@ -261,10 +261,9 @@ class BlockProcessor(electrumx.server.db.DB):
             except Exception:
                 return await self.daemon.raw_blocks(hex_hashes)
 
-        start, hashes = await self.reorg_hashes(count)
+        start, last, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
-        last = start + count - 1
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
             async with self.state_lock:
@@ -275,11 +274,11 @@ class BlockProcessor(electrumx.server.db.DB):
         await self.prefetcher.reset_height(self.height)
 
     async def reorg_hashes(self, count):
-        '''Return a pair (start, hashes) of blocks to back up during a
+        '''Return a pair (start, last, hashes) of blocks to back up during a
         reorg.
 
         The hashes are returned in order of increasing height.  Start
-        is the height of the first hash.
+        is the height of the first hash, last of the last.
         '''
 
         def diff_pos(hashes1, hashes2):
@@ -309,12 +308,12 @@ class BlockProcessor(electrumx.server.db.DB):
         else:
             start = (self.height - count) + 1
 
+        last = start + count - 1
         s = '' if count == 1 else 's'
-        self.logger.info('chain was reorganised replacing {:,d} block{} at '
-                         'heights {:,d}-{:,d}'
-                         .format(count, s, start, start + count - 1))
+        self.logger.info(f'chain was reorganised replacing {count:,d} '
+                         f'block{s} at heights {start:,d}-{last:,d}')
 
-        return start, self.fs_block_hashes(start, count)
+        return start, last, self.fs_block_hashes(start, count)
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
