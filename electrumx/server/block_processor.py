@@ -261,8 +261,10 @@ class BlockProcessor(electrumx.server.db.DB):
             async with self.state_lock:
                 await self.tasks.run_in_thread(self.backup_blocks, raw_blocks)
             last -= len(raw_blocks)
-        # Truncate header_mc: header count is 1 more than the height
-        self.header_mc.truncate(self.height + 1)
+        # Truncate header_mc: header count is 1 more than the height.
+        # Note header_mc is None if the reorg happens at startup.
+        if self.header_mc:
+            self.header_mc.truncate(self.height + 1)
         await self.prefetcher.reset_height(self.height)
 
     async def reorg_hashes(self, count):
