@@ -165,7 +165,8 @@ class MemPool(object):
         # Process new transactions
         new_hashes = list(all_hashes.difference(txs))
         jobs = [self.tasks.create_task(self._fetch_and_accept
-                                       (hashes, all_hashes, touched))
+                                       (hashes, all_hashes, touched),
+                                       daemon=False)
                 for hashes in chunks(new_hashes, 2000)]
         if jobs:
             await asyncio.gather(*jobs)

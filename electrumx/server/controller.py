@@ -111,10 +111,10 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start the peer manager and serving external clients.
         '''
-        self.session_mgr.start_rpc_server()
+        await self.session_mgr.start_rpc_server()
         await self.bp.catch_up_to_daemon()
         await self.mempool.start_and_wait_for_sync()
-        self.session_mgr.start_serving()
+        await self.session_mgr.start_serving()
         # Peer discovery should start after we start serving because
         # we connect to ourself
         self.peer_mgr.start_peer_discovery()

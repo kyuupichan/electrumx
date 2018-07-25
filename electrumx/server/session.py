@@ -396,13 +396,13 @@ class SessionManager(object):
 
     # --- External Interface
 
-    def start_rpc_server(self):
+    async def start_rpc_server(self):
         '''Start the RPC server if enabled.'''
         if self.env.rpc_port is not None:
-            self.tasks.create_task(self._start_server(
-                'RPC', self.env.cs_host(for_rpc=True), self.env.rpc_port))
+            await self._start_server('RPC', self.env.cs_host(for_rpc=True),
+                                     self.env.rpc_port)
 
-    def start_serving(self):
+    async def start_serving(self):
         '''Start TCP and SSL servers.'''
         self.logger.info('max session count: {:,d}'.format(self.max_sessions))
         self.logger.info('session timeout: {:,d} seconds'
@@ -418,7 +418,7 @@ class SessionManager(object):
         if self.env.drop_client is not None:
             self.logger.info('drop clients matching: {}'
                              .format(self.env.drop_client.pattern))
-        self.tasks.create_task(self._start_external_servers())
+        await self._start_external_servers()
         self.tasks.create_task(self._housekeeping())
 
     async def shutdown(self):

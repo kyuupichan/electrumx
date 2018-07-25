@@ -194,9 +194,11 @@ class PeerManager(object):
             # Retry a failed connection if enough time has passed
             return peer.last_try < now - WAKEUP_SECS * 2 ** peer.try_count
 
+        tasks = []
         for peer in self.peers:
             if should_retry(peer):
-                self.tasks.create_task(self._retry_peer(peer))
+                tasks.append(self.tasks.create_task(self._retry_peer(peer)))
+        await asyncio.gather(*tasks)
 
     async def _retry_peer(self, peer):
         peer.try_count += 1
@@ -275,7 +277,7 @@ class PeerManager(object):
         peer.features['server_version'] = server_version
         ptuple = protocol_tuple(protocol_version)
 
-        jobs = [self.tasks.create_task(message) for message in (
+        jobs = [self.tasks.create_task(message, daemon=False) for message in (
             self._send_headers_subscribe(session, peer, timeout, ptuple),
             self._send_server_features(session, peer, timeout),
             self._send_peers_subscribe(session, peer, timeout)
