@@ -25,10 +25,6 @@ STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
 
 
-class RequestError(Exception):
-    pass
-
-
 class BadPeerError(Exception):
     pass
 
@@ -36,7 +32,7 @@ class BadPeerError(Exception):
 def assert_good(request, instance):
     result = request.result()
     if not isinstance(result, instance):
-        raise RequestError(f'{request} returned bad result type '
+        raise BadPeerError(f'{request} returned bad result type '
                            f'{type(result).__name__}')
 
 
@@ -232,24 +228,31 @@ class PeerManager(object):
                 async with PeerSession(peer.host, port, **kwargs) as session:
                     await self._verify_peer(session, peer)
                 success = True
-            except RPCError as e:
-                self.logger.error(f'[{peer}] RPC error: {e.message} '
-                                  f'({e.code})')
-            except (RequestError, asyncio.TimeoutError) as e:
-                self.logger.error(f'[{peer}] {e}')
+                break
             except BadPeerError as e:
                 self.logger.error(f'[{peer}] marking bad: ({e})')
                 peer.mark_bad()
+                break
+            except RPCError as e:
+                self.logger.error(f'[{peer}] RPC error: {e.message} '
+                                  f'({e.code})')
+            except asyncio.TimeoutError as e:
+                self.logger.error(f'[{peer}] {e}')
             except (OSError, ConnectionError) as e:
                 self.logger.info(f'[{peer}] {kind} connection to '
                                  f'port {port} failed: {e}')
-                continue
 
-            self._set_verification_status(peer, kind, success)
-            if success:
-                return
-
-        self._maybe_forget_peer(peer)
+        self._set_verification_status(peer, kind, success)
+        # Forget the peer if appropriate, e.g. long-term unreachable
+        if not success:
+            if peer.last_good and not peer.bad:
+                try_limit = 10
+            else:
+                try_limit = 3
+            if peer.try_count >= try_limit:
+                desc = 'bad' if peer.bad else 'unreachable'
+                self.logger.info(f'forgetting {desc} peer: {peer}')
+                self.peers.discard(peer)
 
     async def _verify_peer(self, session, peer):
         if not peer.is_tor:
@@ -267,7 +270,7 @@ class PeerManager(object):
 
         # Protocol version 1.1 returns a pair with the version first
         if len(result) != 2 or not all(isinstance(x, str) for x in result):
-            raise RequestFailure(f'bad server.version result: {result}')
+            raise BadPeerError(f'bad server.version result: {result}')
         server_version, protocol_version = result
         peer.server_version = server_version
         peer.features['server_version'] = server_version
@@ -383,21 +386,6 @@ class PeerManager(object):
                         self.peers.remove(match)
                 elif peer.host in match.features['hosts']:
                     match.update_features_from_peer(peer)
-        else:
-            self._maybe_forget_peer(peer)
-
-    def _maybe_forget_peer(self, peer):
-        '''Forget the peer if appropriate, e.g. long-term unreachable.'''
-        if peer.last_good and not peer.bad:
-            try_limit = 10
-        else:
-            try_limit = 3
-        forget = peer.try_count >= try_limit
-
-        if forget:
-            desc = 'bad' if peer.bad else 'unreachable'
-            self.logger.info(f'forgetting {desc} peer: {peer}')
-            self.peers.discard(peer)
 
     #
     # External interface
