@@ -103,7 +103,7 @@ class ServerBase(object):
                                     partial(self.on_signal, signame))
         loop.set_exception_handler(self.on_exception)
 
-        await self.start_servers()
+        self.tasks.create_task(self.start_servers())
 
         # Wait for shutdown to be signalled, and log it.
         # Derived classes may want to provide a shutdown() coroutine.
