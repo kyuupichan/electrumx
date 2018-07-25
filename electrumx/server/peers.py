@@ -281,7 +281,7 @@ class PeerManager(object):
             self._send_server_features(session, peer, timeout),
             self._send_peers_subscribe(session, peer, timeout)
         )]
-        await asyncio.wait(jobs)
+        await asyncio.gather(*jobs)
 
     async def _send_headers_subscribe(self, session, peer, timeout, ptuple):
         request = session.send_request('blockchain.headers.subscribe',

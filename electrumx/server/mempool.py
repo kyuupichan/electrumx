@@ -168,7 +168,7 @@ class MemPool(object):
                                        (hashes, all_hashes, touched))
                 for hashes in chunks(new_hashes, 2000)]
         if jobs:
-            await asyncio.wait(jobs)
+            await asyncio.gather(*jobs)
             tx_map = {}
             utxo_map = {}
             for job in jobs:
