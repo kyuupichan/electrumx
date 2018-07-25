@@ -46,19 +46,9 @@ class Tasks(object):
         '''Run a function in a separate thread, and await its completion.'''
         return await self.loop.run_in_executor(None, func, *args)
 
-    def create_task(self, coro, callback=None):
+    def create_task(self, coro):
         '''Schedule the coro to be run.'''
-        task = self.tasks.create_task(coro)
-        task.add_done_callback(callback or self._check_task_exception)
-        return task
-
-    def _check_task_exception(self, task):
-        '''Check a task for exceptions.'''
-        try:
-            if not task.cancelled():
-                task.result()
-        except Exception as e:
-            self.logger.exception(f'uncaught task exception: {e}')
+        return self.tasks.create_task(coro)
 
     async def cancel_all(self, wait=True):
         '''Cancels all tasks and waits for them to complete.'''
