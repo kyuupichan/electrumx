@@ -70,6 +70,7 @@ class Coin(object):
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
     BLOCK_PROCESSOR = BlockProcessor
+    MEMPOOL_HISTOGRAM_REFRESH_SECS = 500
     XPUB_VERBYTES = bytes('????', 'utf-8')
     XPRV_VERBYTES = bytes('????', 'utf-8')
     ENCODE_CHECK = Base58.encode_check
@@ -423,6 +424,7 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    MEMPOOL_HISTOGRAM_REFRESH_SECS = 120
     TX_COUNT = 318337769
     TX_COUNT_HEIGHT = 524213
     TX_PER_BLOCK = 1400

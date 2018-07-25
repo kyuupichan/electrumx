@@ -129,6 +129,8 @@ class MemPool(object):
 
     async def _refresh_hashes(self, once):
         '''Refresh our view of the daemon's mempool.'''
+        sleep = 5
+        histogram_refresh = self.coin.MEMPOOL_HISTOGRAM_REFRESH_SECS // sleep
         for loop_count in itertools.count():
             height = self.daemon.cached_height()
             hex_hashes = await self.daemon.mempool_hashes()
@@ -137,13 +139,12 @@ class MemPool(object):
             hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
             touched = await self._process_mempool(hashes)
             await self.notifications.on_mempool(touched, height)
-            # Refresh the cached histogram periodically.  Thread it as it
-            # can be expensive.
-            if loop_count % 100 == 0:
+            # Thread mempool histogram refreshes - they can be expensive
+            if loop_count % histogram_refresh == 0:
                 await self.tasks.run_in_thread(self._update_histogram)
             if once:
                 return
-            await asyncio.sleep(5)
+            await asyncio.sleep(sleep)
 
     async def _process_mempool(self, all_hashes):
         # Re-sync with the new set of hashes
