@@ -202,6 +202,8 @@ class BlockProcessor(electrumx.server.db.DB):
         '''Process the list of raw blocks passed.  Detects and handles
         reorgs.
         '''
+        if not raw_blocks:
+            return
         first = self.height + 1
         blocks = [self.coin.block(raw_block, first + n)
                   for n, raw_block in enumerate(raw_blocks)]
@@ -813,9 +815,8 @@ class BlockProcessor(electrumx.server.db.DB):
         Returns True if a reorg is queued, false if not caught up.
         '''
         if self._caught_up_event.is_set():
-            if count > 0:
-                self.reorg_count = count
-                self.blocks_event.set()
+            self.reorg_count = count
+            self.blocks_event.set()
             return True
         return False
 
