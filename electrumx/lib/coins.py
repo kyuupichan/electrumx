@@ -617,6 +617,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'hsmithsxurybd7uh.onion t53011 s53012',
         'testnetnode.arihanc.com s t',
         'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
+        'testnet.qtornado.com s t',
     ]
 
 
