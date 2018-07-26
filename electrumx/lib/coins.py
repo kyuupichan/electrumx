@@ -1587,6 +1587,9 @@ class NewyorkcoinTestnet(Newyorkcoin):
 class Bitcore(BitcoinMixin, Coin):
     NAME = "Bitcore"
     SHORTNAME = "BTX"
+    P2PKH_VERBYTE = bytes.fromhex("03")
+    P2SH_VERBYTES = [bytes.fromhex("7D")]
+    WIF_BYTE = bytes.fromhex("80")
     DESERIALIZER = lib_tx.DeserializerSegWit
     GENESIS_HASH = ('604148281e5c4b7f2487e5d03cd60d8e'
                     '6f69411d613f6448034508cea52e9574')
