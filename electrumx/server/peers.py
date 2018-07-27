@@ -14,7 +14,8 @@ import ssl
 import time
 from collections import defaultdict, Counter
 
-from aiorpcx import ClientSession, RPCError, SOCKSProxy, ConnectionError
+from aiorpcx import (ClientSession, RPCError, SOCKSProxy,
+                     SOCKSError, ConnectionError)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
@@ -239,7 +240,7 @@ class PeerManager(object):
                                   f'({e.code})')
             except asyncio.TimeoutError as e:
                 self.logger.error(f'[{peer}] {e}')
-            except (OSError, ConnectionError) as e:
+            except (OSError, SOCKSError, ConnectionError) as e:
                 self.logger.info(f'[{peer}] {kind} connection to '
                                  f'port {port} failed: {e}')
 
