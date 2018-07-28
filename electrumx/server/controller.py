@@ -81,7 +81,7 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start serving external clients.
         '''
-        reqd_version = (0, 5, 8)
+        reqd_version = (0, 5, 9)
         if aiorpcx_version != reqd_version:
             raise RuntimeError('ElectrumX requires aiorpcX version '
                                f'{version_string(reqd_version)}')

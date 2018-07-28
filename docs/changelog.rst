@@ -7,6 +7,11 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.7.2  (29 Jul 2018)
+============================
+
+* require aiorpcX 0.5.9; 0.5.8 didn't work on Python 3.7
+
 Version 1.7.1  (28 Jul 2018)
 ============================
 
