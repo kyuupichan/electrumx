@@ -9,15 +9,16 @@
 import asyncio
 import pylru
 
+from aiorpcx import run_in_thread
+
 
 class ChainState(object):
     '''Used as an interface by servers to request information about
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, tasks, daemon, bp, notifications):
+    def __init__(self, env, daemon, bp, notifications):
         self._env = env
-        self._tasks = tasks
         self._daemon = daemon
         self._bp = bp
         self._history_cache = pylru.lrucache(256)
@@ -64,7 +65,7 @@ class ChainState(object):
 
         hc = self._history_cache
         if hashX not in hc:
-            hc[hashX] = await self._tasks.run_in_thread(job)
+            hc[hashX] = await run_in_thread(job)
         return hc[hashX]
 
     async def get_utxos(self, hashX):
@@ -72,7 +73,7 @@ class ChainState(object):
         def job():
             return list(self._bp.get_utxos(hashX, limit=None))
 
-        return await self._tasks.run_in_thread(job)
+        return await run_in_thread(job)
 
     def header_branch_and_root(self, length, height):
         return self._bp.header_mc.branch_and_root(length, height)
@@ -91,7 +92,3 @@ class ChainState(object):
     def set_daemon_url(self, daemon_url):
         self._daemon.set_urls(self._env.coin.daemon_urls(daemon_url))
         return self._daemon.logged_url()
-
-    async def shutdown(self):
-        '''Shut down the block processor to flush chain state to disk.'''
-        await self._bp.shutdown()

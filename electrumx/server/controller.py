@@ -5,14 +5,15 @@
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
-from aiorpcx import _version as aiorpcx_version
+from asyncio import Event
+
+from aiorpcx import _version as aiorpcx_version, TaskGroup
 
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
 from electrumx.server.chain_state import ChainState
 from electrumx.server.mempool import MemPool
-from electrumx.server.peers import PeerManager
 from electrumx.server.session import SessionManager
 
 
@@ -76,17 +77,16 @@ class Controller(ServerBase):
     Servers are started once the mempool is synced after the block
     processor first catches up with the daemon.
     '''
+    async def serve(self, shutdown_event):
+        '''Start the RPC server and wait for the mempool to synchronize.  Then
+        start serving external clients.
+        '''
+        reqd_version = (0, 5, 8)
+        if aiorpcx_version != reqd_version:
+            raise RuntimeError('ElectrumX requires aiorpcX version '
+                               f'{version_string(reqd_version)}')
 
-    AIORPCX_MIN = (0, 5, 6)
-
-    def __init__(self, env):
-        '''Initialize everything that doesn't require the event loop.'''
-        super().__init__(env)
-
-        if aiorpcx_version < self.AIORPCX_MIN:
-            raise RuntimeError('ElectrumX requires aiorpcX >= '
-                               f'{version_string(self.AIORPCX_MIN)}')
-
+        env = self.env
         min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
         self.logger.info(f'software version: {electrumx.version}')
         self.logger.info(f'aiorpcX version: {version_string(aiorpcx_version)}')
@@ -97,29 +97,20 @@ class Controller(ServerBase):
         notifications = Notifications()
         daemon = env.coin.DAEMON(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
-        self.bp = BlockProcessor(env, self.tasks, daemon, notifications)
-        self.mempool = MemPool(env.coin, self.tasks, daemon, notifications,
-                               self.bp.lookup_utxos)
-        self.chain_state = ChainState(env, self.tasks, daemon, self.bp,
-                                      notifications)
-        self.session_mgr = SessionManager(env, self.tasks, self.chain_state,
-                                          self.mempool, notifications,
-                                          self.shutdown_event)
+        bp = BlockProcessor(env, daemon, notifications)
+        mempool = MemPool(env.coin, daemon, notifications, bp.lookup_utxos)
+        chain_state = ChainState(env, daemon, bp, notifications)
+        session_mgr = SessionManager(env, chain_state, mempool,
+                                     notifications, shutdown_event)
 
-    async def start_servers(self):
-        '''Start the RPC server and wait for the mempool to synchronize.  Then
-        start serving external clients.
-        '''
-        await self.session_mgr.start_rpc_server()
-        await self.bp.catch_up_to_daemon()
-        await self.mempool.start_and_wait_for_sync()
-        await self.session_mgr.start_serving()
+        caught_up_event = Event()
+        serve_externally_event = Event()
+        synchronized_event = Event()
 
-    async def shutdown(self):
-        '''Perform the shutdown sequence.'''
-        # Close servers and connections - main source of new task creation
-        await self.session_mgr.shutdown()
-        # Flush chain state to disk
-        await self.chain_state.shutdown()
-        # Cancel all tasks; this shuts down the prefetcher
-        await self.tasks.cancel_all(wait=True)
+        async with TaskGroup() as group:
+            await group.spawn(session_mgr.serve(serve_externally_event))
+            await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
+            await caught_up_event.wait()
+            await group.spawn(mempool.keep_synchronized(synchronized_event))
+            await synchronized_event.wait()
+            serve_externally_event.set()

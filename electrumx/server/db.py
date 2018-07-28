@@ -17,6 +17,8 @@ from collections import namedtuple
 from glob import glob
 from struct import pack, unpack
 
+from aiorpcx import run_in_thread
+
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.server.storage import db_class
@@ -442,6 +444,5 @@ class DB(object):
                 return hashX, value
             return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 
-        run_in_thread = self.tasks.run_in_thread
         hashX_pairs = await run_in_thread(lookup_hashXs)
         return await run_in_thread(lookup_utxos, hashX_pairs)

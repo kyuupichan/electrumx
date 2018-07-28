@@ -14,8 +14,9 @@ import ssl
 import time
 from collections import defaultdict, Counter
 
-from aiorpcx import (ClientSession, RPCError, SOCKSProxy,
-                     SOCKSError, ConnectionError)
+from aiorpcx import (ClientSession, SOCKSProxy, SOCKSError,
+                     RPCError, ConnectionError,
+                     TaskGroup, run_in_thread, ignore_after)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
@@ -55,14 +56,12 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
-    def __init__(self, env, tasks, chain_state):
+    def __init__(self, env, chain_state):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
-        self.tasks = tasks
         self.chain_state = chain_state
-        self.loop = tasks.loop
 
         # Our clearnet and Tor Peers, if any
         sclass = env.coin.SESSIONCLS
@@ -155,29 +154,12 @@ class PeerManager(object):
         self.logger.info(f'trying to detect proxy on "{host}" ports {ports}')
 
         cls = SOCKSProxy
-        result = await cls.auto_detect_host(host, ports, None, loop=self.loop)
+        result = await cls.auto_detect_host(host, ports, None)
         if isinstance(result, cls):
             self.proxy = result
             self.logger.info(f'detected {self.proxy}')
         else:
             self.logger.info('no proxy detected')
-
-    async def _discover_peers(self):
-        '''Main loop performing peer maintenance.  This includes
-
-          1) Forgetting unreachable peers.
-          2) Verifying connectivity of new peers.
-          3) Retrying old peers at regular intervals.
-        '''
-        self._import_peers()
-
-        while True:
-            await self._maybe_detect_proxy()
-            await self._retry_peers()
-            timeout = self.loop.call_later(WAKEUP_SECS, self.retry_event.set)
-            await self.retry_event.wait()
-            self.retry_event.clear()
-            timeout.cancel()
 
     async def _retry_peers(self):
         '''Retry peers that are close to getting stale.'''
@@ -195,11 +177,10 @@ class PeerManager(object):
             # Retry a failed connection if enough time has passed
             return peer.last_try < now - WAKEUP_SECS * 2 ** peer.try_count
 
-        tasks = []
-        for peer in self.peers:
-            if should_retry(peer):
-                tasks.append(self.tasks.create_task(self._retry_peer(peer)))
-        await asyncio.gather(*tasks)
+        async with TaskGroup() as group:
+            for peer in self.peers:
+                if should_retry(peer):
+                    await group.spawn(self._retry_peer(peer))
 
     async def _retry_peer(self, peer):
         peer.try_count += 1
@@ -278,12 +259,13 @@ class PeerManager(object):
         peer.features['server_version'] = server_version
         ptuple = protocol_tuple(protocol_version)
 
-        jobs = [self.tasks.create_task(message, daemon=False) for message in (
-            self._send_headers_subscribe(session, peer, timeout, ptuple),
-            self._send_server_features(session, peer, timeout),
-            self._send_peers_subscribe(session, peer, timeout)
-        )]
-        await asyncio.gather(*jobs)
+        async with TaskGroup() as group:
+            await group.spawn(self._send_headers_subscribe(session, peer,
+                                                           timeout, ptuple))
+            await group.spawn(self._send_server_features(session, peer,
+                                                         timeout))
+            await group.spawn(self._send_peers_subscribe(session, peer,
+                                                         timeout))
 
     async def _send_headers_subscribe(self, session, peer, timeout, ptuple):
         message = 'blockchain.headers.subscribe'
@@ -389,13 +371,27 @@ class PeerManager(object):
     #
     # External interface
     #
-    def start_peer_discovery(self):
-        if self.env.peer_discovery == self.env.PD_ON:
-            self.logger.info(f'beginning peer discovery. Force use of '
-                             f'proxy: {self.env.force_proxy}')
-            self.tasks.create_task(self._discover_peers())
-        else:
+    async def discover_peers(self):
+        '''Perform peer maintenance.  This includes
+
+          1) Forgetting unreachable peers.
+          2) Verifying connectivity of new peers.
+          3) Retrying old peers at regular intervals.
+        '''
+        if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
+            return
+
+        self.logger.info(f'beginning peer discovery. Force use of '
+                         f'proxy: {self.env.force_proxy}')
+        self._import_peers()
+
+        while True:
+            await self._maybe_detect_proxy()
+            await self._retry_peers()
+            async with ignore_after(WAKEUP_SECS):
+                await self.retry_event.wait()
+                self.retry_event.clear()
 
     def add_peers(self, peers, limit=2, check_ports=False, source=None):
         '''Add a limited number of peers that are not already present.'''
@@ -422,9 +418,8 @@ class PeerManager(object):
                 use_peers = new_peers[:limit]
             else:
                 use_peers = new_peers
-            for n, peer in enumerate(use_peers):
-                self.logger.info(f'accepted new peer {n+1}/{len(use_peers)} '
-                                 f'{peer} from {source}')
+            for peer in use_peers:
+                self.logger.info(f'accepted new peer {peer} from {source}')
             self.peers.update(use_peers)
 
         if retry:
@@ -460,9 +455,9 @@ class PeerManager(object):
             permit = self._permit_new_onion_peer()
             reason = 'rate limiting'
         else:
+            getaddrinfo = asyncio.get_event_loop().getaddrinfo
             try:
-                infos = await self.loop.getaddrinfo(host, 80,
-                                                    type=socket.SOCK_STREAM)
+                infos = await getaddrinfo(host, 80, type=socket.SOCK_STREAM)
             except socket.gaierror:
                 permit = False
                 reason = 'address resolution failure'

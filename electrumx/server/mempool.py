@@ -13,6 +13,7 @@ import time
 from collections import defaultdict
 
 import attr
+from aiorpcx import TaskGroup, run_in_thread
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger, chunks
@@ -40,11 +41,10 @@ class MemPool(object):
        hashXs: hashX   -> set of all hashes of txs touching the hashX
     '''
 
-    def __init__(self, coin, tasks, daemon, notifications, lookup_utxos):
+    def __init__(self, coin, daemon, notifications, lookup_utxos):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.coin = coin
         self.lookup_utxos = lookup_utxos
-        self.tasks = tasks
         self.daemon = daemon
         self.notifications = notifications
         self.txs = {}
@@ -127,7 +127,7 @@ class MemPool(object):
 
         return deferred, {prevout: utxo_map[prevout] for prevout in unspent}
 
-    async def _refresh_hashes(self, once):
+    async def _refresh_hashes(self, synchronized_event):
         '''Refresh our view of the daemon's mempool.'''
         sleep = 5
         histogram_refresh = self.coin.MEMPOOL_HISTOGRAM_REFRESH_SECS // sleep
@@ -138,12 +138,11 @@ class MemPool(object):
                 continue
             hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
             touched = await self._process_mempool(hashes)
+            synchronized_event.set()
             await self.notifications.on_mempool(touched, height)
             # Thread mempool histogram refreshes - they can be expensive
             if loop_count % histogram_refresh == 0:
-                await self.tasks.run_in_thread(self._update_histogram)
-            if once:
-                return
+                await run_in_thread(self._update_histogram)
             await asyncio.sleep(sleep)
 
     async def _process_mempool(self, all_hashes):
@@ -165,16 +164,15 @@ class MemPool(object):
 
         # Process new transactions
         new_hashes = list(all_hashes.difference(txs))
-        jobs = [self.tasks.create_task(self._fetch_and_accept
-                                       (hashes, all_hashes, touched),
-                                       daemon=False)
-                for hashes in chunks(new_hashes, 2000)]
-        if jobs:
-            await asyncio.gather(*jobs)
+        if new_hashes:
+            group = TaskGroup()
+            for hashes in chunks(new_hashes, 200):
+                coro = self._fetch_and_accept(hashes, all_hashes, touched)
+                await group.spawn(coro)
             tx_map = {}
             utxo_map = {}
-            for job in jobs:
-                deferred, unspent = job.result()
+            async for task in group:
+                deferred, unspent = task.result()
                 tx_map.update(deferred)
                 utxo_map.update(unspent)
 
@@ -218,7 +216,7 @@ class MemPool(object):
             return txs
 
         # Thread this potentially slow operation so as not to block
-        tx_map = await self.tasks.run_in_thread(deserialize_txs)
+        tx_map = await run_in_thread(deserialize_txs)
 
         # Determine all prevouts not in the mempool, and fetch the
         # UTXO information from the database.  Failed prevout lookups
@@ -236,19 +234,20 @@ class MemPool(object):
     # External interface
     #
 
-    async def start_and_wait_for_sync(self):
+    async def keep_synchronized(self, synchronized_event):
         '''Starts the mempool synchronizer.
 
         Waits for an initial synchronization before returning.
         '''
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
-        start = time.time()
-        await self._refresh_hashes(once=True)
-        elapsed = time.time() - start
-        self.logger.info(f'synced in {elapsed:.2f}s')
-        self.tasks.create_task(self._log_stats())
-        self.tasks.create_task(self._refresh_hashes(once=False))
+        async with TaskGroup() as group:
+            await group.spawn(self._refresh_hashes(synchronized_event))
+            start = time.time()
+            await synchronized_event.wait()
+            elapsed = time.time() - start
+            self.logger.info(f'synced in {elapsed:.2f}s')
+            await group.spawn(self._log_stats())
 
     async def balance_delta(self, hashX):
         '''Return the unconfirmed amount in the mempool for hashX.

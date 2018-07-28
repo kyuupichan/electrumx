@@ -18,7 +18,7 @@ import time
 from collections import defaultdict
 from functools import partial
 
-from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError
+from aiorpcx import ServerSession, JSONRPCAutoDetect, RPCError, TaskGroup
 
 import electrumx
 import electrumx.lib.text as text
@@ -27,6 +27,7 @@ from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
                                 HASHX_LEN)
 from electrumx.lib.peer import Peer
 from electrumx.server.daemon import DaemonError
+from electrumx.server.peers import PeerManager
 
 
 BAD_REQUEST = 1
@@ -97,14 +98,13 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, tasks, chain_state, mempool, notifications,
+    def __init__(self, env, chain_state, mempool, notifications,
                  shutdown_event):
         env.max_send = max(350000, env.max_send)
         self.env = env
-        self.tasks = tasks
         self.chain_state = chain_state
         self.mempool = mempool
-        self.peer_mgr = PeerManager(env, tasks, chain_state)
+        self.peer_mgr = PeerManager(env, chain_state)
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
@@ -396,42 +396,42 @@ class SessionManager(object):
 
     # --- External Interface
 
-    async def start_rpc_server(self):
-        '''Start the RPC server if enabled.'''
-        if self.env.rpc_port is not None:
-            await self._start_server('RPC', self.env.cs_host(for_rpc=True),
-                                     self.env.rpc_port)
-
-    async def start_serving(self):
-        '''Start TCP and SSL servers.'''
-        self.logger.info('max session count: {:,d}'.format(self.max_sessions))
-        self.logger.info('session timeout: {:,d} seconds'
-                         .format(self.env.session_timeout))
-        self.logger.info('session bandwidth limit {:,d} bytes'
-                         .format(self.env.bandwidth_limit))
-        self.logger.info('max response size {:,d} bytes'
-                         .format(self.env.max_send))
-        self.logger.info('max subscriptions across all sessions: {:,d}'
-                         .format(self.max_subs))
-        self.logger.info('max subscriptions per session: {:,d}'
-                         .format(self.env.max_session_subs))
-        if self.env.drop_client is not None:
-            self.logger.info('drop clients matching: {}'
-                             .format(self.env.drop_client.pattern))
-        await self._start_external_servers()
-        # Peer discovery should start after the external servers
-        # because we connect to ourself
-        self.peer_mgr.start_peer_discovery()
-        self.tasks.create_task(self._housekeeping())
-
-    async def shutdown(self):
-        '''Close servers and sessions.'''
-        self.state = self.SHUTTING_DOWN
-        self._close_servers(list(self.servers.keys()))
-        for session in self.sessions:
-            session.abort()
-        for session in list(self.sessions):
-            await session.wait_closed()
+    async def serve(self, event):
+        '''Start the RPC server if enabled.  When the event is triggered,
+        start TCP and SSL servers.'''
+        try:
+            if self.env.rpc_port is not None:
+                await self._start_server('RPC', self.env.cs_host(for_rpc=True),
+                                         self.env.rpc_port)
+            await event.wait()
+            self.logger.info(f'max session count: {self.max_sessions:,d}')
+            self.logger.info(f'session timeout: '
+                             f'{self.env.session_timeout:,d} seconds')
+            self.logger.info('session bandwidth limit {:,d} bytes'
+                             .format(self.env.bandwidth_limit))
+            self.logger.info('max response size {:,d} bytes'
+                             .format(self.env.max_send))
+            self.logger.info('max subscriptions across all sessions: {:,d}'
+                             .format(self.max_subs))
+            self.logger.info('max subscriptions per session: {:,d}'
+                             .format(self.env.max_session_subs))
+            if self.env.drop_client is not None:
+                self.logger.info('drop clients matching: {}'
+                                 .format(self.env.drop_client.pattern))
+            await self._start_external_servers()
+            # Peer discovery should start after the external servers
+            # because we connect to ourself
+            async with TaskGroup() as group:
+                await group.spawn(self.peer_mgr.discover_peers())
+                await group.spawn(self._housekeeping())
+        finally:
+            # Close servers and sessions
+            self.state = self.SHUTTING_DOWN
+            self._close_servers(list(self.servers.keys()))
+            for session in self.sessions:
+                session.abort()
+            for session in list(self.sessions):
+                await session.wait_closed()
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
@@ -439,9 +439,9 @@ class SessionManager(object):
 
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        create_task = self.tasks.create_task
-        for session in self.sessions:
-            create_task(session.notify(height, touched))
+        async with TaskGroup() as group:
+            for session in self.sessions:
+                await group.spawn(session.notify(height, touched))
 
     def add_session(self, session):
         self.sessions.add(session)

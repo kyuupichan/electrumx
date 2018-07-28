@@ -12,6 +12,8 @@ import sys
 import time
 from functools import partial
 
+from aiorpcx import TaskGroup
+
 from electrumx.lib.util import class_logger
 
 
@@ -93,18 +95,18 @@ class ServerBase(object):
         loop.set_exception_handler(self.on_exception)
 
         shutdown_event = asyncio.Event()
-        task = loop.create_task(self.serve(shutdown_event))
         try:
-            # Wait for shutdown to be signalled, and log it.
-            await shutdown_event.wait()
-            self.logger.info('shutting down')
-            task.cancel()
-            await task
+            async with TaskGroup() as group:
+                server_task = await group.spawn(self.serve(shutdown_event))
+                # Wait for shutdown, log on receipt of the event
+                await shutdown_event.wait()
+                self.logger.info('shutting down')
+                server_task.cancel()
         finally:
             await loop.shutdown_asyncgens()
 
         # Prevent some silly logs
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.001)
         # Finally, work around an apparent asyncio bug that causes log
         # spew on shutdown for partially opened SSL sockets
         try:
