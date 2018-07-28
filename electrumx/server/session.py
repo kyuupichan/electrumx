@@ -326,13 +326,12 @@ class SessionManager(object):
 
     # --- LocalRPC command handlers
 
-    def rpc_add_peer(self, real_name):
+    async def rpc_add_peer(self, real_name):
         '''Add a peer.
 
-        real_name: a real name, as would appear on IRC
+        real_name: "bch.electrumx.cash t50001 s50002" for example
         '''
-        peer = Peer.from_real_name(real_name, 'RPC')
-        self.peer_mgr.add_peers([peer])
+        await self.peer_mgr.add_localRPC_peer(real_name)
         return "peer '{}' added".format(real_name)
 
     def rpc_disconnect(self, session_ids):
@@ -422,7 +421,7 @@ class SessionManager(object):
             # Peer discovery should start after the external servers
             # because we connect to ourself
             async with TaskGroup() as group:
-                await group.spawn(self.peer_mgr.discover_peers())
+                await group.spawn(self.peer_mgr.discover_peers(group))
                 await group.spawn(self._housekeeping())
         finally:
             # Close servers and sessions
