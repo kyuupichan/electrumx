@@ -102,22 +102,18 @@ class Controller(ServerBase):
                                self.bp.lookup_utxos)
         self.chain_state = ChainState(env, self.tasks, daemon, self.bp,
                                       notifications)
-        self.peer_mgr = PeerManager(env, self.tasks, self.chain_state)
         self.session_mgr = SessionManager(env, self.tasks, self.chain_state,
-                                          self.mempool, self.peer_mgr,
-                                          notifications, self.shutdown_event)
+                                          self.mempool, notifications,
+                                          self.shutdown_event)
 
     async def start_servers(self):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
-        start the peer manager and serving external clients.
+        start serving external clients.
         '''
         await self.session_mgr.start_rpc_server()
         await self.bp.catch_up_to_daemon()
         await self.mempool.start_and_wait_for_sync()
         await self.session_mgr.start_serving()
-        # Peer discovery should start after we start serving because
-        # we connect to ourself
-        self.peer_mgr.start_peer_discovery()
 
     async def shutdown(self):
         '''Perform the shutdown sequence.'''
@@ -125,5 +121,5 @@ class Controller(ServerBase):
         await self.session_mgr.shutdown()
         # Flush chain state to disk
         await self.chain_state.shutdown()
-        # Cancel all tasks; this shuts down the peer manager and prefetcher
+        # Cancel all tasks; this shuts down the prefetcher
         await self.tasks.cancel_all(wait=True)

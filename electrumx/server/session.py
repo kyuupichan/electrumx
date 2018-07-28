@@ -97,14 +97,14 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, tasks, chain_state, mempool, peer_mgr,
-                 notifications, shutdown_event):
+    def __init__(self, env, tasks, chain_state, mempool, notifications,
+                 shutdown_event):
         env.max_send = max(350000, env.max_send)
         self.env = env
         self.tasks = tasks
         self.chain_state = chain_state
         self.mempool = mempool
-        self.peer_mgr = peer_mgr
+        self.peer_mgr = PeerManager(env, tasks, chain_state)
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
@@ -419,6 +419,9 @@ class SessionManager(object):
             self.logger.info('drop clients matching: {}'
                              .format(self.env.drop_client.pattern))
         await self._start_external_servers()
+        # Peer discovery should start after the external servers
+        # because we connect to ourself
+        self.peer_mgr.start_peer_discovery()
         self.tasks.create_task(self._housekeeping())
 
     async def shutdown(self):
