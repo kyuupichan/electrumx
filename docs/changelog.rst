@@ -7,6 +7,18 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.7.1  (28 Jul 2018)
+============================
+
+* switch to aiorpcX 0.5.8 which implements some curio task management
+  primitives on top of asyncio that make writing correct async code
+  much easier, as well as making it simpler to reason about
+* use those primitives to restructure the peer manager, which is now
+  fully concurrent again, as well as the block processor and
+  controller
+* fix `#534`_ introduced in 1.7
+* minor coin tweaks (ghost43, cipig)
+
 Version 1.7  (25 Jul 2018)
 ==========================
 
@@ -160,3 +172,4 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#506: https://github.com/kyuupichan/electrumx/issues/506
 .. _#519: https://github.com/kyuupichan/electrumx/issues/519
 .. _#523: https://github.com/kyuupichan/electrumx/issues/523
+.. _#534: https://github.com/kyuupichan/electrumx/issues/534
