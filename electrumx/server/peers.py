@@ -299,13 +299,9 @@ class PeerManager(object):
         peer.features['server_version'] = server_version
         ptuple = protocol_tuple(protocol_version)
 
-        async with TaskGroup() as group:
-            await group.spawn(self._send_headers_subscribe(session, peer,
-                                                           timeout, ptuple))
-            await group.spawn(self._send_server_features(session, peer,
-                                                         timeout))
-            await group.spawn(self._send_peers_subscribe(session, peer,
-                                                         timeout))
+        await self._send_headers_subscribe(session, peer, timeout, ptuple)
+        await self._send_server_features(session, peer, timeout)
+        await self._send_peers_subscribe(session, peer, timeout)
 
     async def _send_headers_subscribe(self, session, peer, timeout, ptuple):
         message = 'blockchain.headers.subscribe'
