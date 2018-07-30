@@ -305,8 +305,6 @@ class MemPool(object):
         # hashXs is a defaultdict, so use get() to query
         for tx_hash in self.hashXs.get(hashX, ()):
             tx = self.txs.get(tx_hash)
-            if not tx:
-                continue
             for pos, (hX, value) in enumerate(tx.out_pairs):
                 if hX == hashX:
                     utxos.append(UTXO(-1, pos, tx_hash, 0, value))
