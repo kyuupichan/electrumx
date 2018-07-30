@@ -244,7 +244,7 @@ has its caches and disk I/O tuned to that task only.
 The :envvar:`CACHE_MB` environment variable controls the total cache
 size ElectrumX uses; see :ref:`here <CACHE>` for caveats.
 
-Here is my experience with the codebase of year ago (the current
+Here is my experience with the codebase of early 2017 (the current
 codebase is faster), to given heights and rough wall-time.  The period
 from heights 363,000 to 378,000 is the most sluggish::
 
@@ -280,7 +280,7 @@ Terminating ElectrumX
 The preferred way to terminate the server process is to send it the
 ``stop`` RPC command::
 
-  electrumx_rpy.py stop
+  electrumx_rpc stop
 
 or alternatively on Unix the ``INT`` or ``TERM`` signals.  For a
 daemontools supervised process this can be done by bringing it down
@@ -371,8 +371,8 @@ The ETA shown is just a rough guide and in the short term can be quite
 volatile.  It tends to be a little optimistic at first; once you get
 to height 280,000 is should be fairly accurate.
 
-Creating an self-signed SSL certificate
-=======================================
+Creating a self-signed SSL certificate
+======================================
 
 These instructions are based on those of the ``electrum-server``
 documentation.
