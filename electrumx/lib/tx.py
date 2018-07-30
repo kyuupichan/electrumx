@@ -30,7 +30,7 @@
 
 from collections import namedtuple
 
-from electrumx.lib.hash import double_sha256, hash_to_hex_str
+from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.util import (
     cachedproperty, unpack_int32_from, unpack_int64_from,
     unpack_uint16_from, unpack_uint32_from, unpack_uint64_from
@@ -413,6 +413,10 @@ class DeserializerBitcoinAtom(DeserializerSegWit):
         if height >= self.FORK_BLOCK_HEIGHT:
             header_len += 4  # flags
         return self._read_nbytes(header_len)
+
+
+class DeserializerGroestlcoin(DeserializerSegWit):
+    TX_HASH_FN = staticmethod(sha256)
 
 
 # Decred
