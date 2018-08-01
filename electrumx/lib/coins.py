@@ -1978,3 +1978,52 @@ class Minexcoin(MinexcoinMixin, Coin):
         'elex01-ams.turinex.eu s t',
         'eu.minexpool.nl s t'
     ]
+
+
+class Groestlcoin(Coin):
+    NAME = "Groestlcoin"
+    SHORTNAME = "GRS"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("24")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00000ac5927c594d49cc0bdb81759d0d'
+                    'a8297eb614683d3acb62f0703b639023')
+    DESERIALIZER = lib_tx.DeserializerGroestlcoin
+    TX_COUNT = 115900
+    TX_COUNT_HEIGHT = 1601528
+    TX_PER_BLOCK = 5
+    RPC_PORT = 1441
+    PEERS = [
+        'electrum1.groestlcoin.org s t',
+        'electrum2.groestlcoin.org s t',
+        '6brsrbiinpc32tfc.onion t',
+        'xkj42efxrcy6vbfw.onion t',
+    ]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import groestlcoin_hash
+        return groestlcoin_hash.getHash(header, len(header))
+
+
+class GroestlcoinTestnet(Groestlcoin):
+    SHORTNAME = "TGRS"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("6f")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('000000ffbb50fc9898cdd36ec163e6ba'
+                    '23230164c0052a28876255b7dcf2cd36')
+    RPC_PORT = 17766
+    PEERS = [
+        'electrum-test1.groestlcoin.org s t',
+        'electrum-test2.groestlcoin.org s t',
+        '7frvhgofuf522b5i.onion t',
+        'aocojvqcybdoxekv.onion t',
+    ]
