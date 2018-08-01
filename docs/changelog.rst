@@ -7,6 +7,11 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.7.2  (01 Aug 2018)
+============================
+
+* fix `#538`_
+
 Version 1.7.2  (29 Jul 2018)
 ============================
 
@@ -178,3 +183,4 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#519: https://github.com/kyuupichan/electrumx/issues/519
 .. _#523: https://github.com/kyuupichan/electrumx/issues/523
 .. _#534: https://github.com/kyuupichan/electrumx/issues/534
+.. _#538: https://github.com/kyuupichan/electrumx/issues/538
