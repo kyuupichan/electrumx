@@ -79,6 +79,8 @@ class Deserializer(object):
     millions of times during sync.
     '''
 
+    TX_HASH_FN = double_sha256
+
     def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
         self.binary = binary
@@ -101,7 +103,8 @@ class Deserializer(object):
         we process it in the natural serialized order.
         '''
         start = self.cursor
-        return self.read_tx(), double_sha256(self.binary[start:self.cursor])
+        return self.read_tx(), type(self).TX_HASH_FN(
+            self.binary[start:self.cursor])
 
     def read_tx_and_vsize(self):
         '''Return a (deserialized TX, vsize) pair.'''
@@ -213,7 +216,7 @@ class DeserializerSegWit(Deserializer):
         marker = self.binary[self.cursor + 4]
         if marker:
             tx = super().read_tx()
-            tx_hash = double_sha256(self.binary[start:self.cursor])
+            tx_hash = type(self).TX_HASH_FN(self.binary[start:self.cursor])
             return tx, tx_hash, self.binary_length
 
         # Ugh, this is nasty.
@@ -237,7 +240,7 @@ class DeserializerSegWit(Deserializer):
         vsize = (3 * base_size + self.binary_length) // 4
 
         return TxSegWit(version, marker, flag, inputs, outputs, witness,
-                        locktime), double_sha256(orig_ser), vsize
+                        locktime), type(self).TX_HASH_FN(orig_ser), vsize
 
     def read_tx(self):
         return self._read_tx_parts()[0]
