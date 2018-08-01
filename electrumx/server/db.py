@@ -21,6 +21,7 @@ from aiorpcx import run_in_thread
 
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.tx import TxInput
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -409,6 +410,10 @@ class DB(object):
             for each prevout.
             '''
             def lookup_hashX(tx_hash, tx_idx):
+                if tx_hash == TxInput.ZERO and tx_idx == TxInput.MINUS_1:
+                    # No hashX for coinbase-like inputs
+                    return None, None
+
                 idx_packed = pack('<H', tx_idx)
 
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
