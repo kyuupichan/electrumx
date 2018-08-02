@@ -263,6 +263,16 @@ class BlockProcessor(electrumx.server.db.DB):
         The hashes are returned in order of increasing height.  Start
         is the height of the first hash, last of the last.
         '''
+        start, count = self.calc_reorg_range(count)
+        last = start + count - 1
+        s = '' if count == 1 else 's'
+        self.logger.info(f'chain was reorganised replacing {count:,d} '
+                         f'block{s} at heights {start:,d}-{last:,d}')
+
+        return start, last, self.fs_block_hashes(start, count)
+
+    async def calc_reorg_range(self, count):
+        '''Calculate the reorg range'''
 
         def diff_pos(hashes1, hashes2):
             '''Returns the index of the first difference in the hash lists.
@@ -291,12 +301,7 @@ class BlockProcessor(electrumx.server.db.DB):
         else:
             start = (self.height - count) + 1
 
-        last = start + count - 1
-        s = '' if count == 1 else 's'
-        self.logger.info(f'chain was reorganised replacing {count:,d} '
-                         f'block{s} at heights {start:,d}-{last:,d}')
-
-        return start, last, self.fs_block_hashes(start, count)
+        return start, count
 
     def flush_state(self, batch):
         '''Flush chain state to the batch.'''
@@ -826,3 +831,13 @@ class BlockProcessor(electrumx.server.db.DB):
             self.blocks_event.set()
             return True
         return False
+
+
+class DecredBlockProcessor(BlockProcessor):
+    async def calc_reorg_range(self, count):
+        start, count = super().calc_reorg_range(count)
+        if start > 0:
+            # A reorg in Decred can invalidate the previous block
+            start -= 1
+            count += 1
+        return start, count
