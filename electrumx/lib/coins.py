@@ -404,7 +404,7 @@ class HOdlcoin(Coin):
 
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
-    SHORTNAME = "BCC"
+    SHORTNAME = "BCH"
     TX_COUNT = 246362688
     TX_COUNT_HEIGHT = 511484
     TX_PER_BLOCK = 400

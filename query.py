@@ -12,64 +12,99 @@
 Not currently documented; might become easier to use in future.
 '''
 
-
+import argparse
+import asyncio
 import sys
 
 from electrumx import Env
 from electrumx.server.db import DB
-from electrumx.lib.hash import hash_to_hex_str
+from electrumx.lib.hash import hash_to_hex_str, Base58Error
 
 
-def count_entries(hist_db, utxo_db):
-    utxos = 0
+async def print_stats(hist_db, utxo_db):
+    count = 0
     for key in utxo_db.iterator(prefix=b'u', include_value=False):
-        utxos += 1
-    print("UTXO count:", utxos)
+        count += 1
+    print(f'UTXO count: {utxos}')
 
-    hashX = 0
+    count = 0
     for key in utxo_db.iterator(prefix=b'h', include_value=False):
-        hashX += 1
-    print("HashX count:", hashX)
+        count += 1
+    print(f'HashX count: {count}')
 
     hist = 0
     hist_len = 0
     for key, value in hist_db.iterator(prefix=b'H'):
         hist += 1
         hist_len += len(value) // 4
-    print("History rows {:,d} entries {:,d}".format(hist, hist_len))
+    print(f'History rows {hist:,d} entries {hist_len:,d}')
+
+
+def arg_to_hashX(coin, arg):
+    try:
+        script = bytes.fromhex(arg)
+        print(f'Script: {arg}')
+        return coin.hashX_from_script(script)
+    except ValueError:
+        pass
+
+    try:
+        hashX = coin.address_to_hashX(arg)
+        print(f'Address: {arg}')
+        return hashX
+    except Base58Error:
+        print(f'Ingoring unknown arg: {arg}')
+        return None
+
+
+async def query(args):
+    env = Env()
+    db = DB(env)
+    coin = env.coin
+
+    await db._open_dbs(False)
+
+    if not args.scripts:
+        await print_stats(db.hist_db, db.utxo_db)
+        return
+    limit = args.limit
+    for arg in args.scripts:
+        hashX = arg_to_hashX(coin, arg)
+        if not hashX:
+            continue
+        n = None
+        for n, (tx_hash, height) in enumerate(db.get_history(hashX, limit),
+                                              start=1):
+            print(f'History #{n:,d}: height {height:,d} '
+                  f'tx_hash {hash_to_hex_str(tx_hash)}')
+        if n is None:
+            print('No history found')
+        n = None
+        for n, utxo in enumerate(db.get_utxos(hashX, limit), start=1):
+            print(f'UTXO #{n:,d}: tx_hash {hash_to_hex_str(utxo.tx_hash)} '
+                  f'tx_pos {utxo.tx_pos:,d} height {utxo.height:,d} '
+                  f'value {utxo.value:,d}')
+        if n is None:
+            print('No UTXOs found')
+        balance = db.get_balance(hashX)
+        print(f'Balance: {coin.decimal_value(balance):,f} {coin.SHORTNAME}')
 
 
 def main():
-    env = Env()
-    bp = DB(env)
-    coin = env.coin
-    if len(sys.argv) == 1:
-        count_entries(bp.hist_db, bp.utxo_db)
-        return
-    argc = 1
-    try:
-        limit = int(sys.argv[argc])
-        argc += 1
-    except Exception:
-        limit = 10
-    for addr in sys.argv[argc:]:
-        print('Address: ', addr)
-        hashX = coin.address_to_hashX(addr)
-
-        for n, (tx_hash, height) in enumerate(bp.get_history(hashX, limit)):
-            print('History #{:d}: hash: {} height: {:d}'
-                  .format(n + 1, hash_to_hex_str(tx_hash), height))
-        n = None
-        for n, utxo in enumerate(bp.get_utxos(hashX, limit)):
-            print('UTXOs #{:d}: hash: {} pos: {:d} height: {:d} value: {:d}'
-                  .format(n + 1, hash_to_hex_str(utxo.tx_hash),
-                          utxo.tx_pos, utxo.height, utxo.value))
-        if n is None:
-            print('No UTXOs')
-        balance = bp.get_balance(hashX)
-        print('Balance: {} {}'.format(coin.decimal_value(balance),
-                                      coin.SHORTNAME))
-
+    default_limit = 10
+    parser = argparse.ArgumentParser(
+        'query.py',
+        description='Invoke with COIN and DB_DIRECTORY set in the '
+        'environment as they would be invoking electrumx_server'
+    )
+    parser.add_argument('-l', '--limit', metavar='limit', type=int,
+                        default=10, help=f'maximum number of entries to '
+                        f'return (default: {default_limit})')
+    parser.add_argument('scripts', nargs='*', default=[], type=str,
+                        help='hex scripts to query')
+    args = parser.parse_args()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(query(args))
 
 if __name__ == '__main__':
     main()
