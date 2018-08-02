@@ -1,0 +1,18 @@
+Metadata-Version: 1.1
+Name: electrumX
+Version: 1.7.3
+Summary: ElectrumX Server
+Home-page: https://github.com/kyuupichan/electrumx
+Author: Neil Booth
+Author-email: kyuupichan@gmail.com
+License: MIT Licence
+Download-URL: https://github.com/kyuupichan/electrumX/archive/1.7.3.tar.gz
+Description: Server implementation for the Electrum protocol
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Framework :: AsyncIO
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: Unix
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Topic :: Database
+Classifier: Topic :: Internet

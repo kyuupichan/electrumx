@@ -1,0 +1,6 @@
+aiorpcX == 0.5.9
+attrs>=15
+plyvel
+pylru
+aiohttp >= 2
+quark_hash
