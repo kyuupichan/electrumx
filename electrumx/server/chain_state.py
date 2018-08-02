@@ -131,8 +131,8 @@ class ChainState(object):
             for n, utxo in enumerate(db.get_utxos(hashX, limit), start=1):
                 lines.append(f'UTXO #{n:,d}: tx_hash '
                              f'{hash_to_hex_str(utxo.tx_hash)} '
-                             f'tx_pos {utxo.tx_pos:,d} height {utxo.height:,d} '
-                             f'value {utxo.value:,d}')
+                             f'tx_pos {utxo.tx_pos:,d} height '
+                             f'{utxo.height:,d} value {utxo.value:,d}')
             if n is None:
                 lines.append('No UTXOs found')
 
