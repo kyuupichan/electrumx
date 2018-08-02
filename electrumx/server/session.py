@@ -130,7 +130,7 @@ class SessionManager(object):
 
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
-                'reorg sessions stop'.split())
+                'query reorg sessions stop'.split())
         self.rpc_handlers = {cmd: getattr(self, 'rpc_' + cmd) for cmd in cmds}
 
     async def _start_server(self, kind, *args, **kw_args):
@@ -353,7 +353,7 @@ class SessionManager(object):
 
         return self._for_each_session(session_ids, toggle_logging)
 
-    def rpc_daemon_url(self, daemon_url=None):
+    def rpc_daemon_url(self, daemon_url):
         '''Replace the daemon URL.'''
         daemon_url = daemon_url or self.env.daemon_url
         try:
@@ -379,19 +379,23 @@ class SessionManager(object):
         '''Return a list of data about server peers.'''
         return self.peer_mgr.rpc_data()
 
+    async def rpc_query(self, items, limit):
+        '''Return a list of data about server peers.'''
+        return await self.chain_state.query(items, limit)
+
     def rpc_sessions(self):
         '''Return statistics about connected sessions.'''
         return self._session_data(for_log=False)
 
-    def rpc_reorg(self, count=3):
+    def rpc_reorg(self, count):
         '''Force a reorg of the given number of blocks.
 
-        count: number of blocks to reorg (default 3)
+        count: number of blocks to reorg
         '''
         count = non_negative_integer(count)
         if not self.chain_state.force_chain_reorg(count):
             raise RPCError(BAD_REQUEST, 'still catching up with daemon')
-        return 'scheduled a reorg of {:,d} blocks'.format(count)
+        return f'scheduled a reorg of {count:,d} blocks'
 
     # --- External Interface
 

@@ -11,6 +11,8 @@ import pylru
 
 from aiorpcx import run_in_thread
 
+from electrumx.lib.hash import hash_to_hex_str
+
 
 class ChainState(object):
     '''Used as an interface by servers to request information about
@@ -92,3 +94,50 @@ class ChainState(object):
     def set_daemon_url(self, daemon_url):
         self._daemon.set_urls(self._env.coin.daemon_urls(daemon_url))
         return self._daemon.logged_url()
+
+    async def query(self, args, limit):
+        coin = self._env.coin
+        db = self._bp
+        lines = []
+
+        def arg_to_hashX(arg):
+            try:
+                script = bytes.fromhex(arg)
+                lines.append(f'Script: {arg}')
+                return coin.hashX_from_script(script)
+            except ValueError:
+                pass
+
+            try:
+                hashX = coin.address_to_hashX(arg)
+                lines.append(f'Address: {arg}')
+                return hashX
+            except Base58Error:
+                print(f'Ingoring unknown arg: {arg}')
+                return None
+
+        for arg in args:
+            hashX = arg_to_hashX(arg)
+            if not hashX:
+                continue
+            n = None
+            for n, (tx_hash, height) in enumerate(
+                    db.get_history(hashX, limit), start=1):
+                lines.append(f'History #{n:,d}: height {height:,d} '
+                             f'tx_hash {hash_to_hex_str(tx_hash)}')
+            if n is None:
+                lines.append('No history found')
+            n = None
+            for n, utxo in enumerate(db.get_utxos(hashX, limit), start=1):
+                lines.append(f'UTXO #{n:,d}: tx_hash '
+                             f'{hash_to_hex_str(utxo.tx_hash)} '
+                             f'tx_pos {utxo.tx_pos:,d} height {utxo.height:,d} '
+                             f'value {utxo.value:,d}')
+            if n is None:
+                lines.append('No UTXOs found')
+
+            balance = db.get_balance(hashX)
+            lines.append(f'Balance: {coin.decimal_value(balance):,f} '
+                         f'{coin.SHORTNAME}')
+
+        return lines
