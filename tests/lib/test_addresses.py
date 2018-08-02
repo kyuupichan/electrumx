@@ -51,6 +51,8 @@ addresses = [
      "2789d58cfa0957d206f025c2af056fc8a77cebb0", "8cc9b11122272bd7b79a50"),
     (coins.Decred, "DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
      "f0b4e85100aee1a996f22915eb3c3f764d53779a", "a03c1a27de9ac3b3122e8d"),
+    (coins.Groestlcoin, "FY7vmDL7FZGACwqVNx5p4fVaGghojWM5AF",
+     "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
 ]
 
 

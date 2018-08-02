@@ -417,6 +417,11 @@ class DeserializerBitcoinAtom(DeserializerSegWit):
 
 
 class DeserializerGroestlcoin(DeserializerSegWit):
+    @staticmethod
+    def grshash(data):
+        import groestlcoin_hash
+        return groestlcoin_hash.getHash(data, len(data))
+
     TX_HASH_FN = staticmethod(sha256)
 
 
