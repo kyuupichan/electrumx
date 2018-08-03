@@ -7,7 +7,7 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
-Version 1.7.2  (01 Aug 2018)
+Version 1.7.3  (01 Aug 2018)
 ============================
 
 * fix `#538`_
