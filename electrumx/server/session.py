@@ -434,7 +434,7 @@ class SessionManager(object):
             # Close servers and sessions
             self.state = self.SHUTTING_DOWN
             await self._close_servers(list(self.servers.keys()))
-            with TaskGroup() as group:
+            async with TaskGroup() as group:
                 for session in list(self.sessions):
                     await group.spawn(await session.close(force_after=0.1))
 
@@ -631,7 +631,7 @@ class ElectrumX(SessionBase):
     async def close(self, force_after=30):
         '''Close the connection and return when closed.'''
         async with ignore_after(force_after):
-            super().close()
+            await super().close()
         self.abort()
 
     async def daemon_request(self, method, *args):
