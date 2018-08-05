@@ -14,7 +14,7 @@ from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
 from electrumx.server.chain_state import ChainState
 from electrumx.server.db import DB
-from electrumx.server.mempool import MemPool
+from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
 
 
@@ -97,8 +97,18 @@ class Controller(ServerBase):
         db = DB(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
         bp = BlockProcessor(env, db, daemon, notifications)
-        mempool = MemPool(env.coin, daemon, notifications, db.lookup_utxos)
         chain_state = ChainState(env, db, daemon, bp)
+
+        # Set ourselves up to implement the MemPoolAPI
+        self.height = daemon.height
+        self.cached_height = daemon.cached_height
+        self.mempool_hashes = daemon.mempool_hashes
+        self.raw_transactions = daemon.getrawtransactions
+        self.lookup_utxos = db.lookup_utxos
+        self.on_mempool = notifications.on_mempool
+        MemPoolAPI.register(Controller)
+        mempool = MemPool(env.coin, self)
+
         session_mgr = SessionManager(env, chain_state, mempool,
                                      notifications, shutdown_event)
 
