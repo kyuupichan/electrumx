@@ -43,7 +43,7 @@ class PeerSession(ClientSession):
     async def handle_request(self, request):
         # We subscribe so might be unlucky enough to get a notification...
         if (isinstance(request, Notification) and
-               request.method == 'blockchain.headers.subscribe'):
+                request.method == 'blockchain.headers.subscribe'):
             pass
         else:
             await handler_invocation(None, request)   # Raises
