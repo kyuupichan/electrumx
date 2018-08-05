@@ -2051,6 +2051,10 @@ class Groestlcoin(Coin):
     GENESIS_HASH = ('00000ac5927c594d49cc0bdb81759d0d'
                     'a8297eb614683d3acb62f0703b639023')
     DESERIALIZER = lib_tx.DeserializerGroestlcoin
+    ENCODE_CHECK = partial(Base58.encode_check,
+                           hash_fn=lib_tx.DeserializerGroestlcoin.grshash)
+    DECODE_CHECK = partial(Base58.decode_check,
+                           hash_fn=lib_tx.DeserializerGroestlcoin.grshash)
     TX_COUNT = 115900
     TX_COUNT_HEIGHT = 1601528
     TX_PER_BLOCK = 5
@@ -2065,8 +2069,7 @@ class Groestlcoin(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import groestlcoin_hash
-        return groestlcoin_hash.getHash(header, len(header))
+        return lib_tx.DeserializerGroestlcoin.grshash(header)
 
 
 class GroestlcoinTestnet(Groestlcoin):
