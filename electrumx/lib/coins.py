@@ -2062,11 +2062,17 @@ class Groestlcoin(Coin):
         'xkj42efxrcy6vbfw.onion t',
     ]
 
+    def grshash(data):
+        import groestlcoin_hash
+        return groestlcoin_hash.getHash(data, len(data))
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import groestlcoin_hash
-        return groestlcoin_hash.getHash(header, len(header))
+        return cls.grshash(header)
+
+    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=grshash)
+    DECODE_CHECK = partial(Base58.decode_check, hash_fn=grshash)
 
 
 class GroestlcoinTestnet(Groestlcoin):
