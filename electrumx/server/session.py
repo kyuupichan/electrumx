@@ -439,7 +439,7 @@ class SessionManager(object):
             await self._close_servers(list(self.servers.keys()))
             async with TaskGroup() as group:
                 for session in list(self.sessions):
-                    await group.spawn(await session.close(force_after=0.1))
+                    await group.spawn(session.close(force_after=0.1))
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
