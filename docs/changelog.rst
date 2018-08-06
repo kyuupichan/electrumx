@@ -7,6 +7,21 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+
+Version 1.8.1 (in development)
+==============================
+
+Version 1.8  (06 Aug 2018)
+==========================
+
+* require aiorpcX 0.6.2
+* fix query.py; move to contrib.  Add :ref:`query <query>` function to RPC
+* rewrite :command:`electrumx_rpc` so that proper command-line help is provided
+* per-coin tx hash functions (erasmospunk)
+* coin additions / updates: Groestlcoin (Kefkius, erasmospunk),
+  Decred (erasmonpsunk)
+* other minor (smmalis37)
+
 Version 1.7.3  (01 Aug 2018)
 ============================
 

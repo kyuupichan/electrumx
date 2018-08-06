@@ -161,6 +161,8 @@ Peer data is obtained via a peer discovery protocol documented
   [...]
   electroncash.checksum0.com     good   50001 50002 ElectrumX 1.2.1    0.9  1.1          07h 30m 40s 07h 30m 41s     0                 peer 149.56.198.233
 
+.. _query:
+
 query
 -----
 
