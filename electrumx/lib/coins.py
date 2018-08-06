@@ -2073,7 +2073,7 @@ class tPivx(Coin):
     TX_COUNT_HEIGHT = 10000
     TX_PER_BLOCK = 1
     RPC_PORT = 51475
-    REORG_LIMIT = 1000
+    REORG_LIMIT = 8000
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
     @classmethod
