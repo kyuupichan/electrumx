@@ -908,14 +908,14 @@ class ElectrumX(SessionBase):
         hashX = scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
-    def _merkle_proof(self, cp_height, height):
+    async def _merkle_proof(self, cp_height, height):
         max_height = self.db_height()
         if not height <= cp_height <= max_height:
             raise RPCError(BAD_REQUEST,
                            f'require header height {height:,d} <= '
                            f'cp_height {cp_height:,d} <= '
                            f'chain height {max_height:,d}')
-        branch, root = self.chain_state.header_branch_and_root(
+        branch, root = await self.chain_state.header_branch_and_root(
             cp_height + 1, height)
         return {
             'branch': [hash_to_hex_str(elt) for elt in branch],
@@ -931,7 +931,7 @@ class ElectrumX(SessionBase):
         if cp_height == 0:
             return raw_header_hex
         result = {'header': raw_header_hex}
-        result.update(self._merkle_proof(cp_height, height))
+        result.update(await self._merkle_proof(cp_height, height))
         return result
 
     async def block_header_13(self, height):
@@ -953,11 +953,12 @@ class ElectrumX(SessionBase):
 
         max_size = self.MAX_CHUNK_SIZE
         count = min(count, max_size)
-        headers, count = self.chain_state.read_headers(start_height, count)
+        headers, count = await self.chain_state.read_headers(start_height,
+                                                             count)
         result = {'hex': headers.hex(), 'count': count, 'max': max_size}
         if count and cp_height:
             last_height = start_height + count - 1
-            result.update(self._merkle_proof(cp_height, last_height))
+            result.update(await self._merkle_proof(cp_height, last_height))
         return result
 
     async def block_headers_12(self, start_height, count):
@@ -970,7 +971,7 @@ class ElectrumX(SessionBase):
         index = non_negative_integer(index)
         size = self.coin.CHUNK_SIZE
         start_height = index * size
-        headers, count = self.chain_state.read_headers(start_height, size)
+        headers, _ = await self.chain_state.read_headers(start_height, size)
         return headers.hex()
 
     async def block_get_header(self, height):

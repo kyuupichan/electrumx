@@ -139,12 +139,6 @@ class Prefetcher(object):
         return True
 
 
-class HeaderSource(object):
-
-    def __init__(self, db):
-        self.hashes = db.fs_block_hashes
-
-
 class ChainError(Exception):
     '''Raised on error processing blocks.'''
 
@@ -174,7 +168,7 @@ class BlockProcessor(electrumx.server.db.DB):
 
         # Header merkle cache
         self.merkle = Merkle()
-        self.header_mc = None
+        self.header_mc = MerkleCache(self.merkle, self.fs_block_hashes)
 
         # Caches of unflushed items.
         self.headers = []
@@ -251,9 +245,7 @@ class BlockProcessor(electrumx.server.db.DB):
             await self.run_in_thread_shielded(self.backup_blocks, raw_blocks)
             last -= len(raw_blocks)
         # Truncate header_mc: header count is 1 more than the height.
-        # Note header_mc is None if the reorg happens at startup.
-        if self.header_mc:
-            self.header_mc.truncate(self.height + 1)
+        self.header_mc.truncate(self.height + 1)
         await self.prefetcher.reset_height(self.height)
 
     async def reorg_hashes(self, count):
@@ -269,7 +261,7 @@ class BlockProcessor(electrumx.server.db.DB):
         self.logger.info(f'chain was reorganised replacing {count:,d} '
                          f'block{s} at heights {start:,d}-{last:,d}')
 
-        return start, last, self.fs_block_hashes(start, count)
+        return start, last, await self.fs_block_hashes(start, count)
 
     async def calc_reorg_range(self, count):
         '''Calculate the reorg range'''
@@ -287,7 +279,7 @@ class BlockProcessor(electrumx.server.db.DB):
             start = self.height - 1
             count = 1
             while start > 0:
-                hashes = self.fs_block_hashes(start, count)
+                hashes = await self.fs_block_hashes(start, count)
                 hex_hashes = [hash_to_hex_str(hash) for hash in hashes]
                 d_hex_hashes = await self.daemon.block_hex_hashes(start, count)
                 n = diff_pos(hex_hashes, d_hex_hashes)
@@ -774,7 +766,7 @@ class BlockProcessor(electrumx.server.db.DB):
         await self.open_for_serving()
         # Populate the header merkle cache
         length = max(1, self.height - self.env.reorg_limit)
-        self.header_mc = MerkleCache(self.merkle, HeaderSource(self), length)
+        await self.header_mc.initialize(length)
         self.logger.info('populated header merkle cache')
 
     async def _first_open_dbs(self):

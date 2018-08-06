@@ -45,12 +45,12 @@ class ChainState(object):
             'db_height': self.db_height(),
         }
 
-    def header_branch_and_root(self, length, height):
+    async def header_branch_and_root(self, length, height):
         return self._bp.header_mc.branch_and_root(length, height)
 
     async def raw_header(self, height):
         '''Return the binary header at the given height.'''
-        header, n = self._bp.read_headers(height, 1)
+        header, n = await self.read_headers(height, 1)
         if n != 1:
             raise IndexError(f'height {height:,d} out of range')
         return header

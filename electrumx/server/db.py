@@ -182,7 +182,7 @@ class DB(object):
         offset = prior_tx_count * 32
         self.hashes_file.write(offset, hashes)
 
-    def read_headers(self, start_height, count):
+    async def read_headers(self, start_height, count):
         '''Requires start_height >= 0, count >= 0.  Reads as many headers as
         are available starting at start_height up to count.  This
         would be zero if start_height is beyond self.db_height, for
@@ -191,16 +191,20 @@ class DB(object):
         Returns a (binary, n) pair where binary is the concatenated
         binary headers, and n is the count of headers returned.
         '''
-        # Read some from disk
         if start_height < 0 or count < 0:
-            raise self.DBError('{:,d} headers starting at {:,d} not on disk'
-                               .format(count, start_height))
-        disk_count = max(0, min(count, self.db_height + 1 - start_height))
-        if disk_count:
-            offset = self.header_offset(start_height)
-            size = self.header_offset(start_height + disk_count) - offset
-            return self.headers_file.read(offset, size), disk_count
-        return b'', 0
+            raise self.DBError(f'{count:,d} headers starting at '
+                               f'{start_height:,d} not on disk')
+
+        def read_headers():
+            # Read some from disk
+            disk_count = max(0, min(count, self.db_height + 1 - start_height))
+            if disk_count:
+                offset = self.header_offset(start_height)
+                size = self.header_offset(start_height + disk_count) - offset
+                return self.headers_file.read(offset, size), disk_count
+            return b'', 0
+
+        return await run_in_thread(read_headers)
 
     def fs_tx_hash(self, tx_num):
         '''Return a par (tx_hash, tx_height) for the given tx number.
@@ -213,8 +217,8 @@ class DB(object):
             tx_hash = self.hashes_file.read(tx_num * 32, 32)
         return tx_hash, tx_height
 
-    def fs_block_hashes(self, height, count):
-        headers_concat, headers_count = self.read_headers(height, count)
+    async def fs_block_hashes(self, height, count):
+        headers_concat, headers_count = await self.read_headers(height, count)
         if headers_count != count:
             raise self.DBError('only got {:,d} headers starting at {:,d}, not '
                                '{:,d}'.format(headers_count, height, count))
