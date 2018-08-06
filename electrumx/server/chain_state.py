@@ -48,7 +48,7 @@ class ChainState(object):
     def header_branch_and_root(self, length, height):
         return self._bp.header_mc.branch_and_root(length, height)
 
-    def raw_header(self, height):
+    async def raw_header(self, height):
         '''Return the binary header at the given height.'''
         header, n = self._bp.read_headers(height, 1)
         if n != 1:

@@ -61,6 +61,13 @@ def non_negative_integer(value):
                    f'{value} should be a non-negative integer')
 
 
+def assert_boolean(value):
+    '''Return param value it is boolean otherwise raise an RPCError.'''
+    if value in (False, True):
+        return value
+    raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
+
+
 def assert_tx_hash(value):
     '''Raise an RPCError if the value is not a valid transaction
     hash.'''
@@ -712,7 +719,7 @@ class ElectrumX(SessionBase):
         if height_changed:
             self.notified_height = height
             if self.subscribe_headers:
-                args = (self.subscribe_headers_result(height), )
+                args = (await self.subscribe_headers_result(height), )
                 await self.send_notification('blockchain.headers.subscribe',
                                              args)
 
@@ -720,49 +727,44 @@ class ElectrumX(SessionBase):
         if touched or (height_changed and self.mempool_statuses):
             await self.notify_touched(touched)
 
-    def assert_boolean(self, value):
-        '''Return param value it is boolean otherwise raise an RPCError.'''
-        if value in (False, True):
-            return value
-        raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
-
-    def raw_header(self, height):
+    async def raw_header(self, height):
         '''Return the binary header at the given height.'''
         try:
-            return self.chain_state.raw_header(height)
+            return await self.chain_state.raw_header(height)
         except IndexError:
-            raise RPCError(BAD_REQUEST, f'height {height:,d} out of range')
+            raise RPCError(BAD_REQUEST, f'height {height:,d} '
+                           'out of range') from None
 
-    def electrum_header(self, height):
+    async def electrum_header(self, height):
         '''Return the deserialized header at the given height.'''
-        raw_header = self.raw_header(height)
+        raw_header = await self.raw_header(height)
         return self.coin.electrum_header(raw_header, height)
 
-    def subscribe_headers_result(self, height):
+    async def subscribe_headers_result(self, height):
         '''The result of a header subscription for the given height.'''
         if self.subscribe_headers_raw:
-            raw_header = self.raw_header(height)
+            raw_header = await self.raw_header(height)
             return {'hex': raw_header.hex(), 'height': height}
-        return self.electrum_header(height)
+        return await self.electrum_header(height)
 
-    def _headers_subscribe(self, raw):
+    async def _headers_subscribe(self, raw):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
-        self.subscribe_headers_raw = self.assert_boolean(raw)
+        self.subscribe_headers_raw = assert_boolean(raw)
         self.notified_height = self.db_height()
-        return self.subscribe_headers_result(self.notified_height)
+        return await self.subscribe_headers_result(self.notified_height)
 
     async def headers_subscribe(self):
         '''Subscribe to get raw headers of new blocks.'''
-        return self._headers_subscribe(True)
+        return await self._headers_subscribe(True)
 
     async def headers_subscribe_True(self, raw=True):
         '''Subscribe to get headers of new blocks.'''
-        return self._headers_subscribe(raw)
+        return await self._headers_subscribe(raw)
 
     async def headers_subscribe_False(self, raw=False):
         '''Subscribe to get headers of new blocks.'''
-        return self._headers_subscribe(raw)
+        return await self._headers_subscribe(raw)
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
@@ -925,7 +927,7 @@ class ElectrumX(SessionBase):
         dictionary with a merkle proof.'''
         height = non_negative_integer(height)
         cp_height = non_negative_integer(cp_height)
-        raw_header_hex = self.raw_header(height).hex()
+        raw_header_hex = (await self.raw_header(height)).hex()
         if cp_height == 0:
             return raw_header_hex
         result = {'header': raw_header_hex}
@@ -976,7 +978,7 @@ class ElectrumX(SessionBase):
 
         height: the header's height'''
         height = non_negative_integer(height)
-        return self.electrum_header(height)
+        return await self.electrum_header(height)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
