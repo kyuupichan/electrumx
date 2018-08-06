@@ -80,13 +80,16 @@ async def query(args):
         if n is None:
             print('No history found')
         n = None
-        for n, utxo in enumerate(db.get_utxos(hashX, limit), start=1):
+        utxos = await db.all_utxos(hashX)
+        for n, utxo in enumerate(utxos, start=1):
             print(f'UTXO #{n:,d}: tx_hash {hash_to_hex_str(utxo.tx_hash)} '
                   f'tx_pos {utxo.tx_pos:,d} height {utxo.height:,d} '
                   f'value {utxo.value:,d}')
+            if n == limit:
+                break
         if n is None:
             print('No UTXOs found')
-        balance = db.get_balance(hashX)
+        balance = sum(utxo.value for utxo in utxos)
         print(f'Balance: {coin.decimal_value(balance):,f} {coin.SHORTNAME}')
 
 

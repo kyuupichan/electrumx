@@ -27,6 +27,7 @@ class ChainState(object):
         self.force_chain_reorg = self._bp.force_chain_reorg
         self.tx_branch_and_root = self._bp.merkle.branch_and_root
         self.read_headers = self._bp.read_headers
+        self.all_utxos = self._bp.all_utxos
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -54,13 +55,6 @@ class ChainState(object):
             # so large requests are logged before refusing them.
             limit = self._env.max_send // 97
             return list(self._bp.get_history(hashX, limit=limit))
-
-        return await run_in_thread(job)
-
-    async def get_utxos(self, hashX):
-        '''Get UTXOs asynchronously to reduce latency.'''
-        def job():
-            return list(self._bp.get_utxos(hashX, limit=None))
 
         return await run_in_thread(job)
 
@@ -115,15 +109,18 @@ class ChainState(object):
             if n is None:
                 lines.append('No history found')
             n = None
-            for n, utxo in enumerate(db.get_utxos(hashX, limit), start=1):
+            utxos = await db.all_utxos(hashX)
+            for n, utxo in enumerate(utxos, start=1):
                 lines.append(f'UTXO #{n:,d}: tx_hash '
                              f'{hash_to_hex_str(utxo.tx_hash)} '
                              f'tx_pos {utxo.tx_pos:,d} height '
                              f'{utxo.height:,d} value {utxo.value:,d}')
+                if n == limit:
+                    break
             if n is None:
                 lines.append('No UTXOs found')
 
-            balance = db.get_balance(hashX)
+            balance = sum(utxo.value for utxo in utxos)
             lines.append(f'Balance: {coin.decimal_value(balance):,f} '
                          f'{coin.SHORTNAME}')
 

@@ -17,7 +17,7 @@ from collections import defaultdict, Counter
 from aiorpcx import (ClientSession, SOCKSProxy,
                      Notification, handler_invocation,
                      SOCKSError, RPCError, TaskTimeout,
-                     TaskGroup, run_in_thread, ignore_after, timeout_after)
+                     TaskGroup, ignore_after, timeout_after)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple

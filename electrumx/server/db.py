@@ -375,28 +375,25 @@ class DB(object):
         with self.utxo_db.write_batch() as batch:
             self.write_utxo_state(batch)
 
-    def get_balance(self, hashX):
-        '''Returns the confirmed balance of an address.'''
-        return sum(utxo.value for utxo in self.get_utxos(hashX, limit=None))
-
-    def get_utxos(self, hashX, limit=1000):
-        '''Generator that yields all UTXOs for an address sorted in no
-        particular order.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
+    async def all_utxos(self, hashX):
+        '''Return all UTXOs for an address sorted in no particular order.  By
+        default yields at most 1000 entries.
         '''
-        limit = util.resolve_limit(limit)
-        s_unpack = unpack
-        # Key: b'u' + address_hashX + tx_idx + tx_num
-        # Value: the UTXO value as a 64-bit unsigned integer
-        prefix = b'u' + hashX
-        for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-            if limit == 0:
-                return
-            limit -= 1
-            tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
-            value, = unpack('<Q', db_value)
-            tx_hash, height = self.fs_tx_hash(tx_num)
-            yield UTXO(tx_num, tx_pos, tx_hash, height, value)
+        def read_utxos():
+            utxos = []
+            utxos_append = utxos.append
+            s_unpack = unpack
+            # Key: b'u' + address_hashX + tx_idx + tx_num
+            # Value: the UTXO value as a 64-bit unsigned integer
+            prefix = b'u' + hashX
+            for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
+                value, = unpack('<Q', db_value)
+                tx_hash, height = self.fs_tx_hash(tx_num)
+                utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
+            return utxos
+
+        return await run_in_thread(read_utxos)
 
     async def lookup_utxos(self, prevouts):
         '''For each prevout, lookup it up in the DB and return a (hashX,
