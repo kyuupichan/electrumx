@@ -153,11 +153,10 @@ class SessionManager(object):
         try:
             self.servers[kind] = await server
         except Exception as e:
-            self.logger.error('{} server failed to listen on {}:{:d} :{}'
-                              .format(kind, host, port, e))
+            self.logger.error(f'{kind} server failed to listen on {host}:'
+                              f'{port:d} :{e!r}')
         else:
-            self.logger.info('{} server listening on {}:{:d}'
-                             .format(kind, host, port))
+            self.logger.info(f'{kind} server listening on {host}:{port:d}')
 
     async def _start_external_servers(self):
         '''Start listening on TCP and SSL ports, but only if the respective
@@ -363,7 +362,7 @@ class SessionManager(object):
         try:
             daemon_url = self.chain_state.set_daemon_url(daemon_url)
         except Exception as e:
-            raise RPCError(BAD_REQUEST, f'an error occured: {e}')
+            raise RPCError(BAD_REQUEST, f'an error occured: {e!r}')
         return f'now using daemon at {daemon_url}'
 
     async def rpc_stop(self):
@@ -588,7 +587,9 @@ class SessionBase(ServerSession):
         return 0
 
     async def handle_request(self, request):
-        '''Return the async handler for the given request method.'''
+        '''Handle an incoming request.  ElectrumX doesn't receive
+        notifications from client sessions.
+        '''
         if isinstance(request, Request):
             handler = self.request_handlers.get(request.method)
         else:
@@ -658,7 +659,7 @@ class ElectrumX(SessionBase):
         try:
             return await self.chain_state.daemon_request(method, args)
         except DaemonError as e:
-            raise RPCError(DAEMON_ERROR, f'daemon error: {e}')
+            raise RPCError(DAEMON_ERROR, f'daemon error: {e!r}') from None
 
     def sub_count(self):
         return len(self.hashX_subs)
@@ -1016,7 +1017,7 @@ class ElectrumX(SessionBase):
                 with codecs.open(banner_file, 'r', 'utf-8') as f:
                     banner = f.read()
             except Exception as e:
-                self.logger.error(f'reading banner file {banner_file}: {e}')
+                self.logger.error(f'reading banner file {banner_file}: {e!r}')
             else:
                 banner = await self.replaced_banner(banner)
 
@@ -1091,7 +1092,7 @@ class ElectrumX(SessionBase):
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.logger.info('sendrawtransaction: {}'.format(message))
+            self.logger.info(f'sendrawtransaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
 
@@ -1277,7 +1278,7 @@ class DashElectrumX(ElectrumX):
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.logger.info('masternode_broadcast: {}'.format(message))
+            self.logger.info(f'masternode_broadcast: {message}')
             raise RPCError(BAD_REQUEST, 'the masternode broadcast was '
                            f'rejected.\n\n{message}\n[{signmnb}]')
 
