@@ -457,9 +457,7 @@ class SessionManager(object):
         if height != self._hc_height:
             self._hc_height = height
             hc = self._history_cache
-            hashXs = set(hc).intersection(touched)
-            text = [hash_to_hex_str(hashX) for hashX in hashXs]
-            for hashX in hashXs:
+            for hashX in set(hc).intersection(touched):
                 del hc[hashX]
 
         async with TaskGroup() as group:
