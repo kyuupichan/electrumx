@@ -19,8 +19,7 @@ from electrumx.server.session import SessionManager
 
 class Notifications(object):
     # hashX notifications come from two sources: new blocks and
-    # mempool refreshes.  The logic in daemon.py only gets new mempool
-    # hashes after getting the latest height.
+    # mempool refreshes.
     #
     # A user with a pending transaction is notified after the block it
     # gets in is processed.  Block processing can take an extended
@@ -35,7 +34,7 @@ class Notifications(object):
         self._touched_mp = {}
         self._touched_bp = {}
         self._highest_block = 0
-        self._notify_funcs = set()
+        self._notify_funcs = []
 
     async def _maybe_notify(self):
         tmp, tbp = self._touched_mp, self._touched_bp
@@ -59,7 +58,7 @@ class Notifications(object):
             await notify_func(height, touched)
 
     def add_callback(self, notify_func):
-        self._notify_funcs.add(notify_func)
+        self._notify_funcs.append(notify_func)
 
     async def on_mempool(self, touched, height):
         self._touched_mp[height] = touched
