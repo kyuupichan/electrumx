@@ -7,6 +7,7 @@
 
 import asyncio
 import os
+import re
 import signal
 import sys
 import time
@@ -27,11 +28,7 @@ class ServerBase(object):
       Upon return the event loop runs until the shutdown signal is received.
     '''
 
-    SUPPRESS_MESSAGES = [
-        'Fatal read error on socket transport',
-        'Fatal write error on socket transport',
-    ]
-
+    SUPPRESS_MESSAGE_REGEX = re.compile('SSH handshake')
     PYTHON_MIN_VERSION = (3, 6)
 
     def __init__(self, env):
@@ -69,9 +66,7 @@ class ServerBase(object):
     def on_exception(self, loop, context):
         '''Suppress spurious messages it appears we cannot control.'''
         message = context.get('message')
-        if message in self.SUPPRESS_MESSAGES:
-            return
-        if 'accept_connection2()' in repr(context.get('task')):
+        if message and self.SUPPRESS_MESSAGE_REGEX.match(message):
             return
         loop.default_exception_handler(context)
 
