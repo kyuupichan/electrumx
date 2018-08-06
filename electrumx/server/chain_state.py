@@ -48,10 +48,6 @@ class ChainState(object):
     def header_branch_and_root(self, length, height):
         return self._bp.header_mc.branch_and_root(length, height)
 
-    def processing_new_block(self):
-        '''Return True if we're processing a new block.'''
-        return self._daemon.cached_height() > self.db_height()
-
     def raw_header(self, height):
         '''Return the binary header at the given height.'''
         header, n = self._bp.read_headers(height, 1)
