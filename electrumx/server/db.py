@@ -227,15 +227,19 @@ class DB(object):
 
         return [self.coin.header_hash(header) for header in headers]
 
-    def get_history(self, hashX, limit=1000):
-        '''Generator that returns an unpruned, sorted list of (tx_hash,
-        height) tuples of confirmed transactions that touched the address,
-        earliest in the blockchain first.  Includes both spending and
-        receiving transactions.  By default yields at most 1000 entries.
-        Set limit to None to get them all.
+    async def limited_history(self, hashX, *, limit=1000):
+        '''Return an unpruned, sorted list of (tx_hash, height) tuples of
+        confirmed transactions that touched the address, earliest in
+        the blockchain first.  Includes both spending and receiving
+        transactions.  By default returns at most 1000 entries.  Set
+        limit to None to get them all.
         '''
-        for tx_num in self.history.get_txnums(hashX, limit):
-            yield self.fs_tx_hash(tx_num)
+        def read_history():
+            tx_nums = list(self.history.get_txnums(hashX, limit))
+            fs_tx_hash = self.fs_tx_hash
+            return [fs_tx_hash(tx_num) for tx_num in tx_nums]
+
+        return await run_in_thread(read_history)
 
     # -- Undo information
 

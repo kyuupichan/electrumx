@@ -444,11 +444,17 @@ class SessionManager(object):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
-    async def get_history(self, hashX):
+    async def limited_history(self, hashX):
         '''A caching layer.'''
         hc = self._history_cache
         if hashX not in hc:
-            hc[hashX] = await self.chain_state.get_history(hashX)
+            # History DoS limit.  Each element of history is about 99
+            # bytes when encoded as JSON.  This limits resource usage
+            # on bloated history requests, and uses a smaller divisor
+            # so large requests are logged before refusing them.
+            limit = self.env.max_send // 97
+            hc[hashX] = await self.chain_state.limited_history(hashX,
+                                                               limit=limit)
         return hc[hashX]
 
     async def _notify_sessions(self, height, touched):
@@ -773,7 +779,7 @@ class ElectrumX(SessionBase):
         '''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.session_mgr.get_history(hashX)
+        history = await self.session_mgr.limited_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
 
         status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
@@ -873,7 +879,7 @@ class ElectrumX(SessionBase):
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.session_mgr.get_history(hashX)
+        history = await self.session_mgr.limited_history(hashX)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)

@@ -8,8 +8,6 @@
 
 import asyncio
 
-from aiorpcx import run_in_thread
-
 from electrumx.lib.hash import hash_to_hex_str
 
 
@@ -28,6 +26,7 @@ class ChainState(object):
         self.tx_branch_and_root = self._bp.merkle.branch_and_root
         self.read_headers = self._bp.read_headers
         self.all_utxos = self._bp.all_utxos
+        self.limited_history = self._bp.limited_history
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -45,18 +44,6 @@ class ChainState(object):
             'daemon_height': self._daemon.cached_height(),
             'db_height': self.db_height(),
         }
-
-    async def get_history(self, hashX):
-        '''Get history asynchronously to reduce latency.'''
-        def job():
-            # History DoS limit.  Each element of history is about 99
-            # bytes when encoded as JSON.  This limits resource usage
-            # on bloated history requests, and uses a smaller divisor
-            # so large requests are logged before refusing them.
-            limit = self._env.max_send // 97
-            return list(self._bp.get_history(hashX, limit=limit))
-
-        return await run_in_thread(job)
 
     def header_branch_and_root(self, length, height):
         return self._bp.header_mc.branch_and_root(length, height)
@@ -102,8 +89,8 @@ class ChainState(object):
             if not hashX:
                 continue
             n = None
-            for n, (tx_hash, height) in enumerate(
-                    db.get_history(hashX, limit), start=1):
+            history = await db.limited_history(hashX, limit=limit)
+            for n, (tx_hash, height) in enumerate(history):
                 lines.append(f'History #{n:,d}: height {height:,d} '
                              f'tx_hash {hash_to_hex_str(tx_hash)}')
             if n is None:
