@@ -10,7 +10,7 @@
 '''Script to send RPC commands to a running ElectrumX server.'''
 
 
-from aiorpcx import timeout_after
+from aiorpcx import timeout_after, ClientSession, TaskTimeout
 import argparse
 import asyncio
 import json
@@ -18,7 +18,6 @@ from os import environ
 
 import electrumx.lib.text as text
 
-from aiorpcx import ClientSession
 
 simple_commands = {
     'getinfo': 'Print a summary of server state',
@@ -113,27 +112,29 @@ def main():
 
     # aiorpcX makes this so easy...
     async def send_request():
-        async with timeout_after(15):
-            async with ClientSession('localhost', port) as session:
-                result = await session.send_request(method, args)
-                if method in ('query', ):
-                    for line in result:
-                        print(line)
-                elif method in ('groups', 'peers', 'sessions'):
-                    lines_func = getattr(text, f'{method}_lines')
-                    for line in lines_func(result):
-                        print(line)
-                else:
-                    print(json.dumps(result, indent=4, sort_keys=True))
+        try:
+            async with timeout_after(1):
+                async with ClientSession('localhost', port) as session:
+                    result = await session.send_request(method, args)
+                    if method in ('query', ):
+                        for line in result:
+                            print(line)
+                    elif method in ('groups', 'peers', 'sessions'):
+                        lines_func = getattr(text, f'{method}_lines')
+                        for line in lines_func(result):
+                            print(line)
+                    else:
+                        print(json.dumps(result, indent=4, sort_keys=True))
+        except OSError:
+            print('cannot connect - is ElectrumX catching up, not running, or '
+                  f'is {port} the wrong RPC port?')
+        except TaskTimeout as e:
+            print(f'request timed out after {e.args[0]}s')
+        except Exception as e:
+            print(f'error making request: {e!r}')
 
     loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(send_request())
-    except OSError:
-        print('cannot connect - is ElectrumX catching up, not running, or '
-              f'is {port} the wrong RPC port?')
-    except Exception as e:
-        print(f'error making request: {e}')
+    loop.run_until_complete(send_request())
 
 
 if __name__ == '__main__':
