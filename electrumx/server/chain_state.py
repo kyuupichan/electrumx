@@ -7,7 +7,6 @@
 
 
 import asyncio
-import pylru
 
 from aiorpcx import run_in_thread
 
@@ -19,24 +18,15 @@ class ChainState(object):
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, daemon, bp, notifications):
+    def __init__(self, env, daemon, bp):
         self._env = env
         self._daemon = daemon
         self._bp = bp
-        self._history_cache = pylru.lrucache(256)
 
         # External interface pass-throughs for session.py
         self.force_chain_reorg = self._bp.force_chain_reorg
         self.tx_branch_and_root = self._bp.merkle.branch_and_root
         self.read_headers = self._bp.read_headers
-        # Cache maintenance
-        notifications.add_callback(self._notify)
-
-    async def _notify(self, height, touched):
-        # Invalidate our history cache for touched hashXs
-        hc = self._history_cache
-        for hashX in set(hc).intersection(touched):
-            del hc[hashX]
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -65,10 +55,7 @@ class ChainState(object):
             limit = self._env.max_send // 97
             return list(self._bp.get_history(hashX, limit=limit))
 
-        hc = self._history_cache
-        if hashX not in hc:
-            hc[hashX] = await run_in_thread(job)
-        return hc[hashX]
+        return await run_in_thread(job)
 
     async def get_utxos(self, hashX):
         '''Get UTXOs asynchronously to reduce latency.'''

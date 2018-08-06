@@ -13,6 +13,7 @@ import datetime
 import itertools
 import json
 import os
+import pylru
 import ssl
 import time
 from collections import defaultdict
@@ -119,6 +120,8 @@ class SessionManager(object):
         self.state = self.CATCHING_UP
         self.txs_sent = 0
         self.start_time = time.time()
+        self._history_cache = pylru.lrucache(256)
+        self._hc_height = 0
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
         # Masternode stuff only for such coins
@@ -442,8 +445,24 @@ class SessionManager(object):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
+    async def get_history(self, hashX):
+        '''A caching layer.'''
+        hc = self._history_cache
+        if hashX not in hc:
+            hc[hashX] = await self.chain_state.get_history(hashX)
+        return hc[hashX]
+
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
+        # Invalidate our history cache for touched hashXs
+        if height != self._hc_height:
+            self._hc_height = height
+            hc = self._history_cache
+            hashXs = set(hc).intersection(touched)
+            text = [hash_to_hex_str(hashX) for hashX in hashXs]
+            for hashX in hashXs:
+                del hc[hashX]
+
         async with TaskGroup() as group:
             for session in self.sessions:
                 await group.spawn(session.notify(height, touched))
@@ -755,7 +774,7 @@ class ElectrumX(SessionBase):
         '''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.chain_state.get_history(hashX)
+        history = await self.session_mgr.get_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
 
         status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
@@ -855,7 +874,7 @@ class ElectrumX(SessionBase):
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.chain_state.get_history(hashX)
+        history = await self.session_mgr.get_history(hashX)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)

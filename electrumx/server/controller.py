@@ -96,7 +96,7 @@ class Controller(ServerBase):
         BlockProcessor = env.coin.BLOCK_PROCESSOR
         bp = BlockProcessor(env, daemon, notifications)
         mempool = MemPool(env.coin, daemon, notifications, bp.lookup_utxos)
-        chain_state = ChainState(env, daemon, bp, notifications)
+        chain_state = ChainState(env, daemon, bp)
         session_mgr = SessionManager(env, chain_state, mempool,
                                      notifications, shutdown_event)
 
