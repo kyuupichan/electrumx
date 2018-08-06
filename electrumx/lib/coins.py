@@ -2014,7 +2014,7 @@ class tBitg(Coin):
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("62")
-    P2SH_VERBYTES = [bytes.fromhex("c")]
+    P2SH_VERBYTES = [bytes.fromhex("0c")]
     WIF_BYTE = bytes.fromhex("6c")
     GENESIS_HASH = ('000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
     DAEMON = daemon.DashDaemon
@@ -2040,7 +2040,7 @@ class Pivx(Coin):
     XPUB_VERBYTES = bytes.fromhex("022d2533")
     XPRV_VERBYTES = bytes.fromhex("0221312b")
     P2PKH_VERBYTE = bytes.fromhex("1e")
-    P2SH_VERBYTES = [bytes.fromhex("d")]
+    P2SH_VERBYTES = [bytes.fromhex("0d")]
     WIF_BYTE = bytes.fromhex("d4")
     GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
     DAEMON = daemon.DashDaemon
