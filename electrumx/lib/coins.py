@@ -2005,3 +2005,79 @@ class Bitg(Coin):
         '''Given a header return the hash.'''
         import quark_hash
         return quark_hash.getPoWHash(header)
+
+class tBitg(Coin):
+  
+    NAME = "testnetBitcoinGreen"
+    SHORTNAME = "tBITG"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("62")
+    P2SH_VERBYTES = [bytes.fromhex("c")]
+    WIF_BYTE = bytes.fromhex("6c")
+    GENESIS_HASH = ('000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
+    DAEMON = daemon.DashDaemon
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 10000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 19332
+    REORG_LIMIT = 1000
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import quark_hash
+        return quark_hash.getPoWHash(header)
+
+
+class Pivx(Coin):
+  
+    NAME = "Pivx"
+    SHORTNAME = "PIVX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("022d2533")
+    XPRV_VERBYTES = bytes.fromhex("0221312b")
+    P2PKH_VERBYTE = bytes.fromhex("1e")
+    P2SH_VERBYTES = [bytes.fromhex("d")]
+    WIF_BYTE = bytes.fromhex("d4")
+    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
+    DAEMON = daemon.DashDaemon
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 10000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 51473
+    REORG_LIMIT = 1000
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import quark_hash
+        return quark_hash.getPoWHash(header)
+
+class tPivx(Coin):
+  
+    NAME = "testnetPivx"
+    SHORTNAME = "tPIVX"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("3a8061a0")
+    XPRV_VERBYTES = bytes.fromhex("3a805837")
+    P2PKH_VERBYTE = bytes.fromhex("8b")
+    P2SH_VERBYTES = [bytes.fromhex("13")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
+    DAEMON = daemon.DashDaemon
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 10000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 51475
+    REORG_LIMIT = 1000
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import quark_hash
+        return quark_hash.getPoWHash(header)
