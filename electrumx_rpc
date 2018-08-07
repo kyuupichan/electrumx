@@ -113,7 +113,7 @@ def main():
     # aiorpcX makes this so easy...
     async def send_request():
         try:
-            async with timeout_after(1):
+            async with timeout_after(15):
                 async with ClientSession('localhost', port) as session:
                     result = await session.send_request(method, args)
                     if method in ('query', ):

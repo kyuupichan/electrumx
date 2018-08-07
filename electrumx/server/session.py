@@ -28,7 +28,7 @@ import electrumx
 import electrumx.lib.text as text
 import electrumx.lib.util as util
 from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
-                                HASHX_LEN)
+                                HASHX_LEN, Base58Error)
 from electrumx.lib.peer import Peer
 from electrumx.server.daemon import DaemonError
 from electrumx.server.peers import PeerManager
@@ -384,7 +384,10 @@ class SessionManager(object):
 
     async def rpc_query(self, items, limit):
         '''Return a list of data about server peers.'''
-        return await self.chain_state.query(items, limit)
+        try:
+            return await self.chain_state.query(items, limit)
+        except Base58Error as e:
+            raise RPCError(BAD_REQUEST, e.args[0]) from None
 
     async def rpc_sessions(self):
         '''Return statistics about connected sessions.'''
