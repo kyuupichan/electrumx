@@ -11,6 +11,8 @@
 Version 1.8.1 (in development)
 ==============================
 
+* fix `#557`_
+
 Version 1.8  (06 Aug 2018)
 ==========================
 
@@ -199,3 +201,4 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#523: https://github.com/kyuupichan/electrumx/issues/523
 .. _#534: https://github.com/kyuupichan/electrumx/issues/534
 .. _#538: https://github.com/kyuupichan/electrumx/issues/538
+.. _#557: https://github.com/kyuupichan/electrumx/issues/557

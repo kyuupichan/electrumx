@@ -584,6 +584,13 @@ class SessionBase(ServerSession):
     def sub_count(self):
         return 0
 
+    # FIXME: make this the aiorpcx API for version 0.7
+    async def close(self, force_after=30):
+        '''Close the connection and return when closed.'''
+        async with ignore_after(force_after):
+            await super().close()
+        self.abort()
+
     async def handle_request(self, request):
         '''Handle an incoming request.  ElectrumX doesn't receive
         notifications from client sessions.
@@ -644,13 +651,6 @@ class ElectrumX(SessionBase):
 
     def protocol_version_string(self):
         return util.version_string(self.protocol_tuple)
-
-    # FIXME: make this the aiorpcx API for version 0.7
-    async def close(self, force_after=30):
-        '''Close the connection and return when closed.'''
-        async with ignore_after(force_after):
-            await super().close()
-        self.abort()
 
     async def daemon_request(self, method, *args):
         '''Catch a DaemonError and convert it to an RPCError.'''
