@@ -430,8 +430,8 @@ class SessionManager(object):
             await self._start_external_servers()
             # Peer discovery should start after the external servers
             # because we connect to ourself
-            async with TaskGroup(wait=object) as group:
-                await group.spawn(self.peer_mgr.discover_peers(group))
+            async with TaskGroup() as group:
+                await group.spawn(self.peer_mgr.discover_peers())
                 await group.spawn(self._clear_stale_sessions())
                 await group.spawn(self._log_sessions())
                 await group.spawn(self._restart_if_paused())
