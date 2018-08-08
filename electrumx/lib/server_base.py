@@ -29,6 +29,7 @@ class ServerBase(object):
     '''
 
     SUPPRESS_MESSAGE_REGEX = re.compile('SSH handshake')
+    SUPPRESS_TASK_REGEX = re.compile('accept_connection2')
     PYTHON_MIN_VERSION = (3, 6)
 
     def __init__(self, env):
@@ -67,6 +68,8 @@ class ServerBase(object):
         '''Suppress spurious messages it appears we cannot control.'''
         message = context.get('message')
         if message and self.SUPPRESS_MESSAGE_REGEX.match(message):
+            return
+        if self.SUPPRESS_TASK_REGEX.match(repr(context.get('task'))):
             return
         loop.default_exception_handler(context)
 
