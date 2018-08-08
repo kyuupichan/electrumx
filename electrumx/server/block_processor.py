@@ -344,18 +344,13 @@ class BlockProcessor(electrumx.server.db.DB):
         tx_diff = self.tx_count - self.last_flush_tx_count
 
         # Flush to file system
-        self.fs_flush(self.height, self.tx_count, self.headers,
+        self.flush_fs(self.height, self.tx_count, self.headers,
                       self.tx_hashes)
         self.tx_hashes = []
         self.headers = []
 
-        fs_end = time.time()
-
-        # History next - it's fast and frees memory
-        hashX_count = self.history.flush()
-        if self.utxo_db.for_sync:
-            self.logger.info('flushed history in {:.1f}s for {:,d} addrs'
-                             .format(time.time() - fs_end, hashX_count))
+        # Then history
+        self.flush_history()
 
         # Flush state last as it reads the wall time.
         with self.utxo_db.write_batch() as batch:

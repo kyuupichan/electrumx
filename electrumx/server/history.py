@@ -11,6 +11,7 @@
 import array
 import ast
 import bisect
+import time
 from collections import defaultdict
 from functools import partial
 from struct import pack, unpack
@@ -119,6 +120,7 @@ class History(object):
         assert not self.unflushed
 
     def flush(self):
+        start_time = time.time()
         self.flush_count += 1
         flush_id = pack('>H', self.flush_count)
         unflushed = self.unflushed
@@ -132,7 +134,12 @@ class History(object):
         count = len(unflushed)
         unflushed.clear()
         self.unflushed_count = 0
-        return count
+
+        if self.db.for_sync:
+            elapsed = time.time() - start_time
+            self.logger.info(f'flushed history in {elapsed:.1f}s '
+                             f'for {count:,d} addrs')
+
 
     def backup(self, hashXs, tx_count):
         # Not certain this is needed, but it doesn't hurt

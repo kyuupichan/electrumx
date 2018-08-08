@@ -150,9 +150,8 @@ class DB(object):
         return await self.header_mc.branch_and_root(length, height)
 
     # Flushing
-    def fs_flush(self, to_height, to_tx_count, headers, block_tx_hashes):
+    def flush_fs(self, to_height, to_tx_count, headers, block_tx_hashes):
         '''Write headers, tx counts and block tx hashes to the filesystem.
-        No LevelDB state is updated.
 
         The first height to write is self.fs_height + 1.  The FS
         metadata is all append-only, so in a crash we just pick up
@@ -186,6 +185,9 @@ class DB(object):
         if self.utxo_db.for_sync:
             elapsed = time.time() - start_time
             self.logger.info(f'flushed to FS in {elapsed:.2f}s')
+
+    def flush_history(self):
+        self.history.flush()
 
     def db_assert_flushed(self, to_tx_count, to_height):
         '''Asserts state is fully flushed.'''
