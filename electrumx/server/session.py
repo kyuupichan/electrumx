@@ -20,8 +20,8 @@ from collections import defaultdict
 from functools import partial
 
 from aiorpcx import (
-    ServerSession, JSONRPCAutoDetect, TaskGroup, handler_invocation,
-    RPCError, Request, ignore_after
+    ServerSession, JSONRPCAutoDetect, JSONRPCConnection,
+    TaskGroup, handler_invocation, RPCError, Request, ignore_after
 )
 
 import electrumx
@@ -506,7 +506,8 @@ class SessionBase(ServerSession):
     session_counter = itertools.count()
 
     def __init__(self, session_mgr, chain_state, mempool, peer_mgr, kind):
-        super().__init__(protocol=JSONRPCAutoDetect)
+        connection = JSONRPCConnection(JSONRPCAutoDetect)
+        super().__init__(connection=connection)
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.session_mgr = session_mgr
         self.chain_state = chain_state
@@ -610,7 +611,7 @@ class ElectrumX(SessionBase):
         self.subscribe_headers = False
         self.subscribe_headers_raw = False
         self.notified_height = None
-        self.connection._max_response_size = self.env.max_send
+        self.connection.max_response_size = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.sv_seen = False
