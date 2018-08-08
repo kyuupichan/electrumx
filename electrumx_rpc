@@ -128,8 +128,6 @@ def main():
         except OSError:
             print('cannot connect - is ElectrumX catching up, not running, or '
                   f'is {port} the wrong RPC port?')
-        except TaskTimeout as e:
-            print(f'request timed out after {e.args[0]}s')
         except Exception as e:
             print(f'error making request: {e!r}')
 

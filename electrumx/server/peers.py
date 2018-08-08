@@ -231,16 +231,14 @@ class PeerManager(object):
                 is_good = True
                 break
             except BadPeerError as e:
-                self.logger.error(f'{peer_text} marking bad: ({e!r})')
+                self.logger.error(f'{peer_text} marking bad: ({e})')
                 peer.mark_bad()
                 break
             except RPCError as e:
                 self.logger.error(f'{peer_text} RPC error: {e.message} '
                                   f'({e.code})')
-            except TaskTimeout as e:
-                self.logger.error(f'{peer_text} timed out after {e.args[0]}s')
-            except (OSError, SOCKSError, ConnectionError) as e:
-                self.logger.info(f'{peer_text} {e!r}')
+            except (OSError, SOCKSError, ConnectionError, TaskTimeout) as e:
+                self.logger.info(f'{peer_text} {e}')
 
         if is_good:
             now = time.time()
