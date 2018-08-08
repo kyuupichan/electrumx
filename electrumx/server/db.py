@@ -90,7 +90,7 @@ class DB(object):
         else:
             assert self.db_tx_count == 0
 
-    async def _open_dbs(self, for_sync):
+    async def _open_dbs(self, for_sync, compacting):
         assert self.utxo_db is None
 
         # First UTXO DB
@@ -110,11 +110,15 @@ class DB(object):
 
         # Then history DB
         self.utxo_flush_count = self.history.open_db(self.db_class, for_sync,
-                                                     self.utxo_flush_count)
+                                                     self.utxo_flush_count,
+                                                     compacting)
         self.clear_excess_undo_info()
 
         # Read TX counts (requires meta directory)
         await self._read_tx_counts()
+
+    async def open_for_compacting(self):
+        await self._open_dbs(True, True)
 
     async def open_for_sync(self):
         '''Open the databases to sync to the daemon.
@@ -123,7 +127,7 @@ class DB(object):
         synchronization.  When serving clients we want the open files for
         serving network connections.
         '''
-        await self._open_dbs(True)
+        await self._open_dbs(True, False)
 
     async def open_for_serving(self):
         '''Open the databases for serving.  If they are already open they are
@@ -134,7 +138,7 @@ class DB(object):
             self.utxo_db.close()
             self.history.close_db()
             self.utxo_db = None
-        await self._open_dbs(False)
+        await self._open_dbs(False, False)
 
     # Header merkle cache
 
@@ -395,6 +399,10 @@ class DB(object):
             self.wall_time = state['wall_time']
             self.first_sync = state['first_sync']
 
+        # These are our state as we move ahead of DB state
+        self.fs_height = self.db_height
+        self.fs_tx_count = self.db_tx_count
+
         # Log some stats
         self.logger.info('DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
@@ -402,6 +410,8 @@ class DB(object):
         self.logger.info('height: {:,d}'.format(self.db_height))
         self.logger.info('tip: {}'.format(hash_to_hex_str(self.db_tip)))
         self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
+        if self.utxo_db.for_sync:
+            self.logger.info(f'flushing DB cache at {self.env.cache_MB:,d} MB')
         if self.first_sync:
             self.logger.info('sync time so far: {}'
                              .format(util.formatted_time(self.wall_time)))

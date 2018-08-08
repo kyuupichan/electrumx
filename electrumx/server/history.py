@@ -32,10 +32,14 @@ class History(object):
         self.unflushed_count = 0
         self.db = None
 
-    def open_db(self, db_class, for_sync, utxo_flush_count):
+    def open_db(self, db_class, for_sync, utxo_flush_count, compacting):
         self.db = db_class('hist', for_sync)
         self.read_state()
         self.clear_excess(utxo_flush_count)
+        # An incomplete compaction needs to be cancelled otherwise
+        # restarting it will corrupt the history
+        if not compacting:
+            self._cancel_compaction()
         return self.flush_count
 
     def close_db(self):
@@ -314,7 +318,7 @@ class History(object):
                                  100 * cursor / 65536))
         return write_size
 
-    def cancel_compaction(self):
+    def _cancel_compaction(self):
         if self.comp_cursor != -1:
             self.logger.warning('cancelling in-progress history compaction')
             self.comp_flush_count = -1

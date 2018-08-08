@@ -159,7 +159,6 @@ class BlockProcessor(electrumx.server.db.DB):
         self.prefetcher = Prefetcher(daemon, env.coin, self.blocks_event)
 
         # Meta
-        self.cache_MB = env.cache_MB
         self.next_cache_check = 0
         self.last_flush = time.time()
         self.touched = set()
@@ -448,8 +447,9 @@ class BlockProcessor(electrumx.server.db.DB):
 
         # Flush history if it takes up over 20% of cache memory.
         # Flush UTXOs once they take up 80% of cache memory.
-        if utxo_MB + hist_MB >= self.cache_MB or hist_MB >= self.cache_MB // 5:
-            return utxo_MB >= self.cache_MB * 4 // 5
+        cache_MB = self.env.cache_MB
+        if utxo_MB + hist_MB >= cache_MB or hist_MB >= cache_MB // 5:
+            return utxo_MB >= cache_MB * 4 // 5
         return None
 
     def advance_blocks(self, blocks):
@@ -755,18 +755,10 @@ class BlockProcessor(electrumx.server.db.DB):
 
     async def _first_open_dbs(self):
         await self.open_for_sync()
-        # An incomplete compaction needs to be cancelled otherwise
-        # restarting it will corrupt the history
-        self.history.cancel_compaction()
-        # These are our state as we move ahead of DB state
-        self.fs_height = self.db_height
-        self.fs_tx_count = self.db_tx_count
         self.height = self.db_height
         self.tip = self.db_tip
         self.tx_count = self.db_tx_count
         self.last_flush_tx_count = self.tx_count
-        if self.utxo_db.for_sync:
-            self.logger.info(f'flushing DB cache at {self.cache_MB:,d} MB')
 
     # --- External API
 
