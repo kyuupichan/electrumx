@@ -149,6 +149,13 @@ class DB(object):
     async def header_branch_and_root(self, length, height):
         return await self.header_mc.branch_and_root(length, height)
 
+    # Flushing
+    def db_assert_flushed(self, to_tx_count, to_height):
+        '''Asserts state is fully flushed.'''
+        assert to_tx_count == self.fs_tx_count == self.db_tx_count
+        assert to_height == self.fs_height == self.db_height
+        self.history.assert_flushed()
+
     def fs_update_header_offsets(self, offset_start, height_start, headers):
         if self.coin.STATIC_BLOCK_HEADERS:
             return

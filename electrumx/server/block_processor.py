@@ -324,12 +324,10 @@ class BlockProcessor(electrumx.server.db.DB):
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
-        assert self.tx_count == self.fs_tx_count == self.db_tx_count
-        assert self.height == self.fs_height == self.db_height
         assert not self.undo_infos
         assert not self.utxo_cache
         assert not self.db_deletes
-        self.history.assert_flushed()
+        self.db_assert_flushed(self.tx_count, self.height)
 
     async def flush(self, flush_utxos):
         if self.height == self.db_height:
