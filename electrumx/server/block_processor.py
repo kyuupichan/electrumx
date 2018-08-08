@@ -20,7 +20,6 @@ from aiorpcx import TaskGroup, run_in_thread
 import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
-from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import chunks, formatted_time, class_logger
 import electrumx.server.db
 
@@ -166,10 +165,6 @@ class BlockProcessor(electrumx.server.db.DB):
         self.touched = set()
         self.reorg_count = 0
 
-        # Header merkle cache
-        self.merkle = Merkle()
-        self.header_mc = MerkleCache(self.merkle, self.fs_block_hashes)
-
         # Caches of unflushed items.
         self.headers = []
         self.tx_hashes = []
@@ -268,8 +263,6 @@ class BlockProcessor(electrumx.server.db.DB):
             await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
             await self.backup_flush()
             last -= len(raw_blocks)
-        # Truncate header_mc: header count is 1 more than the height.
-        self.header_mc.truncate(self.height + 1)
         await self.prefetcher.reset_height(self.height)
 
     async def reorg_hashes(self, count):
@@ -429,9 +422,7 @@ class BlockProcessor(electrumx.server.db.DB):
         '''
         flush_start = time.time()
 
-        # Backup FS (just move the pointers back)
-        self.fs_height = self.height
-        self.fs_tx_count = self.tx_count
+        self.backup_fs(self.height, self.tx_count)
 
         # Backup history.  self.touched can include other addresses
         # which is harmless, but remove None.
@@ -776,10 +767,6 @@ class BlockProcessor(electrumx.server.db.DB):
         await self.notifications.on_block(set(), self.height)
         # Reopen for serving
         await self.open_for_serving()
-        # Populate the header merkle cache
-        length = max(1, self.height - self.env.reorg_limit)
-        await self.header_mc.initialize(length)
-        self.logger.info('populated header merkle cache')
 
     async def _first_open_dbs(self):
         await self.open_for_sync()

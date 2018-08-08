@@ -50,7 +50,7 @@ Return the block header at the given height.
 
 **Example Result**
 
-With *cp_height* zero:
+With *height* 5 and *cp_height* 0 on the Bitcoin Cash chain:
 
 ::
 
@@ -58,7 +58,7 @@ With *cp_height* zero:
 
 .. _cp_height example:
 
-With *cp_height* 8 on the Bitcoin Cash chain::
+With *cp_height* 8::
 
   {
     "branch": [
