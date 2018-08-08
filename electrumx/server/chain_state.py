@@ -6,8 +6,6 @@
 # and warranty status of this software.
 
 
-import asyncio
-
 from electrumx.lib.hash import hash_to_hex_str
 
 
@@ -72,13 +70,9 @@ class ChainState(object):
             except ValueError:
                 pass
 
-            try:
-                hashX = coin.address_to_hashX(arg)
-                lines.append(f'Address: {arg}')
-                return hashX
-            except Base58Error:
-                print(f'Ingoring unknown arg: {arg}')
-                return None
+            hashX = coin.address_to_hashX(arg)
+            lines.append(f'Address: {arg}')
+            return hashX
 
         for arg in args:
             hashX = arg_to_hashX(arg)
