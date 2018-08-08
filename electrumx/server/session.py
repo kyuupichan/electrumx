@@ -252,7 +252,7 @@ class SessionManager(object):
                 # Give the sockets some time to close gracefully
                 async with TaskGroup() as group:
                     for session in stale_sessions:
-                        await group.spawn(session.close(force_after=30))
+                        await group.spawn(session.close())
 
             # Consolidate small groups
             bw_limit = self.env.bandwidth_limit
@@ -441,7 +441,7 @@ class SessionManager(object):
             await self._close_servers(list(self.servers.keys()))
             async with TaskGroup() as group:
                 for session in list(self.sessions):
-                    await group.spawn(session.close(force_after=0.1))
+                    await group.spawn(session.close(force_after=1))
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
@@ -586,13 +586,6 @@ class SessionBase(ServerSession):
 
     def sub_count(self):
         return 0
-
-    # FIXME: make this the aiorpcx API for version 0.7
-    async def close(self, force_after=30):
-        '''Close the connection and return when closed.'''
-        async with ignore_after(force_after):
-            await super().close()
-        self.abort()
 
     async def handle_request(self, request):
         '''Handle an incoming request.  ElectrumX doesn't receive
