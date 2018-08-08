@@ -344,11 +344,12 @@ class BlockProcessor(electrumx.server.db.DB):
         tx_diff = self.tx_count - self.last_flush_tx_count
 
         # Flush to file system
-        self.fs_flush()
+        self.fs_flush(self.height, self.tx_count, self.headers,
+                      self.tx_hashes)
+        self.tx_hashes = []
+        self.headers = []
+
         fs_end = time.time()
-        if self.utxo_db.for_sync:
-            self.logger.info('flushed to FS in {:.1f}s'
-                             .format(fs_end - flush_start))
 
         # History next - it's fast and frees memory
         hashX_count = self.history.flush()
@@ -394,17 +395,6 @@ class BlockProcessor(electrumx.server.db.DB):
             self.logger.info('sync time: {}  ETA: {}'
                              .format(formatted_time(self.wall_time),
                                      formatted_time(tx_est / this_tx_per_sec)))
-
-    def fs_flush(self):
-        '''Flush the things stored on the filesystem.'''
-        assert self.fs_height + len(self.headers) == self.height
-        assert self.tx_count == self.tx_counts[-1] if self.tx_counts else 0
-
-        self.fs_update(self.fs_height, self.headers, self.tx_hashes)
-        self.fs_height = self.height
-        self.fs_tx_count = self.tx_count
-        self.tx_hashes = []
-        self.headers = []
 
     async def backup_flush(self):
         assert self.height < self.db_height

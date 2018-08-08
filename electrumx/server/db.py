@@ -150,6 +150,43 @@ class DB(object):
         return await self.header_mc.branch_and_root(length, height)
 
     # Flushing
+    def fs_flush(self, to_height, to_tx_count, headers, block_tx_hashes):
+        '''Write headers, tx counts and block tx hashes to the filesystem.
+        No LevelDB state is updated.
+
+        The first height to write is self.fs_height + 1.  The FS
+        metadata is all append-only, so in a crash we just pick up
+        again from the height stored in the DB.
+        '''
+        prior_tx_count = (self.tx_counts[self.fs_height]
+                          if self.fs_height >= 0 else 0)
+        assert len(block_tx_hashes) == len(headers)
+        assert to_height == self.fs_height + len(headers)
+        assert to_tx_count == self.tx_counts[-1] if self.tx_counts else 0
+        assert len(self.tx_counts) == to_height + 1
+        hashes = b''.join(block_tx_hashes)
+        assert len(hashes) % 32 == 0
+        assert len(hashes) // 32 == to_tx_count - prior_tx_count
+
+        # Write the headers, tx counts, and tx hashes
+        start_time = time.time()
+        height_start = self.fs_height + 1
+        offset = self.header_offset(height_start)
+        self.headers_file.write(offset, b''.join(headers))
+        self.fs_update_header_offsets(offset, height_start, headers)
+        offset = height_start * self.tx_counts.itemsize
+        self.tx_counts_file.write(offset,
+                                  self.tx_counts[height_start:].tobytes())
+        offset = prior_tx_count * 32
+        self.hashes_file.write(offset, hashes)
+
+        self.fs_height = to_height
+        self.fs_tx_count = to_tx_count
+
+        if self.utxo_db.for_sync:
+            elapsed = time.time() - start_time
+            self.logger.info(f'flushed to FS in {elapsed:.2f}s')
+
     def db_assert_flushed(self, to_tx_count, to_height):
         '''Asserts state is fully flushed.'''
         assert to_tx_count == self.fs_tx_count == self.db_tx_count
@@ -184,36 +221,6 @@ class DB(object):
         self.fs_tx_count = tx_count
         # Truncate header_mc: header count is 1 more than the height.
         self.header_mc.truncate(height + 1)
-
-    def fs_update(self, fs_height, headers, block_tx_hashes):
-        '''Write headers, the tx_count array and block tx hashes to disk.
-
-        Their first height is fs_height.  No recorded DB state is
-        updated.  These arrays are all append only, so in a crash we
-        just pick up again from the DB height.
-        '''
-        blocks_done = len(headers)
-        height_start = fs_height + 1
-        new_height = fs_height + blocks_done
-        prior_tx_count = (self.tx_counts[fs_height] if fs_height >= 0 else 0)
-        cur_tx_count = self.tx_counts[-1] if self.tx_counts else 0
-        txs_done = cur_tx_count - prior_tx_count
-
-        assert len(block_tx_hashes) == blocks_done
-        assert len(self.tx_counts) == new_height + 1
-        hashes = b''.join(block_tx_hashes)
-        assert len(hashes) % 32 == 0
-        assert len(hashes) // 32 == txs_done
-
-        # Write the headers, tx counts, and tx hashes
-        offset = self.header_offset(height_start)
-        self.headers_file.write(offset, b''.join(headers))
-        self.fs_update_header_offsets(offset, height_start, headers)
-        offset = height_start * self.tx_counts.itemsize
-        self.tx_counts_file.write(offset,
-                                  self.tx_counts[height_start:].tobytes())
-        offset = prior_tx_count * 32
-        self.hashes_file.write(offset, hashes)
 
     async def read_headers(self, start_height, count):
         '''Requires start_height >= 0, count >= 0.  Reads as many headers as
