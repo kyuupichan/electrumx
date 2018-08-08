@@ -12,6 +12,7 @@
 import array
 import ast
 import os
+import time
 from bisect import bisect_right
 from collections import namedtuple
 from glob import glob
@@ -21,6 +22,7 @@ from aiorpcx import run_in_thread
 
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -62,6 +64,10 @@ class DB(object):
         self.tx_counts = None
 
         self.logger.info(f'using {self.env.db_engine} for DB backend')
+
+        # Header merkle cache
+        self.merkle = Merkle()
+        self.header_mc = MerkleCache(self.merkle, self.fs_block_hashes)
 
         self.headers_file = util.LogicalFile('meta/headers', 2, 16000000)
         self.tx_counts_file = util.LogicalFile('meta/txcounts', 2, 2000000)
@@ -130,6 +136,19 @@ class DB(object):
             self.utxo_db = None
         await self._open_dbs(False)
 
+    # Header merkle cache
+
+    async def populate_header_merkle_cache(self):
+        self.logger.info('populating header merkle cache...')
+        length = max(1, self.height - self.env.reorg_limit)
+        start = time.time()
+        await self.header_mc.initialize(length)
+        elapsed = time.time() - start
+        self.logger.info(f'header merkle cache populated in {elapsed:.1f}s')
+
+    async def header_branch_and_root(self, length, height):
+        return await self.header_mc.branch_and_root(length, height)
+
     def fs_update_header_offsets(self, offset_start, height_start, headers):
         if self.coin.STATIC_BLOCK_HEADERS:
             return
@@ -151,6 +170,13 @@ class DB(object):
     def dynamic_header_len(self, height):
         return self.dynamic_header_offset(height + 1)\
                - self.dynamic_header_offset(height)
+
+    def backup_fs(self, height, tx_count):
+        '''Back up during a reorg.  This just updates our pointers.'''
+        self.fs_height = height
+        self.fs_tx_count = tx_count
+        # Truncate header_mc: header count is 1 more than the height.
+        self.header_mc.truncate(height + 1)
 
     def fs_update(self, fs_height, headers, block_tx_hashes):
         '''Write headers, the tx_count array and block tx hashes to disk.

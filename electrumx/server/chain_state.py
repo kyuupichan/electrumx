@@ -25,6 +25,7 @@ class ChainState(object):
         self.read_headers = self._bp.read_headers
         self.all_utxos = self._bp.all_utxos
         self.limited_history = self._bp.limited_history
+        self.header_branch_and_root = self._bp.header_branch_and_root
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -42,9 +43,6 @@ class ChainState(object):
             'daemon_height': self._daemon.cached_height(),
             'db_height': self.db_height(),
         }
-
-    async def header_branch_and_root(self, length, height):
-        return self._bp.header_mc.branch_and_root(length, height)
 
     async def raw_header(self, height):
         '''Return the binary header at the given height.'''

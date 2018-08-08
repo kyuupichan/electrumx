@@ -108,6 +108,7 @@ class Controller(ServerBase):
             await group.spawn(session_mgr.serve(serve_externally_event))
             await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
             await caught_up_event.wait()
+            await group.spawn(bp.populate_header_merkle_cache())
             await group.spawn(mempool.keep_synchronized(synchronized_event))
             await synchronized_event.wait()
             serve_externally_event.set()
