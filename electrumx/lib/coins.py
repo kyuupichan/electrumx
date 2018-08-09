@@ -1708,12 +1708,12 @@ class Decred(Coin):
     NAME = "Decred"
     SHORTNAME = "DCR"
     NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("043587d1")
-    XPRV_VERBYTES = bytes.fromhex("04358397")
-    P2PKH_VERBYTE = bytes.fromhex("0f21")
-    P2SH_VERBYTES = [bytes.fromhex("0efc")]
+    XPUB_VERBYTES = bytes.fromhex("02fda926")
+    XPRV_VERBYTES = bytes.fromhex("02fda4e8")
+    P2PKH_VERBYTE = bytes.fromhex("073f")
+    P2SH_VERBYTES = [bytes.fromhex("071a")]
     WIF_BYTE = bytes.fromhex("230e")
-    GENESIS_HASH = ('5b7466edf6739adc9b32aaedc54e24bdc59a05f0ced855088835fe3cbe58375f')
+    GENESIS_HASH = ('4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
     BASIC_HEADER_SIZE = 180
     HEADER_HASH = lib_tx.DeserializerDecred.blake256
     DESERIALIZER = lib_tx.DeserializerDecred
