@@ -24,6 +24,7 @@ from aiorpcx import run_in_thread
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.merkle import Merkle, MerkleCache
+from electrumx.lib.util import formatted_time
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -167,10 +168,11 @@ class DB(object):
         return await self.header_mc.branch_and_root(length, height)
 
     # Flushing
-    def flush_dbs(self, flush_data, flush_utxos):
+    def flush_dbs(self, flush_data, flush_utxos, estimated_txs):
         '''Flush out cached state.  History is always flushed; UTXOs are
         flushed if flush_utxos.'''
         start_time = time.time()
+        prior_flush = self.last_flush
         tx_delta = flush_data.tx_count - self.last_flush_tx_count
 
         # Flush to file system
@@ -193,6 +195,17 @@ class DB(object):
         self.logger.info(f'flush #{self.history.flush_count:,d} took '
                          f'{elapsed:.1f}s.  Height {flush_data.height:,d} '
                          f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d})')
+
+        # Catch-up stats
+        if self.utxo_db.for_sync:
+            flush_interval = self.last_flush - prior_flush
+            tx_per_sec_gen = int(flush_data.tx_count / self.wall_time)
+            tx_per_sec_last = 1 + int(tx_delta / flush_interval)
+            eta = estimated_txs / tx_per_sec_last
+            self.logger.info(f'tx/sec since genesis: {tx_per_sec_gen:,d}, '
+                             f'since last flush: {tx_per_sec_last:,d}')
+            self.logger.info(f'sync time: {formatted_time(self.wall_time)}  '
+                             f'ETA: {formatted_time(eta)}')
 
     def flush_fs(self, flush_data):
         '''Write headers, tx counts and block tx hashes to the filesystem.
