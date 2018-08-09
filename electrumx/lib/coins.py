@@ -1680,7 +1680,7 @@ class BitcoinAtom(Coin):
 class Decred(Coin):
     NAME = "Decred"
     SHORTNAME = "DCR"
-    NET = "testnet"
+    NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("02fda926")
     XPRV_VERBYTES = bytes.fromhex("02fda4e8")
     P2PKH_VERBYTE = bytes.fromhex("073f")
