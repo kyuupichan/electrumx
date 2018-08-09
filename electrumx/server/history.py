@@ -85,7 +85,7 @@ class History(object):
             if flush_id > utxo_flush_count:
                 keys.append(key)
 
-        self.logger.info('deleting {:,d} history entries'.format(len(keys)))
+        self.logger.info(f'deleting {len(keys):,d} history entries')
 
         self.flush_count = utxo_flush_count
         with self.db.write_batch() as batch:
@@ -144,7 +144,6 @@ class History(object):
             self.logger.info(f'flushed history in {elapsed:.1f}s '
                              f'for {count:,d} addrs')
 
-
     def backup(self, hashXs, tx_count):
         # Not certain this is needed, but it doesn't hurt
         self.flush_count += 1
@@ -172,7 +171,7 @@ class History(object):
                     batch.put(key, value)
             self.write_state(batch)
 
-        return nremoves
+        self.logger.info(f'backing up removed {nremoves:,d} history entries')
 
     def get_txnums(self, hashX, limit=1000):
         '''Generator that returns an unpruned, sorted list of tx_nums in the

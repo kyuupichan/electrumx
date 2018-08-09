@@ -261,7 +261,7 @@ class BlockProcessor(DB):
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
             await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
-            await self.backup_flush()
+            await self.flush_for_backup()
             last -= len(raw_blocks)
         await self.prefetcher.reset_height(self.height)
 
@@ -319,6 +319,16 @@ class BlockProcessor(DB):
         assert not self.db_deletes
         self.db_assert_flushed(self.tx_count, self.height)
 
+    async def flush_for_backup(self):
+        # self.touched can include other addresses which is
+        # harmless, but remove None.
+        self.touched.discard(None)
+        await self.run_in_thread_with_lock(
+            self.flush_backup, self.flush_data(), self.touched)
+        self.db_deletes = []
+        self.utxo_cache = {}
+        self.undo_infos = []
+
     async def flush(self, flush_utxos):
         if self.height == self.db_height:
             self.assert_flushed()
@@ -366,46 +376,6 @@ class BlockProcessor(DB):
             self.logger.info('sync time: {}  ETA: {}'
                              .format(formatted_time(self.wall_time),
                                      formatted_time(tx_est / this_tx_per_sec)))
-
-    async def backup_flush(self):
-        assert self.height < self.db_height
-        assert not self.headers
-        assert not self.tx_hashes
-        self.history.assert_flushed()
-        await self.run_in_thread_with_lock(self._backup_flush_body)
-
-    def _backup_flush_body(self):
-        '''Like flush() but when backing up.  All UTXOs are flushed.
-
-        hashXs - sequence of hashXs which were touched by backing
-        up.  Searched for history entries to remove after the backup
-        height.
-        '''
-        flush_start = time.time()
-
-        self.backup_fs(self.height, self.tx_count)
-
-        # Backup history.  self.touched can include other addresses
-        # which is harmless, but remove None.
-        self.touched.discard(None)
-        nremoves = self.history.backup(self.touched, self.tx_count)
-        self.logger.info('backing up removed {:,d} history entries'
-                         .format(nremoves))
-
-        with self.utxo_db.write_batch() as batch:
-            self.flush_utxo_db(batch, self.flush_data())
-            # Flush state last as it reads the wall time.
-            self.flush_state(batch)
-
-        self.db_deletes = []
-        self.utxo_cache = {}
-        self.undo_infos = []
-
-        self.logger.info('backup flush #{:,d} took {:.1f}s.  '
-                         'Height {:,d} txs: {:,d}'
-                         .format(self.history.flush_count,
-                                 self.last_flush - flush_start,
-                                 self.height, self.tx_count))
 
     def check_cache_size(self):
         '''Flush a cache if it gets too big.'''

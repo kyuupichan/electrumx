@@ -282,6 +282,28 @@ class DB(object):
         self.last_flush_tx_count = self.fs_tx_count
         self.write_utxo_state(batch)
 
+    def flush_backup(self, flush_data, touched):
+        '''Like flush_dbs() but when backing up.  All UTXOs are flushed.'''
+        assert not flush_data.headers
+        assert not flush_data.block_tx_hashes
+        assert flush_data.height < self.db_height
+        self.history.assert_flushed()
+
+        start_time = time.time()
+        tx_delta = flush_data.tx_count - self.last_flush_tx_count
+
+        self.backup_fs(flush_data.height, flush_data.tx_count)
+        self.history.backup(touched, flush_data.tx_count)
+        with self.utxo_db.write_batch() as batch:
+            self.flush_utxo_db(batch, flush_data)
+            # Flush state last as it reads the wall time.
+            self.flush_state(batch)
+
+        elapsed = self.last_flush - start_time
+        self.logger.info(f'backup flush #{self.history.flush_count:,d} took '
+                         f'{elapsed:.1f}s.  Height {flush_data.height:,d} '
+                         f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d})')
+
     def db_assert_flushed(self, to_tx_count, to_height):
         '''Asserts state is fully flushed.'''
         assert to_tx_count == self.fs_tx_count == self.db_tx_count
