@@ -160,7 +160,6 @@ class BlockProcessor(electrumx.server.db.DB):
 
         # Meta
         self.next_cache_check = 0
-        self.last_flush = time.time()
         self.touched = set()
         self.reorg_count = 0
 
@@ -312,14 +311,6 @@ class BlockProcessor(electrumx.server.db.DB):
             start = (self.height - count) + 1
 
         return start, count
-
-    def flush_state(self, batch):
-        '''Flush chain state to the batch.'''
-        now = time.time()
-        self.wall_time += now - self.last_flush
-        self.last_flush = now
-        self.last_flush_tx_count = self.tx_count
-        self.write_utxo_state(batch)
 
     def assert_flushed(self):
         '''Asserts state is fully flushed.'''
@@ -725,7 +716,6 @@ class BlockProcessor(electrumx.server.db.DB):
         self.height = self.db_height
         self.tip = self.db_tip
         self.tx_count = self.db_tx_count
-        self.last_flush_tx_count = self.tx_count
 
     # --- External API
 

@@ -62,6 +62,7 @@ class DB(object):
         self.history = History()
         self.utxo_db = None
         self.tx_counts = None
+        self.last_flush = time.time()
 
         self.logger.info(f'using {self.env.db_engine} for DB backend')
 
@@ -231,6 +232,14 @@ class DB(object):
         self.db_height = to_height
         self.db_tx_count = to_tx_count
         self.db_tip = to_tip
+
+    def flush_state(self, batch):
+        '''Flush chain state to the batch.'''
+        now = time.time()
+        self.wall_time += now - self.last_flush
+        self.last_flush = now
+        self.last_flush_tx_count = self.fs_tx_count
+        self.write_utxo_state(batch)
 
     def db_assert_flushed(self, to_tx_count, to_height):
         '''Asserts state is fully flushed.'''
@@ -441,6 +450,7 @@ class DB(object):
         # These are our state as we move ahead of DB state
         self.fs_height = self.db_height
         self.fs_tx_count = self.db_tx_count
+        self.last_flush_tx_count = self.fs_tx_count
 
         # Log some stats
         self.logger.info('DB version: {:d}'.format(self.db_version))
