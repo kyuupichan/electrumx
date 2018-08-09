@@ -8,8 +8,15 @@
    should not occur with Python 3.7.
 
 
-Version 1.8.1 (in development)
-==============================
+Version 1.8.2 (09 Aug 2018)
+===========================
+
+* require aiorpcX 0.7.1 which along with an ElectrumX change restores clean
+  shutdown and flush functionality, particularly during initial sync
+* fix `#564`_
+
+Version 1.8.1 (08 Aug 2018)
+===========================
 
 * require aiorpcX 0.7.0 which fixes a bug causing silent shutdown of ElectrumX
 * fix `#557`_, `#559`_
@@ -206,3 +213,4 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#538: https://github.com/kyuupichan/electrumx/issues/538
 .. _#557: https://github.com/kyuupichan/electrumx/issues/557
 .. _#559: https://github.com/kyuupichan/electrumx/issues/559
+.. _#564: https://github.com/kyuupichan/electrumx/issues/564
