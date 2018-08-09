@@ -261,7 +261,11 @@ class BlockProcessor(DB):
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
             await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
-            await self.flush_for_backup()
+            # self.touched can include other addresses which is
+            # harmless, but remove None.
+            self.touched.discard(None)
+            await self.run_in_thread_with_lock(
+                self.flush_backup, self.flush_data(), self.touched)
             last -= len(raw_blocks)
         await self.prefetcher.reset_height(self.height)
 
@@ -326,16 +330,6 @@ class BlockProcessor(DB):
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip)
 
-    async def flush_for_backup(self):
-        # self.touched can include other addresses which is
-        # harmless, but remove None.
-        self.touched.discard(None)
-        await self.run_in_thread_with_lock(
-            self.flush_backup, self.flush_data(), self.touched)
-        self.db_deletes = []
-        self.utxo_cache = {}
-        self.undo_infos = []
-
     async def flush(self, flush_utxos):
         if self.height == self.db_height:
             self.assert_flushed()
@@ -354,12 +348,6 @@ class BlockProcessor(DB):
                          max(coin.TX_COUNT - self.tx_count, 0)) * factor
 
         self.flush_dbs(self.flush_data(), flush_utxos, estimated_txs)
-        self.tx_hashes = []
-        self.headers = []
-        if flush_utxos:
-            self.db_deletes = []
-            self.utxo_cache = {}
-            self.undo_infos = []
 
     def check_cache_size(self):
         '''Flush a cache if it gets too big.'''
