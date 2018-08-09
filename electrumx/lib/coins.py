@@ -39,11 +39,11 @@ from functools import partial
 import base64
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str,blake
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
-from electrumx.server.block_processor import BlockProcessor
+import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import ElectrumX, DashElectrumX
 
@@ -69,7 +69,7 @@ class Coin(object):
     SESSIONCLS = ElectrumX
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
-    BLOCK_PROCESSOR = BlockProcessor
+    BLOCK_PROCESSOR = block_proc.BlockProcessor
     MEMPOOL_HISTOGRAM_REFRESH_SECS = 500
     XPUB_VERBYTES = bytes('????', 'utf-8')
     XPRV_VERBYTES = bytes('????', 'utf-8')
@@ -404,7 +404,7 @@ class HOdlcoin(Coin):
 
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
-    SHORTNAME = "BCC"
+    SHORTNAME = "BCH"
     TX_COUNT = 246362688
     TX_COUNT_HEIGHT = 511484
     TX_PER_BLOCK = 400
@@ -1676,6 +1676,65 @@ class BitcoinAtom(Coin):
         return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
 
 
+class Decred(Coin):
+    NAME = "Decred"
+    SHORTNAME = "DCR"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("02fda926")
+    XPRV_VERBYTES = bytes.fromhex("02fda4e8")
+    P2PKH_VERBYTE = bytes.fromhex("073f")
+    P2SH_VERBYTES = [bytes.fromhex("071a")]
+    WIF_BYTE = bytes.fromhex("230e")
+    GENESIS_HASH = ('298e5cc3d985bfe7f81dc135f360abe0'
+                    '89edd4396b86d2de66b0cef42b21d980')
+    BASIC_HEADER_SIZE = 180
+    HEADER_HASH = lib_tx.DeserializerDecred.blake256
+    DESERIALIZER = lib_tx.DeserializerDecred
+    DAEMON = daemon.DecredDaemon
+    BLOCK_PROCESSOR = block_proc.DecredBlockProcessor
+    ENCODE_CHECK = partial(Base58.encode_check,
+                           hash_fn=lib_tx.DeserializerDecred.blake256d)
+    DECODE_CHECK = partial(Base58.decode_check,
+                           hash_fn=lib_tx.DeserializerDecred.blake256d)
+    HEADER_UNPACK = struct.Struct('<i32s32s32sH6sHBBIIQIIII32sI').unpack_from
+    TX_COUNT = 4629388
+    TX_COUNT_HEIGHT = 260628
+    TX_PER_BLOCK = 17
+    REORG_LIMIT = 1000
+    RPC_PORT = 9109
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        return cls.HEADER_HASH(header)
+
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        if height > 0:
+            return super().block(raw_block, height)
+        else:
+            return Block(raw_block, cls.block_header(raw_block, height), [])
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        labels = ('version', 'prev_block_hash', 'merkle_root', 'stake_root',
+                  'vote_bits', 'final_state', 'voters', 'fresh_stake',
+                  'revocations', 'pool_size', 'bits', 'sbits', 'block_height',
+                  'size', 'timestamp', 'nonce', 'extra_data', 'stake_version')
+        values = cls.HEADER_UNPACK(header)
+        h = dict(zip(labels, values))
+
+        # Convert some values
+        assert h['block_height'] == height
+        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
+        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
+        h['stake_root'] = hash_to_hex_str(h['stake_root'])
+        h['final_state'] = h['final_state'].hex()
+        h['extra_data'] = h['extra_data'].hex()
+        return h
+
+
 class Axe(Dash):
     NAME = "Axe"
     SHORTNAME = "AXE"
@@ -1980,179 +2039,201 @@ class Minexcoin(MinexcoinMixin, Coin):
     ]
 
 
-
-class Bitg(Coin):
-
-    NAME = "BitcoinGreen"
-    SHORTNAME = "BITG"
+class Groestlcoin(Coin):
+    NAME = "Groestlcoin"
+    SHORTNAME = "GRS"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
-    P2PKH_VERBYTE = bytes.fromhex("26")
-    P2SH_VERBYTES = [bytes.fromhex("06")]
-    WIF_BYTE = bytes.fromhex("2e")
-    GENESIS_HASH = ('000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
-    DAEMON = daemon.DashDaemon
-    TX_COUNT = 1000
-    TX_COUNT_HEIGHT = 10000
-    TX_PER_BLOCK = 1
-    RPC_PORT = 9332
-    REORG_LIMIT = 1000
-    SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
+    P2PKH_VERBYTE = bytes.fromhex("24")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00000ac5927c594d49cc0bdb81759d0d'
+                    'a8297eb614683d3acb62f0703b639023')
+    DESERIALIZER = lib_tx.DeserializerGroestlcoin
+    TX_COUNT = 115900
+    TX_COUNT_HEIGHT = 1601528
+    TX_PER_BLOCK = 5
+    RPC_PORT = 1441
+    PEERS = [
+        'electrum1.groestlcoin.org s t',
+        'electrum2.groestlcoin.org s t',
+        '6brsrbiinpc32tfc.onion t',
+        'xkj42efxrcy6vbfw.onion t',
+    ]
+
+    def grshash(data):
+        import groestlcoin_hash
+        return groestlcoin_hash.getHash(data, len(data))
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import quark_hash
-        return quark_hash.getPoWHash(header)
+        return cls.grshash(header)
 
-class tBitg(Coin):
-  
-    NAME = "testnetBitcoinGreen"
-    SHORTNAME = "tBITG"
-    NET = "mainnet"
+    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=grshash)
+    DECODE_CHECK = partial(Base58.decode_check, hash_fn=grshash)
+
+
+class GroestlcoinTestnet(Groestlcoin):
+    SHORTNAME = "TGRS"
+    NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
-    P2PKH_VERBYTE = bytes.fromhex("62")
-    P2SH_VERBYTES = [bytes.fromhex("0c")]
-    WIF_BYTE = bytes.fromhex("6c")
-    GENESIS_HASH = ('000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
-    DAEMON = daemon.DashDaemon
-    TX_COUNT = 1000
-    TX_COUNT_HEIGHT = 10000
-    TX_PER_BLOCK = 1
-    RPC_PORT = 19332
-    REORG_LIMIT = 1000
-    SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import quark_hash
-        return quark_hash.getPoWHash(header)
+    P2PKH_VERBYTE = bytes.fromhex("6f")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('000000ffbb50fc9898cdd36ec163e6ba'
+                    '23230164c0052a28876255b7dcf2cd36')
+    RPC_PORT = 17766
+    PEERS = [
+        'electrum-test1.groestlcoin.org s t',
+        'electrum-test2.groestlcoin.org s t',
+        '7frvhgofuf522b5i.onion t',
+        'aocojvqcybdoxekv.onion t',
+    ]
+
+
+
+class Bitg(Coin):
+
+   NAME = "BitcoinGreen"
+   SHORTNAME = "BITG"
+   NET = "mainnet"
+   XPUB_VERBYTES = bytes.fromhex("0488b21e")
+   XPRV_VERBYTES = bytes.fromhex("0488ade4")
+   P2PKH_VERBYTE = bytes.fromhex("26")
+   P2SH_VERBYTES = [bytes.fromhex("06")]
+   WIF_BYTE = bytes.fromhex("2e")
+   GENESIS_HASH = ('000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
+   DAEMON = daemon.DashDaemon
+   TX_COUNT = 1000
+   TX_COUNT_HEIGHT = 10000
+   TX_PER_BLOCK = 1
+   RPC_PORT = 9332
+   REORG_LIMIT = 1000
+   SESSIONCLS = DashElectrumX
+   DAEMON = daemon.DashDaemon
+   @classmethod
+   def header_hash(cls, header):
+       '''Given a header return the hash.'''
+       import quark_hash
+       return quark_hash.getPoWHash(header)
+
+class tBitg(Coin):
+    NAME = "testnetBitcoinGreen"
+   SHORTNAME = "tBITG"
+   NET = "mainnet"
+   XPUB_VERBYTES = bytes.fromhex("043587cf")
+   XPRV_VERBYTES = bytes.fromhex("04358394")
+   P2PKH_VERBYTE = bytes.fromhex("62")
+   P2SH_VERBYTES = [bytes.fromhex("0c")]
+   WIF_BYTE = bytes.fromhex("6c")
+   GENESIS_HASH = ('000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
+   DAEMON = daemon.DashDaemon
+   TX_COUNT = 1000
+   TX_COUNT_HEIGHT = 10000
+   TX_PER_BLOCK = 1
+   RPC_PORT = 19332
+   REORG_LIMIT = 1000
+   SESSIONCLS = DashElectrumX
+   DAEMON = daemon.DashDaemon
+   @classmethod
+   def header_hash(cls, header):
+       '''Given a header return the hash.'''
+       import quark_hash
+       return quark_hash.getPoWHash(header)
 
 
 
 
 class Pivx(Coin):
-    NAME = "PIVX"
-    SHORTNAME = "PIVX"
-    NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("022D2533")
-    XPRV_VERBYTES = bytes.fromhex("0221312B")
-    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-    P2PKH_VERBYTE = bytes.fromhex("1e")
-    P2SH_VERBYTE = bytes.fromhex("0d")
-    WIF_BYTE = bytes.fromhex("d4")
-    TX_COUNT_HEIGHT = 569399
-    TX_COUNT = 2157510
-    TX_PER_BLOCK = 1
-    STATIC_BLOCK_HEADERS = False
-    RPC_PORT = 51470
-    ZEROCOIN_HEADER = 112
-    ZEROCOIN_START_HEIGHT = 863787
-    ZEROCOIN_BLOCK_VERSION = 4
+   NAME = "PIVX"
+   SHORTNAME = "PIVX"
+   NET = "mainnet"
+   XPUB_VERBYTES = bytes.fromhex("022D2533")
+   XPRV_VERBYTES = bytes.fromhex("0221312B")
+   GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
+   P2PKH_VERBYTE = bytes.fromhex("1e")
+   P2SH_VERBYTE = bytes.fromhex("0d")
+   WIF_BYTE = bytes.fromhex("d4")
+   TX_COUNT_HEIGHT = 569399
+   TX_COUNT = 2157510
+   TX_PER_BLOCK = 1
+   STATIC_BLOCK_HEADERS = False
+   RPC_PORT = 51470
+   ZEROCOIN_HEADER = 112
+   ZEROCOIN_START_HEIGHT = 863787
+   ZEROCOIN_BLOCK_VERSION = 4
 
-    @classmethod
-    def static_header_len(cls, height):
-        '''Given a header height return its length.'''
-        if height >= cls.ZEROCOIN_START_HEIGHT:
-            return cls.ZEROCOIN_HEADER
-        else:
-            return cls.BASIC_HEADER_SIZE
+   @classmethod
+   def static_header_len(cls, height):
+       '''Given a header height return its length.'''
+       if height >= cls.ZEROCOIN_START_HEIGHT:
+           return cls.ZEROCOIN_HEADER
+       else:
+           return cls.BASIC_HEADER_SIZE
 
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        version, = struct.unpack('<I', header[:4])
-        if version >= cls.ZEROCOIN_BLOCK_VERSION:
-            return super().header_hash(header)
-        else:
-            import quark_hash
-            return quark_hash.getPoWHash(header)
+   @classmethod
+   def header_hash(cls, header):
+       '''Given a header return the hash.'''
+       version, = struct.unpack('<I', header[:4])
+       if version >= cls.ZEROCOIN_BLOCK_VERSION:
+           return super().header_hash(header)
+       else:
+           import quark_hash
+           return quark_hash.getPoWHash(header)
 
-    @classmethod
-    def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+   @classmethod
+   def electrum_header(cls, header, height):
+       version, = struct.unpack('<I', header[:4])
+       timestamp, bits, nonce = struct.unpack('<III', header[68:80])
 
-        if version >= cls.ZEROCOIN_BLOCK_VERSION:
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-                'acc_checkpoint': hash_to_str(header[80:112])
-            }
-        else:
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-            }
+       if version >= cls.ZEROCOIN_BLOCK_VERSION:
+           return {
+               'block_height': height,
+               'version': version,
+               'prev_block_hash': hash_to_str(header[4:36]),
+               'merkle_root': hash_to_str(header[36:68]),
+               'timestamp': timestamp,
+               'bits': bits,
+               'nonce': nonce,
+               'acc_checkpoint': hash_to_str(header[80:112])
+           }
+       else:
+           return {
+               'block_height': height,
+               'version': version,
+               'prev_block_hash': hash_to_str(header[4:36]),
+               'merkle_root': hash_to_str(header[36:68]),
+               'timestamp': timestamp,
+               'bits': bits,
+               'nonce': nonce,
+           }
 
 class PivxTestnet(Pivx):
-    NAME = "PIVX"
-    SHORTNAME = "PIVX"
-    NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("3a8061a0")
-    XPRV_VERBYTES = bytes.fromhex("3a805837")
-    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-    P2PKH_VERBYTE = bytes.fromhex("8B")
-    P2SH_VERBYTE = bytes.fromhex("13")
-    WIF_BYTE = bytes.fromhex("EF")
-    TX_COUNT_HEIGHT = 569399
-    TX_COUNT = 2157510
-    TX_PER_BLOCK = 4
-    RPC_PORT = 51472
+   NAME = "PIVX"
+   SHORTNAME = "PIVX"
+   NET = "testnet"
+   XPUB_VERBYTES = bytes.fromhex("3a8061a0")
+   XPRV_VERBYTES = bytes.fromhex("3a805837")
+   GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
+   P2PKH_VERBYTE = bytes.fromhex("8B")
+   P2SH_VERBYTE = bytes.fromhex("13")
+   WIF_BYTE = bytes.fromhex("EF")
+   TX_COUNT_HEIGHT = 569399
+   TX_COUNT = 2157510
+   TX_PER_BLOCK = 4
+   RPC_PORT = 51472
 
-    @classmethod
-    def static_header_len(cls, height):
-        '''Given a header height return its length.'''
-        if height >= 201564:
-            return cls.ZEROCOIN_HEADER
-        else:
-            return cls.BASIC_HEADER_SIZE
+   @classmethod
+   def static_header_len(cls, height):
+       '''Given a header height return its length.'''
+       if height >= 201564:
+           return cls.ZEROCOIN_HEADER
+       else:
+           return cls.BASIC_HEADER_SIZE
 
 
 
-class Decred(Coin):
-    NAME = "Decred"
-    SHORTNAME = "DCR"
-    NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("02fda926")
-    XPRV_VERBYTES = bytes.fromhex("02fda4e8")
-    P2PKH_VERBYTE = bytes.fromhex("073f")
-    P2SH_VERBYTES = [bytes.fromhex("071a")]
-    WIF_BYTE = bytes.fromhex("230e")
-    GENESIS_HASH = ('4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
-    BASIC_HEADER_SIZE = 180
-    DESERIALIZER = lib_tx.DeserializerDecred
-    ALLOW_ADVANCING_ERRORS = True
-    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=blake)
-    DECODE_CHECK = partial(Base58.decode_check, hash_fn=blake)
-    TX_COUNT = 217380620
-    TX_COUNT_HEIGHT = 464000
-    TX_PER_BLOCK = 1800
-    RPC_PORT = 19119
-    HEADER_HASH = blake
 
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        return cls.HEADER_HASH(header)
-
-    @classmethod
-    def block(cls, raw_block, height):
-        '''Return a Block namedtuple given a raw block and its height.'''
-        if height > 0:
-            return super().block(raw_block, height)
-        else:
-            return Block(raw_block, cls.block_header(raw_block, height), [])        
