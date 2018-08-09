@@ -2032,62 +2032,7 @@ class tBitg(Coin):
         return quark_hash.getPoWHash(header)
 
 
-# class Pivx(Coin):
-  
-#     NAME = "Pivx"
-#     SHORTNAME = "PIVX"
-#     NET = "mainnet"
-#     XPUB_VERBYTES = bytes.fromhex("022d2533")
-#     XPRV_VERBYTES = bytes.fromhex("0221312b")
-#     P2PKH_VERBYTE = bytes.fromhex("1e")
-#     P2SH_VERBYTES = [bytes.fromhex("0d")]
-#     WIF_BYTE = bytes.fromhex("d4")
-#     GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-#     DAEMON = daemon.DashDaemon
-#     TX_COUNT = 1000
-#     TX_COUNT_HEIGHT = 10000
-#     TX_PER_BLOCK = 1
-#     RPC_PORT = 51473
-#     REORG_LIMIT = 1000
-#     SESSIONCLS = DashElectrumX
-#     DAEMON = daemon.DashDaemon
-#     @classmethod
-#     def header_hash(cls, header):
-#         '''Given a header return the hash.'''
-#         import quark_hash
-#         return quark_hash.getPoWHash(header)
 
-# class tPivx(Coin):
-  
-#     NAME = "testnetPivx"
-#     SHORTNAME = "tPIVX"
-#     NET = "testnet"
-#     XPUB_VERBYTES = bytes.fromhex("3a8061a0")
-#     XPRV_VERBYTES = bytes.fromhex("3a805837")
-#     P2PKH_VERBYTE = bytes.fromhex("8b")
-#     P2SH_VERBYTES = [bytes.fromhex("13")]
-#     WIF_BYTE = bytes.fromhex("ef")
-#     GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-#     DAEMON = daemon.DashDaemon
-#     TX_COUNT = 2157510
-#     TX_COUNT_HEIGHT = 569399
-#     TX_PER_BLOCK = 4
-#     RPC_PORT = 51472
-#     REORG_LIMIT = 8000
-#     SESSIONCLS = DashElectrumX
-#     DAEMON = daemon.DashDaemon
-#     @classmethod
-#     def header_hash(cls, header):
-#         '''Given a header return the hash.'''
-#         import quark_hash
-#         return quark_hash.getPoWHash(header)
-
-#    def static_header_len(cls, height):
-#          '''Given a header height return its length.'''
-#          if (height >= 201564):
-#              return cls.ZEROCOIN_HEADER
-#          else:
-#              return cls.BASIC_HEADER_SIZE
 
 class Pivx(Coin):
     NAME = "PIVX"
@@ -2175,3 +2120,39 @@ class PivxTestnet(Pivx):
             return cls.ZEROCOIN_HEADER
         else:
             return cls.BASIC_HEADER_SIZE
+
+
+
+class Decred(Coin):
+    NAME = "Decred"
+    SHORTNAME = "DCR"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("02fda926")
+    XPRV_VERBYTES = bytes.fromhex("02fda4e8")
+    P2PKH_VERBYTE = bytes.fromhex("073f")
+    P2SH_VERBYTES = [bytes.fromhex("071a")]
+    WIF_BYTE = bytes.fromhex("230e")
+    GENESIS_HASH = ('4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
+    BASIC_HEADER_SIZE = 180
+    DESERIALIZER = lib_tx.DeserializerDecred
+    ALLOW_ADVANCING_ERRORS = True
+    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=blake)
+    DECODE_CHECK = partial(Base58.decode_check, hash_fn=blake)
+    TX_COUNT = 217380620
+    TX_COUNT_HEIGHT = 464000
+    TX_PER_BLOCK = 1800
+    RPC_PORT = 19119
+    HEADER_HASH = blake
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        return cls.HEADER_HASH(header)
+
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        if height > 0:
+            return super().block(raw_block, height)
+        else:
+            return Block(raw_block, cls.block_header(raw_block, height), [])        

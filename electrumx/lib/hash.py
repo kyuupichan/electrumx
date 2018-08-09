@@ -30,14 +30,25 @@ import hashlib
 import hmac
 
 from electrumx.lib.util import bytes_to_int, int_to_bytes, hex_to_bytes
+from lib.blake import BLAKE
 
+_blake = BLAKE
 _sha256 = hashlib.sha256
 _sha512 = hashlib.sha512
 _new_hash = hashlib.new
 _new_hmac = hmac.new
 HASHX_LEN = 11
 
+def blake(x):
+    '''Simple wrapper of hashlib blake2.'''
+    return _blake(256).digest(x)  
 
+
+def double_blake(x):
+    '''Blake2 of Blake2, as used in decred.'''
+    return blake(blake(x))
+
+    
 def sha256(x):
     '''Simple wrapper of hashlib sha256.'''
     return _sha256(x).digest()
