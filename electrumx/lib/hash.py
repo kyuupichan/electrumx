@@ -30,7 +30,7 @@ import hashlib
 import hmac
 
 from electrumx.lib.util import bytes_to_int, int_to_bytes, hex_to_bytes
-from lib.blake import BLAKE
+from electrumx.lib.blake import BLAKE
 
 _blake = BLAKE
 _sha256 = hashlib.sha256
