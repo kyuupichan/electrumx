@@ -48,7 +48,7 @@ def double_blake(x):
     '''Blake2 of Blake2, as used in decred.'''
     return blake(blake(x))
 
-    
+
 def sha256(x):
     '''Simple wrapper of hashlib sha256.'''
     return _sha256(x).digest()
