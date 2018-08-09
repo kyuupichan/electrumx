@@ -1713,7 +1713,7 @@ class Decred(Coin):
     P2PKH_VERBYTE = bytes.fromhex("073f")
     P2SH_VERBYTES = [bytes.fromhex("071a")]
     WIF_BYTE = bytes.fromhex("230e")
-    GENESIS_HASH = ('4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
+    GENESIS_HASH = ('a649dce53918caf422e9c711c858837e08d626ecfcd198969b24f7b634a49bac')
     BASIC_HEADER_SIZE = 180
     HEADER_HASH = lib_tx.DeserializerDecred.blake256
     DESERIALIZER = lib_tx.DeserializerDecred
