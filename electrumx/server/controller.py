@@ -13,6 +13,7 @@ import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
 from electrumx.server.chain_state import ChainState
+from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool
 from electrumx.server.session import SessionManager
 
@@ -93,10 +94,11 @@ class Controller(ServerBase):
 
         notifications = Notifications()
         daemon = env.coin.DAEMON(env)
+        db = DB(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
-        bp = BlockProcessor(env, daemon, notifications)
-        mempool = MemPool(env.coin, daemon, notifications, bp.lookup_utxos)
-        chain_state = ChainState(env, daemon, bp)
+        bp = BlockProcessor(env, db, daemon, notifications)
+        mempool = MemPool(env.coin, daemon, notifications, db.lookup_utxos)
+        chain_state = ChainState(env, db, daemon, bp)
         session_mgr = SessionManager(env, chain_state, mempool,
                                      notifications, shutdown_event)
 
@@ -108,7 +110,7 @@ class Controller(ServerBase):
             await group.spawn(session_mgr.serve(serve_externally_event))
             await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
             await caught_up_event.wait()
-            await group.spawn(bp.populate_header_merkle_cache())
+            await group.spawn(db.populate_header_merkle_cache())
             await group.spawn(mempool.keep_synchronized(synchronized_event))
             await synchronized_event.wait()
             serve_externally_event.set()

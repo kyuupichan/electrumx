@@ -158,7 +158,7 @@ class DB(object):
 
     async def populate_header_merkle_cache(self):
         self.logger.info('populating header merkle cache...')
-        length = max(1, self.height - self.env.reorg_limit)
+        length = max(1, self.db_height - self.env.reorg_limit)
         start = time.time()
         await self.header_mc.initialize(length)
         elapsed = time.time() - start
@@ -172,7 +172,7 @@ class DB(object):
         '''Asserts state is fully flushed.'''
         assert flush_data.tx_count == self.fs_tx_count == self.db_tx_count
         assert flush_data.height == self.fs_height == self.db_height
-        assert flush_data.tip == self.tip
+        assert flush_data.tip == self.db_tip
         assert not flush_data.headers
         assert not flush_data.block_tx_hashes
         assert not flush_data.adds
@@ -180,7 +180,7 @@ class DB(object):
         assert not flush_data.undo_infos
         self.history.assert_flushed()
 
-    def flush_dbs(self, flush_data, flush_utxos):
+    def flush_dbs(self, flush_data, flush_utxos, estimate_txs_remaining):
         '''Flush out cached state.  History is always flushed; UTXOs are
         flushed if flush_utxos.'''
         if flush_data.height == self.db_height:
@@ -217,7 +217,7 @@ class DB(object):
             flush_interval = self.last_flush - prior_flush
             tx_per_sec_gen = int(flush_data.tx_count / self.wall_time)
             tx_per_sec_last = 1 + int(tx_delta / flush_interval)
-            eta = self.estimate_txs_remaining() / tx_per_sec_last
+            eta = estimate_txs_remaining() / tx_per_sec_last
             self.logger.info(f'tx/sec since genesis: {tx_per_sec_gen:,d}, '
                              f'since last flush: {tx_per_sec_last:,d}')
             self.logger.info(f'sync time: {formatted_time(self.wall_time)}  '
