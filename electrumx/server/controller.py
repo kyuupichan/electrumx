@@ -12,7 +12,6 @@ from aiorpcx import _version as aiorpcx_version, TaskGroup
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
-from electrumx.server.chain_state import ChainState
 from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
@@ -97,7 +96,6 @@ class Controller(ServerBase):
         db = DB(env)
         BlockProcessor = env.coin.BLOCK_PROCESSOR
         bp = BlockProcessor(env, db, daemon, notifications)
-        chain_state = ChainState(env, db, daemon, bp)
 
         # Set ourselves up to implement the MemPoolAPI
         self.height = daemon.height
@@ -109,7 +107,7 @@ class Controller(ServerBase):
         MemPoolAPI.register(Controller)
         mempool = MemPool(env.coin, self)
 
-        session_mgr = SessionManager(env, chain_state, mempool,
+        session_mgr = SessionManager(env, db, bp, daemon, mempool,
                                      notifications, shutdown_event)
 
         caught_up_event = Event()
