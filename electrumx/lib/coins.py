@@ -124,9 +124,7 @@ class Coin(object):
         header = cls.block_header(block, 0)
         header_hex_hash = hash_to_hex_str(cls.header_hash(header))
         if header_hex_hash != cls.GENESIS_HASH:
-            print('genesis block %s'%header_hex_hash)
-            print('genesis block %s'%cls.GENESIS_HASH)
-            )
+        
             raise CoinError('genesis block has hash {} expected {}'
                             .format(header_hex_hash, cls.GENESIS_HASH))
 
