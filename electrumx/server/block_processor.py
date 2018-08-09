@@ -190,8 +190,15 @@ class BlockProcessor(electrumx.server.db.DB):
         self.state_lock = asyncio.Lock()
 
     async def run_in_thread_shielded(self, func, *args):
-        async with self.state_lock:
-            return await asyncio.shield(run_in_thread(func, *args))
+        # Run in a thread to prevent blocking.  Shielded so that
+        # cancellations from shutdown don't lose work - when the task
+        # completes the data will be flushed and then we shut down.
+        # Take the state lock to be certain in-memory state is
+        # consistent and not being updated elsewhere.
+        async def run_in_thread_locked():
+            async with self.state_lock:
+                return await run_in_thread(func, *args)
+        return await asyncio.shield(run_in_thread_locked())
 
     async def check_and_advance_blocks(self, raw_blocks):
         '''Process the list of raw blocks passed.  Detects and handles
