@@ -826,3 +826,13 @@ class BlockProcessor(electrumx.server.db.DB):
             self.blocks_event.set()
             return True
         return False
+
+
+class DecredBlockProcessor(BlockProcessor):
+    async def calc_reorg_range(self, count):
+        start, count = await super().calc_reorg_range(count)
+        if start > 0:
+            # A reorg in Decred can invalidate the previous block
+            start -= 1
+            count += 1
+        return start, count
