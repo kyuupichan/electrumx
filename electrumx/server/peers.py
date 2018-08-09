@@ -167,7 +167,7 @@ class PeerManager(object):
                 for match in matches:
                     if match.check_ports(peer):
                         self.logger.info(f'ports changed for {peer}')
-                        peer.retry_event.set()
+                        match.retry_event.set()
 
         if new_peers:
             source = source or new_peers[0].source
