@@ -1679,7 +1679,7 @@ class BitcoinAtom(Coin):
 class Decred(Coin):
     NAME = "Decred"
     SHORTNAME = "DCR"
-    NET = "mainnet"
+    NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("02fda926")
     XPRV_VERBYTES = bytes.fromhex("02fda4e8")
     P2PKH_VERBYTE = bytes.fromhex("073f")
@@ -1702,6 +1702,33 @@ class Decred(Coin):
     TX_PER_BLOCK = 17
     REORG_LIMIT = 1000
     RPC_PORT = 9109
+
+class Decred(Coin):
+    NAME = "Decred"
+    SHORTNAME = "DCR"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("02fda926")
+    XPRV_VERBYTES = bytes.fromhex("02fda4e8")
+    P2PKH_VERBYTE = bytes.fromhex("073f")
+    P2SH_VERBYTES = [bytes.fromhex("071a")]
+    WIF_BYTE = bytes.fromhex("230e")
+    GENESIS_HASH = ('4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
+    BASIC_HEADER_SIZE = 180
+    HEADER_HASH = lib_tx.DeserializerDecred.blake256
+    DESERIALIZER = lib_tx.DeserializerDecred
+    DAEMON = daemon.DecredDaemon
+    BLOCK_PROCESSOR = block_proc.DecredBlockProcessor
+    ALLOW_ADVANCING_ERRORS = True
+    ENCODE_CHECK = partial(Base58.encode_check,
+                           hash_fn=lib_tx.DeserializerDecred.blake256d)
+    DECODE_CHECK = partial(Base58.decode_check,
+                           hash_fn=lib_tx.DeserializerDecred.blake256d)
+    HEADER_UNPACK = struct.Struct('<i32s32s32sH6sHBBIIQIIII32sI').unpack_from
+    TX_COUNT = 217380620
+    TX_COUNT_HEIGHT = 464000
+    TX_PER_BLOCK = 1800
+    RPC_PORT = 19119
+    
 
     @classmethod
     def header_hash(cls, header):
