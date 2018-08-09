@@ -187,17 +187,6 @@ class BlockProcessor(DB):
                 return await run_in_thread(func, *args)
         return await asyncio.shield(run_in_thread_locked())
 
-    async def _maybe_flush(self):
-        # If caught up, flush everything as client queries are
-        # performed on the DB.
-        if self._caught_up_event.is_set():
-            await self.flush(True)
-        elif time.time() > self.next_cache_check:
-            flush_arg = self.check_cache_size()
-            if flush_arg is not None:
-                await self.flush(flush_arg)
-            self.next_cache_check = time.time() + 30
-
     async def check_and_advance_blocks(self, raw_blocks):
         '''Process the list of raw blocks passed.  Detects and handles
         reorgs.
@@ -316,38 +305,36 @@ class BlockProcessor(DB):
 
         return start, count
 
+    def estimate_txs_remaining(self):
+        # Try to estimate how many txs there are to go
+        daemon_height = self.daemon.cached_height()
+        coin = self.coin
+        tail_count = daemon_height - max(self.height, coin.TX_COUNT_HEIGHT)
+        # Damp the initial enthusiasm
+        realism = max(2.0 - 0.9 * self.height / coin.TX_COUNT_HEIGHT, 1.0)
+        return (tail_count * coin.TX_PER_BLOCK +
+                max(coin.TX_COUNT - self.tx_count, 0)) * realism
+
     # - Flushing
-
-    def assert_flushed(self):
-        '''Asserts state is fully flushed.'''
-        assert not self.undo_infos
-        assert not self.utxo_cache
-        assert not self.db_deletes
-        self.db_assert_flushed(self.tx_count, self.height)
-
     def flush_data(self):
         return FlushData(self.height, self.tx_count, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip)
 
     async def flush(self, flush_utxos):
-        if self.height == self.db_height:
-            self.assert_flushed()
-        else:
-            await self.run_in_thread_with_lock(self._flush_body, flush_utxos)
+        await self.run_in_thread_with_lock(
+            self.flush_dbs, self.flush_data(), flush_utxos)
 
-    def _flush_body(self, flush_utxos):
-        '''Flush out cached state. UTXOs are flushed if flush_utxos.'''
-        # Try to estimate how many txs there are to go
-        daemon_height = self.daemon.cached_height()
-        coin = self.coin
-        tail_count = daemon_height - max(self.height, coin.TX_COUNT_HEIGHT)
-        # Damp the initial enthusiasm
-        factor = max(2.0 - 0.9 * self.height / coin.TX_COUNT_HEIGHT, 1.0)
-        estimated_txs = (tail_count * coin.TX_PER_BLOCK +
-                         max(coin.TX_COUNT - self.tx_count, 0)) * factor
-
-        self.flush_dbs(self.flush_data(), flush_utxos, estimated_txs)
+    async def _maybe_flush(self):
+        # If caught up, flush everything as client queries are
+        # performed on the DB.
+        if self._caught_up_event.is_set():
+            await self.flush(True)
+        elif time.time() > self.next_cache_check:
+            flush_arg = self.check_cache_size()
+            if flush_arg is not None:
+                await self.flush(flush_arg)
+            self.next_cache_check = time.time() + 30
 
     def check_cache_size(self):
         '''Flush a cache if it gets too big.'''
@@ -448,7 +435,7 @@ class BlockProcessor(DB):
         The blocks should be in order of decreasing height, starting at.
         self.height.  A flush is performed once the blocks are backed up.
         '''
-        self.assert_flushed()
+        self.assert_flushed(self.flush_data())
         assert self.height >= len(raw_blocks)
 
         coin = self.coin

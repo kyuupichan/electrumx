@@ -168,9 +168,25 @@ class DB(object):
         return await self.header_mc.branch_and_root(length, height)
 
     # Flushing
-    def flush_dbs(self, flush_data, flush_utxos, estimated_txs):
+    def assert_flushed(self, flush_data):
+        '''Asserts state is fully flushed.'''
+        assert flush_data.tx_count == self.fs_tx_count == self.db_tx_count
+        assert flush_data.height == self.fs_height == self.db_height
+        assert flush_data.tip == self.tip
+        assert not flush_data.headers
+        assert not flush_data.block_tx_hashes
+        assert not flush_data.adds
+        assert not flush_data.deletes
+        assert not flush_data.undo_infos
+        self.history.assert_flushed()
+
+    def flush_dbs(self, flush_data, flush_utxos):
         '''Flush out cached state.  History is always flushed; UTXOs are
         flushed if flush_utxos.'''
+        if flush_data.height == self.db_height:
+            self.assert_flushed(flush_data)
+            return
+
         start_time = time.time()
         prior_flush = self.last_flush
         tx_delta = flush_data.tx_count - self.last_flush_tx_count
@@ -201,7 +217,7 @@ class DB(object):
             flush_interval = self.last_flush - prior_flush
             tx_per_sec_gen = int(flush_data.tx_count / self.wall_time)
             tx_per_sec_last = 1 + int(tx_delta / flush_interval)
-            eta = estimated_txs / tx_per_sec_last
+            eta = self.estimate_txs_remaining() / tx_per_sec_last
             self.logger.info(f'tx/sec since genesis: {tx_per_sec_gen:,d}, '
                              f'since last flush: {tx_per_sec_last:,d}')
             self.logger.info(f'sync time: {formatted_time(self.wall_time)}  '
@@ -322,12 +338,6 @@ class DB(object):
         self.logger.info(f'backup flush #{self.history.flush_count:,d} took '
                          f'{elapsed:.1f}s.  Height {flush_data.height:,d} '
                          f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d})')
-
-    def db_assert_flushed(self, to_tx_count, to_height):
-        '''Asserts state is fully flushed.'''
-        assert to_tx_count == self.fs_tx_count == self.db_tx_count
-        assert to_height == self.fs_height == self.db_height
-        self.history.assert_flushed()
 
     def fs_update_header_offsets(self, offset_start, height_start, headers):
         if self.coin.STATIC_BLOCK_HEADERS:
