@@ -21,7 +21,7 @@ import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, formatted_time, class_logger
-import electrumx.server.db
+from electrumx.server.db import DB, FlushData
 
 
 class Prefetcher(object):
@@ -142,7 +142,7 @@ class ChainError(Exception):
     '''Raised on error processing blocks.'''
 
 
-class BlockProcessor(electrumx.server.db.DB):
+class BlockProcessor(DB):
     '''Process blocks and update the DB state to match.
 
     Employ a prefetcher to prefetch blocks in batches for processing.
@@ -325,37 +325,23 @@ class BlockProcessor(electrumx.server.db.DB):
         else:
             await self.run_in_thread_with_lock(self._flush_body, flush_utxos)
 
-    def _flush_body(self, flush_utxos):
-        '''Flush out cached state.
+    def flush_data(self):
+        return FlushData(self.height, self.tx_count, self.headers,
+                         self.tx_hashes, self.undo_infos, self.utxo_cache,
+                         self.db_deletes, self.tip)
 
-        History is always flushed.  UTXOs are flushed if flush_utxos.'''
-        flush_start = time.time()
+    def _flush_body(self, flush_utxos):
+        '''Flush out cached state. UTXOs are flushed if flush_utxos.'''
         last_flush = self.last_flush
         tx_diff = self.tx_count - self.last_flush_tx_count
 
-        # Flush to file system
-        self.flush_fs(self.height, self.tx_count, self.headers,
-                      self.tx_hashes)
+        self.flush_dbs(self.flush_data(), flush_utxos)
         self.tx_hashes = []
         self.headers = []
-
-        # Then history
-        self.flush_history()
-
-        # Flush state last as it reads the wall time.
-        with self.utxo_db.write_batch() as batch:
-            if flush_utxos:
-                self.flush_utxos(batch)
-            self.flush_state(batch)
-
-        # Update and put the wall time again - otherwise we drop the
-        # time it took to commit the batch
-        self.flush_state(self.utxo_db)
-
-        self.logger.info('flush #{:,d} took {:.1f}s.  Height {:,d} txs: {:,d}'
-                         .format(self.history.flush_count,
-                                 self.last_flush - flush_start,
-                                 self.height, self.tx_count))
+        if flush_utxos:
+            self.db_deletes = []
+            self.utxo_cache = {}
+            self.undo_infos = []
 
         # Catch-up stats
         if self.utxo_db.for_sync:
@@ -407,9 +393,13 @@ class BlockProcessor(electrumx.server.db.DB):
                          .format(nremoves))
 
         with self.utxo_db.write_batch() as batch:
+            self.flush_utxo_db(batch, self.flush_data())
             # Flush state last as it reads the wall time.
-            self.flush_utxos(batch)
             self.flush_state(batch)
+
+        self.db_deletes = []
+        self.utxo_cache = {}
+        self.undo_infos = []
 
         self.logger.info('backup flush #{:,d} took {:.1f}s.  '
                          'Height {:,d} txs: {:,d}'
@@ -671,15 +661,6 @@ class BlockProcessor(electrumx.server.db.DB):
 
         raise ChainError('UTXO {} / {:,d} not found in "h" table'
                          .format(hash_to_hex_str(tx_hash), tx_idx))
-
-    def flush_utxos(self, batch):
-        '''Flush the cached DB writes and UTXO set to the batch.'''
-        self.flush_utxo_db(batch, self.db_deletes, self.utxo_cache,
-                           self.undo_infos, self.height, self.tx_count,
-                           self.tip)
-        self.db_deletes = []
-        self.utxo_cache = {}
-        self.undo_infos = []
 
     async def _process_prefetched_blocks(self):
         '''Loop forever processing blocks as they arrive.'''
