@@ -184,8 +184,10 @@ class BlockProcessor(electrumx.server.db.DB):
         # completes the data will be flushed and then we shut down.
         # Take the state lock to be certain in-memory state is
         # consistent and not being updated elsewhere.
-        async with self.state_lock:
-            return await asyncio.shield(run_in_thread(func, *args))
+        async def run_in_thread_locked():
+            async with self.state_lock:
+                return await run_in_thread(func, *args)
+        return await asyncio.shield(run_in_thread_locked())
 
     async def _maybe_flush(self):
         # If caught up, flush everything as client queries are
