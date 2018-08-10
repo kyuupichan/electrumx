@@ -31,6 +31,13 @@ class MemPoolTx(object):
     size = attr.ib()
 
 
+@attr.s(slots=True)
+class MemPoolTxSummary(object):
+    hash = attr.ib()
+    fee = attr.ib()
+    has_unconfirmed_inputs = attr.ib()
+
+
 class MemPoolAPI(ABC):
     '''A concrete instance of this class is passed to the MemPool object
     and used by it to query DB and blockchain state.'''
@@ -299,7 +306,6 @@ class MemPool(object):
         Can be positive or negative.
         '''
         value = 0
-        # hashXs is a defaultdict
         if hashX in self.hashXs:
             for hash in self.hashXs[hashX]:
                 tx = self.txs[hash]
@@ -325,18 +331,12 @@ class MemPool(object):
         return result
 
     async def transaction_summaries(self, hashX):
-        '''Return a list of (tx_hash, tx_fee, unconfirmed) tuples for
-        mempool entries for the hashX.
-
-        unconfirmed is True if any txin is unconfirmed.
-        '''
-        # hashXs is a defaultdict, so use get() to query
+        '''Return a list of MemPoolTxSummary objects for the hashX.'''
         result = []
         for tx_hash in self.hashXs.get(hashX, ()):
             tx = self.txs[tx_hash]
-            unconfirmed = any(prev_hash in self.txs
-                              for prev_hash, prev_idx in tx.prevouts)
-            result.append((tx_hash, tx.fee, unconfirmed))
+            has_ui = any(hash in self.txs for hash, idx in tx.prevouts)
+            result.append(MemPoolTxSummary(tx_hash, tx.fee, has_ui))
         return result
 
     async def unordered_UTXOs(self, hashX):
@@ -347,7 +347,6 @@ class MemPool(object):
         the outputs.
         '''
         utxos = []
-        # hashXs is a defaultdict, so use get() to query
         for tx_hash in self.hashXs.get(hashX, ()):
             tx = self.txs.get(tx_hash)
             for pos, (hX, value) in enumerate(tx.out_pairs):
