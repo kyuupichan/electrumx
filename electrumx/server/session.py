@@ -683,8 +683,10 @@ class ElectrumX(SessionBase):
         # Check mempool hashXs - the status is a function of the
         # confirmed state of other transactions.  Note: we cannot
         # iterate over mempool_statuses as it changes size.
-        for hashX in set(self.mempool_statuses):
-            old_status = self.mempool_statuses[hashX]
+        for hashX in tuple(self.mempool_statuses):
+            # Items can be evicted whilst await-ing below; False
+            # ensures such hashXs are notified
+            old_status = self.mempool_statuses.get(hashX, False)
             status = await self.address_status(hashX)
             if status != old_status:
                 alias = self.hashX_subs[hashX]

@@ -23,12 +23,12 @@ class ServerBase(object):
 
     Derived classes are expected to:
 
-    - set PYTHON_MIN_VERSION and SUPPRESS_MESSAGES as appropriate
+    - set PYTHON_MIN_VERSION and SUPPRESS_MESSAGE_REGEX as appropriate
     - implement the serve() coroutine, called from the run() method.
       Upon return the event loop runs until the shutdown signal is received.
     '''
-
-    SUPPRESS_MESSAGE_REGEX = re.compile('SSH handshake')
+    SUPPRESS_MESSAGE_REGEX = re.compile('SSL handshake|Fatal read error on|'
+                                        'SSL error in data received')
     SUPPRESS_TASK_REGEX = re.compile('accept_connection2')
     PYTHON_MIN_VERSION = (3, 6)
 
