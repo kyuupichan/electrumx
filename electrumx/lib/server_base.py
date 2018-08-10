@@ -100,6 +100,9 @@ class ServerBase(object):
             self.logger.info('shutting down')
             server_task.cancel()
 
+        # Prevent some silly logs
+        await asyncio.sleep(0.01)
+
         self.logger.info('shutdown complete')
 
     def run(self):

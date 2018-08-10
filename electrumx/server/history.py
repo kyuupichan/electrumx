@@ -11,6 +11,7 @@
 import array
 import ast
 import bisect
+import time
 from collections import defaultdict
 from functools import partial
 from struct import pack, unpack
@@ -31,10 +32,14 @@ class History(object):
         self.unflushed_count = 0
         self.db = None
 
-    def open_db(self, db_class, for_sync, utxo_flush_count):
+    def open_db(self, db_class, for_sync, utxo_flush_count, compacting):
         self.db = db_class('hist', for_sync)
         self.read_state()
         self.clear_excess(utxo_flush_count)
+        # An incomplete compaction needs to be cancelled otherwise
+        # restarting it will corrupt the history
+        if not compacting:
+            self._cancel_compaction()
         return self.flush_count
 
     def close_db(self):
@@ -80,7 +85,7 @@ class History(object):
             if flush_id > utxo_flush_count:
                 keys.append(key)
 
-        self.logger.info('deleting {:,d} history entries'.format(len(keys)))
+        self.logger.info(f'deleting {len(keys):,d} history entries')
 
         self.flush_count = utxo_flush_count
         with self.db.write_batch() as batch:
@@ -119,6 +124,7 @@ class History(object):
         assert not self.unflushed
 
     def flush(self):
+        start_time = time.time()
         self.flush_count += 1
         flush_id = pack('>H', self.flush_count)
         unflushed = self.unflushed
@@ -132,7 +138,11 @@ class History(object):
         count = len(unflushed)
         unflushed.clear()
         self.unflushed_count = 0
-        return count
+
+        if self.db.for_sync:
+            elapsed = time.time() - start_time
+            self.logger.info(f'flushed history in {elapsed:.1f}s '
+                             f'for {count:,d} addrs')
 
     def backup(self, hashXs, tx_count):
         # Not certain this is needed, but it doesn't hurt
@@ -161,7 +171,7 @@ class History(object):
                     batch.put(key, value)
             self.write_state(batch)
 
-        return nremoves
+        self.logger.info(f'backing up removed {nremoves:,d} history entries')
 
     def get_txnums(self, hashX, limit=1000):
         '''Generator that returns an unpruned, sorted list of tx_nums in the
@@ -307,7 +317,7 @@ class History(object):
                                  100 * cursor / 65536))
         return write_size
 
-    def cancel_compaction(self):
+    def _cancel_compaction(self):
         if self.comp_cursor != -1:
             self.logger.warning('cancelling in-progress history compaction')
             self.comp_flush_count = -1

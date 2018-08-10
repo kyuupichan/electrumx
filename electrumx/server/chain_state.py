@@ -14,18 +14,18 @@ class ChainState(object):
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, daemon, bp):
+    def __init__(self, env, db, daemon, bp):
         self._env = env
+        self._db = db
         self._daemon = daemon
-        self._bp = bp
 
         # External interface pass-throughs for session.py
-        self.force_chain_reorg = self._bp.force_chain_reorg
-        self.tx_branch_and_root = self._bp.merkle.branch_and_root
-        self.read_headers = self._bp.read_headers
-        self.all_utxos = self._bp.all_utxos
-        self.limited_history = self._bp.limited_history
-        self.header_branch_and_root = self._bp.header_branch_and_root
+        self.force_chain_reorg = bp.force_chain_reorg
+        self.tx_branch_and_root = db.merkle.branch_and_root
+        self.read_headers = db.read_headers
+        self.all_utxos = db.all_utxos
+        self.limited_history = db.limited_history
+        self.header_branch_and_root = db.header_branch_and_root
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -34,7 +34,7 @@ class ChainState(object):
         return await getattr(self._daemon, method)(*args)
 
     def db_height(self):
-        return self._bp.db_height
+        return self._db.db_height
 
     def get_info(self):
         '''Chain state info for LocalRPC and logs.'''
@@ -57,7 +57,7 @@ class ChainState(object):
 
     async def query(self, args, limit):
         coin = self._env.coin
-        db = self._bp
+        db = self._db
         lines = []
 
         def arg_to_hashX(arg):

@@ -62,7 +62,7 @@ async def query(args):
     db = DB(env)
     coin = env.coin
 
-    await db._open_dbs(False)
+    await db.open_for_serving()
 
     if not args.scripts:
         await print_stats(db.hist_db, db.utxo_db)
