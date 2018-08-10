@@ -27,14 +27,14 @@
 
 '''Transaction-related classes and functions.'''
 
-
 from collections import namedtuple
-from struct import pack
 
 from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.util import (
     cachedproperty, unpack_int32_from, unpack_int64_from,
-    unpack_uint16_from, unpack_uint32_from, unpack_uint64_from
+    unpack_uint16_from, unpack_uint32_from, unpack_uint64_from,
+    pack_le_int32, pack_varint, pack_le_uint32, pack_le_uint32, pack_le_int64,
+    pack_varbytes,
 )
 
 
@@ -45,7 +45,15 @@ class Tx(namedtuple("Tx", "version inputs outputs locktime")):
     def is_coinbase(self):
         return self.inputs[0].is_coinbase
 
-    # FIXME: add hash as a cached property?
+    def serialize(self):
+        return b''.join((
+            pack_le_int32(self.version),
+            pack_varint(len(self.inputs)),
+            b''.join(tx_in.serialize() for tx_in in self.inputs),
+            pack_varint(len(self.outputs)),
+            b''.join(tx_out.serialize() for tx_out in self.outputs),
+            pack_le_uint32(self.locktime)
+        ))
 
 
 class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
@@ -65,9 +73,22 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
         return ("Input({}, {:d}, script={}, sequence={:d})"
                 .format(prev_hash, self.prev_idx, script, self.sequence))
 
+    def serialize(self):
+        return b''.join((
+            self.prev_hash,
+            pack_le_uint32(self.prev_idx),
+            pack_varbytes(self.script),
+            pack_le_uint32(self.sequence),
+        ))
+
 
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
-    pass
+
+    def serialize(self):
+        return b''.join((
+            pack_le_int64(self.value),
+            pack_varbytes(self.pk_script),
+        ))
 
 
 class Deserializer(object):
@@ -530,7 +551,7 @@ class DeserializerDecred(Deserializer):
 
         if produce_hash:
             # TxSerializeNoWitness << 16 == 0x10000
-            no_witness_header = pack('<I', 0x10000 | (version & 0xffff))
+            no_witness_header = pack_le_uint32(0x10000 | (version & 0xffff))
             prefix_tx = no_witness_header + self.binary[start+4:end_prefix]
             tx_hash = self.blake256(prefix_tx)
         else:
