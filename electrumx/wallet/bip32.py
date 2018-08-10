@@ -271,6 +271,7 @@ def _exponent_to_bytes(exponent):
     '''Convert an exponent to 32 big-endian bytes'''
     return (bytes(32) + int_to_bytes(exponent))[-32:]
 
+
 def _from_extended_key(ekey):
     '''Return a PubKey or PrivKey from an extended key raw bytes.'''
     if not isinstance(ekey, (bytes, bytearray)):
@@ -294,6 +295,7 @@ def _from_extended_key(ekey):
         key = PrivKey(privkey, chain_code, n, depth)
 
     return key, coin
+
 
 def from_extended_key_string(ekey_str):
     '''Given an extended key string, such as
