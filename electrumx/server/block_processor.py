@@ -246,17 +246,19 @@ class BlockProcessor(object):
             except Exception:
                 return await self.daemon.raw_blocks(hex_hashes)
 
+        def flush_backup():
+            # self.touched can include other addresses which is
+            # harmless, but remove None.
+            self.touched.discard(None)
+            self.db.flush_backup(self.flush_data(), self.touched)
+
         start, last, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
             await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
-            # self.touched can include other addresses which is
-            # harmless, but remove None.
-            self.touched.discard(None)
-            await self.run_in_thread_with_lock(
-                self.db.flush_backup, self.flush_data(), self.touched)
+            await self.run_in_thread_with_lock(flush_backup)
             last -= len(raw_blocks)
         await self.prefetcher.reset_height(self.height)
 
@@ -319,14 +321,17 @@ class BlockProcessor(object):
 
     # - Flushing
     def flush_data(self):
+        '''The data for a flush.  The lock must be taken.'''
+        assert self.state_lock.locked()
         return FlushData(self.height, self.tx_count, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip)
 
     async def flush(self, flush_utxos):
-        await self.run_in_thread_with_lock(
-            self.db.flush_dbs, self.flush_data(), flush_utxos,
-            self.estimate_txs_remaining)
+        def flush():
+            self.db.flush_dbs(self.flush_data(), flush_utxos,
+                              self.estimate_txs_remaining)
+        await self.run_in_thread_with_lock(flush)
 
     async def _maybe_flush(self):
         # If caught up, flush everything as client queries are
