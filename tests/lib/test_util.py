@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from electrumx.lib import util
+from electrumx.lib import util, tx
 
 
 def test_cachedproperty():
@@ -223,3 +223,21 @@ def test_unpackers():
 def test_hex_transforms():
     h = "AABBCCDDEEFF"
     assert util.hex_to_bytes(h) == b'\xaa\xbb\xcc\xdd\xee\xff'
+
+
+def test_pack_varint():
+    tests = list(range(0, 258))
+    tests.extend([1024, 65535, 65536, 4294967295, 4294967296, 8294967296])
+
+    for n in tests:
+        data = util.pack_varint(n)
+        deser = tx.Deserializer(data)
+        assert deser._read_varint() == n
+
+def test_pack_varbytes():
+    tests = [b'', b'1', b'2' * 253, b'3' * 254, b'4' * 256, b'5' * 65536]
+
+    for test in tests:
+        data = util.pack_varbytes(test)
+        deser = tx.Deserializer(data)
+        assert deser._read_varbytes() == test
