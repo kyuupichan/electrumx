@@ -330,10 +330,38 @@ def protocol_version(client_req, min_tuple, max_tuple):
     return result, client_min
 
 
-unpack_int32_from = Struct('<i').unpack_from
-unpack_int64_from = Struct('<q').unpack_from
-unpack_uint16_from = Struct('<H').unpack_from
-unpack_uint32_from = Struct('<I').unpack_from
-unpack_uint64_from = Struct('<Q').unpack_from
+structi = Struct('<i')
+structq = Struct('<q')
+structH = Struct('<H')
+structI = Struct('<I')
+structQ = Struct('<Q')
+structB = Struct('B')
+
+unpack_int32_from = structi.unpack_from
+unpack_int64_from = structq.unpack_from
+unpack_uint16_from = structH.unpack_from
+unpack_uint32_from = structI.unpack_from
+unpack_uint64_from = structQ.unpack_from
+
+pack_le_int32 = structi.pack
+pack_le_int64 = structq.pack
+pack_le_uint16 = structH.pack
+pack_le_uint32 = structI.pack
+pack_le_uint64 = structQ.pack
+pack_byte = structB.pack
 
 hex_to_bytes = bytes.fromhex
+
+
+def pack_varint(n):
+    if n < 253:
+        return pack_byte(n)
+    if n < 65536:
+        return pack_byte(253) + pack_le_uint16(n)
+    if n < 4294967296:
+        return pack_byte(254) + pack_le_uint32(n)
+    return pack_byte(255) + pack_le_uint64(n)
+
+
+def pack_varbytes(data):
+    return pack_varint(len(data)) + data
