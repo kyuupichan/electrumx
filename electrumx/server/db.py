@@ -31,6 +31,7 @@ from electrumx.server.history import History
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 
+
 @attr.s(slots=True)
 class FlushData(object):
     height = attr.ib()
@@ -42,6 +43,7 @@ class FlushData(object):
     adds = attr.ib()
     deletes = attr.ib()
     tip = attr.ib()
+
 
 class DB(object):
     '''Simple wrapper of the backend database for querying.
