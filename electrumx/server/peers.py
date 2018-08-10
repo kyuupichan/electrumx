@@ -390,9 +390,13 @@ class PeerManager(object):
             await group.spawn(forever.wait())
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
-            # Consume tasks as they complete
+            # Consume tasks as they complete, logging unexpected failures
             async for task in group:
-                task.result()
+                if not task.cancelled():
+                    try:
+                        task.result()
+                    except Exception:
+                        self.logger.exception('task failed unexpectedly')
 
     def info(self):
         '''The number of peers.'''
