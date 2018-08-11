@@ -8,6 +8,13 @@
    should not occur with Python 3.7.
 
 
+Version 1.8.3 (11 Aug 2018)
+===========================
+
+* separate the DB and the BlockProcessor objects
+* comprehensive mempool tests
+* fix `#521`_, `#565`_, `#567`_
+
 Version 1.8.2 (09 Aug 2018)
 ===========================
 
@@ -171,26 +178,6 @@ Version 1.4
    The Decred implementation doesn't work on mainnet; I will remove it
    if this remains unfixed.
 
-Version 1.3
-===========
-
-* Switch to :ref:`version 1.2` of the protocol.
-  :func:`mempool.get_fee_histogram` implementation contributed by ecdsa,
-  verbose mode of :func:`blockchain.transaction.get` by gdassori.
-* :func:`blockchain.scripthash.listunspent` now takes into account mempool
-  spends and receipts.
-* Improved client notification handling.
-* Wait for mempool to fully sync before serving.
-* Documentation moved to `readthedocs.io
-  <https://electrumx.readthedocs.io/>`_.  Rewritten and improved
-  protocol documentation.
-* new/updated coins: Chips (cipig), Feathercoin (lclc), Zclassic(heyrhett),
-  Dash (thelazier), NYC (xarakas), Koto (wo01), BitcoinZ (cipig), BitCore
-  (cipig), Fujicoin (fujicoin), Bitcoin Atom (erasmospunk), Deanrius (carsenk),
-  SNG (blackjok3rtt).
-* Minor fixes and improvements: duckartes, blin00, bauerj,
-  erasmospunk, SomberNight, romanz.
-
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
@@ -208,9 +195,12 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#502: https://github.com/kyuupichan/electrumx/issues/50
 .. _#506: https://github.com/kyuupichan/electrumx/issues/506
 .. _#519: https://github.com/kyuupichan/electrumx/issues/519
+.. _#521: https://github.com/kyuupichan/electrumx/issues/521
 .. _#523: https://github.com/kyuupichan/electrumx/issues/523
 .. _#534: https://github.com/kyuupichan/electrumx/issues/534
 .. _#538: https://github.com/kyuupichan/electrumx/issues/538
 .. _#557: https://github.com/kyuupichan/electrumx/issues/557
 .. _#559: https://github.com/kyuupichan/electrumx/issues/559
 .. _#564: https://github.com/kyuupichan/electrumx/issues/564
+.. _#565: https://github.com/kyuupichan/electrumx/issues/565
+.. _#567: https://github.com/kyuupichan/electrumx/issues/567
