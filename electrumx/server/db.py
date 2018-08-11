@@ -579,9 +579,7 @@ class DB(object):
             self.write_utxo_state(batch)
 
     async def all_utxos(self, hashX):
-        '''Return all UTXOs for an address sorted in no particular order.  By
-        default yields at most 1000 entries.
-        '''
+        '''Return all UTXOs for an address sorted in no particular order.'''
         def read_utxos():
             utxos = []
             utxos_append = utxos.append
