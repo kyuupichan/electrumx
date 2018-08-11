@@ -6,8 +6,6 @@
 # and warranty status of this software.
 
 
-from aiorpcx import run_in_thread
-
 from electrumx.lib.hash import hash_to_hex_str
 
 
@@ -16,15 +14,18 @@ class ChainState(object):
     blocks, transaction history, UTXOs and the mempool.
     '''
 
-    def __init__(self, env, daemon, bp):
+    def __init__(self, env, db, daemon, bp):
         self._env = env
+        self._db = db
         self._daemon = daemon
-        self._bp = bp
 
         # External interface pass-throughs for session.py
-        self.force_chain_reorg = self._bp.force_chain_reorg
-        self.tx_branch_and_root = self._bp.merkle.branch_and_root
-        self.read_headers = self._bp.read_headers
+        self.force_chain_reorg = bp.force_chain_reorg
+        self.tx_branch_and_root = db.merkle.branch_and_root
+        self.read_headers = db.read_headers
+        self.all_utxos = db.all_utxos
+        self.limited_history = db.limited_history
+        self.header_branch_and_root = db.header_branch_and_root
 
     async def broadcast_transaction(self, raw_tx):
         return await self._daemon.sendrawtransaction([raw_tx])
@@ -33,7 +34,7 @@ class ChainState(object):
         return await getattr(self._daemon, method)(*args)
 
     def db_height(self):
-        return self._bp.db_height
+        return self._db.db_height
 
     def get_info(self):
         '''Chain state info for LocalRPC and logs.'''
@@ -43,35 +44,9 @@ class ChainState(object):
             'db_height': self.db_height(),
         }
 
-    async def get_history(self, hashX):
-        '''Get history asynchronously to reduce latency.'''
-        def job():
-            # History DoS limit.  Each element of history is about 99
-            # bytes when encoded as JSON.  This limits resource usage
-            # on bloated history requests, and uses a smaller divisor
-            # so large requests are logged before refusing them.
-            limit = self._env.max_send // 97
-            return list(self._bp.get_history(hashX, limit=limit))
-
-        return await run_in_thread(job)
-
-    async def get_utxos(self, hashX):
-        '''Get UTXOs asynchronously to reduce latency.'''
-        def job():
-            return list(self._bp.get_utxos(hashX, limit=None))
-
-        return await run_in_thread(job)
-
-    def header_branch_and_root(self, length, height):
-        return self._bp.header_mc.branch_and_root(length, height)
-
-    def processing_new_block(self):
-        '''Return True if we're processing a new block.'''
-        return self._daemon.cached_height() > self.db_height()
-
-    def raw_header(self, height):
+    async def raw_header(self, height):
         '''Return the binary header at the given height.'''
-        header, n = self._bp.read_headers(height, 1)
+        header, n = await self.read_headers(height, 1)
         if n != 1:
             raise IndexError(f'height {height:,d} out of range')
         return header
@@ -82,7 +57,7 @@ class ChainState(object):
 
     async def query(self, args, limit):
         coin = self._env.coin
-        db = self._bp
+        db = self._db
         lines = []
 
         def arg_to_hashX(arg):
@@ -102,22 +77,25 @@ class ChainState(object):
             if not hashX:
                 continue
             n = None
-            for n, (tx_hash, height) in enumerate(
-                    db.get_history(hashX, limit), start=1):
+            history = await db.limited_history(hashX, limit=limit)
+            for n, (tx_hash, height) in enumerate(history):
                 lines.append(f'History #{n:,d}: height {height:,d} '
                              f'tx_hash {hash_to_hex_str(tx_hash)}')
             if n is None:
                 lines.append('No history found')
             n = None
-            for n, utxo in enumerate(db.get_utxos(hashX, limit), start=1):
+            utxos = await db.all_utxos(hashX)
+            for n, utxo in enumerate(utxos, start=1):
                 lines.append(f'UTXO #{n:,d}: tx_hash '
                              f'{hash_to_hex_str(utxo.tx_hash)} '
                              f'tx_pos {utxo.tx_pos:,d} height '
                              f'{utxo.height:,d} value {utxo.value:,d}')
+                if n == limit:
+                    break
             if n is None:
                 lines.append('No UTXOs found')
 
-            balance = db.get_balance(hashX)
+            balance = sum(utxo.value for utxo in utxos)
             lines.append(f'Balance: {coin.decimal_value(balance):,f} '
                          f'{coin.SHORTNAME}')
 

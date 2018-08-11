@@ -50,7 +50,7 @@ Return the block header at the given height.
 
 **Example Result**
 
-With *cp_height* zero:
+With *height* 5 and *cp_height* 0 on the Bitcoin Cash chain:
 
 ::
 
@@ -58,7 +58,7 @@ With *cp_height* zero:
 
 .. _cp_height example:
 
-With *cp_height* 8 on the Bitcoin Cash chain::
+With *cp_height* 8::
 
   {
     "branch": [
@@ -310,166 +310,68 @@ Return the confirmed and unconfirmed balances of a :ref:`script hash
     "unconfirmed": "0.236844"
   }
 
-blockchain.scripthash.get_history
-=================================
+blockchain.scripthash.history
+=============================
 
-Return the confirmed and unconfirmed history of a :ref:`script hash
-<script hashes>`.
+Return part of the confirmed history of a :ref:`script hash <script
+hashes>`.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.get_history(scripthash)
-  .. versionadded:: 1.1
+  .. function:: blockchain.scripthash.history(scripthash, start_height)
+  .. versionadded:: 1.5
 
   *scripthash*
 
     The script hash as a hexadecimal string.
 
+  *start_height*
+
+    History will be returned starting from this height, a non-negative
+    integer.  If there are several matching transactions in a block,
+    the server will return *all* of them -- partial results from a
+    block are not permitted.  The client can start subsequent requests
+    at one above the greatest returned height and avoid repeats.
+
 **Result**
 
-  A list of confirmed transactions in blockchain order, with the
-  output of :func:`blockchain.scripthash.get_mempool` appended to the
-  list.  Each confirmed transaction is a dictionary with the following
-  keys:
+  A dictionary with the following keys.
 
-  * *height*
+  * *more*
 
-    The integer height of the block the transaction was confirmed in.
+    :const:`true` indicates that there *may* be more history
+    available.  A follow-up request is required to obtain any.
+    :const:`false` means all history to blockchain's tip has been
+    returned.
 
-  * *tx_hash*
+  * *history*
 
-    The transaction hash in hexadecimal.
+    A list ot transactions.  Each transaction is itself a list of
+    two elements:
 
-  See :func:`blockchain.scripthash.get_mempool` for how mempool
-  transactions are returned.
+      1. The block height
+      2. The transaction hash
 
 **Result Examples**
 
 ::
 
-  [
-    {
-      "height": 200004,
-      "tx_hash": "acc3758bd2a26f869fcc67d48ff30b96464d476bca82c1cd6656e7d506816412"
-    },
-    {
-      "height": 215008,
-      "tx_hash": "f3e1bf48975b8d6060a9de8884296abb80be618dc00ae3cb2f6cee3085e09403"
-    }
-  ]
+  {
+    "more": false,
+    "history": [
+      [
+        200004,
+        "acc3758bd2a26f869fcc67d48ff30b96464d476bca82c1cd6656e7d506816412"
+      ],
+      [
+        215008,
+        "f3e1bf48975b8d6060a9de8884296abb80be618dc00ae3cb2f6cee3085e09403"
+      ]
+    ]
+  }
 
-::
 
-  [
-    {
-      "fee": 20000,
-      "height": 0,
-      "tx_hash": "9fbed79a1e970343fcd39f4a2d830a6bde6de0754ed2da70f489d0303ed558ec"
-    }
-  ]
-
-blockchain.scripthash.get_mempool
-=================================
-
-Return the unconfirmed transactions of a :ref:`script hash <script
-hashes>`.
-
-**Signature**
-
-  .. function:: blockchain.scripthash.get_mempool(scripthash)
-  .. versionadded:: 1.1
-
-  *scripthash*
-
-    The script hash as a hexadecimal string.
-
-**Result**
-
-  A list of mempool transactions in arbitrary order.  Each mempool
-  transaction is a dictionary with the following keys:
-
-  * *height*
-
-    ``0`` if all inputs are confirmed, and ``-1`` otherwise.
-
-  * *tx_hash*
-
-    The transaction hash in hexadecimal.
-
-  * *fee*
-
-    The transaction fee in minimum coin units (satoshis).
-
-**Result Example**
-
-::
-
-  [
-    {
-      "tx_hash": "45381031132c57b2ff1cbe8d8d3920cf9ed25efd9a0beb764bdb2f24c7d1c7e3",
-      "height": 0,
-      "fee": 24310
-    }
-  ]
-
-blockchain.scripthash.listunspent
-=================================
-
-Return an ordered list of UTXOs sent to a script hash.
-
-**Signature**
-
-  .. function:: blockchain.scripthash.listunspent(scripthash)
-  .. versionadded:: 1.1
-
-  *scripthash*
-
-    The script hash as a hexadecimal string.
-
-**Result**
-
-  A list of unspent outputs in blockchain order.  This function takes
-  the mempool into account.  Mempool transactions paying to the
-  address are included at the end of the list in an undefined order.
-  Any output that is spent in the mempool does not appear.  Each
-  output is a dictionary with the following keys:
-
-  * *height*
-
-    The integer height of the block the transaction was confirmed in.
-    ``0`` if the transaction is in the mempool.
-
-  * *tx_pos*
-
-    The zero-based index of the output in the transaction's list of
-    outputs.
-
-  * *tx_hash*
-
-    The output's transaction hash as a hexadecimal string.
-
-  * *value*
-
-    The output's value in minimum coin units (satoshis).
-
-**Result Example**
-
-::
-
-  [
-    {
-      "tx_pos": 0,
-      "value": 45318048,
-      "tx_hash": "9f2c45a12db0144909b5db269415f7319179105982ac70ed80d76ea79d923ebf",
-      "height": 437146
-    },
-    {
-      "tx_pos": 0,
-      "value": 919195,
-      "tx_hash": "3d2290c93436a3e964cfc2f0950174d8847b1fbe3946432c4784e168da0f019f",
-      "height": 441696
-    }
-  ]
+.. _subscribed:
 
 blockchain.scripthash.subscribe
 ===============================
@@ -487,15 +389,89 @@ Subscribe to a script hash.
 
 **Result**
 
-  The :ref:`status <status>` of the script hash.
+  .. versionchanged:: 1.5
+
+  As of protocol 1.5, the transaction hash of the last confirmed
+  transaction in blockchain order, or :const:`null` if there are none.
+
+  For protocol versions 1.4 and below, the :ref:`status <status>` of
+  the script hash.
 
 **Notifications**
 
-  As this is a subcription, the client will receive a notification
-  when the :ref:`status <status>` of the script hash changes.  Its
-  signature is
+  .. versionchanged:: 1.5
 
-  .. function:: blockchain.scripthash.subscribe(scripthash, status)
+  As this is a subscription, the client receives notifications when
+  the confirmed transaction history and/or associated mempool
+  transactions change.
+
+  As of protocol 1.5, the initial mempool and subsequent changes to it
+  are sent with :func:`mempool.changes` notifications.  When confirmed
+  history changes, a notification with signature
+
+    .. function:: blockchain.scripthash.subscribe(scripthash, tx_hash)
+
+  is sent, where *tx_hash* is the hash of the last confirmed
+  transaction in blockchain order.
+
+  For protocol versions 1.4 and below, the client will receive a
+  notification when the :ref:`status <status>` of the script hash
+  changes.  Its signature is
+
+    .. function:: blockchain.scripthash.subscribe(scripthash, status)
+
+blockchain.scripthash.utxos
+===========================
+
+Return some confirmed UTXOs sent to a script hash.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.utxos(scripthash, start_height)
+  .. versionadded:: 1.5
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+  *start_height*
+
+    UTXOs will be returned starting from this height, a non-negative
+    integer.  If there are several UTXOs in one block, the server will
+    return *all* of them -- partial results from a block are not
+    permitted.  The client can start subsequent requests at one above
+    the greatest returned height and avoid repeats.
+
+.. note:: To get the effects of transactions in the mempool adding or
+   removing UTXOs, a client must
+   :func:`blockchain.scripthash.subscribe` and track mempool
+   transactions sent via :func:`mempool.changes` notifications.
+
+**Result**
+
+  A dictionary with the following keys.
+
+  * *more*
+
+    :const:`true` indicates that there *may* be more UTXOs available.
+    A follow-up request is required to obtain any.  :const:`false`
+    means all UTXOs to the blockchain's tip have been returned.
+
+  * *utxos*
+
+    A list of UTXOs.  Each UTXO is itself a list with the following
+    elements:
+
+    1. The height of the block the transaction is in
+    2. The transaction hash as a hexadecimal string
+    3. The zero-based index of the output in the transaction's outputs
+    4. The output value, an integer in minimum coin units (satoshis)
+
+**Result Example**
+
+::
+  **TODO**
+
 
 blockchain.transaction.broadcast
 ================================
@@ -542,11 +518,13 @@ Return a raw transaction.
 
 **Signature**
 
-  .. function:: blockchain.transaction.get(tx_hash, verbose=false)
+  .. function:: blockchain.transaction.get(tx_hash, verbose=false, merkle=false)
   .. versionchanged:: 1.1
      ignored argument *height* removed
   .. versionchanged:: 1.2
      *verbose* argument added
+  .. versionchanged:: 1.5
+     *merkle* argument added
 
   *tx_hash*
 
@@ -556,16 +534,38 @@ Return a raw transaction.
 
     Whether a verbose coin-specific response is required.
 
+  *markle*
+
+    Whether a merkle branch proof should be returned as well.
+
 **Result**
 
-    If *verbose* is :const:`false`, the raw transaction as a
-    hexadecimal string.  If :const:`true`, the result is coin-specific
-    and whatever the coin daemon returns when asked for a verbose form
-    of the raw transaction.
+    If *verbose* is :const:`false`:
+
+       If *merkle* is :const:`false`, the raw transaction as a
+       hexadecimal string.  If :const:`true`, the dictionary returned
+       by :func:`blockchain.transaction.get_merkle` with an additional
+       key:
+
+       *hex*
+
+          The raw transaction as a hexadecimal string.
+
+    If *verbose* is :const:`true`:
+
+       The result is a coin-specific dictionary -- whatever the coin
+       daemon returns when asked for a verbose form of the raw
+       transaction.  If *merkle* is :const:`true` it will have an
+       additional key:
+
+       *merkle*
+
+          The dictionary returned by
+          :func:`blockchain.transaction.get_merkle`.
 
 **Example Results**
 
-When *verbose* is :const:`false`::
+When *verbose* is :const:`false` and *merkle* is :const:`false`::
 
   "01000000015bb9142c960a838329694d3fe9ba08c2a6421c5158d8f7044cb7c48006c1b48"
   "4000000006a4730440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a824"
@@ -575,7 +575,7 @@ When *verbose* is :const:`false`::
   "4fe5f88ac50a8cf00000000001976a91445dac110239a7a3814535c15858b939211f85298"
   "88ac61ee0700"
 
-When *verbose* is :const:`true`::
+When *verbose* is :const:`true` and *merkle* is :const:`false`::
 
  {
    "blockhash": "0000000000000000015a4f37ece911e5e3549f988e855548ce7494a0a08b2ad6",
@@ -734,6 +734,52 @@ When *merkle* is :const:`true`::
       "503d3349648b985c1b571f59059e4da55a57b0163b08cc50379d73be80c4c8f3"
     ]
   }
+
+mempool.changes
+===============
+
+A notification that indicates changes to unconfirmed transactions of a
+:ref:`subscribed <subscribed>` :ref:`script hash <script hashes>`.  As
+its name suggests the notification is stateful; its contents are a
+function of what was sent previously.
+
+**Signature**
+
+  .. function:: mempool.changes(scripthash, new, gone)
+  .. versionadded:: 1.5
+
+  The parameters are as follows:
+
+  * *scripthash*
+
+    The script hash the notification is for, a hexadecimal string.
+
+  * *new*
+
+    A list of transactions in the mempool that have not previously
+    been sent to the client, or whose *confirmed input* status
+    has changed.  Each transaction is an ordered list of 3 items:
+
+    1. The raw transaction or its hash as a hexadecimal string.  The
+       first time the server sends a transaction it sends it raw.
+       Subsequent references in the same *new* list or in later
+       notifications will send the hash only.  Transactions cannot be
+       32 bytes in size so length can be used to distinguish.
+    2. The transaction fee, an integer in minimum coin units (satoshis)
+    3. :const:`true` if all inputs are confirmed otherwise :const:`false`
+
+  * *gone*
+
+    A list of hashes of transactions that were previously sent to the
+    client as being in the mempool but no longer are.  Those
+    transactions presumably were confirmed in a block or were evicted
+    from the mempool.
+
+**Notification Example**
+
+::
+  **TODO**
+
 
 mempool.get_fee_histogram
 =========================

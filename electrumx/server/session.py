@@ -61,6 +61,13 @@ def non_negative_integer(value):
                    f'{value} should be a non-negative integer')
 
 
+def assert_boolean(value):
+    '''Return param value it is boolean otherwise raise an RPCError.'''
+    if value in (False, True):
+        return value
+    raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
+
+
 def assert_tx_hash(value):
     '''Raise an RPCError if the value is not a valid transaction
     hash.'''
@@ -447,11 +454,17 @@ class SessionManager(object):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
-    async def get_history(self, hashX):
+    async def limited_history(self, hashX):
         '''A caching layer.'''
         hc = self._history_cache
         if hashX not in hc:
-            hc[hashX] = await self.chain_state.get_history(hashX)
+            # History DoS limit.  Each element of history is about 99
+            # bytes when encoded as JSON.  This limits resource usage
+            # on bloated history requests, and uses a smaller divisor
+            # so large requests are logged before refusing them.
+            limit = self.env.max_send // 97
+            hc[hashX] = await self.chain_state.limited_history(hashX,
+                                                               limit=limit)
         return hc[hashX]
 
     async def _notify_sessions(self, height, touched):
@@ -705,7 +718,7 @@ class ElectrumX(SessionBase):
         if height_changed:
             self.notified_height = height
             if self.subscribe_headers:
-                args = (self.subscribe_headers_result(height), )
+                args = (await self.subscribe_headers_result(height), )
                 await self.send_notification('blockchain.headers.subscribe',
                                              args)
 
@@ -713,49 +726,44 @@ class ElectrumX(SessionBase):
         if touched or (height_changed and self.mempool_statuses):
             await self.notify_touched(touched)
 
-    def assert_boolean(self, value):
-        '''Return param value it is boolean otherwise raise an RPCError.'''
-        if value in (False, True):
-            return value
-        raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
-
-    def raw_header(self, height):
+    async def raw_header(self, height):
         '''Return the binary header at the given height.'''
         try:
-            return self.chain_state.raw_header(height)
+            return await self.chain_state.raw_header(height)
         except IndexError:
-            raise RPCError(BAD_REQUEST, f'height {height:,d} out of range')
+            raise RPCError(BAD_REQUEST, f'height {height:,d} '
+                           'out of range') from None
 
-    def electrum_header(self, height):
+    async def electrum_header(self, height):
         '''Return the deserialized header at the given height.'''
-        raw_header = self.raw_header(height)
+        raw_header = await self.raw_header(height)
         return self.coin.electrum_header(raw_header, height)
 
-    def subscribe_headers_result(self, height):
+    async def subscribe_headers_result(self, height):
         '''The result of a header subscription for the given height.'''
         if self.subscribe_headers_raw:
-            raw_header = self.raw_header(height)
+            raw_header = await self.raw_header(height)
             return {'hex': raw_header.hex(), 'height': height}
-        return self.electrum_header(height)
+        return await self.electrum_header(height)
 
-    def _headers_subscribe(self, raw):
+    async def _headers_subscribe(self, raw):
         '''Subscribe to get headers of new blocks.'''
         self.subscribe_headers = True
-        self.subscribe_headers_raw = self.assert_boolean(raw)
+        self.subscribe_headers_raw = assert_boolean(raw)
         self.notified_height = self.db_height()
-        return self.subscribe_headers_result(self.notified_height)
+        return await self.subscribe_headers_result(self.notified_height)
 
     async def headers_subscribe(self):
         '''Subscribe to get raw headers of new blocks.'''
-        return self._headers_subscribe(True)
+        return await self._headers_subscribe(True)
 
     async def headers_subscribe_True(self, raw=True):
         '''Subscribe to get headers of new blocks.'''
-        return self._headers_subscribe(raw)
+        return await self._headers_subscribe(raw)
 
     async def headers_subscribe_False(self, raw=False):
         '''Subscribe to get headers of new blocks.'''
-        return self._headers_subscribe(raw)
+        return await self._headers_subscribe(raw)
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
@@ -771,15 +779,16 @@ class ElectrumX(SessionBase):
         Status is a hex string, but must be None if there is no history.
         '''
         # Note history is ordered and mempool unordered in electrum-server
-        # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.session_mgr.get_history(hashX)
+        # For mempool, height is -1 if it has unconfirmed inputs, otherwise 0
+        db_history = await self.session_mgr.limited_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
 
-        status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
-                         for tx_hash, height in history)
-        status += ''.join('{}:{:d}:'.format(hash_to_hex_str(hex_hash),
-                                            -unconfirmed)
-                          for hex_hash, tx_fee, unconfirmed in mempool)
+        status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                         f'{height:d}:'
+                         for tx_hash, height in db_history)
+        status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                          f'{-tx.has_unconfirmed_inputs:d}:'
+                          for tx in mempool)
         if status:
             status = sha256(status.encode()).hex()
         else:
@@ -795,7 +804,7 @@ class ElectrumX(SessionBase):
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash, including mempool
         effects.'''
-        utxos = await self.chain_state.get_utxos(hashX)
+        utxos = await self.chain_state.all_utxos(hashX)
         utxos = sorted(utxos)
         utxos.extend(await self.mempool.unordered_UTXOs(hashX))
         spends = await self.mempool.potential_spends(hashX)
@@ -852,7 +861,7 @@ class ElectrumX(SessionBase):
         return await self.hashX_subscribe(hashX, address)
 
     async def get_balance(self, hashX):
-        utxos = await self.chain_state.get_utxos(hashX)
+        utxos = await self.chain_state.all_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = await self.mempool.balance_delta(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
@@ -864,15 +873,15 @@ class ElectrumX(SessionBase):
 
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
-        # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = await self.mempool.transaction_summaries(hashX)
-        return [{'tx_hash': hash_to_hex_str(tx_hash), 'height': -unconfirmed,
-                 'fee': fee}
-                for tx_hash, fee, unconfirmed in mempool]
+        # height is -1 if it has unconfirmed inputs, otherwise 0
+        return [{'tx_hash': hash_to_hex_str(tx.hash),
+                 'height': -tx.has_unconfirmed_inputs,
+                 'fee': tx.fee}
+                for tx in await self.mempool.transaction_summaries(hashX)]
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.session_mgr.get_history(hashX)
+        history = await self.session_mgr.limited_history(hashX)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)
@@ -899,14 +908,14 @@ class ElectrumX(SessionBase):
         hashX = scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
 
-    def _merkle_proof(self, cp_height, height):
+    async def _merkle_proof(self, cp_height, height):
         max_height = self.db_height()
         if not height <= cp_height <= max_height:
             raise RPCError(BAD_REQUEST,
                            f'require header height {height:,d} <= '
                            f'cp_height {cp_height:,d} <= '
                            f'chain height {max_height:,d}')
-        branch, root = self.chain_state.header_branch_and_root(
+        branch, root = await self.chain_state.header_branch_and_root(
             cp_height + 1, height)
         return {
             'branch': [hash_to_hex_str(elt) for elt in branch],
@@ -918,11 +927,11 @@ class ElectrumX(SessionBase):
         dictionary with a merkle proof.'''
         height = non_negative_integer(height)
         cp_height = non_negative_integer(cp_height)
-        raw_header_hex = self.raw_header(height).hex()
+        raw_header_hex = (await self.raw_header(height)).hex()
         if cp_height == 0:
             return raw_header_hex
         result = {'header': raw_header_hex}
-        result.update(self._merkle_proof(cp_height, height))
+        result.update(await self._merkle_proof(cp_height, height))
         return result
 
     async def block_header_13(self, height):
@@ -944,11 +953,12 @@ class ElectrumX(SessionBase):
 
         max_size = self.MAX_CHUNK_SIZE
         count = min(count, max_size)
-        headers, count = self.chain_state.read_headers(start_height, count)
+        headers, count = await self.chain_state.read_headers(start_height,
+                                                             count)
         result = {'hex': headers.hex(), 'count': count, 'max': max_size}
         if count and cp_height:
             last_height = start_height + count - 1
-            result.update(self._merkle_proof(cp_height, last_height))
+            result.update(await self._merkle_proof(cp_height, last_height))
         return result
 
     async def block_headers_12(self, start_height, count):
@@ -961,7 +971,7 @@ class ElectrumX(SessionBase):
         index = non_negative_integer(index)
         size = self.coin.CHUNK_SIZE
         start_height = index * size
-        headers, count = self.chain_state.read_headers(start_height, size)
+        headers, _ = await self.chain_state.read_headers(start_height, size)
         return headers.hex()
 
     async def block_get_header(self, height):
@@ -969,7 +979,7 @@ class ElectrumX(SessionBase):
 
         height: the header's height'''
         height = non_negative_integer(height)
-        return self.electrum_header(height)
+        return await self.electrum_header(height)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
