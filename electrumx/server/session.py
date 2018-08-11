@@ -779,15 +779,16 @@ class ElectrumX(SessionBase):
         Status is a hex string, but must be None if there is no history.
         '''
         # Note history is ordered and mempool unordered in electrum-server
-        # For mempool, height is -1 if unconfirmed txins, otherwise 0
-        history = await self.session_mgr.limited_history(hashX)
+        # For mempool, height is -1 if it has unconfirmed inputs, otherwise 0
+        db_history = await self.session_mgr.limited_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
 
-        status = ''.join('{}:{:d}:'.format(hash_to_hex_str(tx_hash), height)
-                         for tx_hash, height in history)
-        status += ''.join('{}:{:d}:'.format(hash_to_hex_str(hex_hash),
-                                            -unconfirmed)
-                          for hex_hash, tx_fee, unconfirmed in mempool)
+        status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                         f'{height:d}:'
+                         for tx_hash, height in db_history)
+        status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                          f'{-tx.has_unconfirmed_inputs:d}:'
+                          for tx in mempool)
         if status:
             status = sha256(status.encode()).hex()
         else:
@@ -872,11 +873,11 @@ class ElectrumX(SessionBase):
 
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
-        # Height is -1 if unconfirmed txins, otherwise 0
-        mempool = await self.mempool.transaction_summaries(hashX)
-        return [{'tx_hash': hash_to_hex_str(tx_hash), 'height': -unconfirmed,
-                 'fee': fee}
-                for tx_hash, fee, unconfirmed in mempool]
+        # height is -1 if it has unconfirmed inputs, otherwise 0
+        return [{'tx_hash': hash_to_hex_str(tx.hash),
+                 'height': -tx.has_unconfirmed_inputs,
+                 'fee': tx.fee}
+                for tx in await self.mempool.transaction_summaries(hashX)]
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s

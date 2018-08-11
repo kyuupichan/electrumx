@@ -212,6 +212,14 @@ class Coin(object):
         return ScriptPubKey.P2PK_script(pubkey)
 
     @classmethod
+    def hash160_to_P2PKH_script(cls, hash160):
+        return ScriptPubKey.P2PKH_script(hash160)
+
+    @classmethod
+    def hash160_to_P2PKH_hashX(cls, hash160):
+        return cls.hashX_from_script(cls.hash160_to_P2PKH_script(hash160))
+
+    @classmethod
     def pay_to_address_script(cls, address):
         '''Return a pubkey script that pays to a pubkey hash.
 
@@ -223,12 +231,12 @@ class Coin(object):
         verbyte = -1
         verlen = len(raw) - 20
         if verlen > 0:
-            verbyte, hash_bytes = raw[:verlen], raw[verlen:]
+            verbyte, hash160 = raw[:verlen], raw[verlen:]
 
         if verbyte == cls.P2PKH_VERBYTE:
-            return ScriptPubKey.P2PKH_script(hash_bytes)
+            return cls.hash160_to_P2PKH_script(hash160)
         if verbyte in cls.P2SH_VERBYTES:
-            return ScriptPubKey.P2SH_script(hash_bytes)
+            return ScriptPubKey.P2SH_script(hash160)
 
         raise CoinError('invalid address: {}'.format(address))
 
