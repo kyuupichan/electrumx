@@ -150,6 +150,9 @@ Removed methods
 Version 1.5
 ===========
 
+.. note:: This is a draft of ideas for protocol 1.5; they are not
+           implemented
+
 This protocol version makes changes intended to allow clients and
 servers to more easily scale to support queries about busy addresses.
 It has changes to reduce the amount of round-trip queries made in
