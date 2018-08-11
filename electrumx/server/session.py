@@ -508,6 +508,19 @@ class SessionManager(object):
         except DaemonError as e:
             raise RPCError(DAEMON_ERROR, f'daemon error: {e!r}') from None
 
+    async def raw_header(self, height):
+        '''Return the binary header at the given height.'''
+        try:
+            return await self.db.raw_header(height)
+        except IndexError:
+            raise RPCError(BAD_REQUEST, f'height {height:,d} '
+                           'out of range') from None
+
+    async def electrum_header(self, height):
+        '''Return the deserialized header at the given height.'''
+        raw_header = await self.raw_header(height)
+        return self.env.coin.electrum_header(raw_header, height)
+
     async def broadcast_transaction(self, raw_tx):
         hex_hash = await self.daemon.sendrawtransaction([raw_tx])
         self.txs_sent += 1
@@ -777,25 +790,12 @@ class ElectrumX(SessionBase):
         if touched or (height_changed and self.mempool_statuses):
             await self.notify_touched(touched)
 
-    async def raw_header(self, height):
-        '''Return the binary header at the given height.'''
-        try:
-            return await self.db.raw_header(height)
-        except IndexError:
-            raise RPCError(BAD_REQUEST, f'height {height:,d} '
-                           'out of range') from None
-
-    async def electrum_header(self, height):
-        '''Return the deserialized header at the given height.'''
-        raw_header = await self.raw_header(height)
-        return self.coin.electrum_header(raw_header, height)
-
     async def subscribe_headers_result(self, height):
         '''The result of a header subscription for the given height.'''
         if self.subscribe_headers_raw:
-            raw_header = await self.raw_header(height)
+            raw_header = await self.session_mgr.raw_header(height)
             return {'hex': raw_header.hex(), 'height': height}
-        return await self.electrum_header(height)
+        return await self.session_mgr.electrum_header(height)
 
     async def _headers_subscribe(self, raw):
         '''Subscribe to get headers of new blocks.'''
@@ -978,7 +978,7 @@ class ElectrumX(SessionBase):
         dictionary with a merkle proof.'''
         height = non_negative_integer(height)
         cp_height = non_negative_integer(cp_height)
-        raw_header_hex = (await self.raw_header(height)).hex()
+        raw_header_hex = (await self.session_mgr.raw_header(height)).hex()
         if cp_height == 0:
             return raw_header_hex
         result = {'header': raw_header_hex}
@@ -1029,7 +1029,7 @@ class ElectrumX(SessionBase):
 
         height: the header's height'''
         height = non_negative_integer(height)
-        return await self.electrum_header(height)
+        return await self.session_mgr.electrum_header(height)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
