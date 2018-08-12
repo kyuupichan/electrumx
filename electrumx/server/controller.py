@@ -92,9 +92,11 @@ class Controller(ServerBase):
         self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
         notifications = Notifications()
-        daemon = env.coin.DAEMON(env)
-        db = DB(env)
+        Daemon = env.coin.DAEMON
         BlockProcessor = env.coin.BLOCK_PROCESSOR
+
+        daemon = Daemon(env.coin, env.daemon_url)
+        db = DB(env)
         bp = BlockProcessor(env, db, daemon, notifications)
 
         # Set ourselves up to implement the MemPoolAPI

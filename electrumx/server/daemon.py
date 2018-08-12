@@ -37,14 +37,14 @@ class Daemon(object):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, env):
+    def __init__(self, coin, urls, max_workqueue=10):
+        self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.coin = env.coin
-        self.set_urls(env.coin.daemon_urls(env.daemon_url))
+        self.set_urls(coin.daemon_urls(urls))
         self._height = None
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
-        self.workqueue_semaphore = asyncio.Semaphore(value=10)
+        self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
         self.down = False
         self.last_error_time = 0
         self.req_id = 0
