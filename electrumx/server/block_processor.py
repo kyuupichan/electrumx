@@ -411,7 +411,7 @@ class BlockProcessor(object):
             tx_numb = s_pack('<I', tx_num)
 
             # Spend the inputs
-            if not tx.is_coinbase:
+            if not tx.is_generation:
                 for txin in tx.inputs:
                     cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                     undo_info_append(cache_value)
@@ -490,7 +490,7 @@ class BlockProcessor(object):
                     touched.add(cache_value[:-12])
 
             # Restore the inputs
-            if not tx.is_coinbase:
+            if not tx.is_generation:
                 for txin in reversed(tx.inputs):
                     n -= undo_entry_len
                     undo_item = undo_info[n:n + undo_entry_len]
