@@ -47,8 +47,6 @@ class Daemon(object):
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
-        self.down = False
-        self.last_error_time = 0
         self._available_rpcs = {}  # caches results for _is_rpc_available()
 
     def set_urls(self, urls):
@@ -99,17 +97,20 @@ class Daemon(object):
         are raise through DaemonError.
         '''
         def log_error(error):
-            self.down = True
+            nonlocal down, last_error_time
+            down = True
             now = time.time()
-            prior_time = self.last_error_time
+            prior_time = last_error_time
             if now - prior_time > 60:
-                self.last_error_time = now
+                last_error_time = now
                 if prior_time and self.failover():
                     secs = 0
                 else:
                     self.logger.error('{}  Retrying occasionally...'
                                       .format(error))
 
+        down = False
+        last_error_time = 0
         data = json.dumps(payload)
         secs = 1
         max_secs = 4
@@ -118,9 +119,7 @@ class Daemon(object):
                 result = await self._send_data(data)
                 if not isinstance(result, tuple):
                     result = processor(result)
-                    if self.down:
-                        self.down = False
-                        self.last_error_time = 0
+                    if down:
                         self.logger.info('connection restored')
                     return result
                 log_error('HTTP error code {:d}: {}'
