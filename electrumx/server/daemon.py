@@ -9,6 +9,7 @@
 daemon.'''
 
 import asyncio
+import itertools
 import json
 import time
 from calendar import timegm
@@ -33,6 +34,7 @@ class Daemon(object):
 
     WARMING_UP = -28
     RPC_MISC_ERROR = -1
+    id_counter = itertools.count()
 
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
@@ -47,13 +49,7 @@ class Daemon(object):
         self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
         self.down = False
         self.last_error_time = 0
-        self.req_id = 0
         self._available_rpcs = {}  # caches results for _is_rpc_available()
-
-    def next_req_id(self):
-        '''Retrns the next request ID.'''
-        self.req_id += 1
-        return self.req_id
 
     def set_urls(self, urls):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -162,7 +158,7 @@ class Daemon(object):
                 raise self.DaemonWarmingUpError
             raise DaemonError(err)
 
-        payload = {'method': method, 'id': self.next_req_id()}
+        payload = {'method': method, 'id': next(self.id_counter)}
         if params:
             payload['params'] = params
         return await self._send(payload, processor)
@@ -181,7 +177,7 @@ class Daemon(object):
                 return [item['result'] for item in result]
             raise DaemonError(errs)
 
-        payload = [{'method': method, 'params': p, 'id': self.next_req_id()}
+        payload = [{'method': method, 'params': p, 'id': next(self.id_counter)}
                    for p in params_iterable]
         if payload:
             return await self._send(payload, processor)
