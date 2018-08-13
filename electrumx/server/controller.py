@@ -112,10 +112,13 @@ class Controller(ServerBase):
         session_mgr = SessionManager(env, db, bp, daemon, mempool,
                                      notifications, shutdown_event)
 
+        # Test daemon authentication, and also ensure it has a cached
+        # height.  Do this before entering the task group.
+        await daemon.height()
+
         caught_up_event = Event()
         serve_externally_event = Event()
         synchronized_event = Event()
-
         async with TaskGroup() as group:
             await group.spawn(session_mgr.serve(serve_externally_event))
             await group.spawn(bp.fetch_and_process_blocks(caught_up_event))

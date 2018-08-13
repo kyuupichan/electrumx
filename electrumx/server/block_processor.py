@@ -650,10 +650,7 @@ class BlockProcessor(object):
         could be lost.
         '''
         self._caught_up_event = caught_up_event
-        async with TaskGroup() as group:
-            await group.spawn(self._first_open_dbs())
-            # Ensure cached_height is set
-            await group.spawn(self.daemon.height())
+        await self._first_open_dbs()
         try:
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
