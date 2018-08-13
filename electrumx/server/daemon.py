@@ -29,8 +29,12 @@ class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
 
+class WarmingUpError(Exception):
+    '''Internal - when the daemon is warming up.'''
+
+
 class WorkQueueFullError(Exception):
-    pass
+    '''Internal - when the daemon's work queue is full.'''
 
 
 class Daemon(object):
@@ -38,9 +42,6 @@ class Daemon(object):
 
     WARMING_UP = -28
     id_counter = itertools.count()
-
-    class DaemonWarmingUpError(Exception):
-        '''Raised when the daemon returns an error in its results.'''
 
     def __init__(self, coin, url, max_workqueue=10, init_retry=0.25,
                  max_retry=4.0):
@@ -139,7 +140,7 @@ class Daemon(object):
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
                 on_good_message = 'connection restored'
-            except self.DaemonWarmingUpError:
+            except WarmingUpError:
                 log_error('starting up checking blocks.')
                 on_good_message = 'running normally'
             except WorkQueueFullError:
@@ -156,7 +157,7 @@ class Daemon(object):
             if not err:
                 return result['result']
             if err.get('code') == self.WARMING_UP:
-                raise self.DaemonWarmingUpError
+                raise WarmingUpError
             raise DaemonError(err)
 
         payload = {'method': method, 'id': next(self.id_counter)}
@@ -173,7 +174,7 @@ class Daemon(object):
         def processor(result):
             errs = [item['error'] for item in result if item['error']]
             if any(err.get('code') == self.WARMING_UP for err in errs):
-                raise self.DaemonWarmingUpError
+                raise WarmingUpError
             if not errs or replace_errs:
                 return [item['result'] for item in result]
             raise DaemonError(errs)
