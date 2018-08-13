@@ -535,7 +535,7 @@ class SessionManager(object):
         return electrum_header
 
     async def broadcast_transaction(self, raw_tx):
-        hex_hash = await self.daemon.sendrawtransaction([raw_tx])
+        hex_hash = await self.daemon.broadcast_transaction(raw_tx)
         self.txs_sent += 1
         return hex_hash
 
@@ -1144,7 +1144,7 @@ class ElectrumX(SessionBase):
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.logger.info(f'sendrawtransaction: {message}')
+            self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
 
