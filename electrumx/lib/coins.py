@@ -112,10 +112,6 @@ class Coin(object):
         return url + '/'
 
     @classmethod
-    def daemon_urls(cls, urls):
-        return [cls.sanitize_url(url) for url in urls.split(',')]
-
-    @classmethod
     def genesis_block(cls, block):
         '''Check the Genesis block is the right one for this coin.
 

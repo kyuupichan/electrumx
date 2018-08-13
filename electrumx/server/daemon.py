@@ -38,30 +38,35 @@ class Daemon(object):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, coin, urls, max_workqueue=10):
+    def __init__(self, coin, url, max_workqueue=10):
         self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.set_urls(coin.daemon_urls(urls))
+        self.set_url(url)
         self._height = None
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
         self.available_rpcs = {}
 
-    def set_urls(self, urls):
+    def set_url(self, url):
         '''Set the URLS to the given list, and switch to the first one.'''
-        if not urls:
-            raise DaemonError('no daemon URLs provided')
-        self.urls = urls
-        self.url_index = 0
+        urls = url.split(',')
+        urls = [self.coin.sanitize_url(url) for url in urls]
         for n, url in enumerate(urls):
             status = '' if n else ' (current)'
             logged_url = self.logged_url(url)
             self.logger.info(f'daemon #{n + 1} at {logged_url}{status}')
+        self.url_index = 0
+        self.urls = urls
 
-    def url(self):
+    def current_url(self):
         '''Returns the current daemon URL.'''
         return self.urls[self.url_index]
+
+    def logged_url(self, url=None):
+        '''The host and port part, for logging.'''
+        url = url or self.current_url()
+        return url[url.rindex('@') + 1:]
 
     def failover(self):
         '''Call to fail-over to the next daemon URL.
@@ -81,7 +86,7 @@ class Daemon(object):
     async def _send_data(self, data):
         async with self.workqueue_semaphore:
             async with self.client_session() as session:
-                async with session.post(self.url(), data=data) as resp:
+                async with session.post(self.current_url(), data=data) as resp:
                     # If bitcoind can't find a tx, for some reason
                     # it returns 500 but fills out the JSON.
                     # Should still return 200 IMO.
@@ -138,11 +143,6 @@ class Daemon(object):
 
             await asyncio.sleep(secs)
             secs = min(max_secs, secs * 2, 1)
-
-    def logged_url(self, url=None):
-        '''The host and port part, for logging.'''
-        url = url or self.url()
-        return url[url.rindex('@') + 1:]
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''

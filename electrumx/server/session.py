@@ -383,7 +383,7 @@ class SessionManager(object):
         '''Replace the daemon URL.'''
         daemon_url = daemon_url or self.env.daemon_url
         try:
-            self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
+            self.daemon.set_url(daemon_url)
         except Exception as e:
             raise RPCError(BAD_REQUEST, f'an error occured: {e!r}')
         return f'now using daemon at {self.daemon.logged_url()}'
