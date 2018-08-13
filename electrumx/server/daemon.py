@@ -33,7 +33,6 @@ class Daemon(object):
     '''Handles connections to a daemon at the given URL.'''
 
     WARMING_UP = -28
-    RPC_MISC_ERROR = -1
     id_counter = itertools.count()
 
     class DaemonWarmingUpError(Exception):
@@ -47,7 +46,7 @@ class Daemon(object):
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
-        self._available_rpcs = {}  # caches results for _is_rpc_available()
+        self.available_rpcs = {}
 
     def set_urls(self, urls):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -185,26 +184,16 @@ class Daemon(object):
 
         Results are cached and the daemon will generally not be queried with
         the same method more than once.'''
-        available = self._available_rpcs.get(method, None)
+        available = self.available_rpcs.get(method)
         if available is None:
+            available = True
             try:
                 await self._send_single(method)
-                available = True
             except DaemonError as e:
                 err = e.args[0]
                 error_code = err.get("code")
-                if error_code == JSONRPC.METHOD_NOT_FOUND:
-                    available = False
-                elif error_code == self.RPC_MISC_ERROR:
-                    # method found but exception was thrown in command handling
-                    # probably because we did not provide arguments
-                    available = True
-                else:
-                    self.logger.warning(f'error (code {error_code}: '
-                                        f'{err.get("message")}) testing '
-                                        f'RPC availability of method {method}')
-                    available = False
-            self._available_rpcs[method] = available
+                available = error_code != JSONRPC.METHOD_NOT_FOUND
+            self.available_rpcs[method] = available
         return available
 
     async def block_hex_hashes(self, first, count):
