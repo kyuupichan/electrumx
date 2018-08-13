@@ -56,9 +56,9 @@ class Daemon(object):
         self.urls = urls
         self.url_index = 0
         for n, url in enumerate(urls):
-            self.logger.info('daemon #{:d} at {}{}'
-                             .format(n + 1, self.logged_url(url),
-                                     '' if n else ' (current)'))
+            status = '' if n else ' (current)'
+            logged_url = self.logged_url(url)
+            self.logger.info(f'daemon #{n + 1} at {logged_url}{status}')
 
     def url(self):
         '''Returns the current daemon URL.'''
@@ -71,7 +71,7 @@ class Daemon(object):
         '''
         if len(self.urls) > 1:
             self.url_index = (self.url_index + 1) % len(self.urls)
-            self.logger.info('failing over to {}'.format(self.logged_url()))
+            self.logger.info(f'failing over to {self.logged_url()}')
             return True
         return False
 
@@ -106,8 +106,7 @@ class Daemon(object):
                 if prior_time and self.failover():
                     secs = 0
                 else:
-                    self.logger.error('{}  Retrying occasionally...'
-                                      .format(error))
+                    self.logger.error(f'{error}  Retrying occasionally...')
 
         down = False
         last_error_time = 0
@@ -122,8 +121,7 @@ class Daemon(object):
                     if down:
                         self.logger.info('connection restored')
                     return result
-                log_error('HTTP error code {:d}: {}'
-                          .format(result[0], result[1]))
+                log_error(f'HTTP error code {result[0]}: {result[1]}')
             except asyncio.TimeoutError:
                 log_error('timeout error.')
             except aiohttp.ServerDisconnectedError:
@@ -202,10 +200,9 @@ class Daemon(object):
                     # probably because we did not provide arguments
                     available = True
                 else:
-                    self.logger.warning('error (code {:d}: {}) when testing '
-                                        'RPC availability of method {}'
-                                        .format(error_code, err.get("message"),
-                                                method))
+                    self.logger.warning(f'error (code {error_code}: '
+                                        f'{err.get("message")}) testing '
+                                        f'RPC availability of method {method}')
                     available = False
             self._available_rpcs[method] = available
         return available
