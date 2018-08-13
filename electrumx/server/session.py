@@ -1088,7 +1088,7 @@ class ElectrumX(SessionBase):
         number: the number of blocks
         '''
         number = non_negative_integer(number)
-        return await self.daemon_request('estimatefee', [number])
+        return await self.daemon_request('estimatefee', number)
 
     async def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to

@@ -216,12 +216,16 @@ class Daemon(object):
         '''Update our record of the daemon's mempool hashes.'''
         return await self._send_single('getrawmempool')
 
-    async def estimatefee(self, params):
-        '''Return the fee estimate for the given parameters.'''
+    async def estimatefee(self, block_count):
+        '''Return the fee estimate for the block count.  Units are whole
+        currency units per KB, e.g. 0.00000995, or -1 if no estimate
+        is available.
+        '''
+        args = (block_count, )
         if await self._is_rpc_available('estimatesmartfee'):
-            estimate = await self._send_single('estimatesmartfee', params)
+            estimate = await self._send_single('estimatesmartfee', args)
             return estimate.get('feerate', -1)
-        return await self._send_single('estimatefee', params)
+        return await self._send_single('estimatefee', args)
 
     async def getnetworkinfo(self):
         '''Return the result of the 'getnetworkinfo' RPC call.'''
@@ -280,7 +284,7 @@ class FakeEstimateFeeDaemon(Daemon):
     '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that
     wants to use this daemon must define ESTIMATE_FEE & RELAY_FEE'''
 
-    async def estimatefee(self, params):
+    async def estimatefee(self, block_count):
         '''Return the fee estimate for the given parameters.'''
         return self.coin.ESTIMATE_FEE
 
