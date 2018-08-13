@@ -29,6 +29,10 @@ class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
 
+class WorkQueueFullError(Exception):
+    pass
+
+
 class Daemon(object):
     '''Handles connections to a daemon at the given URL.'''
 
@@ -87,12 +91,16 @@ class Daemon(object):
         async with self.workqueue_semaphore:
             async with self.client_session() as session:
                 async with session.post(self.current_url(), data=data) as resp:
-                    # If bitcoind can't find a tx, for some reason
-                    # it returns 500 but fills out the JSON.
-                    # Should still return 200 IMO.
-                    if resp.status in (200, 404, 500):
+                    kind = resp.headers.get('Content-Type', None)
+                    if kind == 'application/json':
                         return await resp.json()
-                    return (resp.status, resp.reason)
+                    # bitcoind's HTTP protocol "handling" is a bad joke
+                    text = await resp.text()
+                    if 'Work queue depth exceeded' in text:
+                        raise WorkQueueFullError
+                    text = text.strip() or resp.reason
+                    self.logger.error(text)
+                    raise DaemonError(text)
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -101,48 +109,45 @@ class Daemon(object):
         are raise through DaemonError.
         '''
         def log_error(error):
-            nonlocal down, last_error_time
-            down = True
+            nonlocal last_error_log, secs
             now = time.time()
-            prior_time = last_error_time
-            if now - prior_time > 60:
+            if now - last_error_log > 60:
                 last_error_time = now
-                if prior_time and self.failover():
-                    secs = 0
-                else:
-                    self.logger.error(f'{error}  Retrying occasionally...')
+                self.logger.error(f'{error}  Retrying occasionally...')
+            if secs == max_secs and self.failover():
+                secs = 0.25
 
-        down = False
-        last_error_time = 0
+        on_good_message = None
+        last_error_log = 0
         data = json.dumps(payload)
-        secs = 1
+        secs = 0.25
         max_secs = 4
         while True:
             try:
                 result = await self._send_data(data)
-                if not isinstance(result, tuple):
-                    result = processor(result)
-                    if down:
-                        self.logger.info('connection restored')
-                    return result
-                log_error(f'HTTP error code {result[0]}: {result[1]}')
+                result = processor(result)
+                if on_good_message:
+                    self.logger.info(on_good_message)
+                return result
             except asyncio.TimeoutError:
                 log_error('timeout error.')
             except aiohttp.ServerDisconnectedError:
                 log_error('disconnected.')
+                on_good_message = 'connection restored'
             except aiohttp.ClientPayloadError:
                 log_error('payload encoding error.')
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
+                on_good_message = 'connection restored'
             except self.DaemonWarmingUpError:
                 log_error('starting up checking blocks.')
-            except (asyncio.CancelledError, DaemonError):
-                raise
-            except Exception as e:
-                self.logger.exception(f'uncaught exception: {e}')
+                on_good_message = 'running normally'
+            except WorkQueueFullError:
+                log_error('work queue full.')
+                on_good_message = 'running normally'
 
             await asyncio.sleep(secs)
-            secs = min(max_secs, secs * 2, 1)
+            secs = min(max_secs, secs * 2)
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
