@@ -71,25 +71,14 @@ def test_increment_byte_string():
     assert util.increment_byte_string(b'\x01\x01') == b'\x01\x02'
     assert util.increment_byte_string(b'\xff\xff') is None
 
+
 def test_bytes_to_int():
     assert util.bytes_to_int(b'\x07[\xcd\x15') == 123456789
+
 
 def test_int_to_bytes():
     assert util.int_to_bytes(456789) == b'\x06\xf8U'
 
-def test_int_to_varint():
-    with pytest.raises(ValueError):
-        util.int_to_varint(-1)
-    assert util.int_to_varint(0) == b'\0'
-    assert util.int_to_varint(5) == b'\5'
-    assert util.int_to_varint(252) == b'\xfc'
-    assert util.int_to_varint(253) == b'\xfd\xfd\0'
-    assert util.int_to_varint(65535) == b'\xfd\xff\xff'
-    assert util.int_to_varint(65536) == b'\xfe\0\0\1\0'
-    assert util.int_to_varint(2**32-1) == b'\xfe\xff\xff\xff\xff'
-    assert util.int_to_varint(2**32) == b'\xff\0\0\0\0\1\0\0\0'
-    assert util.int_to_varint(2**64-1) \
-        == b'\xff\xff\xff\xff\xff\xff\xff\xff\xff'
 
 def test_LogicalFile(tmpdir):
     prefix = os.path.join(tmpdir, 'log')
@@ -233,6 +222,20 @@ def test_pack_varint():
         data = util.pack_varint(n)
         deser = tx.Deserializer(data)
         assert deser._read_varint() == n
+
+    import struct
+    with pytest.raises(struct.error):
+        util.pack_varint(-1)
+    assert util.pack_varint(0) == b'\0'
+    assert util.pack_varint(5) == b'\5'
+    assert util.pack_varint(252) == b'\xfc'
+    assert util.pack_varint(253) == b'\xfd\xfd\0'
+    assert util.pack_varint(65535) == b'\xfd\xff\xff'
+    assert util.pack_varint(65536) == b'\xfe\0\0\1\0'
+    assert util.pack_varint(2**32-1) == b'\xfe\xff\xff\xff\xff'
+    assert util.pack_varint(2**32) == b'\xff\0\0\0\0\1\0\0\0'
+    assert util.pack_varint(2**64-1) \
+           == b'\xff\xff\xff\xff\xff\xff\xff\xff\xff'
 
 def test_pack_varbytes():
     tests = [b'', b'1', b'2' * 253, b'3' * 254, b'4' * 256, b'5' * 65536]

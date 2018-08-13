@@ -17,8 +17,8 @@ from time import strptime
 
 import aiohttp
 
-from electrumx.lib.util import int_to_varint, hex_to_bytes, class_logger, \
-    unpack_le_uint16_from
+from electrumx.lib.util import hex_to_bytes, class_logger,\
+    unpack_le_uint16_from, pack_varint
 from electrumx.lib.hash import hex_str_to_hash, hash_to_hex_str
 from electrumx.lib.tx import DeserializerDecred
 from aiorpcx import JSONRPC
@@ -356,7 +356,7 @@ class LegacyRPCDaemon(Daemon):
         raw_block = header
         num_txs = len(transactions)
         if num_txs > 0:
-            raw_block += int_to_varint(num_txs)
+            raw_block += pack_varint(num_txs)
             raw_block += b''.join(transactions)
         else:
             raw_block += b'\x00'

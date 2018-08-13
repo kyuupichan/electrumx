@@ -168,20 +168,6 @@ def int_to_bytes(value):
     return value.to_bytes((value.bit_length() + 7) // 8, 'big')
 
 
-def int_to_varint(value):
-    '''Converts an integer to a Bitcoin-like varint bytes'''
-    if value < 0:
-        raise ValueError("attempt to write size < 0")
-    elif value < 253:
-        return pack('<B', value)
-    elif value < 2**16:
-        return b'\xfd' + pack('<H', value)
-    elif value < 2**32:
-        return b'\xfe' + pack('<I', value)
-    elif value < 2**64:
-        return b'\xff' + pack('<Q', value)
-
-
 def increment_byte_string(bs):
     '''Return the lexicographically next byte string of the same length.
 
