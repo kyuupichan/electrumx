@@ -42,14 +42,17 @@ class Daemon(object):
     class DaemonWarmingUpError(Exception):
         '''Raised when the daemon returns an error in its results.'''
 
-    def __init__(self, coin, url, max_workqueue=10):
+    def __init__(self, coin, url, max_workqueue=10, init_retry=0.25,
+                 max_retry=4.0):
         self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.set_url(url)
-        self._height = None
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
         self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
+        self.init_retry = init_retry
+        self.max_retry = max_retry
+        self._height = None
         self.available_rpcs = {}
 
     def set_url(self, url):
@@ -109,19 +112,18 @@ class Daemon(object):
         are raise through DaemonError.
         '''
         def log_error(error):
-            nonlocal last_error_log, secs
+            nonlocal last_error_log, retry
             now = time.time()
             if now - last_error_log > 60:
                 last_error_time = now
                 self.logger.error(f'{error}  Retrying occasionally...')
-            if secs == max_secs and self.failover():
-                secs = 0.25
+            if retry == self.max_retry and self.failover():
+                retry = 0
 
         on_good_message = None
         last_error_log = 0
         data = json.dumps(payload)
-        secs = 0.25
-        max_secs = 4
+        retry = self.init_retry
         while True:
             try:
                 result = await self._send_data(data)
@@ -146,8 +148,8 @@ class Daemon(object):
                 log_error('work queue full.')
                 on_good_message = 'running normally'
 
-            await asyncio.sleep(secs)
-            secs = min(max_secs, secs * 2)
+            await asyncio.sleep(retry)
+            retry = max(min(self.max_retry, retry * 2), self.init_retry)
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
