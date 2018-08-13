@@ -18,7 +18,7 @@ from time import strptime
 import aiohttp
 
 from electrumx.lib.util import int_to_varint, hex_to_bytes, class_logger, \
-    unpack_uint16_from
+    unpack_le_uint16_from
 from electrumx.lib.hash import hex_str_to_hash, hash_to_hex_str
 from electrumx.lib.tx import DeserializerDecred
 from aiorpcx import JSONRPC
@@ -384,7 +384,7 @@ class DecredDaemon(Daemon):
             raw_blocks.append(raw_block)
             # Check if previous block is valid
             prev = self.prev_hex_hash(raw_block)
-            votebits = unpack_uint16_from(raw_block[100:102])[0]
+            votebits = unpack_le_uint16_from(raw_block[100:102])[0]
             valid_tx_tree[prev] = self.is_valid_tx_tree(votebits)
 
         processed_raw_blocks = []

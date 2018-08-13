@@ -208,17 +208,17 @@ def test_protocol_version():
 
 def test_unpackers():
     b = bytes(range(256))
-    assert util.unpack_int32_from(b, 0) == (50462976,)
-    assert util.unpack_int32_from(b, 42) == (757869354,)
-    assert util.unpack_int64_from(b, 0) == (506097522914230528,)
-    assert util.unpack_int64_from(b, 42) == (3544384782113450794,)
+    assert util.unpack_le_int32_from(b, 0) == (50462976,)
+    assert util.unpack_le_int32_from(b, 42) == (757869354,)
+    assert util.unpack_le_int64_from(b, 0) == (506097522914230528,)
+    assert util.unpack_le_int64_from(b, 42) == (3544384782113450794,)
 
-    assert util.unpack_uint16_from(b, 0) == (256,)
-    assert util.unpack_uint16_from(b, 42) == (11050,)
-    assert util.unpack_uint32_from(b, 0) == (50462976,)
-    assert util.unpack_uint32_from(b, 42) == (757869354,)
-    assert util.unpack_uint64_from(b, 0) == (506097522914230528,)
-    assert util.unpack_uint64_from(b, 42) == (3544384782113450794,)
+    assert util.unpack_le_uint16_from(b, 0) == (256,)
+    assert util.unpack_le_uint16_from(b, 42) == (11050,)
+    assert util.unpack_le_uint32_from(b, 0) == (50462976,)
+    assert util.unpack_le_uint32_from(b, 42) == (757869354,)
+    assert util.unpack_le_uint64_from(b, 0) == (506097522914230528,)
+    assert util.unpack_le_uint64_from(b, 42) == (3544384782113450794,)
 
 def test_hex_transforms():
     h = "AABBCCDDEEFF"
