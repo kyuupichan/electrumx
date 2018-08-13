@@ -938,7 +938,7 @@ class ElectrumX(SessionBase):
         '''Return a raw block header as a hexadecimal string.
 
         height: the header's height'''
-        return self.block_header(height)
+        return await self.block_header(height)
 
     async def block_headers(self, start_height, count, cp_height=0):
         '''Return count concatenated block headers as hex for the main chain;
