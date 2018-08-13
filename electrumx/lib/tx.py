@@ -31,8 +31,8 @@ from collections import namedtuple
 
 from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.util import (
-    cachedproperty, unpack_int32_from, unpack_int64_from,
-    unpack_uint16_from, unpack_uint32_from, unpack_uint64_from,
+    cachedproperty, unpack_le_int32_from, unpack_le_int64_from,
+    unpack_le_uint16_from, unpack_le_uint32_from, unpack_le_uint64_from,
     pack_le_int32, pack_varint, pack_le_uint32, pack_le_uint32, pack_le_int64,
     pack_varbytes,
 )
@@ -185,27 +185,27 @@ class Deserializer(object):
         return self._read_le_uint64()
 
     def _read_le_int32(self):
-        result, = unpack_int32_from(self.binary, self.cursor)
+        result, = unpack_le_int32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_int64(self):
-        result, = unpack_int64_from(self.binary, self.cursor)
+        result, = unpack_le_int64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
     def _read_le_uint16(self):
-        result, = unpack_uint16_from(self.binary, self.cursor)
+        result, = unpack_le_uint16_from(self.binary, self.cursor)
         self.cursor += 2
         return result
 
     def _read_le_uint32(self):
-        result, = unpack_uint32_from(self.binary, self.cursor)
+        result, = unpack_le_uint32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_uint64(self):
-        result, = unpack_uint64_from(self.binary, self.cursor)
+        result, = unpack_le_uint64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
