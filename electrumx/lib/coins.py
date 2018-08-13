@@ -70,6 +70,9 @@ class Coin(object):
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
     BLOCK_PROCESSOR = block_proc.BlockProcessor
+    HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'timestamp',
+                     'bits', 'nonce')
+    HEADER_UNPACK = struct.Struct('< I 32s 32s I I I').unpack_from
     MEMPOOL_HISTOGRAM_REFRESH_SECS = 500
     XPUB_VERBYTES = bytes('????', 'utf-8')
     XPRV_VERBYTES = bytes('????', 'utf-8')
@@ -296,18 +299,13 @@ class Coin(object):
 
     @classmethod
     def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
-
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_hex_str(header[4:36]),
-            'merkle_root': hash_to_hex_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': nonce,
-        }
+        h = dict(zip(cls.HEADER_VALUES, cls.HEADER_UNPACK(header)))
+        # Add the height that is not present in the header itself
+        h['block_height'] = height
+        # Convert bytes to str
+        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
+        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
+        return h
 
 
 class AuxPowMixin(object):
@@ -330,21 +328,21 @@ class EquihashMixin(object):
     STATIC_BLOCK_HEADERS = False
     BASIC_HEADER_SIZE = 140  # Excluding Equihash solution
     DESERIALIZER = lib_tx.DeserializerEquihash
+    HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'reserved',
+                     'timestamp', 'bits', 'nonce')
+    HEADER_UNPACK = struct.Struct('< I 32s 32s 32s I I 32s').unpack_from
 
     @classmethod
     def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits = struct.unpack('<II', header[100:108])
-
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_hex_str(header[4:36]),
-            'merkle_root': hash_to_hex_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': hash_to_hex_str(header[108:140]),
-        }
+        h = dict(zip(cls.HEADER_VALUES, cls.HEADER_UNPACK(header)))
+        # Add the height that is not present in the header itself
+        h['block_height'] = height
+        # Convert bytes to str
+        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
+        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
+        h['reserved'] = hash_to_hex_str(h['reserved'])
+        h['nonce'] = hash_to_hex_str(h['nonce'])
+        return h
 
     @classmethod
     def block_header(cls, block, height):
@@ -365,7 +363,7 @@ class ScryptMixin(object):
             import scrypt
             cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
 
-        version, = struct.unpack('<I', header[:4])
+        version, = util.unpack_le_uint32_from(header)
         if version > 6:
             return super().header_hash(header)
         else:
@@ -475,8 +473,7 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return hash'''
-        height, = struct.unpack('<I', header[68:72])
-
+        height, = util.unpack_le_uint32_from(header, 68)
         if height >= cls.FORK_HEIGHT:
             return double_sha256(header)
         else:
@@ -484,18 +481,9 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
 
     @classmethod
     def electrum_header(cls, header, height):
-        h = dict(
-            block_height=height,
-            version=struct.unpack('<I', header[:4])[0],
-            prev_block_hash=hash_to_hex_str(header[4:36]),
-            merkle_root=hash_to_hex_str(header[36:68]),
-            timestamp=struct.unpack('<I', header[100:104])[0],
-            reserved=hash_to_hex_str(header[72:100]),
-            bits=struct.unpack('<I', header[104:108])[0],
-            nonce=hash_to_hex_str(header[108:140]),
-            solution=hash_to_hex_str(header[140:])
-        )
-
+        h = super().electrum_header(header, height)
+        h['reserved'] = hash_to_hex_str(header[72:100])
+        h['solution'] = hash_to_hex_str(header[140:])
         return h
 
 
@@ -948,6 +936,9 @@ class FairCoin(Coin):
     GENESIS_HASH = ('beed44fa5e96150d95d56ebd5d262578'
                     '1825a9407a5215dd7eda723373a0a1d7')
     BASIC_HEADER_SIZE = 108
+    HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root',
+                     'payload_hash', 'timestamp', 'creatorId')
+    HEADER_UNPACK = struct.Struct('< I 32s 32s 32s I I').unpack_from
     TX_COUNT = 505
     TX_COUNT_HEIGHT = 470
     TX_PER_BLOCK = 1
@@ -968,17 +959,9 @@ class FairCoin(Coin):
 
     @classmethod
     def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, creatorId = struct.unpack('<II', header[100:108])
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_hex_str(header[4:36]),
-            'merkle_root': hash_to_hex_str(header[36:68]),
-            'payload_hash': hash_to_hex_str(header[68:100]),
-            'timestamp': timestamp,
-            'creatorId': creatorId,
-        }
+        h = super().electrum_header(header, height)
+        h['payload_hash'] = hash_to_hex_str(h['payload_hash'])
+        return h
 
 
 class Zcash(EquihashMixin, Coin):
@@ -1031,21 +1014,10 @@ class SnowGem(EquihashMixin, Coin):
 
     @classmethod
     def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits = struct.unpack('<II', header[100:108])
-
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_hex_str(header[4:36]),
-            'merkle_root': hash_to_hex_str(header[36:68]),
-            'hash_reserved': hash_to_hex_str(header[68:100]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': hash_to_hex_str(header[108:140]),
-            'n_solution': base64.b64encode(lib_tx.Deserializer(
-                header, start=140)._read_varbytes()).decode('utf8')
-        }
+        h = super().electrum_header(header, height)
+        h['n_solution'] = base64.b64encode(lib_tx.Deserializer(
+            header, start=140)._read_varbytes()).decode('utf8')
+        return h
 
 
 class BitcoinZ(EquihashMixin, Coin):
@@ -1670,7 +1642,7 @@ class BitcoinAtom(Coin):
         header_to_be_hashed = header[:cls.BASIC_HEADER_SIZE]
         # New block header format has some extra flags in the end
         if len(header) == cls.HEADER_SIZE_POST_FORK:
-            flags, = struct.unpack('<I', header[-4:])
+            flags, = util.unpack_le_uint32_from(header, len(header) - 4)
             # Proof of work blocks have special serialization
             if flags & cls.BLOCK_PROOF_OF_STAKE != 0:
                 header_to_be_hashed += cls.BLOCK_PROOF_OF_STAKE_FLAGS
@@ -1704,7 +1676,13 @@ class Decred(Coin):
                            hash_fn=lib_tx.DeserializerDecred.blake256d)
     DECODE_CHECK = partial(Base58.decode_check,
                            hash_fn=lib_tx.DeserializerDecred.blake256d)
-    HEADER_UNPACK = struct.Struct('<i32s32s32sH6sHBBIIQIIII32sI').unpack_from
+    HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'stake_root',
+                     'vote_bits', 'final_state', 'voters', 'fresh_stake',
+                     'revocations', 'pool_size', 'bits', 'sbits',
+                     'block_height', 'size', 'timestamp', 'nonce',
+                     'extra_data', 'stake_version')
+    HEADER_UNPACK = struct.Struct(
+        '< i 32s 32s 32s H 6s H B B I I Q I I I I 32s I').unpack_from
     TX_COUNT = 4629388
     TX_COUNT_HEIGHT = 260628
     TX_PER_BLOCK = 17
@@ -1726,20 +1704,10 @@ class Decred(Coin):
 
     @classmethod
     def electrum_header(cls, header, height):
-        labels = ('version', 'prev_block_hash', 'merkle_root', 'stake_root',
-                  'vote_bits', 'final_state', 'voters', 'fresh_stake',
-                  'revocations', 'pool_size', 'bits', 'sbits', 'block_height',
-                  'size', 'timestamp', 'nonce', 'extra_data', 'stake_version')
-        values = cls.HEADER_UNPACK(header)
-        h = dict(zip(labels, values))
-
-        # Convert some values
-        assert h['block_height'] == height
-        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
-        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
+        h = super().electrum_header(header, height)
         h['stake_root'] = hash_to_hex_str(h['stake_root'])
-        h['final_state'] = h['final_state'].hex()
-        h['extra_data'] = h['extra_data'].hex()
+        h['final_state'] = hash_to_hex_str(h['final_state'])
+        h['extra_data'] = hash_to_hex_str(h['extra_data'])
         return h
 
 
@@ -1799,7 +1767,7 @@ class Xuez(Coin):
         Need to download `xevan_hash` module
         Source code: https://github.com/xuez/xuez
         '''
-        version, = struct.unpack('<I', header[:4])
+        version, = util.unpack_le_uint32_from(header)
 
         import xevan_hash
 
@@ -1810,29 +1778,10 @@ class Xuez(Coin):
 
     @classmethod
     def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
-        if version == 1:
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_hex_str(header[4:36]),
-                'merkle_root': hash_to_hex_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-            }
-        else:
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_hex_str(header[4:36]),
-                'merkle_root': hash_to_hex_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-                'nAccumulatorCheckpoint': hash_to_hex_str(header[80:112]),
-            }
+        h = super().electrum_header(header, height)
+        if h['version'] > 1:
+            h['nAccumulatorCheckpoint'] = hash_to_hex_str(header[80:])
+        return h
 
 
 class Pac(Coin):
@@ -1998,35 +1947,7 @@ class Monoeci(Coin):
                 return x11_hash.getPoWHash(header)
 
 
-class MinexcoinMixin(object):
-    STATIC_BLOCK_HEADERS = True
-    BASIC_HEADER_SIZE = 209
-    DESERIALIZER = lib_tx.DeserializerEquihash
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits = struct.unpack('<II', header[100:108])
-
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_hex_str(header[4:36]),
-            'merkle_root': hash_to_hex_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': hash_to_hex_str(header[108:140]),
-            'solution': hash_to_hex_str(header[140:209]),
-        }
-
-    @classmethod
-    def block_header(cls, block, height):
-        '''Return the block header bytes'''
-        deserializer = cls.DESERIALIZER(block)
-        return deserializer.read_header(height, 140)
-
-
-class Minexcoin(MinexcoinMixin, Coin):
+class Minexcoin(EquihashMixin, Coin):
     NAME = "Minexcoin"
     SHORTNAME = "MNX"
     NET = "mainnet"
@@ -2035,7 +1956,9 @@ class Minexcoin(MinexcoinMixin, Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('490a36d9451a55ed197e34aca7414b35'
                     'd775baa4a8e896f1c577f65ce2d214cb')
-    DESERIALIZER = lib_tx.DeserializerEquihash
+    STATIC_BLOCK_HEADERS = True
+    BASIC_HEADER_SIZE = 209
+    HEADER_SIZE_NO_SOLUTION = 140
     TX_COUNT = 327963
     TX_COUNT_HEIGHT = 74495
     TX_PER_BLOCK = 5
@@ -2045,6 +1968,18 @@ class Minexcoin(MinexcoinMixin, Coin):
         'elex01-ams.turinex.eu s t',
         'eu.minexpool.nl s t'
     ]
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        h = super().electrum_header(header, height)
+        h['solution'] = hash_to_hex_str(header[cls.HEADER_SIZE_NO_SOLUTION:])
+        return h
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(height, cls.HEADER_SIZE_NO_SOLUTION)
 
 
 class Groestlcoin(Coin):
@@ -2133,7 +2068,7 @@ class Pivx(Coin):
 
     @classmethod
     def header_hash(cls, header):
-        version, = struct.unpack('<I', header[:4])
+        version, = util.unpack_le_uint32_from(header)
         if version >= 4:
             return super().header_hash(header)
         else:
