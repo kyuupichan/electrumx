@@ -55,7 +55,7 @@ addresses = [
      "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e")
 ]
 
-pdb.set_trace()
+# pdb.set_trace()
 
 
 @pytest.fixture(params=addresses)
