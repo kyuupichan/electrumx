@@ -8,6 +8,16 @@
    should not occur with Python 3.7.
 
 
+Version 1.8.4 (14 Aug 2018)
+===========================
+
+* improved notification handling and efficiency
+* improved daemon handling with minor fixes; full tests for Daemon class
+* remove chain_state class
+* various internal cleanups and improvements (erasmospunk)
+* add PIVX support (erasmospunk) - mempool handling WIP
+* fix protocol 1.3 handling of blockchain.block.header RPC (ghost43)
+
 Version 1.8.3 (11 Aug 2018)
 ===========================
 
