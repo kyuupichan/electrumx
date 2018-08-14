@@ -9,6 +9,7 @@
 daemon.'''
 
 import asyncio
+import itertools
 import json
 import time
 from calendar import timegm
@@ -17,8 +18,13 @@ from time import strptime
 
 import aiohttp
 
+<<<<<<< HEAD
 from electrumx.lib.util import int_to_varint, hex_to_bytes, class_logger, \
     unpack_uint16_from
+=======
+from electrumx.lib.util import hex_to_bytes, class_logger,\
+    unpack_le_uint16_from, pack_varint
+>>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6
 from electrumx.lib.hash import hex_str_to_hash, hash_to_hex_str
 from electrumx.lib.tx import DeserializerDecred
 from aiorpcx import JSONRPC
@@ -28,47 +34,52 @@ class DaemonError(Exception):
     '''Raised when the daemon returns an error in its results.'''
 
 
+class WarmingUpError(Exception):
+    '''Internal - when the daemon is warming up.'''
+
+
+class WorkQueueFullError(Exception):
+    '''Internal - when the daemon's work queue is full.'''
+
+
 class Daemon(object):
     '''Handles connections to a daemon at the given URL.'''
 
     WARMING_UP = -28
-    RPC_MISC_ERROR = -1
+    id_counter = itertools.count()
 
-    class DaemonWarmingUpError(Exception):
-        '''Raised when the daemon returns an error in its results.'''
-
-    def __init__(self, env):
+    def __init__(self, coin, url, max_workqueue=10, init_retry=0.25,
+                 max_retry=4.0):
+        self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.coin = env.coin
-        self.set_urls(env.coin.daemon_urls(env.daemon_url))
-        self._height = None
+        self.set_url(url)
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
-        self.workqueue_semaphore = asyncio.Semaphore(value=10)
-        self.down = False
-        self.last_error_time = 0
-        self.req_id = 0
-        self._available_rpcs = {}  # caches results for _is_rpc_available()
+        self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
+        self.init_retry = init_retry
+        self.max_retry = max_retry
+        self._height = None
+        self.available_rpcs = {}
 
-    def next_req_id(self):
-        '''Retrns the next request ID.'''
-        self.req_id += 1
-        return self.req_id
-
-    def set_urls(self, urls):
+    def set_url(self, url):
         '''Set the URLS to the given list, and switch to the first one.'''
-        if not urls:
-            raise DaemonError('no daemon URLs provided')
-        self.urls = urls
-        self.url_index = 0
+        urls = url.split(',')
+        urls = [self.coin.sanitize_url(url) for url in urls]
         for n, url in enumerate(urls):
-            self.logger.info('daemon #{:d} at {}{}'
-                             .format(n + 1, self.logged_url(url),
-                                     '' if n else ' (current)'))
+            status = '' if n else ' (current)'
+            logged_url = self.logged_url(url)
+            self.logger.info(f'daemon #{n + 1} at {logged_url}{status}')
+        self.url_index = 0
+        self.urls = urls
 
-    def url(self):
+    def current_url(self):
         '''Returns the current daemon URL.'''
         return self.urls[self.url_index]
+
+    def logged_url(self, url=None):
+        '''The host and port part, for logging.'''
+        url = url or self.current_url()
+        return url[url.rindex('@') + 1:]
 
     def failover(self):
         '''Call to fail-over to the next daemon URL.
@@ -77,7 +88,7 @@ class Daemon(object):
         '''
         if len(self.urls) > 1:
             self.url_index = (self.url_index + 1) % len(self.urls)
-            self.logger.info('failing over to {}'.format(self.logged_url()))
+            self.logger.info(f'failing over to {self.logged_url()}')
             return True
         return False
 
@@ -88,13 +99,17 @@ class Daemon(object):
     async def _send_data(self, data):
         async with self.workqueue_semaphore:
             async with self.client_session() as session:
-                async with session.post(self.url(), data=data) as resp:
-                    # If bitcoind can't find a tx, for some reason
-                    # it returns 500 but fills out the JSON.
-                    # Should still return 200 IMO.
-                    if resp.status in (200, 404, 500):
+                async with session.post(self.current_url(), data=data) as resp:
+                    kind = resp.headers.get('Content-Type', None)
+                    if kind == 'application/json':
                         return await resp.json()
-                    return (resp.status, resp.reason)
+                    # bitcoind's HTTP protocol "handling" is a bad joke
+                    text = await resp.text()
+                    if 'Work queue depth exceeded' in text:
+                        raise WorkQueueFullError
+                    text = text.strip() or resp.reason
+                    self.logger.error(text)
+                    raise DaemonError(text)
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -103,54 +118,42 @@ class Daemon(object):
         are raise through DaemonError.
         '''
         def log_error(error):
-            self.down = True
+            nonlocal last_error_log, retry
             now = time.time()
-            prior_time = self.last_error_time
-            if now - prior_time > 60:
-                self.last_error_time = now
-                if prior_time and self.failover():
-                    secs = 0
-                else:
-                    self.logger.error('{}  Retrying occasionally...'
-                                      .format(error))
+            if now - last_error_log > 60:
+                last_error_time = now
+                self.logger.error(f'{error}  Retrying occasionally...')
+            if retry == self.max_retry and self.failover():
+                retry = 0
 
+        on_good_message = None
+        last_error_log = 0
         data = json.dumps(payload)
-        secs = 1
-        max_secs = 4
+        retry = self.init_retry
         while True:
             try:
                 result = await self._send_data(data)
-                if not isinstance(result, tuple):
-                    result = processor(result)
-                    if self.down:
-                        self.down = False
-                        self.last_error_time = 0
-                        self.logger.info('connection restored')
-                    return result
-                log_error('HTTP error code {:d}: {}'
-                          .format(result[0], result[1]))
+                result = processor(result)
+                if on_good_message:
+                    self.logger.info(on_good_message)
+                return result
             except asyncio.TimeoutError:
                 log_error('timeout error.')
             except aiohttp.ServerDisconnectedError:
                 log_error('disconnected.')
-            except aiohttp.ClientPayloadError:
-                log_error('payload encoding error.')
+                on_good_message = 'connection restored'
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
-            except self.DaemonWarmingUpError:
+                on_good_message = 'connection restored'
+            except WarmingUpError:
                 log_error('starting up checking blocks.')
-            except (asyncio.CancelledError, DaemonError):
-                raise
-            except Exception as e:
-                self.logger.exception(f'uncaught exception: {e}')
+                on_good_message = 'running normally'
+            except WorkQueueFullError:
+                log_error('work queue full.')
+                on_good_message = 'running normally'
 
-            await asyncio.sleep(secs)
-            secs = min(max_secs, secs * 2, 1)
-
-    def logged_url(self, url=None):
-        '''The host and port part, for logging.'''
-        url = url or self.url()
-        return url[url.rindex('@') + 1:]
+            await asyncio.sleep(retry)
+            retry = max(min(self.max_retry, retry * 2), self.init_retry)
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
@@ -159,10 +162,10 @@ class Daemon(object):
             if not err:
                 return result['result']
             if err.get('code') == self.WARMING_UP:
-                raise self.DaemonWarmingUpError
+                raise WarmingUpError
             raise DaemonError(err)
 
-        payload = {'method': method, 'id': self.next_req_id()}
+        payload = {'method': method, 'id': next(self.id_counter)}
         if params:
             payload['params'] = params
         return await self._send(payload, processor)
@@ -176,12 +179,12 @@ class Daemon(object):
         def processor(result):
             errs = [item['error'] for item in result if item['error']]
             if any(err.get('code') == self.WARMING_UP for err in errs):
-                raise self.DaemonWarmingUpError
+                raise WarmingUpError
             if not errs or replace_errs:
                 return [item['result'] for item in result]
             raise DaemonError(errs)
 
-        payload = [{'method': method, 'params': p, 'id': self.next_req_id()}
+        payload = [{'method': method, 'params': p, 'id': next(self.id_counter)}
                    for p in params_iterable]
         if payload:
             return await self._send(payload, processor)
@@ -192,27 +195,16 @@ class Daemon(object):
 
         Results are cached and the daemon will generally not be queried with
         the same method more than once.'''
-        available = self._available_rpcs.get(method, None)
+        available = self.available_rpcs.get(method)
         if available is None:
+            available = True
             try:
                 await self._send_single(method)
-                available = True
             except DaemonError as e:
                 err = e.args[0]
                 error_code = err.get("code")
-                if error_code == JSONRPC.METHOD_NOT_FOUND:
-                    available = False
-                elif error_code == self.RPC_MISC_ERROR:
-                    # method found but exception was thrown in command handling
-                    # probably because we did not provide arguments
-                    available = True
-                else:
-                    self.logger.warning('error (code {:d}: {}) when testing '
-                                        'RPC availability of method {}'
-                                        .format(error_code, err.get("message"),
-                                                method))
-                    available = False
-            self._available_rpcs[method] = available
+                available = error_code != JSONRPC.METHOD_NOT_FOUND
+            self.available_rpcs[method] = available
         return available
 
     async def block_hex_hashes(self, first, count):
@@ -235,12 +227,16 @@ class Daemon(object):
         '''Update our record of the daemon's mempool hashes.'''
         return await self._send_single('getrawmempool')
 
-    async def estimatefee(self, params):
-        '''Return the fee estimate for the given parameters.'''
+    async def estimatefee(self, block_count):
+        '''Return the fee estimate for the block count.  Units are whole
+        currency units per KB, e.g. 0.00000995, or -1 if no estimate
+        is available.
+        '''
+        args = (block_count, )
         if await self._is_rpc_available('estimatesmartfee'):
-            estimate = await self._send_single('estimatesmartfee', params)
+            estimate = await self._send_single('estimatesmartfee', args)
             return estimate.get('feerate', -1)
-        return await self._send_single('estimatefee', params)
+        return await self._send_single('estimatefee', args)
 
     async def getnetworkinfo(self):
         '''Return the result of the 'getnetworkinfo' RPC call.'''
@@ -268,9 +264,9 @@ class Daemon(object):
         # Convert hex strings to bytes
         return [hex_to_bytes(tx) if tx else None for tx in txs]
 
-    async def sendrawtransaction(self, params):
+    async def broadcast_transaction(self, raw_tx):
         '''Broadcast a transaction to the network.'''
-        return await self._send_single('sendrawtransaction', params)
+        return await self._send_single('sendrawtransaction', (raw_tx, ))
 
     async def height(self):
         '''Query the daemon for its current height.'''
@@ -299,7 +295,7 @@ class FakeEstimateFeeDaemon(Daemon):
     '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that
     wants to use this daemon must define ESTIMATE_FEE & RELAY_FEE'''
 
-    async def estimatefee(self, params):
+    async def estimatefee(self, block_count):
         '''Return the fee estimate for the given parameters.'''
         return self.coin.ESTIMATE_FEE
 
@@ -356,7 +352,7 @@ class LegacyRPCDaemon(Daemon):
         raw_block = header
         num_txs = len(transactions)
         if num_txs > 0:
-            raw_block += int_to_varint(num_txs)
+            raw_block += pack_varint(num_txs)
             raw_block += b''.join(transactions)
         else:
             raw_block += b'\x00'
@@ -384,7 +380,11 @@ class DecredDaemon(Daemon):
             raw_blocks.append(raw_block)
             # Check if previous block is valid
             prev = self.prev_hex_hash(raw_block)
+<<<<<<< HEAD
             votebits = unpack_uint16_from(raw_block[100:102])[0]
+=======
+            votebits = unpack_le_uint16_from(raw_block[100:102])[0]
+>>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6
             valid_tx_tree[prev] = self.is_valid_tx_tree(votebits)
 
         processed_raw_blocks = []
@@ -450,4 +450,8 @@ class DecredDaemon(Daemon):
     def client_session(self):
         # FIXME allow self signed certificates
         connector = aiohttp.TCPConnector(verify_ssl=False)
+<<<<<<< HEAD
         return aiohttp.ClientSession(connector=connector)
+=======
+        return aiohttp.ClientSession(connector=connector)
+>>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6

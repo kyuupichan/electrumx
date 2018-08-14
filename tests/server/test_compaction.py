@@ -2,12 +2,11 @@
 
 import array
 import asyncio
-from collections import defaultdict
 from os import environ, urandom
-from struct import pack
 import random
 
 from electrumx.lib.hash import HASHX_LEN
+from electrumx.lib.util import pack_be_uint16
 from electrumx.server.env import Env
 from electrumx.server.db import DB
 
@@ -49,7 +48,7 @@ def check_hashX_compaction(history):
     hist_list = []
     hist_map = {}
     for flush_count, count in pairs:
-        key = hashX + pack('>H', flush_count)
+        key = hashX + pack_be_uint16(flush_count)
         hist = full_hist[cum * 4: (cum+count) * 4]
         hist_map[key] = hist
         hist_list.append(hist)
@@ -65,10 +64,10 @@ def check_hashX_compaction(history):
     assert len(keys_to_delete) == 3
     assert len(hist_map) == len(pairs)
     for n, item in enumerate(write_items):
-        assert item == (hashX + pack('>H', n),
+        assert item == (hashX + pack_be_uint16(n),
                         full_hist[n * row_size: (n + 1) * row_size])
     for flush_count, count in pairs:
-        assert hashX + pack('>H', flush_count) in keys_to_delete
+        assert hashX + pack_be_uint16(flush_count) in keys_to_delete
 
     # Check re-compaction is null
     hist_map = {key: value for key, value in write_items}
@@ -87,7 +86,7 @@ def check_hashX_compaction(history):
     write_size = history._compact_hashX(hashX, hist_map, hist_list,
                                         write_items, keys_to_delete)
     assert write_size == len(hist_list[-1])
-    assert write_items == [(hashX + pack('>H', 2), hist_list[-1])]
+    assert write_items == [(hashX + pack_be_uint16(2), hist_list[-1])]
     assert len(keys_to_delete) == 1
     assert write_items[0][0] in keys_to_delete
     assert len(hist_map) == len(pairs)

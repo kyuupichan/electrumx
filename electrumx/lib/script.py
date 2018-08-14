@@ -32,6 +32,8 @@ from collections import namedtuple
 
 from electrumx.lib.enum import Enumeration
 from electrumx.lib.hash import hash160
+from electrumx.lib.util import unpack_le_uint16_from, unpack_le_uint32_from, \
+    pack_le_uint16, pack_le_uint32
 
 
 class ScriptError(Exception):
@@ -196,10 +198,10 @@ class Script(object):
                         dlen = script[n]
                         n += 1
                     elif op == OpCodes.OP_PUSHDATA2:
-                        dlen, = struct.unpack('<H', script[n: n + 2])
+                        dlen, = unpack_le_uint16_from(script[n: n + 2])
                         n += 2
                     else:
-                        dlen, = struct.unpack('<I', script[n: n + 4])
+                        dlen, = unpack_le_uint32_from(script[n: n + 4])
                         n += 4
                     if n + dlen > len(script):
                         raise IndexError
@@ -225,8 +227,8 @@ class Script(object):
         if n < 256:
             return bytes([OpCodes.OP_PUSHDATA1, n]) + data
         if n < 65536:
-            return bytes([OpCodes.OP_PUSHDATA2]) + struct.pack('<H', n) + data
-        return bytes([OpCodes.OP_PUSHDATA4]) + struct.pack('<I', n) + data
+            return bytes([OpCodes.OP_PUSHDATA2]) + pack_le_uint16(n) + data
+        return bytes([OpCodes.OP_PUSHDATA4]) + pack_le_uint32(n) + data
 
     @classmethod
     def opcode_name(cls, opcode):

@@ -48,7 +48,7 @@ async def compact_history():
     environ['DAEMON_URL'] = ''   # Avoid Env erroring out
     env = Env()
     db = DB(env)
-    await db.open_for_sync()
+    await db.open_for_compacting()
 
     assert not db.first_sync
     history = db.history
