@@ -39,7 +39,7 @@ from functools import partial
 import base64
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str,blake
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
@@ -1708,9 +1708,9 @@ class Decred(Coin):
         return h
 
 
-class Decred(Coin):
-    NAME = "Decred"
-    SHORTNAME = "DCR"
+class DecredTestnet(Coin):
+    NAME = "DecredTestnet"
+    SHORTNAME = "tDCR"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("02fda926")
     XPRV_VERBYTES = bytes.fromhex("02fda4e8")
@@ -1729,11 +1729,11 @@ class Decred(Coin):
     TX_PER_BLOCK = 1800
     RPC_PORT = 19119
     HEADER_HASH = blake
-     @classmethod
+    @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         return cls.HEADER_HASH(header)
-     @classmethod
+    @classmethod
     def block(cls, raw_block, height):
         '''Return a Block namedtuple given a raw block and its height.'''
         if height > 0:
