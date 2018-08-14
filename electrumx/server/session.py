@@ -383,7 +383,7 @@ class SessionManager(object):
         '''Replace the daemon URL.'''
         daemon_url = daemon_url or self.env.daemon_url
         try:
-            self.daemon.set_urls(self.env.coin.daemon_urls(daemon_url))
+            self.daemon.set_url(daemon_url)
         except Exception as e:
             raise RPCError(BAD_REQUEST, f'an error occured: {e!r}')
         return f'now using daemon at {self.daemon.logged_url()}'
@@ -535,7 +535,7 @@ class SessionManager(object):
         return electrum_header
 
     async def broadcast_transaction(self, raw_tx):
-        hex_hash = await self.daemon.sendrawtransaction([raw_tx])
+        hex_hash = await self.daemon.broadcast_transaction(raw_tx)
         self.txs_sent += 1
         return hex_hash
 
@@ -1088,7 +1088,7 @@ class ElectrumX(SessionBase):
         number: the number of blocks
         '''
         number = non_negative_integer(number)
-        return await self.daemon_request('estimatefee', [number])
+        return await self.daemon_request('estimatefee', number)
 
     async def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
@@ -1144,7 +1144,7 @@ class ElectrumX(SessionBase):
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.logger.info(f'sendrawtransaction: {message}')
+            self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
 
