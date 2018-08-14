@@ -149,83 +149,72 @@ class Source(object):
     def __init__(self, length):
         self._hashes = [os.urandom(32) for _ in range(length)]
 
-    async def hashes(self, start, count):
+    def hashes(self, start, count):
         assert start >= 0
         assert start + count <= len(self._hashes)
         return self._hashes[start: start + count]
 
 
-@pytest.mark.asyncio
-async def test_merkle_cache():
+def test_merkle_cache():
     lengths = (*range(1, 18), 31, 32, 33, 57)
-    source = Source(max(lengths)).hashes
+    source = Source(max(lengths))
     for length in lengths:
-        cache = MerkleCache(merkle, source)
-        await cache.initialize(length)
+        cache = MerkleCache(merkle, source, length)
         # Simulate all possible checkpoints
         for cp_length in range(1, length + 1):
-            cp_hashes = await source(0, cp_length)
+            cp_hashes = source.hashes(0, cp_length)
             # All possible indices
             for index in range(cp_length):
                 # Compare correct answer with cache
                 branch, root = merkle.branch_and_root(cp_hashes, index)
-                branch2, root2 = await cache.branch_and_root(cp_length, index)
+                branch2, root2 = cache.branch_and_root(cp_length, index)
                 assert branch == branch2
                 assert root == root2
 
 
-@pytest.mark.asyncio
-async def test_merkle_cache_extension():
-    source = Source(64).hashes
+def test_merkle_cache_extension():
+    source = Source(64)
     for length in range(14, 18):
         for cp_length in range(30, 36):
-            cache = MerkleCache(merkle, source)
-            await cache.initialize(length)
-            cp_hashes = await source(0, cp_length)
+            cache = MerkleCache(merkle, source, length)
+            cp_hashes = source.hashes(0, cp_length)
             # All possible indices
             for index in range(cp_length):
                 # Compare correct answer with cache
                 branch, root = merkle.branch_and_root(cp_hashes, index)
-                branch2, root2 = await cache.branch_and_root(cp_length, index)
+                branch2, root2 = cache.branch_and_root(cp_length, index)
                 assert branch == branch2
                 assert root == root2
 
 
-@pytest.mark.asyncio
-async def test_merkle_cache_truncation():
+def test_merkle_cache_truncation():
     max_length = 33
-    source = Source(max_length).hashes
+    source = Source(max_length)
     for length in range(max_length - 2, max_length + 1):
         for trunc_length in range(1, 20, 3):
-            cache = MerkleCache(merkle, source)
-            await cache.initialize(length)
+            cache = MerkleCache(merkle, source, length)
             cache.truncate(trunc_length)
             assert cache.length <= trunc_length
             for cp_length in range(1, length + 1, 3):
-                cp_hashes = await source(0, cp_length)
+                cp_hashes = source.hashes(0, cp_length)
                 # All possible indices
                 for index in range(cp_length):
                     # Compare correct answer with cache
                     branch, root = merkle.branch_and_root(cp_hashes, index)
-                    branch2, root2 = await cache.branch_and_root(cp_length,
-                                                                 index)
+                    branch2, root2 = cache.branch_and_root(cp_length, index)
                     assert branch == branch2
                     assert root == root2
 
     # Truncation is a no-op if longer
-    cache = MerkleCache(merkle, source)
-    await cache.initialize(10)
+    cache = MerkleCache(merkle, source, 10)
     level = cache.level.copy()
     for length in range(10, 13):
         cache.truncate(length)
         assert cache.level == level
         assert cache.length == 10
 
-
-@pytest.mark.asyncio
-async def test_truncation_bad():
-    cache = MerkleCache(merkle, Source(10).hashes)
-    await cache.initialize(10)
+def test_truncation_bad():
+    cache = MerkleCache(merkle, Source(10), 10)
     with pytest.raises(TypeError):
         cache.truncate(1.0)
     for n in (-1, 0):
@@ -233,48 +222,43 @@ async def test_truncation_bad():
             cache.truncate(n)
 
 
-@pytest.mark.asyncio
-async def test_markle_cache_bad():
+def test_markle_cache_bad():
     length = 23
-    source = Source(length).hashes
-    cache = MerkleCache(merkle, source)
-    await cache.initialize(length)
-    await cache.branch_and_root(5, 3)
+    source = Source(length)
+    cache = MerkleCache(merkle, source, length)
+    cache.branch_and_root(5, 3)
     with pytest.raises(TypeError):
-        await cache.branch_and_root(5.0, 3)
+        cache.branch_and_root(5.0, 3)
     with pytest.raises(TypeError):
-        await cache.branch_and_root(5, 3.0)
+        cache.branch_and_root(5, 3.0)
     with pytest.raises(ValueError):
-        await cache.branch_and_root(0, -1)
+        cache.branch_and_root(0, -1)
     with pytest.raises(ValueError):
-        await cache.branch_and_root(3, 3)
+        cache.branch_and_root(3, 3)
 
 
-@pytest.mark.asyncio
-async def test_bad_extension():
+def test_bad_extension():
     length = 5
-    source = Source(length).hashes
-    cache = MerkleCache(merkle, source)
-    await cache.initialize(length)
+    source = Source(length)
+    cache = MerkleCache(merkle, source, length)
     level = cache.level.copy()
     with pytest.raises(AssertionError):
-        await cache.branch_and_root(8, 0)
+        cache.branch_and_root(8, 0)
     # The bad extension should not destroy the cache
     assert cache.level == level
     assert cache.length == length
 
 
-async def time_it():
-    source = Source(500000).hashes
-    cp_length = 492000
+def time_it():
+    source = Source(500000)
     import time
     cache = MerkleCache(merkle, source)
-    await cache.initialize(cp_length)
-    cp_hashes = await source(0, cp_length)
+    cp_length = 492000
+    cp_hashes = source.hashes(0, cp_length)
     brs2 = []
     t1 = time.time()
     for index in range(5, 400000, 500):
-        brs2.append(await cache.branch_and_root(cp_length, index))
+        brs2.append(cache.branch_and_root(cp_length, index))
     t2 = time.time()
     print(t2 - t1)
     assert False
