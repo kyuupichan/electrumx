@@ -53,6 +53,10 @@ addresses = [
      "f0b4e85100aee1a996f22915eb3c3f764d53779a", "a03c1a27de9ac3b3122e8d"),
     (coins.Groestlcoin, "FY7vmDL7FZGACwqVNx5p4fVaGghojWM5AF",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
+    (coins.Bitg, "GP1vBChXjjbaKwMcoPGB4T8cZLXWCe2wLV",
+     "38bc968f95157bb7446feb1a7d75f2791fc8cf91", "4c7332cd142b788dd89241"),
+    (coins.Bitg, "GaXGkXrm4dK1CYfSWvKubKgMcrYN59BZGF",
+     "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e")
 ]
 
 # pdb.set_trace()
