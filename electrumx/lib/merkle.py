@@ -28,6 +28,8 @@
 
 from math import ceil, log
 
+from aiorpcx import Event
+
 from electrumx.lib.hash import double_sha256
 
 
@@ -158,13 +160,17 @@ class Merkle(object):
 class MerkleCache(object):
     '''A cache to calculate merkle branches efficiently.'''
 
-    def __init__(self, merkle, source, length):
-        '''Initialise a cache of length hashes taken from source.'''
+    def __init__(self, merkle, source_func):
+        '''Initialise a cache hashes taken from source_func:
+
+           async def source_func(index, count):
+              ...
+        '''
         self.merkle = merkle
-        self.source = source
-        self.length = length
-        self.depth_higher = merkle.tree_depth(length) // 2
-        self.level = self._level(source.hashes(0, length))
+        self.source_func = source_func
+        self.length = 0
+        self.depth_higher = 0
+        self.initialized = Event()
 
     def _segment_length(self):
         return 1 << self.depth_higher
@@ -179,18 +185,18 @@ class MerkleCache(object):
     def _level(self, hashes):
         return self.merkle.level(hashes, self.depth_higher)
 
-    def _extend_to(self, length):
+    async def _extend_to(self, length):
         '''Extend the length of the cache if necessary.'''
         if length <= self.length:
             return
         # Start from the beginning of any final partial segment.
         # Retain the value of depth_higher; in practice this is fine
         start = self._leaf_start(self.length)
-        hashes = self.source.hashes(start, length - start)
+        hashes = await self.source_func(start, length - start)
         self.level[start >> self.depth_higher:] = self._level(hashes)
         self.length = length
 
-    def _level_for(self, length):
+    async def _level_for(self, length):
         '''Return a (level_length, final_hash) pair for a truncation
         of the hashes to the given length.'''
         if length == self.length:
@@ -198,9 +204,16 @@ class MerkleCache(object):
         level = self.level[:length >> self.depth_higher]
         leaf_start = self._leaf_start(length)
         count = min(self._segment_length(), length - leaf_start)
-        hashes = self.source.hashes(leaf_start, count)
+        hashes = await self.source_func(leaf_start, count)
         level += self._level(hashes)
         return level
+
+    async def initialize(self, length):
+        '''Call to initialize the cache to a source of given length.'''
+        self.length = length
+        self.depth_higher = self.merkle.tree_depth(length) // 2
+        self.level = self._level(await self.source_func(0, length))
+        self.initialized.set()
 
     def truncate(self, length):
         '''Truncate the cache so it covers no more than length underlying
@@ -215,7 +228,7 @@ class MerkleCache(object):
         self.length = length
         self.level[length >> self.depth_higher:] = []
 
-    def branch_and_root(self, length, index):
+    async def branch_and_root(self, length, index):
         '''Return a merkle branch and root.  Length is the number of
         hashes used to calculate the merkle root, index is the position
         of the hash to calculate the branch of.
@@ -229,12 +242,13 @@ class MerkleCache(object):
             raise ValueError('length must be positive')
         if index >= length:
             raise ValueError('index must be less than length')
-        self._extend_to(length)
+        await self.initialized.wait()
+        await self._extend_to(length)
         leaf_start = self._leaf_start(index)
         count = min(self._segment_length(), length - leaf_start)
-        leaf_hashes = self.source.hashes(leaf_start, count)
+        leaf_hashes = await self.source_func(leaf_start, count)
         if length < self._segment_length():
             return self.merkle.branch_and_root(leaf_hashes, index)
-        level = self._level_for(length)
+        level = await self._level_for(length)
         return self.merkle.branch_and_root_from_level(
             level, leaf_hashes, index, self.depth_higher)

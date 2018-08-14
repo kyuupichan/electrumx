@@ -14,9 +14,10 @@ import ssl
 import time
 from collections import defaultdict, Counter
 
-from aiorpcx import (ClientSession, SOCKSProxy, SOCKSError,
-                     RPCError, ConnectionError,
-                     TaskGroup, run_in_thread, ignore_after)
+from aiorpcx import (ClientSession, SOCKSProxy,
+                     Notification, handler_invocation,
+                     SOCKSError, RPCError, TaskTimeout, TaskGroup, Event,
+                     sleep, run_in_thread, ignore_after, timeout_after)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
@@ -39,14 +40,13 @@ def assert_good(message, result, instance):
 class PeerSession(ClientSession):
     '''An outgoing session to a peer.'''
 
-    def _header_notification(self, header):
-        pass
-
-    def notification_handler(self, method):
+    async def handle_request(self, request):
         # We subscribe so might be unlucky enough to get a notification...
-        if method == 'blockchain.headers.subscribe':
-            return self._header_notification
-        return None
+        if (isinstance(request, Notification) and
+                request.method == 'blockchain.headers.subscribe'):
+            pass
+        else:
+            await handler_invocation(None, request)   # Raises
 
 
 class PeerManager(object):
@@ -55,22 +55,12 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
-<<<<<<< HEAD
     def __init__(self, env, db):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
         self.db = db
-=======
-
-    def __init__(self, env, chain_state):
-        self.logger=class_logger(__name__, self.__class__.__name__)
-        # Initialise the Peer class
-        Peer.DEFAULT_PORTS=env.coin.PEER_DEFAULT_PORTS
-        self.env=env
-        self.chain_state=chain_state
->>>>>>> parent of fbac38a... merge conflicts
 
         # Our clearnet and Tor Peers, if any
         sclass=env.coin.SESSIONCLS
@@ -84,7 +74,7 @@ class PeerManager(object):
         self.peers = set()
         self.permit_onion_peer_time = time.time()
         self.proxy = None
-        self.task_group = None
+        self.group = TaskGroup()
 
     def _my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -160,7 +150,7 @@ class PeerManager(object):
                 self.logger.info(f'detected {proxy}')
                 return
             self.logger.info('no proxy detected, will try later')
-            await asyncio.sleep(900)
+            await sleep(900)
 
     async def _note_peers(self, peers, limit=2, check_ports=False,
                           source=None):
@@ -177,7 +167,7 @@ class PeerManager(object):
                 for match in matches:
                     if match.check_ports(peer):
                         self.logger.info(f'ports changed for {peer}')
-                        peer.retry_event.set()
+                        match.retry_event.set()
 
         if new_peers:
             source = source or new_peers[0].source
@@ -188,9 +178,9 @@ class PeerManager(object):
                 use_peers = new_peers
             for peer in use_peers:
                 self.logger.info(f'accepted new peer {peer} from {source}')
-                peer.retry_event = asyncio.Event()
+                peer.retry_event = Event()
                 self.peers.add(peer)
-                await self.task_group.spawn(self._monitor_peer(peer))
+                await self.group.spawn(self._monitor_peer(peer))
 
     async def _monitor_peer(self, peer):
         # Stop monitoring if we were dropped (a duplicate peer)
@@ -232,34 +222,28 @@ class PeerManager(object):
                 # connections so our peers see the correct source.
                 kwargs['local_addr'] = (host, None)
 
+            peer_text = f'[{peer}:{port} {kind}]'
             try:
-                async with PeerSession(peer.host, port, **kwargs) as session:
-                    await self._verify_peer(session, peer)
+                async with timeout_after(120 if peer.is_tor else 30):
+                    async with PeerSession(peer.host, port,
+                                           **kwargs) as session:
+                        await self._verify_peer(session, peer)
                 is_good = True
                 break
             except BadPeerError as e:
-                self.logger.error(f'[{peer}] marking bad: ({e})')
+                self.logger.error(f'{peer_text} marking bad: ({e})')
                 peer.mark_bad()
                 break
             except RPCError as e:
-                self.logger.error(f'[{peer}] RPC error: {e.message} '
+                self.logger.error(f'{peer_text} RPC error: {e.message} '
                                   f'({e.code})')
-            except asyncio.TimeoutError as e:
-                self.logger.error(f'[{peer}] {e}')
-            except (OSError, SOCKSError, ConnectionError) as e:
-                self.logger.info(f'[{peer}] {kind} connection to '
-                                 f'port {port} failed: {e}')
-
-        now = time.time()
-        if self.env.force_proxy or peer.is_tor:
-            how = f'via {kind} over Tor'
-        else:
-            how = f'via {kind} at {peer.ip_addr}'
-        status = 'verified' if is_good else 'failed to verify'
-        elapsed = now - peer.last_try
-        self.logger.info(f'{status} {peer} {how} in {elapsed:.1f}s')
+            except (OSError, SOCKSError, ConnectionError, TaskTimeout) as e:
+                self.logger.info(f'{peer_text} {e}')
 
         if is_good:
+            now = time.time()
+            elapsed = now - peer.last_try
+            self.logger.info(f'{peer_text} verified in {elapsed:.1f}s')
             peer.try_count = 0
             peer.last_good = now
             peer.source = 'peer'
@@ -293,12 +277,9 @@ class PeerManager(object):
             if address:
                 peer.ip_addr = address[0]
 
-        timeout = 20 if peer.is_tor else 10
-
         # server.version goes first
         message = 'server.version'
-        result = await session.send_request(
-            message, self.server_version_args, timeout=timeout)
+        result = await session.send_request(message, self.server_version_args)
         assert_good(message, result, list)
 
         # Protocol version 1.1 returns a pair with the version first
@@ -309,16 +290,17 @@ class PeerManager(object):
         peer.features['server_version'] = server_version
         ptuple = protocol_tuple(protocol_version)
 
-        await self._send_headers_subscribe(session, peer, timeout, ptuple)
-        await self._send_server_features(session, peer, timeout)
-        await self._send_peers_subscribe(session, peer, timeout)
+        # FIXME: Make concurrent preserving the exception
+        await self._send_headers_subscribe(session, peer, ptuple)
+        await self._send_server_features(session, peer)
+        await self._send_peers_subscribe(session, peer)
 
-    async def _send_headers_subscribe(self, session, peer, timeout, ptuple):
+    async def _send_headers_subscribe(self, session, peer, ptuple):
         message = 'blockchain.headers.subscribe'
-        result = await session.send_request(message, timeout=timeout)
+        result = await session.send_request(message)
         assert_good(message, result, dict)
 
-        our_height = self.chain_state.db_height()
+        our_height = self.db.db_height
         if ptuple < (1, 3):
             their_height = result.get('block_height')
         else:
@@ -331,12 +313,11 @@ class PeerManager(object):
 
         # Check prior header too in case of hard fork.
         check_height = min(our_height, their_height)
-        raw_header = self.chain_state.raw_header(check_height)
+        raw_header = await self.db.raw_header(check_height)
         if ptuple >= (1, 4):
             ours = raw_header.hex()
             message = 'blockchain.block.header'
-            theirs = await session.send_request(message, [check_height],
-                                                timeout=timeout)
+            theirs = await session.send_request(message, [check_height])
             assert_good(message, theirs, str)
             if ours != theirs:
                 raise BadPeerError(f'our header {ours} and '
@@ -345,17 +326,16 @@ class PeerManager(object):
             ours = self.env.coin.electrum_header(raw_header, check_height)
             ours = ours.get('prev_block_hash')
             message = 'blockchain.block.get_header'
-            theirs = await session.send_request(message, [check_height],
-                                                timeout=timeout)
+            theirs = await session.send_request(message, [check_height])
             assert_good(message, theirs, dict)
             theirs = theirs.get('prev_block_hash')
             if ours != theirs:
                 raise BadPeerError(f'our header hash {ours} and '
                                    f'theirs {theirs} differ')
 
-    async def _send_server_features(self, session, peer, timeout):
+    async def _send_server_features(self, session, peer):
         message = 'server.features'
-        features = await session.send_request(message, timeout=timeout)
+        features = await session.send_request(message)
         assert_good(message, features, dict)
         hosts = [host.lower() for host in features.get('hosts', {})]
         if self.env.coin.GENESIS_HASH != features.get('genesis_hash'):
@@ -365,9 +345,9 @@ class PeerManager(object):
         else:
             raise BadPeerError(f'not listed in own hosts list {hosts}')
 
-    async def _send_peers_subscribe(self, session, peer, timeout):
+    async def _send_peers_subscribe(self, session, peer):
         message = 'server.peers.subscribe'
-        raw_peers = await session.send_request(message, timeout=timeout)
+        raw_peers = await session.send_request(message)
         assert_good(message, raw_peers, list)
 
         # Check the peers list we got from a remote peer.
@@ -387,13 +367,12 @@ class PeerManager(object):
             return
         self.logger.info(f'registering ourself with {peer}')
         # We only care to wait for the response
-        await session.send_request('server.add_peer', [features],
-                                   timeout=timeout)
+        await session.send_request('server.add_peer', [features])
 
     #
     # External interface
     #
-    async def discover_peers(self, task_group):
+    async def discover_peers(self):
         '''Perform peer maintenance.  This includes
 
           1) Forgetting unreachable peers.
@@ -406,9 +385,18 @@ class PeerManager(object):
 
         self.logger.info(f'beginning peer discovery. Force use of '
                          f'proxy: {self.env.force_proxy}')
-        self.task_group = task_group
-        await task_group.spawn(self._detect_proxy())
-        await task_group.spawn(self._import_peers())
+        forever = Event()
+        async with self.group as group:
+            await group.spawn(forever.wait())
+            await group.spawn(self._detect_proxy())
+            await group.spawn(self._import_peers())
+            # Consume tasks as they complete, logging unexpected failures
+            async for task in group:
+                if not task.cancelled():
+                    try:
+                        task.result()
+                    except Exception:
+                        self.logger.exception('task failed unexpectedly')
 
     def info(self):
         '''The number of peers.'''

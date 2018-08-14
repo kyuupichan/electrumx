@@ -15,7 +15,8 @@ import ecdsa.numbertheory as NT
 
 from electrumx.lib.coins import Coin
 from electrumx.lib.hash import Base58, hmac_sha512, hash160
-from electrumx.lib.util import cachedproperty, bytes_to_int, int_to_bytes
+from electrumx.lib.util import cachedproperty, bytes_to_int, int_to_bytes, \
+    pack_be_uint32, unpack_be_uint32_from
 
 
 class DerivationError(Exception):
@@ -65,7 +66,7 @@ class _KeyBase(object):
             raise ValueError('raw_serkey must have length 33')
 
         return (ver_bytes + bytes([self.depth])
-                + self.parent_fingerprint() + struct.pack('>I', self.n)
+                + self.parent_fingerprint() + pack_be_uint32(self.n)
                 + self.chain_code + raw_serkey)
 
     def fingerprint(self):
@@ -142,7 +143,7 @@ class PubKey(_KeyBase):
         if not 0 <= n < (1 << 31):
             raise ValueError('invalid BIP32 public key child number')
 
-        msg = self.pubkey_bytes + struct.pack('>I', n)
+        msg = self.pubkey_bytes + pack_be_uint32(n)
         L, R = self._hmac_sha512(msg)
 
         curve = self.CURVE
@@ -244,7 +245,7 @@ class PrivKey(_KeyBase):
         else:
             serkey = self.public_key.pubkey_bytes
 
-        msg = serkey + struct.pack('>I', n)
+        msg = serkey + pack_be_uint32(n)
         L, R = self._hmac_sha512(msg)
 
         curve = self.CURVE
@@ -271,6 +272,7 @@ def _exponent_to_bytes(exponent):
     '''Convert an exponent to 32 big-endian bytes'''
     return (bytes(32) + int_to_bytes(exponent))[-32:]
 
+
 def _from_extended_key(ekey):
     '''Return a PubKey or PrivKey from an extended key raw bytes.'''
     if not isinstance(ekey, (bytes, bytearray)):
@@ -281,7 +283,7 @@ def _from_extended_key(ekey):
     is_public, coin = Coin.lookup_xverbytes(ekey[:4])
     depth = ekey[4]
     fingerprint = ekey[5:9]   # Not used
-    n, = struct.unpack('>I', ekey[9:13])
+    n, = unpack_be_uint32_from(ekey[9:13])
     chain_code = ekey[13:45]
 
     if is_public:
@@ -294,6 +296,7 @@ def _from_extended_key(ekey):
         key = PrivKey(privkey, chain_code, n, depth)
 
     return key, coin
+
 
 def from_extended_key_string(ekey_str):
     '''Given an extended key string, such as

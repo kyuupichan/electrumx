@@ -26,45 +26,33 @@
 
 import pytest
 
-<<<<<<< HEAD
 import electrumx.lib.coins as coins
-=======
-from electrumx.lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin, BitcoinGold, Bitg
-from electrumx.lib.hash import Base58
->>>>>>> parent of fbac38a... merge conflicts
 
 addresses = [
-    (BitcoinCash, "13xDKJbjh4acmLpNVr6Lc9hFcXRr9fyt4x",
+    (coins.BitcoinCash, "13xDKJbjh4acmLpNVr6Lc9hFcXRr9fyt4x",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
-    (BitcoinCash, "3GxRZWkJufR5XA8hnNJgQ2gkASSheoBcmW",
+    (coins.BitcoinCash, "3GxRZWkJufR5XA8hnNJgQ2gkASSheoBcmW",
      "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
-    (BitcoinGold, "GZjH8pETu5xXd5DTt5VAqS9giooLNoHjnJ",
+    (coins.BitcoinGold, "GZjH8pETu5xXd5DTt5VAqS9giooLNoHjnJ",
      "ae40655d7006806fd668248d10e7822c0b774dab", "3a1af301b378ad92493b17"),
-    (BitcoinGold, "AXfENBm9FP1PMa8AWnVPZZ4tHEwBiqNZav",
+    (coins.BitcoinGold, "AXfENBm9FP1PMa8AWnVPZZ4tHEwBiqNZav",
      "ae40655d7006806fd668248d10e7822c0b774dab", "cb3db4271432c0ac9f88d5"),
-    (Emercoin, "ELAeVHQg2mmdTTrTrZSzMgAQyXfC9TSRys",
+    (coins.Emercoin, "ELAeVHQg2mmdTTrTrZSzMgAQyXfC9TSRys",
      "210c4482ad8eacb0d349992973608300677adb15", "d71f2df4ef1b397088d731"),
-    (Litecoin, "LNBAaWuZmipg29WXfz5dtAm1pjo8FEH8yg",
+    (coins.Litecoin, "LNBAaWuZmipg29WXfz5dtAm1pjo8FEH8yg",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
-    (Litecoin, "MPAZsQAGrnGWKfQbtFJ2Dfw9V939e7D3E2",
+    (coins.Litecoin, "MPAZsQAGrnGWKfQbtFJ2Dfw9V939e7D3E2",
      "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
-    (Zcash, "t1LppKe1sfPNDMysGSGuTjxoAsBcvvSYv5j",
+    (coins.Zcash, "t1LppKe1sfPNDMysGSGuTjxoAsBcvvSYv5j",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
-    (Zcash, "t3Zq2ZrASszCg7oBbio7oXqnfR6dnSWqo76",
+    (coins.Zcash, "t3Zq2ZrASszCg7oBbio7oXqnfR6dnSWqo76",
      "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
-<<<<<<< HEAD
     (coins.Decred, "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
      "2789d58cfa0957d206f025c2af056fc8a77cebb0", "8cc9b11122272bd7b79a50"),
     (coins.Decred, "DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
      "f0b4e85100aee1a996f22915eb3c3f764d53779a", "a03c1a27de9ac3b3122e8d"),
     (coins.Groestlcoin, "FY7vmDL7FZGACwqVNx5p4fVaGghojWM5AF",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
-=======
-    (Bitg, "GP1vBChXjjbaKwMcoPGB4T8cZLXWCe2wLV",
-     "38bc968f95157bb7446feb1a7d75f2791fc8cf91", "4c7332cd142b788dd89241"),
-    (Bitg, "GaXGkXrm4dK1CYfSWvKubKgMcrYN59BZGF",
-     "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e")
->>>>>>> parent of fbac38a... merge conflicts
 ]
 
 # pdb.set_trace()
