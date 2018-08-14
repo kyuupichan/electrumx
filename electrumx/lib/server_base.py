@@ -13,7 +13,7 @@ import sys
 import time
 from functools import partial
 
-from aiorpcx import TaskGroup
+from aiorpcx import spawn
 
 from electrumx.lib.util import class_logger
 
@@ -93,12 +93,11 @@ class ServerBase(object):
         loop.set_exception_handler(self.on_exception)
 
         shutdown_event = asyncio.Event()
-        async with TaskGroup() as group:
-            server_task = await group.spawn(self.serve(shutdown_event))
-            # Wait for shutdown, log on receipt of the event
-            await shutdown_event.wait()
-            self.logger.info('shutting down')
-            server_task.cancel()
+        server_task = await spawn(self.serve(shutdown_event))
+        # Wait for shutdown, log on receipt of the event
+        await shutdown_event.wait()
+        self.logger.info('shutting down')
+        server_task.cancel()
 
         # Prevent some silly logs
         await asyncio.sleep(0.01)

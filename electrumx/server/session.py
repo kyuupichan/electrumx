@@ -109,13 +109,15 @@ class SessionManager(object):
 
     CATCHING_UP, LISTENING, PAUSED, SHUTTING_DOWN = range(4)
 
-    def __init__(self, env, chain_state, mempool, notifications,
+    def __init__(self, env, db, bp, daemon, mempool, notifications,
                  shutdown_event):
         env.max_send = max(350000, env.max_send)
         self.env = env
-        self.chain_state = chain_state
+        self.db = db
+        self.bp = bp
+        self.daemon = daemon
         self.mempool = mempool
-        self.peer_mgr = PeerManager(env, chain_state)
+        self.peer_mgr = PeerManager(env, db)
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
@@ -127,8 +129,8 @@ class SessionManager(object):
         self.state = self.CATCHING_UP
         self.txs_sent = 0
         self.start_time = time.time()
-        self._history_cache = pylru.lrucache(256)
-        self._hc_height = 0
+        self.history_cache = pylru.lrucache(256)
+        self.notified_height = None
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
         # Masternode stuff only for such coins
@@ -152,7 +154,7 @@ class SessionManager(object):
             protocol_class = LocalRPC
         else:
             protocol_class = self.env.coin.SESSIONCLS
-        protocol_factory = partial(protocol_class, self, self.chain_state,
+        protocol_factory = partial(protocol_class, self, self.db,
                                    self.mempool, self.peer_mgr, kind)
         server = loop.create_server(protocol_factory, *args, **kw_args)
 
@@ -276,10 +278,11 @@ class SessionManager(object):
     def _get_info(self):
         '''A summary of server state.'''
         group_map = self._group_map()
-        result = self.chain_state.get_info()
-        result.update({
-            'version': electrumx.version,
+        return {
             'closing': len([s for s in self.sessions if s.is_closing()]),
+            'daemon': self.daemon.logged_url(),
+            'daemon_height': self.daemon.cached_height(),
+            'db_height': self.db.db_height,
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(group_map),
             'logged': len([s for s in self.sessions if s.log_me]),
@@ -291,8 +294,8 @@ class SessionManager(object):
             'subs': self._sub_count(),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
-        })
-        return result
+            'version': electrumx.version,
+        }
 
     def _session_data(self, for_log):
         '''Returned to the RPC 'sessions' call.'''
@@ -328,6 +331,19 @@ class SessionManager(object):
                            sum(s.send_size for s in sessions),
                            ])
         return result
+
+    async def _electrum_and_raw_headers(self, height):
+        raw_header = await self.raw_header(height)
+        electrum_header = self.env.coin.electrum_header(raw_header, height)
+        return electrum_header, raw_header
+
+    async def _refresh_hsub_results(self, height):
+        '''Refresh the cached header subscription responses to be for height,
+        and record that as notified_height.
+        '''
+        electrum, raw = await self._electrum_and_raw_headers(height)
+        self.hsub_results = (electrum, {'hex': raw.hex(), 'height': height})
+        self.notified_height = height
 
     # --- LocalRPC command handlers
 
@@ -367,10 +383,10 @@ class SessionManager(object):
         '''Replace the daemon URL.'''
         daemon_url = daemon_url or self.env.daemon_url
         try:
-            daemon_url = self.chain_state.set_daemon_url(daemon_url)
+            self.daemon.set_url(daemon_url)
         except Exception as e:
             raise RPCError(BAD_REQUEST, f'an error occured: {e!r}')
-        return f'now using daemon at {daemon_url}'
+        return f'now using daemon at {self.daemon.logged_url()}'
 
     async def rpc_stop(self):
         '''Shut down the server cleanly.'''
@@ -391,10 +407,54 @@ class SessionManager(object):
 
     async def rpc_query(self, items, limit):
         '''Return a list of data about server peers.'''
-        try:
-            return await self.chain_state.query(items, limit)
-        except Base58Error as e:
-            raise RPCError(BAD_REQUEST, e.args[0]) from None
+        coin = self.env.coin
+        db = self.db
+        lines = []
+
+        def arg_to_hashX(arg):
+            try:
+                script = bytes.fromhex(arg)
+                lines.append(f'Script: {arg}')
+                return coin.hashX_from_script(script)
+            except ValueError:
+                pass
+
+            try:
+                hashX = coin.address_to_hashX(arg)
+            except Base58Error as e:
+                lines.append(e.args[0])
+                return None
+            lines.append(f'Address: {arg}')
+            return hashX
+
+        for arg in args:
+            hashX = arg_to_hashX(arg)
+            if not hashX:
+                continue
+            n = None
+            history = await db.limited_history(hashX, limit=limit)
+            for n, (tx_hash, height) in enumerate(history):
+                lines.append(f'History #{n:,d}: height {height:,d} '
+                             f'tx_hash {hash_to_hex_str(tx_hash)}')
+            if n is None:
+                lines.append('No history found')
+            n = None
+            utxos = await db.all_utxos(hashX)
+            for n, utxo in enumerate(utxos, start=1):
+                lines.append(f'UTXO #{n:,d}: tx_hash '
+                             f'{hash_to_hex_str(utxo.tx_hash)} '
+                             f'tx_pos {utxo.tx_pos:,d} height '
+                             f'{utxo.height:,d} value {utxo.value:,d}')
+                if n == limit:
+                    break
+            if n is None:
+                lines.append('No UTXOs found')
+
+            balance = sum(utxo.value for utxo in utxos)
+            lines.append(f'Balance: {coin.decimal_value(balance):,f} '
+                         f'{coin.SHORTNAME}')
+
+        return lines
 
     async def rpc_sessions(self):
         '''Return statistics about connected sessions.'''
@@ -406,7 +466,7 @@ class SessionManager(object):
         count: number of blocks to reorg
         '''
         count = non_negative_integer(count)
-        if not self.chain_state.force_chain_reorg(count):
+        if not self.bp.force_chain_reorg(count):
             raise RPCError(BAD_REQUEST, 'still catching up with daemon')
         return f'scheduled a reorg of {count:,d} blocks'
 
@@ -454,31 +514,57 @@ class SessionManager(object):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
 
+    async def daemon_request(self, method, *args):
+        '''Catch a DaemonError and convert it to an RPCError.'''
+        try:
+            return await getattr(self.daemon, method)(*args)
+        except DaemonError as e:
+            raise RPCError(DAEMON_ERROR, f'daemon error: {e!r}') from None
+
+    async def raw_header(self, height):
+        '''Return the binary header at the given height.'''
+        try:
+            return await self.db.raw_header(height)
+        except IndexError:
+            raise RPCError(BAD_REQUEST, f'height {height:,d} '
+                           'out of range') from None
+
+    async def electrum_header(self, height):
+        '''Return the deserialized header at the given height.'''
+        electrum_header, _ = await self._electrum_and_raw_headers(height)
+        return electrum_header
+
+    async def broadcast_transaction(self, raw_tx):
+        hex_hash = await self.daemon.broadcast_transaction(raw_tx)
+        self.txs_sent += 1
+        return hex_hash
+
     async def limited_history(self, hashX):
         '''A caching layer.'''
-        hc = self._history_cache
+        hc = self.history_cache
         if hashX not in hc:
             # History DoS limit.  Each element of history is about 99
             # bytes when encoded as JSON.  This limits resource usage
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
             limit = self.env.max_send // 97
-            hc[hashX] = await self.chain_state.limited_history(hashX,
-                                                               limit=limit)
+            hc[hashX] = await self.db.limited_history(hashX, limit=limit)
         return hc[hashX]
 
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        # Invalidate our history cache for touched hashXs
-        if height != self._hc_height:
-            self._hc_height = height
-            hc = self._history_cache
+        height_changed = height != self.notified_height
+        if height_changed:
+            # Paranoia: a reorg could race and leave db_height lower
+            await self._refresh_hsub_results(min(height, self.db.db_height))
+            # Invalidate our history cache for touched hashXs
+            hc = self.history_cache
             for hashX in set(hc).intersection(touched):
                 del hc[hashX]
 
         async with TaskGroup() as group:
             for session in self.sessions:
-                await group.spawn(session.notify(height, touched))
+                await group.spawn(session.notify(touched, height_changed))
 
     def add_session(self, session):
         self.sessions.add(session)
@@ -518,12 +604,12 @@ class SessionBase(ServerSession):
     MAX_CHUNK_SIZE = 2016
     session_counter = itertools.count()
 
-    def __init__(self, session_mgr, chain_state, mempool, peer_mgr, kind):
+    def __init__(self, session_mgr, db, mempool, peer_mgr, kind):
         connection = JSONRPCConnection(JSONRPCAutoDetect)
         super().__init__(connection=connection)
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.session_mgr = session_mgr
-        self.chain_state = chain_state
+        self.db = db
         self.mempool = mempool
         self.peer_mgr = peer_mgr
         self.kind = kind  # 'RPC', 'TCP' etc.
@@ -534,11 +620,12 @@ class SessionBase(ServerSession):
         self.txs_sent = 0
         self.log_me = False
         self.bw_limit = self.env.bandwidth_limit
+        self.daemon_request = self.session_mgr.daemon_request
         # Hijack the connection so we can log messages
         self._receive_message_orig = self.connection.receive_message
         self.connection.receive_message = self.receive_message
 
-    async def notify(self, height, touched):
+    async def notify(self, touched, height_changed):
         pass
 
     def peer_address_str(self, *, for_log=True):
@@ -623,14 +710,12 @@ class ElectrumX(SessionBase):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
         self.subscribe_headers_raw = False
-        self.notified_height = None
         self.connection.max_response_size = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
         self.sv_seen = False
         self.mempool_statuses = {}
         self.set_request_handlers(self.PROTOCOL_MIN)
-        self.db_height = self.chain_state.db_height
 
     @classmethod
     def protocol_min_max_strings(cls):
@@ -662,96 +747,58 @@ class ElectrumX(SessionBase):
     def protocol_version_string(self):
         return util.version_string(self.protocol_tuple)
 
-    async def daemon_request(self, method, *args):
-        '''Catch a DaemonError and convert it to an RPCError.'''
-        try:
-            return await self.chain_state.daemon_request(method, args)
-        except DaemonError as e:
-            raise RPCError(DAEMON_ERROR, f'daemon error: {e!r}') from None
-
     def sub_count(self):
         return len(self.hashX_subs)
 
-    async def notify_touched(self, our_touched):
-        changed = {}
-
-        for hashX in our_touched:
-            alias = self.hashX_subs[hashX]
-            status = await self.address_status(hashX)
-            changed[alias] = status
-
-        # Check mempool hashXs - the status is a function of the
-        # confirmed state of other transactions.  Note: we cannot
-        # iterate over mempool_statuses as it changes size.
-        for hashX in tuple(self.mempool_statuses):
-            # Items can be evicted whilst await-ing below; False
-            # ensures such hashXs are notified
-            old_status = self.mempool_statuses.get(hashX, False)
-            status = await self.address_status(hashX)
-            if status != old_status:
-                alias = self.hashX_subs[hashX]
-                changed[alias] = status
-
-        for alias, status in changed.items():
-            if len(alias) == 64:
-                method = 'blockchain.scripthash.subscribe'
-            else:
-                method = 'blockchain.address.subscribe'
-            await self.send_notification(method, (alias, status))
-
-        if changed:
-            es = '' if len(changed) == 1 else 'es'
-            self.logger.info('notified of {:,d} address{}'
-                             .format(len(changed), es))
-
-    async def notify(self, height, touched):
+    async def notify(self, touched, height_changed):
         '''Notify the client about changes to touched addresses (from mempool
         updates or new blocks) and height.
-
-        Return the set of addresses the session needs to be
-        asyncronously notified about.  This can be empty if there are
-        possible mempool status updates.
-
-        Returns None if nothing needs to be notified asynchronously.
         '''
-        height_changed = height != self.notified_height
-        if height_changed:
-            self.notified_height = height
-            if self.subscribe_headers:
-                args = (await self.subscribe_headers_result(height), )
-                await self.send_notification('blockchain.headers.subscribe',
-                                             args)
+        if height_changed and self.subscribe_headers:
+            args = (await self.subscribe_headers_result(), )
+            await self.send_notification('blockchain.headers.subscribe', args)
 
         touched = touched.intersection(self.hashX_subs)
         if touched or (height_changed and self.mempool_statuses):
-            await self.notify_touched(touched)
+            changed = {}
 
-    async def raw_header(self, height):
-        '''Return the binary header at the given height.'''
-        try:
-            return await self.chain_state.raw_header(height)
-        except IndexError:
-            raise RPCError(BAD_REQUEST, f'height {height:,d} '
-                           'out of range') from None
+            for hashX in touched:
+                alias = self.hashX_subs[hashX]
+                status = await self.address_status(hashX)
+                changed[alias] = status
 
-    async def electrum_header(self, height):
-        '''Return the deserialized header at the given height.'''
-        raw_header = await self.raw_header(height)
-        return self.coin.electrum_header(raw_header, height)
+            # Check mempool hashXs - the status is a function of the
+            # confirmed state of other transactions.  Note: we cannot
+            # iterate over mempool_statuses as it changes size.
+            for hashX in tuple(self.mempool_statuses):
+                # Items can be evicted whilst await-ing status; False
+                # ensures such hashXs are notified
+                old_status = self.mempool_statuses.get(hashX, False)
+                status = await self.address_status(hashX)
+                if status != old_status:
+                    alias = self.hashX_subs[hashX]
+                    changed[alias] = status
 
-    async def subscribe_headers_result(self, height):
-        '''The result of a header subscription for the given height.'''
-        if self.subscribe_headers_raw:
-            raw_header = await self.raw_header(height)
-            return {'hex': raw_header.hex(), 'height': height}
-        return await self.electrum_header(height)
+            for alias, status in changed.items():
+                if len(alias) == 64:
+                    method = 'blockchain.scripthash.subscribe'
+                else:
+                    method = 'blockchain.address.subscribe'
+                await self.send_notification(method, (alias, status))
+
+            if changed:
+                es = '' if len(changed) == 1 else 'es'
+                self.logger.info(f'notified of {len(changed):,d} address{es}')
+
+    async def subscribe_headers_result(self):
+        '''The result of a header subscription or notification.'''
+        return self.session_mgr.hsub_results[self.subscribe_headers_raw]
 
     async def _headers_subscribe(self, raw):
         '''Subscribe to get headers of new blocks.'''
-        self.subscribe_headers = True
         self.subscribe_headers_raw = assert_boolean(raw)
-        self.notified_height = self.db_height()
-        return await self.subscribe_headers_result(self.notified_height)
+        self.subscribe_headers = True
+        return await self.subscribe_headers_result()
 
     async def headers_subscribe(self):
         '''Subscribe to get raw headers of new blocks.'''
@@ -804,7 +851,7 @@ class ElectrumX(SessionBase):
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash, including mempool
         effects.'''
-        utxos = await self.chain_state.all_utxos(hashX)
+        utxos = await self.db.all_utxos(hashX)
         utxos = sorted(utxos)
         utxos.extend(await self.mempool.unordered_UTXOs(hashX))
         spends = await self.mempool.potential_spends(hashX)
@@ -861,7 +908,7 @@ class ElectrumX(SessionBase):
         return await self.hashX_subscribe(hashX, address)
 
     async def get_balance(self, hashX):
-        utxos = await self.chain_state.all_utxos(hashX)
+        utxos = await self.db.all_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = await self.mempool.balance_delta(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
@@ -909,14 +956,14 @@ class ElectrumX(SessionBase):
         return await self.hashX_subscribe(hashX, scripthash)
 
     async def _merkle_proof(self, cp_height, height):
-        max_height = self.db_height()
+        max_height = self.db.db_height
         if not height <= cp_height <= max_height:
             raise RPCError(BAD_REQUEST,
                            f'require header height {height:,d} <= '
                            f'cp_height {cp_height:,d} <= '
                            f'chain height {max_height:,d}')
-        branch, root = await self.chain_state.header_branch_and_root(
-            cp_height + 1, height)
+        branch, root = await self.db.header_branch_and_root(cp_height + 1,
+                                                            height)
         return {
             'branch': [hash_to_hex_str(elt) for elt in branch],
             'root': hash_to_hex_str(root),
@@ -927,7 +974,7 @@ class ElectrumX(SessionBase):
         dictionary with a merkle proof.'''
         height = non_negative_integer(height)
         cp_height = non_negative_integer(cp_height)
-        raw_header_hex = (await self.raw_header(height)).hex()
+        raw_header_hex = (await self.session_mgr.raw_header(height)).hex()
         if cp_height == 0:
             return raw_header_hex
         result = {'header': raw_header_hex}
@@ -953,8 +1000,7 @@ class ElectrumX(SessionBase):
 
         max_size = self.MAX_CHUNK_SIZE
         count = min(count, max_size)
-        headers, count = await self.chain_state.read_headers(start_height,
-                                                             count)
+        headers, count = await self.db.read_headers(start_height, count)
         result = {'hex': headers.hex(), 'count': count, 'max': max_size}
         if count and cp_height:
             last_height = start_height + count - 1
@@ -971,7 +1017,7 @@ class ElectrumX(SessionBase):
         index = non_negative_integer(index)
         size = self.coin.CHUNK_SIZE
         start_height = index * size
-        headers, _ = await self.chain_state.read_headers(start_height, size)
+        headers, _ = await self.db.read_headers(start_height, size)
         return headers.hex()
 
     async def block_get_header(self, height):
@@ -979,7 +1025,7 @@ class ElectrumX(SessionBase):
 
         height: the header's height'''
         height = non_negative_integer(height)
-        return await self.electrum_header(height)
+        return await self.session_mgr.electrum_header(height)
 
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
@@ -1042,7 +1088,7 @@ class ElectrumX(SessionBase):
         number: the number of blocks
         '''
         number = non_negative_integer(number)
-        return await self.daemon_request('estimatefee', [number])
+        return await self.daemon_request('estimatefee', number)
 
     async def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
@@ -1091,15 +1137,14 @@ class ElectrumX(SessionBase):
         raw_tx: the raw transaction as a hexadecimal string'''
         # This returns errors as JSON RPC errors, as is natural
         try:
-            tx_hash = await self.chain_state.broadcast_transaction(raw_tx)
+            hex_hash = await self.session_mgr.broadcast_transaction(raw_tx)
             self.txs_sent += 1
-            self.session_mgr.txs_sent += 1
-            self.logger.info('sent tx: {}'.format(tx_hash))
-            return tx_hash
+            self.logger.info(f'sent tx: {hex_hash}')
+            return hex_hash
         except DaemonError as e:
             error, = e.args
             message = error['message']
-            self.logger.info(f'sendrawtransaction: {message}')
+            self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
 
@@ -1135,7 +1180,7 @@ class ElectrumX(SessionBase):
         tx_pos: index of transaction in tx_hashes to create branch for
         '''
         hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch, root = self.chain_state.tx_branch_and_root(hashes, tx_pos)
+        branch, root = self.db.merkle.branch_and_root(hashes, tx_pos)
         branch = [hash_to_hex_str(hash) for hash in branch]
         return branch
 
@@ -1264,9 +1309,9 @@ class DashElectrumX(ElectrumX):
             'masternode.list': self.masternode_list
         })
 
-    async def notify(self, height, touched):
+    async def notify(self, touched, height_changed):
         '''Notify the client about changes in masternode list.'''
-        await super().notify(height, touched)
+        await super().notify(touched, height_changed)
         for mn in self.mns:
             status = await self.daemon_request('masternode_list',
                                                ['status', mn])
@@ -1358,7 +1403,7 @@ class DashElectrumX(ElectrumX):
         # with the masternode information including the payment
         # position is returned.
         cache = self.session_mgr.mn_cache
-        if not cache or self.session_mgr.mn_cache_height != self.db_height():
+        if not cache or self.session_mgr.mn_cache_height != self.db.db_height:
             full_mn_list = await self.daemon_request('masternode_list',
                                                      ['full'])
             mn_payment_queue = get_masternode_payment_queue(full_mn_list)
@@ -1386,7 +1431,7 @@ class DashElectrumX(ElectrumX):
                 mn_list.append(mn_info)
             cache.clear()
             cache.extend(mn_list)
-            self.session_mgr.mn_cache_height = self.db_height()
+            self.session_mgr.mn_cache_height = self.db.db_height
 
         # If payees is an empty list the whole masternode list is returned
         if payees:
