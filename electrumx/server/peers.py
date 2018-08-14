@@ -14,19 +14,16 @@ import ssl
 import time
 from collections import defaultdict, Counter
 
-# from aiorpcx import (ClientSession, SOCKSProxy, SOCKSError,
-#                      RPCError, ConnectionError,
-#                      TaskGroup, run_in_thread, ignore_after)
 from aiorpcx import (ClientSession, SOCKSProxy, SOCKSError,
-                     RPCError,
+                     RPCError, ConnectionError,
                      TaskGroup, run_in_thread, ignore_after)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
 
-PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
-STALE_SECS = 24 * 3600
-WAKEUP_SECS = 300
+PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD=range(4)
+STALE_SECS=24 * 3600
+WAKEUP_SECS=300
 
 
 class BadPeerError(Exception):
@@ -60,15 +57,15 @@ class PeerManager(object):
     '''
 
     def __init__(self, env, chain_state):
-        self.logger = class_logger(__name__, self.__class__.__name__)
+        self.logger=class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
-        Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
-        self.env = env
-        self.chain_state = chain_state
+        Peer.DEFAULT_PORTS=env.coin.PEER_DEFAULT_PORTS
+        self.env=env
+        self.chain_state=chain_state
 
         # Our clearnet and Tor Peers, if any
-        sclass = env.coin.SESSIONCLS
-        self.myselves = [Peer(ident.host, sclass.server_features(env), 'env')
+        sclass=env.coin.SESSIONCLS
+        self.myselves=[Peer(ident.host, sclass.server_features(env), 'env')
                          for ident in env.identities]
         self.server_version_args = sclass.server_version_args()
         # Peers have one entry per hostname.  Once connected, the
@@ -240,8 +237,7 @@ class PeerManager(object):
                                   f'({e.code})')
             except asyncio.TimeoutError as e:
                 self.logger.error(f'[{peer}] {e}')
-            # except (OSError, SOCKSError, ConnectionError) as e:
-                except (OSError, SOCKSError) as e:
+            except (OSError, SOCKSError, ConnectionError) as e:
                 self.logger.info(f'[{peer}] {kind} connection to '
                                  f'port {port} failed: {e}')
 
