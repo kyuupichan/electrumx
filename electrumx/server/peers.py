@@ -14,8 +14,11 @@ import ssl
 import time
 from collections import defaultdict, Counter
 
+# from aiorpcx import (ClientSession, SOCKSProxy, SOCKSError,
+#                      RPCError, ConnectionError,
+#                      TaskGroup, run_in_thread, ignore_after)
 from aiorpcx import (ClientSession, SOCKSProxy, SOCKSError,
-                     RPCError, ConnectionError,
+                     RPCError,
                      TaskGroup, run_in_thread, ignore_after)
 
 from electrumx.lib.peer import Peer
@@ -55,6 +58,7 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
+
     def __init__(self, env, chain_state):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
@@ -236,7 +240,8 @@ class PeerManager(object):
                                   f'({e.code})')
             except asyncio.TimeoutError as e:
                 self.logger.error(f'[{peer}] {e}')
-            except (OSError, SOCKSError, ConnectionError) as e:
+            # except (OSError, SOCKSError, ConnectionError) as e:
+                except (OSError, SOCKSError) as e:
                 self.logger.info(f'[{peer}] {kind} connection to '
                                  f'port {port} failed: {e}')
 

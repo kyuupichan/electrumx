@@ -2151,7 +2151,7 @@ class Bitg(Coin):
 class tBitg(Coin):
     NAME = "testnetBitcoinGreen"
     SHORTNAME = "tBITG"
-    NET = "mainnet"
+    NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("62")
@@ -2171,97 +2171,5 @@ class tBitg(Coin):
        '''Given a header return the hash.'''
        import quark_hash
        return quark_hash.getPoWHash(header)
-
-
-
-
-class Pivx(Coin):
-   NAME = "PIVX"
-   SHORTNAME = "PIVX"
-   NET = "mainnet"
-   XPUB_VERBYTES = bytes.fromhex("022D2533")
-   XPRV_VERBYTES = bytes.fromhex("0221312B")
-   GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-   P2PKH_VERBYTE = bytes.fromhex("1e")
-   P2SH_VERBYTE = bytes.fromhex("0d")
-   WIF_BYTE = bytes.fromhex("d4")
-   TX_COUNT_HEIGHT = 569399
-   TX_COUNT = 2157510
-   TX_PER_BLOCK = 1
-   STATIC_BLOCK_HEADERS = False
-   RPC_PORT = 51470
-   ZEROCOIN_HEADER = 112
-   ZEROCOIN_START_HEIGHT = 863787
-   ZEROCOIN_BLOCK_VERSION = 4
-
-   @classmethod
-   def static_header_len(cls, height):
-       '''Given a header height return its length.'''
-       if height >= cls.ZEROCOIN_START_HEIGHT:
-           return cls.ZEROCOIN_HEADER
-       else:
-           return cls.BASIC_HEADER_SIZE
-
-   @classmethod
-   def header_hash(cls, header):
-       '''Given a header return the hash.'''
-       version, = struct.unpack('<I', header[:4])
-       if version >= cls.ZEROCOIN_BLOCK_VERSION:
-           return super().header_hash(header)
-       else:
-           import quark_hash
-           return quark_hash.getPoWHash(header)
-
-   @classmethod
-   def electrum_header(cls, header, height):
-       version, = struct.unpack('<I', header[:4])
-       timestamp, bits, nonce = struct.unpack('<III', header[68:80])
-
-       if version >= cls.ZEROCOIN_BLOCK_VERSION:
-           return {
-               'block_height': height,
-               'version': version,
-               'prev_block_hash': hash_to_str(header[4:36]),
-               'merkle_root': hash_to_str(header[36:68]),
-               'timestamp': timestamp,
-               'bits': bits,
-               'nonce': nonce,
-               'acc_checkpoint': hash_to_str(header[80:112])
-           }
-       else:
-           return {
-               'block_height': height,
-               'version': version,
-               'prev_block_hash': hash_to_str(header[4:36]),
-               'merkle_root': hash_to_str(header[36:68]),
-               'timestamp': timestamp,
-               'bits': bits,
-               'nonce': nonce,
-           }
-
-class PivxTestnet(Pivx):
-   NAME = "PIVX"
-   SHORTNAME = "PIVX"
-   NET = "testnet"
-   XPUB_VERBYTES = bytes.fromhex("3a8061a0")
-   XPRV_VERBYTES = bytes.fromhex("3a805837")
-   GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-   P2PKH_VERBYTE = bytes.fromhex("8B")
-   P2SH_VERBYTE = bytes.fromhex("13")
-   WIF_BYTE = bytes.fromhex("EF")
-   TX_COUNT_HEIGHT = 569399
-   TX_COUNT = 2157510
-   TX_PER_BLOCK = 4
-   RPC_PORT = 51472
-
-   @classmethod
-   def static_header_len(cls, height):
-       '''Given a header height return its length.'''
-       if height >= 201564:
-           return cls.ZEROCOIN_HEADER
-       else:
-           return cls.BASIC_HEADER_SIZE
-
-
 
 

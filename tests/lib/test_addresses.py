@@ -25,8 +25,9 @@
 # and warranty status of this software.
 
 import pytest
+import pdb
 
-from electrumx.lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin, BitcoinGold
+from electrumx.lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin, BitcoinGold, Bitg
 from electrumx.lib.hash import Base58
 
 addresses = [
@@ -48,7 +49,14 @@ addresses = [
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
     (Zcash, "t3Zq2ZrASszCg7oBbio7oXqnfR6dnSWqo76",
      "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
+    (BitcoinGre),
+    (Bitg, "GP1vBChXjjbaKwMcoPGB4T8cZLXWCe2wLV",
+     "38bc968f95157bb7446feb1a7d75f2791fc8cf91", "4c7332cd142b788dd89241"),
+    (Bitg, "GaXGkXrm4dK1CYfSWvKubKgMcrYN59BZGF",
+     "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e")
 ]
+
+pdb.set_trace()
 
 
 @pytest.fixture(params=addresses)
