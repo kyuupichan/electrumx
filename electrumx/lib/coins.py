@@ -2100,3 +2100,42 @@ class GroestlcoinTestnet(Groestlcoin):
         '7frvhgofuf522b5i.onion t',
         'aocojvqcybdoxekv.onion t',
     ]
+
+
+class Pivx(Coin):
+    NAME = "Pivx"
+    SHORTNAME = "PIVX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("022D2533")
+    XPRV_VERBYTES = bytes.fromhex("0221312B")
+    P2PKH_VERBYTE = bytes.fromhex("1e")
+    P2SH_VERBYTES = [bytes.fromhex("0d")]
+    WIF_BYTE = bytes.fromhex("d4")
+    GENESIS_HASH = ('0000041e482b9b9691d98eefb4847340'
+                    '5c0b8ec31b76df3797c74a78680ef818')
+    BASIC_HEADER_SIZE = 80
+    HDR_V4_SIZE = 112
+    HDR_V4_HEIGHT = 863787
+    HDR_V4_START_OFFSET = HDR_V4_HEIGHT * BASIC_HEADER_SIZE
+    TX_COUNT = 2930206
+    TX_COUNT_HEIGHT = 1299212
+    TX_PER_BLOCK = 2
+    RPC_PORT = 51473
+
+    @classmethod
+    def static_header_offset(cls, height):
+        assert cls.STATIC_BLOCK_HEADERS
+        if height >= cls.HDR_V4_HEIGHT:
+            relative_v4_offset = (height - cls.HDR_V4_HEIGHT) * cls.HDR_V4_SIZE
+            return cls.HDR_V4_START_OFFSET + relative_v4_offset
+        else:
+            return height * cls.BASIC_HEADER_SIZE
+
+    @classmethod
+    def header_hash(cls, header):
+        version, = struct.unpack('<I', header[:4])
+        if version >= 4:
+            return super().header_hash(header)
+        else:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
