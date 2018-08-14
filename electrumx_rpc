@@ -10,7 +10,6 @@
 '''Script to send RPC commands to a running ElectrumX server.'''
 
 
-from aiorpcx import timeout_after, ClientSession, TaskTimeout
 import argparse
 import asyncio
 import json
@@ -18,121 +17,49 @@ from os import environ
 
 import electrumx.lib.text as text
 
-
-simple_commands = {
-    'getinfo': 'Print a summary of server state',
-    'groups': 'Print current session groups',
-    'peers': 'Print information about peer servers for the same coin',
-    'sessions': 'Print information about client sessions',
-    'stop': 'Shut down the server cleanly',
-}
-
-session_commands = {
-    'disconnect': 'Disconnect sessions',
-    'log': 'Toggle logging of sessions',
-}
-
-other_commands = {
-    'add_peer': (
-        'add a peer to the peers list',
-        [], {
-            'type': str,
-            'dest': 'real_name',
-            'help': 'e.g. "a.domain.name s995 t"',
-        },
-    ),
-    'daemon_url': (
-        "replace the daemon's URL at run-time, and forecefully rotate "
-        " to the first URL in the list",
-        [], {
-            'type': str,
-            'nargs': '?',
-            'default': '',
-            'dest': 'daemon_url',
-            'help': 'see documentation of DAEMON_URL envvar',
-        },
-    ),
-    'query': (
-        'query the UTXO and history databases',
-        ['-l', '--limit'], {
-            'type': int,
-            'default': 1000,
-            'help': 'UTXO and history output limit',
-        }, ['items'], {
-            'nargs': '+',
-            'type': str,
-            'help': 'hex scripts, or addresses, to query',
-        },
-    ),
-    'reorg': (
-        'simulate a chain reorganization',
-        [], {
-            'type': int,
-            'dest': 'count',
-            'default': 3,
-            'help': 'number of blocks to back up'
-        },
-    ),
-}
+from aiorpcx import ClientSession
 
 
 def main():
     '''Send the RPC command to the server and print the result.'''
-    main_parser = argparse.ArgumentParser(
-        'elextrumx_rpc',
-        description='Send electrumx an RPC command'
-    )
-    main_parser.add_argument('-p', '--port', metavar='port_num', type=int,
-                             help='RPC port number')
+    parser = argparse.ArgumentParser('Send electrumx an RPC command')
+    parser.add_argument('-p', '--port', metavar='port_num', type=int,
+                        help='RPC port number')
+    parser.add_argument('command', nargs=1, default=[],
+                        help='command to send')
+    parser.add_argument('param', nargs='*', default=[],
+                        help='params to send')
+    args = parser.parse_args()
 
-    subparsers = main_parser.add_subparsers(help='sub-command help',
-                                            dest='command')
-
-    for command, help in simple_commands.items():
-        parser = subparsers.add_parser(command, help=help)
-
-    for command, help in session_commands.items():
-        parser = subparsers.add_parser(command, help=help)
-        parser.add_argument('session_ids', nargs='+', type=int,
-                            help='list of session ids')
-
-    for command, data in other_commands.items():
-        parser_help, *arguments = data
-        parser = subparsers.add_parser(command, help=parser_help)
-        for n in range(0, len(arguments), 2):
-            args, kwargs = arguments[n: n+2]
-            parser.add_argument(*args, **kwargs)
-
-    args = main_parser.parse_args()
-    args = vars(args)
-    port = args.pop('port')
+    port = args.port
     if port is None:
         port = int(environ.get('RPC_PORT', 8000))
-    method = args.pop('command')
 
-    # aiorpcX makes this so easy...
+    # Get the RPC request.
+    method = args.command[0]
+    params = args.param
+    if method in ('log', 'disconnect'):
+        params = [params]
+
     async def send_request():
-        try:
-            async with timeout_after(15):
-                async with ClientSession('localhost', port) as session:
-                    result = await session.send_request(method, args)
-                    if method in ('query', ):
-                        for line in result:
-                            print(line)
-                    elif method in ('groups', 'peers', 'sessions'):
-                        lines_func = getattr(text, f'{method}_lines')
-                        for line in lines_func(result):
-                            print(line)
-                    else:
-                        print(json.dumps(result, indent=4, sort_keys=True))
-        except OSError:
-            print('cannot connect - is ElectrumX catching up, not running, or '
-                  f'is {port} the wrong RPC port?')
-        except Exception as e:
-            print(f'error making request: {e!r}')
+        # aiorpcX makes this so easy...
+        async with ClientSession('localhost', port) as session:
+            result = await session.send_request(method, params, timeout=15)
+            if method in ('groups', 'peers', 'sessions'):
+                lines_func = getattr(text, f'{method}_lines')
+                for line in lines_func(result):
+                    print(line)
+            else:
+                print(json.dumps(result, indent=4, sort_keys=True))
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(send_request())
+    try:
+        loop.run_until_complete(send_request())
+    except OSError:
+        print('cannot connect - is ElectrumX catching up, not running, or '
+              f'is {port} the wrong RPC port?')
+    except Exception as e:
+        print(f'error making request: {e}')
 
 
 if __name__ == '__main__':

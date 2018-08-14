@@ -7,14 +7,13 @@
 
 '''Mempool handling.'''
 
+import asyncio
 import itertools
 import time
-from abc import ABC, abstractmethod
-from asyncio import Lock
 from collections import defaultdict
 
 import attr
-from aiorpcx import TaskGroup, run_in_thread, sleep
+from aiorpcx import TaskGroup, run_in_thread
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.util import class_logger, chunks
@@ -31,59 +30,8 @@ class MemPoolTx(object):
     size = attr.ib()
 
 
-@attr.s(slots=True)
-class MemPoolTxSummary(object):
-    hash = attr.ib()
-    fee = attr.ib()
-    has_unconfirmed_inputs = attr.ib()
-
-
-class MemPoolAPI(ABC):
-    '''A concrete instance of this class is passed to the MemPool object
-    and used by it to query DB and blockchain state.'''
-
-    @abstractmethod
-    async def height(self):
-        '''Query bitcoind for its height.'''
-
-    @abstractmethod
-    def cached_height(self):
-        '''Return the height of bitcoind the last time it was queried,
-        for any reason, without actually querying it.
-        '''
-
-    @abstractmethod
-    async def mempool_hashes(self):
-        '''Query bitcoind for the hashes of all transactions in its
-        mempool, returned as a list.'''
-
-    @abstractmethod
-    async def raw_transactions(self, hex_hashes):
-        '''Query bitcoind for the serialized raw transactions with the given
-        hashes.  Missing transactions are returned as None.
-
-        hex_hashes is an iterable of hexadecimal hash strings.'''
-
-    @abstractmethod
-    async def lookup_utxos(self, prevouts):
-        '''Return a list of (hashX, value) pairs each prevout if unspent,
-        otherwise return None if spent or not found.
-
-        prevouts - an iterable of (hash, index) pairs
-        '''
-
-    @abstractmethod
-    async def on_mempool(self, touched, height):
-        '''Called each time the mempool is synchronized.  touched is a set of
-        hashXs touched since the previous call.  height is the
-        daemon's height at the time the mempool was obtained.'''
-
-
 class MemPool(object):
     '''Representation of the daemon's mempool.
-
-        coin - a coin class from coins.py
-        api - an object implementing MemPoolAPI
 
     Updated regularly in caught-up state.  Goal is to enable efficient
     response to the calls in the external interface.  To that end we
@@ -93,42 +41,23 @@ class MemPool(object):
        hashXs: hashX   -> set of all hashes of txs touching the hashX
     '''
 
-    def __init__(self, coin, api, refresh_secs=5.0, log_status_secs=120.0):
-        assert isinstance(api, MemPoolAPI)
-        self.coin = coin
-        self.api = api
+    def __init__(self, coin, daemon, notifications, lookup_utxos):
         self.logger = class_logger(__name__, self.__class__.__name__)
+        self.coin = coin
+        self.lookup_utxos = lookup_utxos
+        self.daemon = daemon
+        self.notifications = notifications
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
         self.cached_compact_histogram = []
-        self.refresh_secs = refresh_secs
-        self.log_status_secs = log_status_secs
-        # Prevents mempool refreshes during fee histogram calculation
-        self.lock = Lock()
 
-    async def _logging(self, synchronized_event):
-        '''Print regular logs of mempool stats.'''
-        self.logger.info('beginning processing of daemon mempool.  '
-                         'This can take some time...')
-        start = time.time()
-        await synchronized_event.wait()
-        elapsed = time.time() - start
-        self.logger.info(f'synced in {elapsed:.2f}s')
+    async def _log_stats(self):
         while True:
             self.logger.info(f'{len(self.txs):,d} txs '
                              f'touching {len(self.hashXs):,d} addresses')
-            await sleep(self.log_status_secs)
-            await synchronized_event.wait()
+            await asyncio.sleep(120)
 
-    async def _refresh_histogram(self, synchronized_event):
-        while True:
-            await synchronized_event.wait()
-            async with self.lock:
-                # Threaded as can be expensive
-                await run_in_thread(self._update_histogram, 100_000)
-            await sleep(self.coin.MEMPOOL_HISTOGRAM_REFRESH_SECS)
-
-    def _update_histogram(self, bin_size):
+    def _update_histogram(self):
         # Build a histogram by fee rate
         histogram = defaultdict(int)
         for tx in self.txs.values():
@@ -145,6 +74,7 @@ class MemPool(object):
         compact = []
         cum_size = 0
         r = 0   # ?
+        bin_size = 100 * 1000
         for fee_rate, size in sorted(histogram.items(), reverse=True):
             cum_size += size
             if cum_size + r > bin_size:
@@ -199,18 +129,21 @@ class MemPool(object):
 
     async def _refresh_hashes(self, synchronized_event):
         '''Refresh our view of the daemon's mempool.'''
-        while True:
-            height = self.api.cached_height()
-            hex_hashes = await self.api.mempool_hashes()
-            if height != await self.api.height():
+        sleep = 5
+        histogram_refresh = self.coin.MEMPOOL_HISTOGRAM_REFRESH_SECS // sleep
+        for loop_count in itertools.count():
+            height = self.daemon.cached_height()
+            hex_hashes = await self.daemon.mempool_hashes()
+            if height != await self.daemon.height():
                 continue
             hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
-            async with self.lock:
-                touched = await self._process_mempool(hashes)
+            touched = await self._process_mempool(hashes)
             synchronized_event.set()
-            synchronized_event.clear()
-            await self.api.on_mempool(touched, height)
-            await sleep(self.refresh_secs)
+            await self.notifications.on_mempool(touched, height)
+            # Thread mempool histogram refreshes - they can be expensive
+            if loop_count % histogram_refresh == 0:
+                await run_in_thread(self._update_histogram)
+            await asyncio.sleep(sleep)
 
     async def _process_mempool(self, all_hashes):
         # Re-sync with the new set of hashes
@@ -243,6 +176,9 @@ class MemPool(object):
                 tx_map.update(deferred)
                 utxo_map.update(unspent)
 
+            # Handle the stragglers
+            if len(tx_map) >= 10:
+                self.logger.info(f'{len(tx_map)} stragglers')
             prior_count = 0
             # FIXME: this is not particularly efficient
             while tx_map and len(tx_map) != prior_count:
@@ -257,7 +193,7 @@ class MemPool(object):
     async def _fetch_and_accept(self, hashes, all_hashes, touched):
         '''Fetch a list of mempool transactions.'''
         hex_hashes_iter = (hash_to_hex_str(hash) for hash in hashes)
-        raw_txs = await self.api.raw_transactions(hex_hashes_iter)
+        raw_txs = await self.daemon.getrawtransactions(hex_hashes_iter)
 
         def deserialize_txs():    # This function is pure
             to_hashX = self.coin.hashX_from_script
@@ -289,7 +225,7 @@ class MemPool(object):
         prevouts = tuple(prevout for tx in tx_map.values()
                          for prevout in tx.prevouts
                          if prevout[0] not in all_hashes)
-        utxos = await self.api.lookup_utxos(prevouts)
+        utxos = await self.lookup_utxos(prevouts)
         utxo_map = {prevout: utxo for prevout, utxo in zip(prevouts, utxos)}
 
         return self._accept_transactions(tx_map, utxo_map, touched)
@@ -299,11 +235,19 @@ class MemPool(object):
     #
 
     async def keep_synchronized(self, synchronized_event):
-        '''Keep the mempool synchronized with the daemon.'''
-        async with TaskGroup(wait=any) as group:
+        '''Starts the mempool synchronizer.
+
+        Waits for an initial synchronization before returning.
+        '''
+        self.logger.info('beginning processing of daemon mempool.  '
+                         'This can take some time...')
+        async with TaskGroup() as group:
             await group.spawn(self._refresh_hashes(synchronized_event))
-            await group.spawn(self._refresh_histogram(synchronized_event))
-            await group.spawn(self._logging(synchronized_event))
+            start = time.time()
+            await synchronized_event.wait()
+            elapsed = time.time() - start
+            self.logger.info(f'synced in {elapsed:.2f}s')
+            await group.spawn(self._log_stats())
 
     async def balance_delta(self, hashX):
         '''Return the unconfirmed amount in the mempool for hashX.
@@ -311,6 +255,7 @@ class MemPool(object):
         Can be positive or negative.
         '''
         value = 0
+        # hashXs is a defaultdict
         if hashX in self.hashXs:
             for hash in self.hashXs[hashX]:
                 tx = self.txs[hash]
@@ -326,8 +271,7 @@ class MemPool(object):
         '''Return a set of (prev_hash, prev_idx) pairs from mempool
         transactions that touch hashX.
 
-        None, some or all of these may be spends of the hashX, but all
-        actual spends of it (in the DB or mempool) will be included.
+        None, some or all of these may be spends of the hashX.
         '''
         result = set()
         for tx_hash in self.hashXs.get(hashX, ()):
@@ -336,12 +280,18 @@ class MemPool(object):
         return result
 
     async def transaction_summaries(self, hashX):
-        '''Return a list of MemPoolTxSummary objects for the hashX.'''
+        '''Return a list of (tx_hash, tx_fee, unconfirmed) tuples for
+        mempool entries for the hashX.
+
+        unconfirmed is True if any txin is unconfirmed.
+        '''
+        # hashXs is a defaultdict, so use get() to query
         result = []
         for tx_hash in self.hashXs.get(hashX, ()):
             tx = self.txs[tx_hash]
-            has_ui = any(hash in self.txs for hash, idx in tx.prevouts)
-            result.append(MemPoolTxSummary(tx_hash, tx.fee, has_ui))
+            unconfirmed = any(prev_hash in self.txs
+                              for prev_hash, prev_idx in tx.prevouts)
+            result.append((tx_hash, tx.fee, unconfirmed))
         return result
 
     async def unordered_UTXOs(self, hashX):
@@ -352,6 +302,7 @@ class MemPool(object):
         the outputs.
         '''
         utxos = []
+        # hashXs is a defaultdict, so use get() to query
         for tx_hash in self.hashXs.get(hashX, ()):
             tx = self.txs.get(tx_hash)
             for pos, (hX, value) in enumerate(tx.out_pairs):

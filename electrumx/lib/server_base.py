@@ -7,13 +7,12 @@
 
 import asyncio
 import os
-import re
 import signal
 import sys
 import time
 from functools import partial
 
-from aiorpcx import spawn
+from aiorpcx import TaskGroup
 
 from electrumx.lib.util import class_logger
 
@@ -23,13 +22,16 @@ class ServerBase(object):
 
     Derived classes are expected to:
 
-    - set PYTHON_MIN_VERSION and SUPPRESS_MESSAGE_REGEX as appropriate
+    - set PYTHON_MIN_VERSION and SUPPRESS_MESSAGES as appropriate
     - implement the serve() coroutine, called from the run() method.
       Upon return the event loop runs until the shutdown signal is received.
     '''
-    SUPPRESS_MESSAGE_REGEX = re.compile('SSL handshake|Fatal read error on|'
-                                        'SSL error in data received')
-    SUPPRESS_TASK_REGEX = re.compile('accept_connection2')
+
+    SUPPRESS_MESSAGES = [
+        'Fatal read error on socket transport',
+        'Fatal write error on socket transport',
+    ]
+
     PYTHON_MIN_VERSION = (3, 6)
 
     def __init__(self, env):
@@ -67,9 +69,9 @@ class ServerBase(object):
     def on_exception(self, loop, context):
         '''Suppress spurious messages it appears we cannot control.'''
         message = context.get('message')
-        if message and self.SUPPRESS_MESSAGE_REGEX.match(message):
+        if message in self.SUPPRESS_MESSAGES:
             return
-        if self.SUPPRESS_TASK_REGEX.match(repr(context.get('task'))):
+        if 'accept_connection2()' in repr(context.get('task')):
             return
         loop.default_exception_handler(context)
 
@@ -93,20 +95,28 @@ class ServerBase(object):
         loop.set_exception_handler(self.on_exception)
 
         shutdown_event = asyncio.Event()
-        server_task = await spawn(self.serve(shutdown_event))
-        # Wait for shutdown, log on receipt of the event
-        await shutdown_event.wait()
-        self.logger.info('shutting down')
-        server_task.cancel()
+        try:
+            async with TaskGroup() as group:
+                server_task = await group.spawn(self.serve(shutdown_event))
+                # Wait for shutdown, log on receipt of the event
+                await shutdown_event.wait()
+                self.logger.info('shutting down')
+                server_task.cancel()
+        finally:
+            await loop.shutdown_asyncgens()
 
         # Prevent some silly logs
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.001)
+        # Finally, work around an apparent asyncio bug that causes log
+        # spew on shutdown for partially opened SSL sockets
+        try:
+            del asyncio.sslproto._SSLProtocolTransport.__del__
+        except Exception:
+            pass
 
         self.logger.info('shutdown complete')
 
     def run(self):
         loop = asyncio.get_event_loop()
-        try:
-            loop.run_until_complete(self._main(loop))
-        finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.run_until_complete(self._main(loop))
+        loop.close()
