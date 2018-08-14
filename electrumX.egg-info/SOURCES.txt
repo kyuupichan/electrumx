@@ -9,10 +9,12 @@ electrumX.egg-info/requires.txt
 electrumX.egg-info/top_level.txt
 electrumx/__init__.py
 electrumx/lib/__init__.py
+electrumx/lib/blake.py
 electrumx/lib/coins.py
 electrumx/lib/enum.py
 electrumx/lib/env_base.py
 electrumx/lib/hash.py
+electrumx/lib/jsonrpc.py
 electrumx/lib/merkle.py
 electrumx/lib/peer.py
 electrumx/lib/script.py
@@ -22,7 +24,6 @@ electrumx/lib/tx.py
 electrumx/lib/util.py
 electrumx/server/__init__.py
 electrumx/server/block_processor.py
-electrumx/server/chain_state.py
 electrumx/server/controller.py
 electrumx/server/daemon.py
 electrumx/server/db.py

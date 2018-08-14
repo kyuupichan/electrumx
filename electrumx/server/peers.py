@@ -55,22 +55,12 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
-<<<<<<< HEAD
-
-    def __init__(self, env, chain_state):
-        self.logger=class_logger(__name__, self.__class__.__name__)
-        # Initialise the Peer class
-        Peer.DEFAULT_PORTS=env.coin.PEER_DEFAULT_PORTS
-        self.env=env
-        self.chain_state=chain_state
-=======
     def __init__(self, env, db):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
         self.db = db
->>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6
 
         # Our clearnet and Tor Peers, if any
         sclass=env.coin.SESSIONCLS

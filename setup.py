@@ -11,14 +11,11 @@ setuptools.setup(
     # "tribus_hash" package is required to sync Denarius network.
     # "blake256" package is required to sync Decred network.
     # "xevan_hash" package is required to sync Xuez network.
-<<<<<<< HEAD
-    install_requires=['aiorpcX == 0.5.9', 'attrs>=15',
-                      'plyvel', 'pylru', 'aiohttp >= 2','quark_hash','blake256'],
-=======
     # "groestlcoin_hash" package is required to sync Groestlcoin network.
     install_requires=['aiorpcX>=0.7.1,<0.8', 'attrs',
-                      'plyvel', 'pylru', 'aiohttp >= 2'],
->>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6
+    # "xevan_hash" package is required to sync Xuez network.
+    # "xevan_hash" package is required to sync Xuez network.
+                      'plyvel', 'pylru', 'aiohttp >= 2','quark_hash','blake256','x11_hash','tribus_hash',"xevan_hash","groestlcoin_hash"],
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',
     author='Neil Booth',

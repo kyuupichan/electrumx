@@ -25,14 +25,8 @@
 # and warranty status of this software.
 
 import pytest
-import pdb
 
-<<<<<<< HEAD
-from electrumx.lib.coins import Litecoin, BitcoinCash, Zcash, Emercoin, BitcoinGold, Bitg
-from electrumx.lib.hash import Base58
-=======
 import electrumx.lib.coins as coins
->>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6
 
 addresses = [
     (coins.BitcoinCash, "13xDKJbjh4acmLpNVr6Lc9hFcXRr9fyt4x",
@@ -53,19 +47,12 @@ addresses = [
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
     (coins.Zcash, "t3Zq2ZrASszCg7oBbio7oXqnfR6dnSWqo76",
      "a773db925b09add367dcc253c1f9bbc1d11ec6fd", "062d8515e50cb92b8a3a73"),
-<<<<<<< HEAD
-    (Bitg, "GP1vBChXjjbaKwMcoPGB4T8cZLXWCe2wLV",
-     "38bc968f95157bb7446feb1a7d75f2791fc8cf91", "4c7332cd142b788dd89241"),
-    (Bitg, "GaXGkXrm4dK1CYfSWvKubKgMcrYN59BZGF",
-     "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e")
-=======
     (coins.Decred, "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
      "2789d58cfa0957d206f025c2af056fc8a77cebb0", "8cc9b11122272bd7b79a50"),
     (coins.Decred, "DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
      "f0b4e85100aee1a996f22915eb3c3f764d53779a", "a03c1a27de9ac3b3122e8d"),
     (coins.Groestlcoin, "FY7vmDL7FZGACwqVNx5p4fVaGghojWM5AF",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
->>>>>>> ee86de86a3f690897246ad04a9de86629d3dfba6
 ]
 
 # pdb.set_trace()
