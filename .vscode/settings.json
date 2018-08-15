@@ -1,5 +1,5 @@
 {
-  "python.pythonPath": "C:\\Users\\labco4\\AppData\\Local\\Programs\\Python\\Python37-32\\python.exe",
+  "python.pythonPath": "/usr/bin/python3.7",
   "python.unitTest.pyTestArgs": [
     "tests"
   ],
