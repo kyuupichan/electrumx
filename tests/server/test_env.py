@@ -113,20 +113,6 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.BitcoinGoldRegtest
     os.environ.pop('NET')
-    os.environ['COIN'] = ' BitcoinGreen '
-    e = Env()
-    assert e.coin == lib_coins.Bitg
-    os.environ['NET'] = 'mainnet'
-    e = Env()
-    os.environ.pop('NET')
-    os.environ['COIN'] = ' Pivx '
-    os.environ['NET'] = 'mainnet'
-    e = Env()
-    assert e.coin == lib_coins.Pivx
-    os.environ['NET'] = 'testnet'
-    e = Env()
-    assert e.coin == lib_coins.PivxTestnet
-    os.environ.pop('NET')
 
 
 def test_CACHE_MB():
