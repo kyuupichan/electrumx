@@ -53,15 +53,15 @@ addresses = [
      "f0b4e85100aee1a996f22915eb3c3f764d53779a", "a03c1a27de9ac3b3122e8d"),
     (coins.Groestlcoin, "FY7vmDL7FZGACwqVNx5p4fVaGghojWM5AF",
      "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
-    (coins.Bitg, "GP1vBChXjjbaKwMcoPGB4T8cZLXWCe2wLV",
-     "38bc968f95157bb7446feb1a7d75f2791fc8cf91", "4c7332cd142b788dd89241"),
-    (coins.Bitg, "GaXGkXrm4dK1CYfSWvKubKgMcrYN59BZGF",
-     "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e"),
-    (coins.Pivx,"DGSHy3fsygJTZtvnkpT1qG8QvNim5kwyqp","7be9fe7b9f894ba8481814c5eb085b788597059a","9f1c9c70216bdc67a897fc"),
-    (coins.Pivx,"DSHxy3zZLUxZndKtXq9rXhwAMH1Ypt8qEW","e808105b7bfcc8b102cafa7242089b22c77a3b94","31d61c3076fa0b2b7c74ef"),
-    (coins.PivxTestnet,"yJ8iHtUxj9U4vsXLCZTbPNbuxG6NJNCvb8","e808105b7bfcc8b102cafa7242089b22c77a3b94","31d61c3076fa0b2b7c74ef"),
-    (coins.PivxTestnet,"yCcNWqqMhDmsPzKchCPK1ux4HpxK7j3xpB","ab72728952c06dfc0f6cf21449dd645422731ec4","eb3a3155215538d51de7cc")
-     
+    (coins.Pivx, "DGSHy3fsygJTZtvnkpT1qG8QvNim5kwyqp",
+     "7be9fe7b9f894ba8481814c5eb085b788597059a", "9f1c9c70216bdc67a897fc"),
+    (coins.Pivx, "DSHxy3zZLUxZndKtXq9rXhwAMH1Ypt8qEW",
+     "e808105b7bfcc8b102cafa7242089b22c77a3b94", "31d61c3076fa0b2b7c74ef"),
+    (coins.PivxTestnet, "yJ8iHtUxj9U4vsXLCZTbPNbuxG6NJNCvb8",
+     "e808105b7bfcc8b102cafa7242089b22c77a3b94", "31d61c3076fa0b2b7c74ef"),
+    (coins.PivxTestnet, "yCcNWqqMhDmsPzKchCPK1ux4HpxK7j3xpB",
+     "ab72728952c06dfc0f6cf21449dd645422731ec4", "eb3a3155215538d51de7cc")
+
 ]
 
 # pdb.set_trace()
