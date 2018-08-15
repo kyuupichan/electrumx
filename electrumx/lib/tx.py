@@ -30,7 +30,7 @@
 from collections import namedtuple
 from struct import pack
 
-from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str, blake
+from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.util import (
     cachedproperty, unpack_le_int32_from, unpack_le_int64_from,
     unpack_le_uint16_from, unpack_le_uint32_from, unpack_le_uint64_from,
