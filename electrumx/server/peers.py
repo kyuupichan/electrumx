@@ -22,9 +22,9 @@ from aiorpcx import (ClientSession, SOCKSProxy,
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
 
-PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD=range(4)
-STALE_SECS=24 * 3600
-WAKEUP_SECS=300
+PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
+STALE_SECS = 24 * 3600
+WAKEUP_SECS = 300
 
 
 class BadPeerError(Exception):
@@ -55,6 +55,7 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
+
     def __init__(self, env, db):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
@@ -63,8 +64,8 @@ class PeerManager(object):
         self.db = db
 
         # Our clearnet and Tor Peers, if any
-        sclass=env.coin.SESSIONCLS
-        self.myselves=[Peer(ident.host, sclass.server_features(env), 'env')
+        sclass = env.coin.SESSIONCLS
+        self.myselves = [Peer(ident.host, sclass.server_features(env), 'env')
                          for ident in env.identities]
         self.server_version_args = sclass.server_version_args()
         # Peers have one entry per hostname.  Once connected, the

@@ -39,7 +39,7 @@ from functools import partial
 import base64
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str,blake
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str, blake
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
@@ -1718,14 +1718,13 @@ class DecredTestnet(Decred):
     WIF_BYTE = bytes.fromhex("22de")
     GENESIS_HASH = (
         '4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
-    BASIC_HEADER_SIZE = 180    
+    BASIC_HEADER_SIZE = 180
     ALLOW_ADVANCING_ERRORS = True
     TX_COUNT = 217380620
     TX_COUNT_HEIGHT = 464000
     TX_PER_BLOCK = 1800
     REORG_LIMIT = 1000
     RPC_PORT = 19109
-    
 
 
 class Axe(Dash):
