@@ -39,9 +39,10 @@ _new_hash = hashlib.new
 _new_hmac = hmac.new
 HASHX_LEN = 11
 
+
 def blake(x):
     '''Simple wrapper of hashlib blake2.'''
-    return _blake(256).digest(x)  
+    return _blake(256).digest(x)
 
 
 def double_blake(x):
