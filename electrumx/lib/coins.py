@@ -1708,38 +1708,24 @@ class Decred(Coin):
         return h
 
 
-class DecredTestnet(Coin):
-    NAME = "DecredTestnet"
+class DecredTestnet(Decred):
     SHORTNAME = "tDCR"
     NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("02fda926")
-    XPRV_VERBYTES = bytes.fromhex("02fda4e8")
-    P2PKH_VERBYTE = bytes.fromhex("073f")
-    P2SH_VERBYTES = [bytes.fromhex("071a")]
-    WIF_BYTE = bytes.fromhex("230e")
+    XPUB_VERBYTES = bytes.fromhex("043587d1")
+    XPRV_VERBYTES = bytes.fromhex("04358397")
+    P2PKH_VERBYTE = bytes.fromhex("0f21")
+    P2SH_VERBYTES = [bytes.fromhex("0efc")]
+    WIF_BYTE = bytes.fromhex("22de")
     GENESIS_HASH = (
-        'a649dce53918caf422e9c711c858837e08d626ecfcd198969b24f7b634a49bac')
-    BASIC_HEADER_SIZE = 180
-    DESERIALIZER = lib_tx.DeserializerDecred
+        '4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
+    BASIC_HEADER_SIZE = 180    
     ALLOW_ADVANCING_ERRORS = True
-    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=blake)
-    DECODE_CHECK = partial(Base58.decode_check, hash_fn=blake)
     TX_COUNT = 217380620
     TX_COUNT_HEIGHT = 464000
     TX_PER_BLOCK = 1800
-    RPC_PORT = 19119
-    HEADER_HASH = blake
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        return cls.HEADER_HASH(header)
-    @classmethod
-    def block(cls, raw_block, height):
-        '''Return a Block namedtuple given a raw block and its height.'''
-        if height > 0:
-            return super().block(raw_block, height)
-        else:
-            return Block(raw_block, cls.block_header(raw_block, height), [])
+    REORG_LIMIT = 1000
+    RPC_PORT = 19109
+    
 
 
 class Axe(Dash):
@@ -2107,8 +2093,7 @@ class Pivx(Coin):
             return quark_hash.getPoWHash(header)
 
 
-class PivxTestnet(Coin):
-    NAME = "PivxTestnet"
+class PivxTestnet(Pivx):
     SHORTNAME = "tPIVX"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("3a8061a0")
@@ -2174,8 +2159,7 @@ class Bitg(Coin):
         return quark_hash.getPoWHash(header)
 
 
-class tBitg(Coin):
-    NAME = "testnetBitcoinGreen"
+class tBitg(Bitg):
     SHORTNAME = "tBITG"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
@@ -2185,17 +2169,4 @@ class tBitg(Coin):
     WIF_BYTE = bytes.fromhex("6c")
     GENESIS_HASH = (
         '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
-    DAEMON = daemon.DashDaemon
-    TX_COUNT = 1000
-    TX_COUNT_HEIGHT = 10000
-    TX_PER_BLOCK = 1
     RPC_PORT = 19332
-    REORG_LIMIT = 1000
-    SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import quark_hash
-        return quark_hash.getPoWHash(header)
