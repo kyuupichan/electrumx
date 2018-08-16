@@ -69,9 +69,9 @@ def test_block(block_details):
     assert block_info['nonce'] == h['nonce']
     assert block_info['bits'] == pack_be_uint32(h['bits']).hex()
 
-    assert coin.header_hash(block.header) == hex_str_to_hash(block_info['hash'])
+    assert coin.header_hash(
+        block.header) == hex_str_to_hash(block_info['hash'])
     assert (coin.header_prevhash(block.header)
             == hex_str_to_hash(block_info['previousblockhash']))
     for n, (tx, txid) in enumerate(block.transactions):
-        if n < len(block_info['tx']):
-            assert txid == hex_str_to_hash(block_info['tx'][n])
+        assert txid == hex_str_to_hash(block_info['tx'][n])
