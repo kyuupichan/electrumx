@@ -1,8 +1,9 @@
+import datetime
 import logging
 import os
 from collections import defaultdict
 from functools import partial
-from random import randrange, choice
+from random import randrange, choice, seed
 
 import pytest
 from aiorpcx import Event, TaskGroup, sleep, spawn, ignore_after
@@ -16,6 +17,8 @@ from electrumx.lib.util import make_logger
 
 coin = BitcoinCash
 tx_hash_fn = coin.DESERIALIZER.TX_HASH_FN
+# Change seed daily
+seed(datetime.date.today().toordinal)
 
 
 def random_tx(hash160s, utxos):
@@ -40,7 +43,7 @@ def random_tx(hash160s, utxos):
     outputs = []
     n_outputs = randrange(1, 4)
     for n in range(n_outputs):
-        value = randrange(input_value)
+        value = randrange(input_value + 1)
         input_value -= value
         pk_script = coin.hash160_to_P2PKH_script(choice(hash160s))
         outputs.append(TxOutput(value, pk_script))
