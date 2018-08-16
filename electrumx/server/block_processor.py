@@ -18,6 +18,7 @@ from functools import partial
 from aiorpcx import TaskGroup, run_in_thread
 
 import electrumx
+from electrumx.lib.tx import is_gen_outpoint
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, class_logger
@@ -411,11 +412,12 @@ class BlockProcessor(object):
             tx_numb = s_pack('<I', tx_num)
 
             # Spend the inputs
-            if not tx.is_generation:
-                for txin in tx.inputs:
-                    cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
-                    undo_info_append(cache_value)
-                    append_hashX(cache_value[:-12])
+            for txin in tx.inputs:
+                if is_gen_outpoint(txin.prev_hash, txin.prev_idx):
+                    continue
+                cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
+                undo_info_append(cache_value)
+                append_hashX(cache_value[:-12])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
@@ -490,13 +492,14 @@ class BlockProcessor(object):
                     touched.add(cache_value[:-12])
 
             # Restore the inputs
-            if not tx.is_generation:
-                for txin in reversed(tx.inputs):
-                    n -= undo_entry_len
-                    undo_item = undo_info[n:n + undo_entry_len]
-                    put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
-                             undo_item)
-                    touched.add(undo_item[:-12])
+            for txin in reversed(tx.inputs):
+                if is_gen_outpoint(txin.prev_hash, txin.prev_idx):
+                    continue
+                n -= undo_entry_len
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                         undo_item)
+                touched.add(undo_item[:-12])
 
         assert n == 0
         self.tx_count -= len(txs)
