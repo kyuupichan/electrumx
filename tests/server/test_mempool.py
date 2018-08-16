@@ -315,7 +315,6 @@ async def test_compact_fee_histogram():
     assert len(histogram) > 0
     rates, sizes = zip(*histogram)
     assert all(rates[n] < rates[n - 1] for n in range(1, len(rates)))
-    assert all(size > bin_size * 0.95 for size in sizes)
 
 
 @pytest.mark.asyncio
