@@ -1,0 +1,11 @@
+aiorpcX>=0.7.1,<0.8
+attrs
+plyvel
+pylru
+aiohttp >= 2
+quark_hash
+blake256
+x11_hash
+tribus_hash
+xevan_hash
+groestlcoin_hash
