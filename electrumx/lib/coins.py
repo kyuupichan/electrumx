@@ -1706,6 +1706,7 @@ class Decred(Coin):
         h['extra_data'] = hash_to_hex_str(h['extra_data'])
         return h
 
+
 class DecredTestnet(Decred):
     SHORTNAME = "tDCR"
     NET = "testnet"
