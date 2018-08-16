@@ -55,6 +55,5 @@ def test_transaction(transaction_details):
         spk = vout[i]['scriptPubKey']
         tx_pks = tx.outputs[i].pk_script
         assert spk['hex'] == tx_pks.hex()
-        assert spk['address'] == coin.address_from_script(tx_pks)
         assert coin.address_to_hashX(spk['address']) == \
                coin.hashX_from_script(tx_pks)

@@ -137,21 +137,6 @@ class Coin(object):
             return None
         return sha256(script).digest()[:HASHX_LEN]
 
-    @util.cachedproperty
-    def address_handlers(cls):
-        return ScriptPubKey.PayToHandlers(
-            address=cls.P2PKH_address_from_hash160,
-            script_hash=cls.P2SH_address_from_hash160,
-            pubkey=cls.P2PKH_address_from_pubkey,
-            unspendable=lambda: None,
-            strange=lambda script: None,
-        )
-
-    @classmethod
-    def address_from_script(cls, script):
-        '''Given a pk_script, return the adddress it pays to, or None.'''
-        return ScriptPubKey.pay_to(cls.address_handlers, script)
-
     @staticmethod
     def lookup_xverbytes(verbytes):
         '''Return a (is_xpub, coin_class) pair given xpub/xprv verbytes.'''
@@ -184,31 +169,6 @@ class Coin(object):
         '''Return a coin address given a hash160.'''
         assert len(hash160) == 20
         return cls.ENCODE_CHECK(cls.P2SH_VERBYTES[0] + hash160)
-
-    @classmethod
-    def multisig_address(cls, m, pubkeys):
-        '''Return the P2SH address for an M of N multisig transaction.
-
-        Pass the N pubkeys of which M are needed to sign it.  If
-        generating an address for a wallet, it is the caller's
-        responsibility to sort them to ensure order does not matter
-        for, e.g., wallet recovery.
-        '''
-        script = cls.pay_to_multisig_script(m, pubkeys)
-        return cls.P2SH_address_from_hash160(hash160(script))
-
-    @classmethod
-    def pay_to_multisig_script(cls, m, pubkeys):
-        '''Return a P2SH script for an M of N multisig transaction.'''
-        return ScriptPubKey.multisig_script(m, pubkeys)
-
-    @classmethod
-    def pay_to_pubkey_script(cls, pubkey):
-        '''Return a pubkey script that pays to a pubkey.
-
-        Pass the raw pubkey bytes (length 33 or 65).
-        '''
-        return ScriptPubKey.P2PK_script(pubkey)
 
     @classmethod
     def hash160_to_P2PKH_script(cls, hash160):
