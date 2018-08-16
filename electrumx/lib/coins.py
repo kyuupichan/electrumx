@@ -1886,61 +1886,61 @@ class ColossusXT(Coin):
 
 
 class GoByte(Coin):
-        NAME = "GoByte"
-        SHORTNAME = "GBX"
-        NET = "mainnet"
-        XPUB_VERBYTES = bytes.fromhex("0488B21E")
-        XPRV_VERBYTES = bytes.fromhex("0488ADE4")
-        GENESIS_HASH = ('0000033b01055cf8df90b01a14734cae'
-                        '92f7039b9b0e48887b4e33a469d7bc07')
-        P2PKH_VERBYTE = bytes.fromhex("26")
-        P2SH_VERBYTES = [bytes.fromhex("0A")]
-        WIF_BYTE = bytes.fromhex("C6")
-        TX_COUNT_HEIGHT = 115890
-        TX_COUNT = 245030
-        TX_PER_BLOCK = 4
-        RPC_PORT = 12454
-        PEERS = [
-            'electrum1-gbx.polispay.org',
-            'electrum2-gbx.polispay.org'
-        ]
-        SESSIONCLS = DashElectrumX
-        DAEMON = daemon.DashDaemon
+    NAME = "GoByte"
+    SHORTNAME = "GBX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('0000033b01055cf8df90b01a14734cae'
+                    '92f7039b9b0e48887b4e33a469d7bc07')
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("0A")]
+    WIF_BYTE = bytes.fromhex("C6")
+    TX_COUNT_HEIGHT = 115890
+    TX_COUNT = 245030
+    TX_PER_BLOCK = 4
+    RPC_PORT = 12454
+    PEERS = [
+        'electrum1-gbx.polispay.org',
+        'electrum2-gbx.polispay.org'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
 
-        @classmethod
-        def header_hash(cls, header):
-            '''Given a header return the hash.'''
-            import neoscrypt
-            return neoscrypt.getPoWHash(header)
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
 
 
 class Monoeci(Coin):
-            NAME = "Monoeci"
-            SHORTNAME = "XMCC"
-            NET = "mainnet"
-            XPUB_VERBYTES = bytes.fromhex("0488B21E")
-            XPRV_VERBYTES = bytes.fromhex("0488ADE4")
-            GENESIS_HASH = ('0000005be1eb05b05fb45ae38ee9c144'
-                            '1514a65343cd146100a574de4278f1a3')
-            P2PKH_VERBYTE = bytes.fromhex("32")
-            P2SH_VERBYTES = [bytes.fromhex("49")]
-            WIF_BYTE = bytes.fromhex("4D")
-            TX_COUNT_HEIGHT = 140000
-            TX_COUNT = 140000
-            TX_PER_BLOCK = 4
-            RPC_PORT = 24156
-            PEERS = [
-                'electrum1-gbx.polispay.org',
-                'electrum2-gbx.polispay.org'
-            ]
-            SESSIONCLS = DashElectrumX
-            DAEMON = daemon.DashDaemon
+    NAME = "Monoeci"
+    SHORTNAME = "XMCC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('0000005be1eb05b05fb45ae38ee9c144'
+                    '1514a65343cd146100a574de4278f1a3')
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("49")]
+    WIF_BYTE = bytes.fromhex("4D")
+    TX_COUNT_HEIGHT = 140000
+    TX_COUNT = 140000
+    TX_PER_BLOCK = 4
+    RPC_PORT = 24156
+    PEERS = [
+        'electrum1-gbx.polispay.org',
+        'electrum2-gbx.polispay.org'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
 
-            @classmethod
-            def header_hash(cls, header):
-                '''Given a header return the hash.'''
-                import x11_hash
-                return x11_hash.getPoWHash(header)
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x11_hash
+        return x11_hash.getPoWHash(header)
 
 
 class Minexcoin(EquihashMixin, Coin):
@@ -2071,6 +2071,7 @@ class Pivx(Coin):
             import quark_hash
             return quark_hash.getPoWHash(header)
 
+
 class PivxTestnet(Pivx):
     SHORTNAME = "tPIVX"
     NET = "testnet"
@@ -2089,4 +2090,3 @@ class PivxTestnet(Pivx):
     TX_COUNT_HEIGHT = 569399
     TX_PER_BLOCK = 2
     RPC_PORT = 51472
-    
