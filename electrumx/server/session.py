@@ -427,7 +427,7 @@ class SessionManager(object):
             lines.append(f'Address: {arg}')
             return hashX
 
-        for arg in args:
+        for arg in items:
             hashX = arg_to_hashX(arg)
             if not hashX:
                 continue
