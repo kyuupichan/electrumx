@@ -52,8 +52,10 @@ addresses = [
     (coins.Decred, "DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
      "f0b4e85100aee1a996f22915eb3c3f764d53779a", "a03c1a27de9ac3b3122e8d"),
     (coins.Groestlcoin, "FY7vmDL7FZGACwqVNx5p4fVaGghojWM5AF",
-     "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
+     "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e")
 ]
+
+# pdb.set_trace()
 
 
 @pytest.fixture(params=addresses)

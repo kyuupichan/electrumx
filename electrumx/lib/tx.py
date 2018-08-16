@@ -28,6 +28,7 @@
 '''Transaction-related classes and functions.'''
 
 from collections import namedtuple
+from struct import pack
 
 from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.util import (
