@@ -4,7 +4,7 @@
 ###############
 
 # configure electrumx
-export COIN=Bitcoin
+export COIN=BitcoinSegwit
 export DAEMON_URL=http://rpcuser:rpcpassword@127.0.0.1
 export NET=mainnet
 export CACHE_MB=400
@@ -25,7 +25,7 @@ export RPC_PORT=8000
 
 # run electrumx
 ulimit -n 10000
-/usr/local/bin/electrumx_server.py 2>> /home/username/.electrumx/electrumx.log >> /home/username/.electrumx/electrumx.log &
+/usr/local/bin/electrumx_server 2>> /home/username/.electrumx/electrumx.log >> /home/username/.electrumx/electrumx.log &
 
 ######################
 # auto-start electrumx

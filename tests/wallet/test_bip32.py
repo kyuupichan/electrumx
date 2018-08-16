@@ -4,9 +4,9 @@
 
 import pytest
 
-import wallet.bip32 as bip32
-from lib.coins import BitcoinCash as Bitcoin, CoinError
-from lib.hash import Base58
+import electrumx.wallet.bip32 as bip32
+from electrumx.lib.coins import BitcoinCash as Bitcoin, CoinError
+from electrumx.lib.hash import Base58
 
 
 MXPRV = 'xprv9s21ZrQH143K2gMVrSwwojnXigqHgm1khKZGTCm7K8w4PmuDEUrudk11ZBxhGPUiUeVcrfGLoZmt8rFNRDLp18jmKMcVma89z7PJd2Vn7R9'

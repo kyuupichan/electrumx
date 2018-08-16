@@ -6,8 +6,8 @@ import re
 
 import pytest
 
-from server.env import Env, NetIdentity
-import lib.coins as lib_coins
+from electrumx.server.env import Env, NetIdentity
+import electrumx.lib.coins as lib_coins
 
 
 BASE_DAEMON_URL = 'http://username:password@hostname:321/'
@@ -351,3 +351,7 @@ def test_ban_versions():
     assert e.drop_client == re.compile(ban_re)
     assert e.drop_client.match("1.2.3_buggy_client")
     assert e.drop_client.match("1.3.0_good_client") is None
+
+def test_coin_class_provided():
+    e = Env(lib_coins.BitcoinCash)
+    assert e.coin == lib_coins.BitcoinCash

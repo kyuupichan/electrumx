@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from lib import util
+from electrumx.lib import util, tx
 
 
 def test_cachedproperty():
@@ -176,28 +176,34 @@ def test_protocol_tuple():
     assert util.protocol_tuple("0.10") == (0, 10)
     assert util.protocol_tuple("2.5.3") == (2, 5, 3)
 
-def test_protocol_version_string():
-    assert util.protocol_version_string(()) == "0.0"
-    assert util.protocol_version_string((1, )) == "1.0"
-    assert util.protocol_version_string((1, 2)) == "1.2"
-    assert util.protocol_version_string((1, 3, 2)) == "1.3.2"
+def test_version_string():
+    assert util.version_string(()) == "0.0"
+    assert util.version_string((1, )) == "1.0"
+    assert util.version_string((1, 2)) == "1.2"
+    assert util.version_string((1, 3, 2)) == "1.3.2"
 
 def test_protocol_version():
-    assert util.protocol_version(None, "1.0", "1.0") == (1, 0)
-    assert util.protocol_version("0.10", "0.10", "1.1") == (0, 10)
+    assert util.protocol_version(None, (1, 0), (1, 0)) == ((1, 0), (1, 0))
+    assert util.protocol_version("0.10", (0, 1), (1, 1)) == ((0, 10), (0, 10))
 
-    assert util.protocol_version("1.0", "1.0", "1.0") == (1, 0)
-    assert util.protocol_version("1.0", "1.0", "1.1") == (1, 0)
-    assert util.protocol_version("1.1", "1.0", "1.1") == (1, 1)
-    assert util.protocol_version("1.2", "1.0", "1.1") is None
-    assert util.protocol_version("0.9", "1.0", "1.1") is None
+    assert util.protocol_version("1.0", (1, 0), (1, 0)) == ((1, 0), (1, 0))
+    assert util.protocol_version("1.0", (1, 0), (1, 1)) == ((1, 0), (1, 0))
+    assert util.protocol_version("1.1", (1, 0), (1, 1)) == ((1, 1), (1, 1))
+    assert util.protocol_version("1.2", (1, 0), (1, 1)) == (None, (1, 2))
+    assert util.protocol_version("0.9", (1, 0), (1, 1)) == (None, (0, 9))
 
-    assert util.protocol_version(["0.9", "1.0"], "1.0", "1.1") == (1, 0)
-    assert util.protocol_version(["0.9", "1.1"], "1.0", "1.1") == (1, 1)
-    assert util.protocol_version(["1.1", "0.9"], "1.0", "1.1") is None
-    assert util.protocol_version(["0.8", "0.9"], "1.0", "1.1") is None
-    assert util.protocol_version(["1.1", "1.2"], "1.0", "1.1") == (1, 1)
-    assert util.protocol_version(["1.2", "1.3"], "1.0", "1.1") is None
+    assert util.protocol_version(["0.9", "1.0"], (1, 0), (1, 1)) \
+                                                         == ((1, 0), (0, 9))
+    assert util.protocol_version(["0.9", "1.1"], (1, 0), (1, 1)) \
+                                                         == ((1, 1), (0,9))
+    assert util.protocol_version(["1.1", "0.9"], (1, 0), (1, 1)) \
+                                                         == (None, (1, 1))
+    assert util.protocol_version(["0.8", "0.9"], (1, 0), (1, 1)) \
+                                                         == (None, (0, 8))
+    assert util.protocol_version(["1.1", "1.2"], (1, 0), (1, 1)) \
+                                                         == ((1, 1), (1, 1))
+    assert util.protocol_version(["1.2", "1.3"], (1, 0), (1, 1)) \
+                                                         == (None, (1, 2))
 
 
 def test_unpackers():
@@ -217,3 +223,21 @@ def test_unpackers():
 def test_hex_transforms():
     h = "AABBCCDDEEFF"
     assert util.hex_to_bytes(h) == b'\xaa\xbb\xcc\xdd\xee\xff'
+
+
+def test_pack_varint():
+    tests = list(range(0, 258))
+    tests.extend([1024, 65535, 65536, 4294967295, 4294967296, 8294967296])
+
+    for n in tests:
+        data = util.pack_varint(n)
+        deser = tx.Deserializer(data)
+        assert deser._read_varint() == n
+
+def test_pack_varbytes():
+    tests = [b'', b'1', b'2' * 253, b'3' * 254, b'4' * 256, b'5' * 65536]
+
+    for test in tests:
+        data = util.pack_varbytes(test)
+        deser = tx.Deserializer(data)
+        assert deser._read_varbytes() == test

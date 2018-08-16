@@ -15,7 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-from server.controller import Controller
+VERSION="ElectrumX 1.8.3"
 
 # -- Project information -----------------------------------------------------
 
@@ -23,10 +23,10 @@ project = 'ElectrumX'
 copyright = '2016-2018, Neil Booth'
 author = 'Neil Booth'
 
-# The short X.Y version
-version = Controller.short_version()
 # The full version including branding
-release = Controller.VERSION
+release = VERSION
+# The short X.Y version
+version = VERSION.split()[-1]
 
 
 # -- General configuration ---------------------------------------------------
