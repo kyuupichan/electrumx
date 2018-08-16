@@ -17,6 +17,7 @@ import attr
 from aiorpcx import TaskGroup, run_in_thread, sleep
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
+from electrumx.lib.tx import is_gen_outpoint
 from electrumx.lib.util import class_logger, chunks
 from electrumx.server.db import UTXO
 
@@ -172,6 +173,9 @@ class MemPool(object):
             in_pairs = []
             try:
                 for prevout in tx.prevouts:
+                    # Skip generation like prevouts
+                    if is_gen_outpoint(*prevout):
+                        continue
                     utxo = utxo_map.get(prevout)
                     if not utxo:
                         prev_hash, prev_index = prevout
@@ -187,8 +191,10 @@ class MemPool(object):
 
             # Save the in_pairs, compute the fee and accept the TX
             tx.in_pairs = tuple(in_pairs)
-            tx.fee = (sum(v for hashX, v in tx.in_pairs) -
-                      sum(v for hashX, v in tx.out_pairs))
+            # Avoid negative fees if dealing with generation-like transactions
+            # because some in_parts would be missing
+            tx.fee = max(0, (sum(v for _, v in tx.in_pairs) -
+                             sum(v for _, v in tx.out_pairs)))
             txs[hash] = tx
 
             for hashX, value in itertools.chain(tx.in_pairs, tx.out_pairs):
@@ -285,10 +291,12 @@ class MemPool(object):
         # Determine all prevouts not in the mempool, and fetch the
         # UTXO information from the database.  Failed prevout lookups
         # return None - concurrent database updates happen - which is
-        # relied upon by _accept_transactions
+        # relied upon by _accept_transactions. Ignore prevouts that are
+        # generation-like.
         prevouts = tuple(prevout for tx in tx_map.values()
                          for prevout in tx.prevouts
-                         if prevout[0] not in all_hashes)
+                         if (prevout[0] not in all_hashes and
+                             not is_gen_outpoint(*prevout)))
         utxos = await self.api.lookup_utxos(prevouts)
         utxo_map = {prevout: utxo for prevout, utxo in zip(prevouts, utxos)}
 
