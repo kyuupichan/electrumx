@@ -55,6 +55,7 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
+
     def __init__(self, env, db):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
