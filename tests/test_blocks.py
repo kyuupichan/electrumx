@@ -30,8 +30,8 @@ from binascii import unhexlify
 
 import pytest
 
-from lib.coins import Coin
-from lib.hash import hex_str_to_hash
+from electrumx.lib.coins import Coin
+from electrumx.lib.hash import hex_str_to_hash
 
 BLOCKS_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'blocks')

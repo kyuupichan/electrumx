@@ -53,7 +53,7 @@ The following are required if you use the ``run`` script:
 
 .. envvar:: ELECTRUMX
 
-  The path to the electrumx_server.py script.  Relative paths should
+  The path to the electrumx_server script.  Relative paths should
   be relative to the directory of the ``run`` script.
 
 .. envvar:: USERNAME

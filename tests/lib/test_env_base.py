@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from lib.env_base import EnvBase
+from electrumx.lib.env_base import EnvBase
 
 
 os.environ.update({

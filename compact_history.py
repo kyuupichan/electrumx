@@ -31,22 +31,24 @@ running the compaction to completion, it will not benefit and
 subsequent compactions will restart from the beginning.
 '''
 
+import asyncio
 import logging
 import sys
 import traceback
 from os import environ
 
-from server.env import Env
-from server.db import DB
+from electrumx import Env
+from electrumx.server.db import DB
 
 
-def compact_history():
+async def compact_history():
     if sys.version_info < (3, 6):
         raise RuntimeError('Python >= 3.6 is required to run ElectrumX')
 
     environ['DAEMON_URL'] = ''   # Avoid Env erroring out
     env = Env()
     db = DB(env)
+    await db.open_for_compacting()
 
     assert not db.first_sync
     history = db.history
@@ -66,8 +68,9 @@ def compact_history():
 def main():
     logging.basicConfig(level=logging.INFO)
     logging.info('Starting history compaction...')
+    loop = asyncio.get_event_loop()
     try:
-        compact_history()
+        loop.run_until_complete(compact_history())
     except Exception:
         traceback.print_exc()
         logging.critical('History compaction terminated abnormally')

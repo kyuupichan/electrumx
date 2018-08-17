@@ -192,4 +192,45 @@ transaction has at least one unconfirmed input, and ``0`` if all
 inputs are confirmed.
 
 4. The :dfn:`status` of the script hash is the :func:`sha256` hash of the
-full string expressed as a hexadecimal string.
+full string expressed as a hexadecimal string, or :const:`null` if the
+string is empty because there are no transactions.
+
+
+Block Headers
+-------------
+
+Originally Electrum clients would download all block headers and
+verify the chain of hashes and header difficulty in order to confirm
+the merkle roots with which to check transaction inclusion.
+
+With the BTC and BCH chains now past height 500,000, the headers form
+over 40MB of raw data which becomes 80MB if downloaded as text from
+Electrum servers.  The situation is worse for testnet and coins with
+more frequent blocks.  Downloading and verifying all this data on
+initial use would take several minutes, during which Electrum was
+non-responsive.
+
+To facilitate a better experience for SPV clients, particularly on
+mobile, protocol :ref:`version 1.4 <version 1.4>` introduces an
+optional *cp_height* argument to the :func:`blockchain.block.header`
+and :func:`blockchain.block.headers` RPC calls.
+
+This requests the server provide a merkle proof, to a single 32-byte
+checkpoint hard-coded in the client, that the header(s) provided are
+valid in the same way the server proves a transaction is included in a
+block.  If several consecutive headers are requested, the proof is
+provided for the final header - the *prev_hash* links in the headers
+are sufficient to prove the others valid.
+
+Using this feature client software only needs to download the headers
+it is interested in up to the checkpoint.  Headers after the
+checkpoint must all be downloaded and validated as before.  The RPC
+calls return the merkle root, so to embed a checkpoint in a client
+simply make an RPC request to a couple of trusted servers for the
+greatest height to which a reorganisation of the chain is infeasible,
+and confirm the returned roots match.
+
+.. note:: with 500,000 headers of 80 bytes each, a naïve server
+  implementation would require hashing approximately 88MB of data to
+  provide a single merkle proof.  ElectrumX implements an optimization
+  such that it hashes only approximately 180KB of data per proof.

@@ -10,3 +10,4 @@ alike.
    protocol-basics
    protocol-methods
    protocol-changes
+   protocol-removed

@@ -1,14 +1,15 @@
 # Test of compaction code in server/history.py
 
 import array
+import asyncio
 from collections import defaultdict
 from os import environ, urandom
 from struct import pack
 import random
 
-from lib.hash import hash_to_str, HASHX_LEN
-from server.env import Env
-from server.db import DB
+from electrumx.lib.hash import HASHX_LEN
+from electrumx.server.env import Env
+from electrumx.server.db import DB
 
 
 def create_histories(history, hashX_count=100):
@@ -109,13 +110,15 @@ def compact_history(history):
         write_size += history._compact_history(limit)
     assert write_size != 0
 
-def run_test(db_dir):
+async def run_test(db_dir):
     environ.clear()
     environ['DB_DIRECTORY'] = db_dir
     environ['DAEMON_URL'] = ''
     environ['COIN'] = 'BitcoinCash'
-    env = Env()
-    history = DB(env).history
+    db = DB(Env())
+    await db.open_for_serving()
+    history = db.history
+
     # Test abstract compaction
     check_hashX_compaction(history)
     # Now test in with random data
@@ -127,4 +130,5 @@ def run_test(db_dir):
 def test_compaction(tmpdir):
     db_dir = str(tmpdir)
     print('Temp dir: {}'.format(db_dir))
-    run_test(db_dir)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_test(db_dir))

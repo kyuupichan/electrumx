@@ -7,15 +7,14 @@ Features
   time to height 448k (mid January 2017) reported is under 4h 30m.  On
   the same hardware JElectrum would take around 4 days and
   electrum-server probably around 1 month.
-- The full current Electrum protocol is implemented.
 - Various configurable means of controlling resource consumption and
-  handling denial of service attacks.  These include maximum
-  connection counts, subscription limits per-connection and across all
-  connections, maximum response size, per-session bandwidth limits,
-  and session timeouts.
+  handling bad clients and denial of service attacks.  These include
+  maximum connection counts, subscription limits per-connection and
+  across all connections, maximum response size, per-session bandwidth
+  limits, and session timeouts.
 - Minimal resource usage once caught up and serving clients; tracking the
   transaction mempool appears to be the most expensive part.
-- Fully asynchronous processing of new blocks, mempool updates, and
+- Mostly asynchronous processing of new blocks, mempool updates, and
   client requests.  Busy clients should not noticeably impede other
   clients' requests and notifications, nor the processing of incoming
   blocks and mempool updates.
@@ -32,8 +31,8 @@ ElectrumX does not do any pruning or throwing away of history.  I want
 to retain this property for as long as it is feasible, and it appears
 efficiently achievable for the forseeable future with plain Python.
 
-The following all play a part in making ElectrumX very efficient as a
-Python blockchain indexer:
+The following all play a part in making it efficient as a Python
+blockchain indexer:
 
 - aggressive caching and batching of DB writes
 - more compact and efficient representation of UTXOs, address index,
@@ -77,7 +76,7 @@ Roadmap
   aspects of the current protocol are very inefficient.
 * investigate speaking the Bitcoin protocol and connecting to the
   Bitcoin network directly for some queries.  This could lead to
-  ElectrumX being runnable without a node without a tx index, or a
+  ElectrumX being runnable with a node without a tx index, or a
   pruning node, or not needing to run a node at all.  ElectrumX would
   store all blocks itself and index the transactions therein.
 * lifting internal limits such as maximum 4 billion transactions

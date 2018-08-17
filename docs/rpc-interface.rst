@@ -3,12 +3,12 @@ RPC Interface
 
 You can query the status of a running server, and affect its behaviour
 by sending **JSON RPC** commands to the LocalRPC port it is listening
-on.  This is best done using the :file:`electrumx_rpc.py` script
+on.  This is best done using the :file:`electrumx_rpc` script
 provided.
 
 The general form of invocation is::
 
-  electrumx_rpc.py [-p PORT] <command> [arg1 [arg2...]]
+  electrumx_rpc [-p PORT] <command> [arg1 [arg2...]]
 
 The port to send the commands to can be specified on the command line,
 otherwise the environment variable :envvar:`RPC_PORT` is used, and if
@@ -23,7 +23,7 @@ Add a peer to the peers list.  ElectrumX will schdule an immediate
 connection attempt.  This command takes a single argument: the peer's
 "real name" as it used to advertise itself on IRC::
 
-  $ ./electrumx_rpc.py add_peer "ecdsa.net v1.0 s110 t"
+  $ electrumx_rpc add_peer "ecdsa.net v1.0 s110 t"
   "peer 'ecdsa.net v1.0 s110 t' added"
 
 daemon_url
@@ -48,7 +48,7 @@ disconnect
 Disconnect the given session IDs.  Session IDs can be seen in the logs
 or with the `sessions`_ RPC command::
 
-  $ ./electrumx_rpc.py disconnect 2 3
+  $ electrumx_rpc disconnect 2 3
   [
       "disconnected 2",
       "disconnected 3"
@@ -64,7 +64,7 @@ getinfo
 Return a summary of server state.  This command takes no arguments.
 A typical result is as follows (with annotated comments)::
 
-  $ electrumx_rpc.py getinfo
+  $ electrumx_rpc getinfo
   {
     "closing": 1,                  # The number of sessions being closed down
     "daemon": "192.168.0.2:8332/", # The daemon URL without auth info
@@ -128,7 +128,7 @@ Toggle logging of the given session IDs.  All incoming requests for a
 logged session are written to the server log.  Session IDs can be seen
 in the logs or with the `sessions`_ RPC command::
 
-  $ electrumx_rpc.py log 0 1 2 3 4 5
+  $ electrumx_rpc log 0 1 2 3 4 5
   [
       "log 0: False",
       "log 1: False",
@@ -153,13 +153,39 @@ This command takes no arguments.
 Peer data is obtained via a peer discovery protocol documented
 :ref:`here <Peer Discovery>`::
 
-  $ electrumx_rpc.py peers
+  $ electrumx_rpc peers
   Host                           Status   TCP   SSL Server             Min  Max  Pruning   Last Good    Last Try Tries               Source IP Address
   bch.tedy.pw                    good   50001 50002 ElectrumX 1.2.1    0.9  1.2          07h 29m 23s 07h 30m 40s     0                 peer 185.215.224.26
   shsmithgoggryfbx.onion         good   60001 60002 ElectrumX 1.2.1    0.9  1.2          07h 30m 34s 07h 30m 38s     0                 peer
   bccarihace4jdcnt.onion         good   52001 52002 ElectrumX 1.2.1    0.9  1.2          07h 30m 34s 07h 30m 39s     0                 peer
   [...]
   electroncash.checksum0.com     good   50001 50002 ElectrumX 1.2.1    0.9  1.1          07h 30m 40s 07h 30m 41s     0                 peer 149.56.198.233
+
+.. _query:
+
+query
+-----
+
+Run a query of the UTXO and history databases against one or more
+addresses or hex scripts.  `--limit <N>` or `-l <N>` limits the output
+for each kind to that many entries.  History is printed in blockchain
+order; UTXOs in an arbitrary order.
+
+For example::
+
+  $ electrumx_rpc query --limit 5 76a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac
+  Script: 76a91462e907b15cbf27d5425399ebf6f0fb50ebb88f1888ac
+  History #1: height 123,723 tx_hash 3387418aaddb4927209c5032f515aa442a6587d6e54677f08a03b8fa7789e688
+  History #2: height 127,280 tx_hash 4574958d135e66a53abf9c61950aba340e9e140be50efeea9456aa9f92bf40b5
+  History #3: height 127,909 tx_hash 8b960c87f9f1a6e6910e214fcf5f9c69b60319ba58a39c61f299548412f5a1c6
+  History #4: height 127,943 tx_hash 8f6b63012753005236b1b76e4884e4dee7415e05ab96604d353001662cde6b53
+  History #5: height 127,943 tx_hash 60ff2dfdf67917040139903a0141f7525a7d152365b371b35fd1cf83f1d7f704
+  UTXO #1: tx_hash 9aa497bf000b20f5ec5dc512bb6c1b60b68fc584d38b292b434e839ea8807bf0 tx_pos 0 height 254,148 value 5,500
+  UTXO #2: tx_hash 1c998142a5a5aae6f8c1eab245351413fe8d4032a3f14345f9943a0d0bc90ec0 tx_pos 0 height 254,161 value 5,500
+  UTXO #3: tx_hash 53345491b4829140be53f30079c6e4556a18545343b122900ebbfa158f9ca97a tx_pos 0 height 254,163 value 5,500
+  UTXO #4: tx_hash c71ad947ac46af217da3cd5521113cbd03e36ddada2b4452afe6c15f944d2529 tx_pos 0 height 372,916 value 1,000
+  UTXO #5: tx_hash c944a6acac054275a5e294e746d9ce79f6dcae91f3b4f5a84561aee6404a55b3 tx_pos 0 height 254,148 value 5,500
+  Balance: 17.8983303 BCH
 
 reorg
 -----
