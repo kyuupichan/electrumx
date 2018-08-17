@@ -2051,6 +2051,26 @@ class Pivx(Coin):
             return quark_hash.getPoWHash(header)
 
 
+class PivxTestnet(Pivx):
+    SHORTNAME = "tPIVX"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("3a8061a0")
+    XPRV_VERBYTES = bytes.fromhex("3a805837")
+    P2PKH_VERBYTE = bytes.fromhex("8B")
+    P2SH_VERBYTES = [bytes.fromhex("13")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH = (
+        '0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
+    BASIC_HEADER_SIZE = 80
+    HDR_V4_SIZE = 112
+    HDR_V4_HEIGHT = 863787
+    HDR_V4_START_OFFSET = HDR_V4_HEIGHT * BASIC_HEADER_SIZE
+    TX_COUNT = 2157510
+    TX_COUNT_HEIGHT = 569399
+    TX_PER_BLOCK = 2
+    RPC_PORT = 51472
+
+
 class Bitg(Coin):
 
     NAME = "BitcoinGreen"
