@@ -113,6 +113,14 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.BitcoinGoldRegtest
     os.environ.pop('NET')
+    os.environ['COIN'] = ' Pivx '
+    os.environ['NET'] = 'mainnet'
+    e = Env()
+    assert e.coin == lib_coins.Pivx
+    os.environ['NET'] = 'testnet'
+    e = Env()
+    assert e.coin == lib_coins.PivxTestnet
+    os.environ.pop('NET')
     os.environ['COIN'] = ' Decred '
     e = Env()
     assert e.coin == lib_coins.Decred
