@@ -575,7 +575,7 @@ class SessionManager(object):
                                 'connections until count drops to {:,d}'
                                 .format(self.max_sessions, self.low_watermark))
             loop = asyncio.get_event_loop()
-            loop.call_soon(self._close_servers(['TCP', 'SSL']))
+            asyncio.run_coroutine_threadsafe(self._close_servers(['TCP', 'SSL']), loop)
         gid = int(session.start_time - self.start_time) // 900
         if self.cur_group.gid != gid:
             self.cur_group = SessionGroup(gid)
