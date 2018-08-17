@@ -62,6 +62,10 @@ addresses = [
     (coins.PivxTestnet, "yCcNWqqMhDmsPzKchCPK1ux4HpxK7j3xpB",
      "ab72728952c06dfc0f6cf21449dd645422731ec4", "eb3a3155215538d51de7cc")
 
+    (coins.Bitg, "GP1vBChXjjbaKwMcoPGB4T8cZLXWCe2wLV",
+     "38bc968f95157bb7446feb1a7d75f2791fc8cf91", "4c7332cd142b788dd89241"),
+    (coins.Bitg, "GaXGkXrm4dK1CYfSWvKubKgMcrYN59BZGF",
+     "b6f335a20a887f03a1d8a5c701f967c35d9b45c4", "383b20a90a9109531ccd7e")
 ]
 
 
