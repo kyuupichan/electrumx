@@ -1667,6 +1667,25 @@ class Decred(Coin):
         return h
 
 
+class DecredTestnet(Decred):
+    SHORTNAME = "tDCR"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587d1")
+    XPRV_VERBYTES = bytes.fromhex("04358397")
+    P2PKH_VERBYTE = bytes.fromhex("0f21")
+    P2SH_VERBYTES = [bytes.fromhex("0efc")]
+    WIF_BYTE = bytes.fromhex("22de")
+    GENESIS_HASH = (
+        '4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
+    BASIC_HEADER_SIZE = 180
+    ALLOW_ADVANCING_ERRORS = True
+    TX_COUNT = 217380620
+    TX_COUNT_HEIGHT = 464000
+    TX_PER_BLOCK = 1800
+    REORG_LIMIT = 1000
+    RPC_PORT = 19109
+
+
 class Axe(Dash):
     NAME = "Axe"
     SHORTNAME = "AXE"
