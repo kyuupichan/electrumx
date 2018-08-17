@@ -2050,8 +2050,8 @@ class PivxTestnet(Pivx):
     TX_COUNT_HEIGHT = 569399
     TX_PER_BLOCK = 2
     RPC_PORT = 51472
-    
-    
+
+
 class Bitg(Coin):
 
     NAME = "BitcoinGreen"
@@ -2091,4 +2091,3 @@ class tBitg(Bitg):
     GENESIS_HASH = (
         '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
     RPC_PORT = 19332
-    
