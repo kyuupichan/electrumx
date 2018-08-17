@@ -24,4 +24,4 @@ WORKDIR /data
 
 EXPOSE 50001 50002
 
-CMD ["/electrumx/electrumx_server.py"]
+CMD ["/electrumx/electrumx_server"]
