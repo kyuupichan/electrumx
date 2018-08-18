@@ -104,11 +104,14 @@ class ClientSessionGood(ClientSessionBase):
             assert request.args == args
             return JSONResponse(result, request_id)
         else:
-            assert isinstance(request, Batch)
-            for request, args in zip(request, args):
-                assert request.method == method
-                assert request.args == args
-            return JSONResponse(result, request_id)
+            batch = request
+            assert isinstance(batch, list)
+            request_ids = []
+            for payload, args in zip(batch, args):
+                assert payload['method'] == method
+                assert payload['params'] == args
+                request_ids.append(payload['id'])
+            return JSONResponse(result, request_ids)
 
 
 class ClientSessionBadAuth(ClientSessionBase):
