@@ -8,6 +8,17 @@
    should not occur with Python 3.7.
 
 
+Version 1.8.5 (18 Aug 2018)
+===========================
+
+* require aiorpcX 0.7.3 which contains a couple of bugfixes
+* fix `#552`_, `#577`_
+* fixed a session limiting bug reported by ghost43
+* coin additions / updates: PIVX and Decred Testnets, BitcoinGreen (cunhasb)
+  Monacoin (wakayamap)
+* proper generation input handling for various altcoins (erasmospunk) fixing
+  `#570`_
+
 Version 1.8.4 (14 Aug 2018)
 ===========================
 
@@ -209,8 +220,11 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#523: https://github.com/kyuupichan/electrumx/issues/523
 .. _#534: https://github.com/kyuupichan/electrumx/issues/534
 .. _#538: https://github.com/kyuupichan/electrumx/issues/538
+.. _#552: https://github.com/kyuupichan/electrumx/issues/552
 .. _#557: https://github.com/kyuupichan/electrumx/issues/557
 .. _#559: https://github.com/kyuupichan/electrumx/issues/559
 .. _#564: https://github.com/kyuupichan/electrumx/issues/564
 .. _#565: https://github.com/kyuupichan/electrumx/issues/565
 .. _#567: https://github.com/kyuupichan/electrumx/issues/567
+.. _#570: https://github.com/kyuupichan/electrumx/issues/570
+.. _#577: https://github.com/kyuupichan/electrumx/issues/577
