@@ -19,7 +19,7 @@ from glob import glob
 from struct import pack, unpack
 
 import attr
-from aiorpcx import run_in_thread
+from aiorpcx import run_in_thread, sleep
 
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
@@ -438,7 +438,13 @@ class DB(object):
             fs_tx_hash = self.fs_tx_hash
             return [fs_tx_hash(tx_num) for tx_num in tx_nums]
 
-        return await run_in_thread(read_history)
+        while True:
+            history = await run_in_thread(read_history)
+            if all(hash is not None for hash, height in history):
+                return history
+            self.logger.warning(f'limited_history: tx hash '
+                                f'not found (reorg?), retrying...')
+            await sleep(0.25)
 
     # -- Undo information
 
@@ -601,7 +607,13 @@ class DB(object):
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
             return utxos
 
-        return await run_in_thread(read_utxos)
+        while True:
+            utxos = await run_in_thread(read_utxos)
+            if all(utxo.tx_hash is not None for utxo in utxos):
+                return utxos
+            self.logger.warning(f'all_utxos: tx hash not '
+                                f'found (reorg?), retrying...')
+            await sleep(0.25)
 
     async def lookup_utxos(self, prevouts):
         '''For each prevout, lookup it up in the DB and return a (hashX,
