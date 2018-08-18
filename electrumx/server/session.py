@@ -197,9 +197,9 @@ class SessionManager(object):
             await self.session_event.wait()
             self.session_event.clear()
             if not paused and len(self.sessions) >= max_sessions:
-                session.logger.info(f'maximum sessions {max_sessions:,d} '
-                                    f'reached, stopping new connections until '
-                                    f'count drops to {low_watermark:,d}')
+                self.logger.info(f'maximum sessions {max_sessions:,d} '
+                                 f'reached, stopping new connections until '
+                                 f'count drops to {low_watermark:,d}')
                 await self._close_servers(['TCP', 'SSL'])
                 paused = True
             # Start listening for incoming connections if paused and
