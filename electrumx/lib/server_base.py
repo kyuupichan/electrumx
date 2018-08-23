@@ -13,7 +13,7 @@ import sys
 import time
 from functools import partial
 
-from aiorpcx import TaskGroup
+from aiorpcx import spawn
 
 from electrumx.lib.util import class_logger
 
@@ -28,7 +28,8 @@ class ServerBase(object):
       Upon return the event loop runs until the shutdown signal is received.
     '''
     SUPPRESS_MESSAGE_REGEX = re.compile('SSL handshake|Fatal read error on|'
-                                        'SSL error in data received')
+                                        'SSL error in data received|'
+                                        'socket.send() raised exception')
     SUPPRESS_TASK_REGEX = re.compile('accept_connection2')
     PYTHON_MIN_VERSION = (3, 6)
 
@@ -93,12 +94,11 @@ class ServerBase(object):
         loop.set_exception_handler(self.on_exception)
 
         shutdown_event = asyncio.Event()
-        async with TaskGroup() as group:
-            server_task = await group.spawn(self.serve(shutdown_event))
-            # Wait for shutdown, log on receipt of the event
-            await shutdown_event.wait()
-            self.logger.info('shutting down')
-            server_task.cancel()
+        server_task = await spawn(self.serve(shutdown_event))
+        # Wait for shutdown, log on receipt of the event
+        await shutdown_event.wait()
+        self.logger.info('shutting down')
+        server_task.cancel()
 
         # Prevent some silly logs
         await asyncio.sleep(0.01)
