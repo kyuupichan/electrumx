@@ -5,7 +5,7 @@ export CACHE_MB=400
 
 export COIN=Ravencoin
 export DB_DIRECTORY=~/.electrumx/rvn
-export DAEMON_URL=http://ravencoin:MBQ2xH6xGhZzpnhF@127.0.0.1:8751
+export DAEMON_URL=http://rpcuser:rpcpass@127.0.0.1:8766
 
 export NET=mainnet
 export DB_ENGINE=leveldb
