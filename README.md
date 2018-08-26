@@ -2,13 +2,13 @@
 
 # Install necessary packages and Python 3.7:
 
-sudo apt-get -y install build-essential python-dev python-setuptools python-pip python-smbus
-sudo apt-get -y install libncursesw5-dev libgdbm-dev libc6-dev
-sudo apt-get -y install zlib1g-dev libsqlite3-dev tk-dev
-sudo apt-get -y install libssl-dev openssl
-sudo apt-get -y install libffi-dev
-sudo ufw allow 50001/tcp # Needed to allow incoming connections
-sudo ufw allow 50002/tcp # Needed to allow incoming connections
+	sudo apt-get -y install build-essential python-dev python-setuptools python-pip python-smbus
+	sudo apt-get -y install libncursesw5-dev libgdbm-dev libc6-dev
+	sudo apt-get -y install zlib1g-dev libsqlite3-dev tk-dev
+	sudo apt-get -y install libssl-dev openssl
+	sudo apt-get -y install libffi-dev
+	sudo ufw allow 50001/tcp # Needed to allow incoming connections
+	sudo ufw allow 50002/tcp # Needed to allow incoming connections
 
 mkdir /tmp/Python37
 cd /tmp/Python37
