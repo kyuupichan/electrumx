@@ -1,6 +1,6 @@
 # Instructions for running on an Ubuntu 16.04 server:
 
-# Install necessary packages and Python 3.7:
+# Install necessary packages
 
 	sudo apt-get -y install build-essential python-dev python-setuptools python-pip python-smbus
 	sudo apt-get -y install libncursesw5-dev libgdbm-dev libc6-dev
@@ -10,43 +10,44 @@
 	sudo ufw allow 50001/tcp # Needed to allow incoming connections
 	sudo ufw allow 50002/tcp # Needed to allow incoming connections
 
-mkdir /tmp/Python37
-cd /tmp/Python37
-wget https://www.python.org/ftp/python/3.7.0/Python-3.7.0.tar.xz
-tar xvf Python-3.7.0.tar.xz
-cd /tmp/Python37/Python-3.7.0
-./configure
-sudo make altinstall
+# Install Python 3.7
 
-sudo pip install virtualenv
+	mkdir /tmp/Python37
+	cd /tmp/Python37
+	wget https://www.python.org/ftp/python/3.7.0/Python-3.7.0.tar.xz
+	tar xvf Python-3.7.0.tar.xz
+	cd /tmp/Python37/Python-3.7.0
+	./configure
+	sudo make altinstall
 
-cd ~
-virtualenv -p /usr/local/bin/python3.7 ve 
-echo "source ve/bin/activate" >> ~/.bashrc
-. ~/.bashrc
-python --version # Should show 3.7
-pip install plyvel pylru aiorpcx aiohttp
-pip install git+https://github.com/traysi/x16r_hash
-cd ~
-git clone https://github.com/traysi/electrumx.git
-cd electrumx/
-python setup.py install
+# Setup your local virtualenv for Python
 
-mkdir -p ~/.electrumx/rvn
+	sudo pip install virtualenv
+	cd ~
+	virtualenv -p /usr/local/bin/python3.7 ve 
+	echo "source ve/bin/activate" >> ~/.bashrc
+	. ~/.bashrc
+	python --version # Should show 3.7
+	pip install plyvel pylru aiorpcx aiohttp
+	pip install git+https://github.com/traysi/x16r_hash
 
-openssl genrsa -des3 -passout pass:x -out ~/server.pass.key 2048
-openssl rsa -passin pass:x -in ~/server.pass.key -out ~/.electrumx/server.key
-rm ~/server.pass.key
+# Install ElectrumX
 
-# Don’t set a password in the next step !
-openssl req -new -key ~/.electrumx/server.key -out ~/.electrumx/server.csr
-openssl x509 -req -days 1825 -in ~/.electrumx/server.csr -signkey ~/.electrumx/server.key -out ~/.electrumx/server.crt
+	git clone https://github.com/traysi/electrumx.git
+	cd electrumx/
+	python setup.py install
+	mkdir -p ~/.electrumx/rvn
+	openssl genrsa -des3 -passout pass:x -out ~/server.pass.key 2048
+	openssl rsa -passin pass:x -in ~/server.pass.key -out ~/.electrumx/server.key
+	rm ~/server.pass.key
+	# Don’t set a password in the next step !
+	openssl req -new -key ~/.electrumx/server.key -out ~/.electrumx/server.csr
+	openssl x509 -req -days 1825 -in ~/.electrumx/server.csr -signkey ~/.electrumx/server.key -out ~/.electrumx/server.crt
 
 # Edit ~/electrumx/start_ravencoin to update the variables to reflect your local environment.
 
-~/electrumx/start_ravencoin &
-
-tail -f ~/.electrumx/electrumx.log # to watch the logs.
+	~/electrumx/start_ravencoin &
+	tail -f ~/.electrumx/electrumx.log # to watch the logs.
 
 It'll take a while to connect and build its local database, so be patient. After the syncing is finished, you can connect and test it with:
 
