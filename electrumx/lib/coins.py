@@ -1445,6 +1445,29 @@ class Chips(Coin):
     RPC_PORT = 57776
     REORG_LIMIT = 800
 
+class Ravencoin(Coin):
+    NAME = "Ravencoin"
+    SHORTNAME = "RVN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("3C")
+    P2SH_VERBYTES = [bytes.fromhex("7A")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('0000006b444bc2f2ffe627be9d9e7e7a'
+                    '0730000870ef6eb6da46c8eae389df90')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 1399509
+    TX_COUNT_HEIGHT = 337036
+    TX_PER_BLOCK = 4
+    RPC_PORT =8766
+    REORG_LIMIT = 2000
+    PEERS = []
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
 
 class Feathercoin(Coin):
     NAME = "Feathercoin"
