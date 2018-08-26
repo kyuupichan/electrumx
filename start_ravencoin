@@ -1,0 +1,27 @@
+#!/bin/bash
+
+export RPC_PORT=8000
+export CACHE_MB=400
+
+export COIN=Ravencoin
+export DB_DIRECTORY=~/.electrumx/rvn
+export DAEMON_URL=http://ravencoin:MBQ2xH6xGhZzpnhF@127.0.0.1:8751
+
+export NET=mainnet
+export DB_ENGINE=leveldb
+export HOST=localhost
+export TCP_PORT=50001
+export SSL_PORT=50002
+export SSL_CERTFILE=~/.electrumx/server.crt
+export SSL_KEYFILE=~/.electrumx/server.key
+export BANNER_FILE=~/.electrumx/banner_file.txt
+export DONATION_ADDRESS=CHANGEME
+export REPORT_HOST=yoursite.example.com
+
+# run electrumx
+ulimit -n 10000
+while [ true ] ; do
+  echo "Starting ElectrumX, logging to ~/.electrumx/electrumx.log"
+  ~/electrumx/electrumx_server >> ~/.electrumx/electrumx.log 2>> ~/.electrumx/electrumx.log
+done
+
