@@ -1,5 +1,9 @@
 # Instructions for running on an Ubuntu 16.04 server:
 
+Recommended 2GB RAM. Install a swap file if you don't have enough memory. If you find your daemon dies, you might be running out of memory.
+
+Install ravend and run it with -txindex just like you would with an explorer.
+
 # Install necessary packages
 
 	sudo apt-get -y install build-essential python-dev python-setuptools python-pip python-smbus

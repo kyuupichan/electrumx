@@ -5,7 +5,7 @@ export CACHE_MB=400
 
 export COIN=Ravencoin
 export DB_DIRECTORY=~/.electrumx/rvn
-export DAEMON_URL=http://rpcuser:rpcpass@127.0.0.1:8766
+export DAEMON_URL=http://rpcuser:rpcpass@127.0.0.1:8766/
 
 export NET=mainnet
 export DB_ENGINE=leveldb
@@ -23,5 +23,6 @@ ulimit -n 10000
 while [ true ] ; do
   echo "Starting ElectrumX, logging to ~/.electrumx/electrumx.log"
   ~/electrumx/electrumx_server >> ~/.electrumx/electrumx.log 2>> ~/.electrumx/electrumx.log
+  sleep 1
 done
 
