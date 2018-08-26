@@ -46,6 +46,7 @@
 
 # Edit ~/electrumx/start_ravencoin to update the variables to reflect your local environment.
 
+	nano ~/electrumx/start_ravencoin
 	~/electrumx/start_ravencoin &
 	tail -f ~/.electrumx/electrumx.log # to watch the logs.
 
