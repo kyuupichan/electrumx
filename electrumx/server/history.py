@@ -14,9 +14,9 @@ import bisect
 import time
 from collections import defaultdict
 from functools import partial
-from struct import pack, unpack
 
 import electrumx.lib.util as util
+from electrumx.lib.util import pack_be_uint16, unpack_be_uint16_from
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 
 
@@ -81,7 +81,7 @@ class History(object):
 
         keys = []
         for key, hist in self.db.iterator(prefix=b''):
-            flush_id, = unpack('>H', key[-2:])
+            flush_id, = unpack_be_uint16_from(key[-2:])
             if flush_id > utxo_flush_count:
                 keys.append(key)
 
@@ -126,7 +126,7 @@ class History(object):
     def flush(self):
         start_time = time.time()
         self.flush_count += 1
-        flush_id = pack('>H', self.flush_count)
+        flush_id = pack_be_uint16(self.flush_count)
         unflushed = self.unflushed
 
         with self.db.write_batch() as batch:
@@ -250,7 +250,7 @@ class History(object):
         write_size = 0
         keys_to_delete.update(hist_map)
         for n, chunk in enumerate(util.chunks(full_hist, max_row_size)):
-            key = hashX + pack('>H', n)
+            key = hashX + pack_be_uint16(n)
             if hist_map.get(key) == chunk:
                 keys_to_delete.remove(key)
             else:
@@ -302,7 +302,7 @@ class History(object):
         # Loop over 2-byte prefixes
         cursor = self.comp_cursor
         while write_size < limit and cursor < 65536:
-            prefix = pack('>H', cursor)
+            prefix = pack_be_uint16(cursor)
             write_size += self._compact_prefix(prefix, write_items,
                                                keys_to_delete)
             cursor += 1

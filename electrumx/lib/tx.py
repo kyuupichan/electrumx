@@ -31,19 +31,22 @@ from collections import namedtuple
 
 from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.util import (
-    cachedproperty, unpack_int32_from, unpack_int64_from,
-    unpack_uint16_from, unpack_uint32_from, unpack_uint64_from,
-    pack_le_int32, pack_varint, pack_le_uint32, pack_le_uint32, pack_le_int64,
-    pack_varbytes,
+    unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
+    unpack_le_uint32_from, unpack_le_uint64_from, pack_le_int32, pack_varint,
+    pack_le_uint32, pack_le_int64, pack_varbytes,
 )
+
+ZERO = bytes(32)
+MINUS_1 = 4294967295
+
+
+def is_gen_outpoint(hash, index):
+    '''Test if an outpoint is a generation/coinbase like'''
+    return index == MINUS_1 and hash == ZERO
 
 
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a transaction.'''
-
-    @cachedproperty
-    def is_generation(self):
-        return self.inputs[0].is_generation
 
     def serialize(self):
         return b''.join((
@@ -58,15 +61,6 @@ class Tx(namedtuple("Tx", "version inputs outputs locktime")):
 
 class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
     '''Class representing a transaction input.'''
-
-    ZERO = bytes(32)
-    MINUS_1 = 4294967295
-
-    @cachedproperty
-    def is_generation(self):
-        return (self.prev_idx == TxInput.MINUS_1 and
-                self.prev_hash == TxInput.ZERO)
-
     def __str__(self):
         script = self.script.hex()
         prev_hash = hash_to_hex_str(self.prev_hash)
@@ -185,27 +179,27 @@ class Deserializer(object):
         return self._read_le_uint64()
 
     def _read_le_int32(self):
-        result, = unpack_int32_from(self.binary, self.cursor)
+        result, = unpack_le_int32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_int64(self):
-        result, = unpack_int64_from(self.binary, self.cursor)
+        result, = unpack_le_int64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
     def _read_le_uint16(self):
-        result, = unpack_uint16_from(self.binary, self.cursor)
+        result, = unpack_le_uint16_from(self.binary, self.cursor)
         self.cursor += 2
         return result
 
     def _read_le_uint32(self):
-        result, = unpack_uint32_from(self.binary, self.cursor)
+        result, = unpack_le_uint32_from(self.binary, self.cursor)
         self.cursor += 4
         return result
 
     def _read_le_uint64(self):
-        result, = unpack_uint64_from(self.binary, self.cursor)
+        result, = unpack_le_uint64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
 
@@ -213,10 +207,6 @@ class Deserializer(object):
 class TxSegWit(namedtuple("Tx", "version marker flag inputs outputs "
                           "witness locktime")):
     '''Class representing a SegWit transaction.'''
-
-    @cachedproperty
-    def is_generation(self):
-        return self.inputs[0].is_generation
 
 
 class DeserializerSegWit(Deserializer):
@@ -326,10 +316,6 @@ class DeserializerEquihashSegWit(DeserializerSegWit, DeserializerEquihash):
 class TxJoinSplit(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a JoinSplit transaction.'''
 
-    @cachedproperty
-    def is_generation(self):
-        return self.inputs[0].is_generation if len(self.inputs) > 0 else False
-
 
 class DeserializerZcash(DeserializerEquihash):
     def read_tx(self):
@@ -359,10 +345,6 @@ class DeserializerZcash(DeserializerEquihash):
 
 class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
     '''Class representing transaction that has a time field.'''
-
-    @cachedproperty
-    def is_generation(self):
-        return self.inputs[0].is_generation
 
 
 class DeserializerTxTime(Deserializer):
@@ -445,11 +427,6 @@ class DeserializerGroestlcoin(DeserializerSegWit):
 class TxInputDcr(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
     '''Class representing a Decred transaction input.'''
 
-    @cachedproperty
-    def is_generation(self):
-        return (self.prev_idx == TxInput.MINUS_1 and
-                self.prev_hash == TxInput.ZERO)
-
     def __str__(self):
         prev_hash = hash_to_hex_str(self.prev_hash)
         return ("Input({}, {:d}, tree={}, sequence={:d})"
@@ -464,10 +441,6 @@ class TxOutputDcr(namedtuple("TxOutput", "value version pk_script")):
 class TxDcr(namedtuple("Tx", "version inputs outputs locktime expiry "
                              "witness")):
     '''Class representing a Decred  transaction.'''
-
-    @cachedproperty
-    def is_generation(self):
-        return self.inputs[0].is_generation
 
 
 class DeserializerDecred(Deserializer):
@@ -540,11 +513,6 @@ class DeserializerDecred(Deserializer):
         expiry = self._read_le_uint32()
         end_prefix = self.cursor
         witness = self._read_witness(len(inputs))
-
-        # Drop the coinbase-like input from a vote tx as it creates problems
-        # with UTXOs lookups and mempool management
-        if inputs[0].is_generation and len(inputs) > 1:
-            inputs = inputs[1:]
 
         if produce_hash:
             # TxSerializeNoWitness << 16 == 0x10000

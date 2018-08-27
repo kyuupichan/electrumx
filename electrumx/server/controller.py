@@ -12,7 +12,6 @@ from aiorpcx import _version as aiorpcx_version, TaskGroup
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
-from electrumx.server.chain_state import ChainState
 from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
@@ -81,8 +80,8 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start serving external clients.
         '''
-        if not (0, 7, 1) <= aiorpcx_version < (0, 8):
-            raise RuntimeError('aiorpcX version 0.7.x required with x >= 1')
+        if not (0, 7, 3) <= aiorpcx_version < (0, 8):
+            raise RuntimeError('aiorpcX version 0.7.x required with x >= 3')
 
         env = self.env
         min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
@@ -93,11 +92,12 @@ class Controller(ServerBase):
         self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
         notifications = Notifications()
-        daemon = env.coin.DAEMON(env)
-        db = DB(env)
+        Daemon = env.coin.DAEMON
         BlockProcessor = env.coin.BLOCK_PROCESSOR
+
+        daemon = Daemon(env.coin, env.daemon_url)
+        db = DB(env)
         bp = BlockProcessor(env, db, daemon, notifications)
-        chain_state = ChainState(env, db, daemon, bp)
 
         # Set ourselves up to implement the MemPoolAPI
         self.height = daemon.height
@@ -109,13 +109,16 @@ class Controller(ServerBase):
         MemPoolAPI.register(Controller)
         mempool = MemPool(env.coin, self)
 
-        session_mgr = SessionManager(env, chain_state, mempool,
+        session_mgr = SessionManager(env, db, bp, daemon, mempool,
                                      notifications, shutdown_event)
+
+        # Test daemon authentication, and also ensure it has a cached
+        # height.  Do this before entering the task group.
+        await daemon.height()
 
         caught_up_event = Event()
         serve_externally_event = Event()
         synchronized_event = Event()
-
         async with TaskGroup() as group:
             await group.spawn(session_mgr.serve(serve_externally_event))
             await group.spawn(bp.fetch_and_process_blocks(caught_up_event))

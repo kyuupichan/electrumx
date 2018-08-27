@@ -55,12 +55,12 @@ class PeerManager(object):
     Attempts to maintain a connection with up to 8 peers.
     Issues a 'peers.subscribe' RPC to them and tells them our data.
     '''
-    def __init__(self, env, chain_state):
+    def __init__(self, env, db):
         self.logger = class_logger(__name__, self.__class__.__name__)
         # Initialise the Peer class
         Peer.DEFAULT_PORTS = env.coin.PEER_DEFAULT_PORTS
         self.env = env
-        self.chain_state = chain_state
+        self.db = db
 
         # Our clearnet and Tor Peers, if any
         sclass = env.coin.SESSIONCLS
@@ -300,7 +300,7 @@ class PeerManager(object):
         result = await session.send_request(message)
         assert_good(message, result, dict)
 
-        our_height = self.chain_state.db_height()
+        our_height = self.db.db_height
         if ptuple < (1, 3):
             their_height = result.get('block_height')
         else:
@@ -313,7 +313,7 @@ class PeerManager(object):
 
         # Check prior header too in case of hard fork.
         check_height = min(our_height, their_height)
-        raw_header = await self.chain_state.raw_header(check_height)
+        raw_header = await self.db.raw_header(check_height)
         if ptuple >= (1, 4):
             ours = raw_header.hex()
             message = 'blockchain.block.header'
