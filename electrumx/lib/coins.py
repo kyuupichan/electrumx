@@ -2135,3 +2135,23 @@ class tBitg(Bitg):
     GENESIS_HASH = (
         '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
     RPC_PORT = 19332
+
+class Zcoin(Coin):
+    NAME = "Zcoin"
+    SHORTNAME = "XZC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("52")
+    P2SH_VERBYTES = [bytes.fromhex("07")]
+    WIF_BYTE = bytes.fromhex("d2")
+    GENESIS_HASH = ('4381deb85b1b2c9843c222944b616d99'
+                    '7516dcbd6a964e1eaf0def0830695233')
+    TX_COUNT = 667154
+    TX_COUNT_HEIGHT = 100266
+    TX_PER_BLOCK = 4000 # 2000 for 1MB block
+    IRC_PREFIX = None
+    RPC_PORT = 8888
+    REORG_LIMIT = 5000
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
+    PEERS = [
+        # 'host.example.com s t'
+    ]
