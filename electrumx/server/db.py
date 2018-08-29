@@ -19,11 +19,12 @@ from glob import glob
 from struct import pack, unpack
 
 import attr
-from aiorpcx import run_in_thread, sleep
+from aiorpcx import run_in_thread
 
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.merkle import Merkle, MerkleCache
+from electrumx.lib.tx import is_generation
 from electrumx.lib.util import formatted_time
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
@@ -370,13 +371,6 @@ class DB(object):
         # Truncate header_mc: header count is 1 more than the height.
         self.header_mc.truncate(height + 1)
 
-    async def raw_header(self, height):
-        '''Return the binary header at the given height.'''
-        header, n = await self.read_headers(height, 1)
-        if n != 1:
-            raise IndexError(f'height {height:,d} out of range')
-        return header
-
     async def read_headers(self, start_height, count):
         '''Requires start_height >= 0, count >= 0.  Reads as many headers as
         are available starting at start_height up to count.  This
@@ -438,13 +432,7 @@ class DB(object):
             fs_tx_hash = self.fs_tx_hash
             return [fs_tx_hash(tx_num) for tx_num in tx_nums]
 
-        while True:
-            history = await run_in_thread(read_history)
-            if all(hash is not None for hash, height in history):
-                return history
-            self.logger.warning(f'limited_history: tx hash '
-                                f'not found (reorg?), retrying...')
-            await sleep(0.25)
+        return await run_in_thread(read_history)
 
     # -- Undo information
 
@@ -607,13 +595,7 @@ class DB(object):
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
             return utxos
 
-        while True:
-            utxos = await run_in_thread(read_utxos)
-            if all(utxo.tx_hash is not None for utxo in utxos):
-                return utxos
-            self.logger.warning(f'all_utxos: tx hash not '
-                                f'found (reorg?), retrying...')
-            await sleep(0.25)
+        return await run_in_thread(read_utxos)
 
     async def lookup_utxos(self, prevouts):
         '''For each prevout, lookup it up in the DB and return a (hashX,
@@ -626,6 +608,9 @@ class DB(object):
             for each prevout.
             '''
             def lookup_hashX(tx_hash, tx_idx):
+                # Generation-like UTXO are not present in the DB
+                if is_generation(tx_hash, tx_idx):
+                    return None, None
                 idx_packed = pack('<H', tx_idx)
 
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
