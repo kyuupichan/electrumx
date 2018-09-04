@@ -40,11 +40,6 @@ ZERO = bytes(32)
 MINUS_1 = 4294967295
 
 
-def is_gen_outpoint(hash, index):
-    '''Test if an outpoint is a generation/coinbase like'''
-    return index == MINUS_1 and hash == ZERO
-
-
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a transaction.'''
 
@@ -66,6 +61,10 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
         prev_hash = hash_to_hex_str(self.prev_hash)
         return ("Input({}, {:d}, script={}, sequence={:d})"
                 .format(prev_hash, self.prev_idx, script, self.sequence))
+
+    def is_generation(self):
+        '''Test if an input is generation/coinbase like'''
+        return self.prev_idx == MINUS_1 and self.prev_hash == ZERO
 
     def serialize(self):
         return b''.join((

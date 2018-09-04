@@ -11,7 +11,7 @@ from aiorpcx import Event, TaskGroup, sleep, spawn, ignore_after
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.lib.coins import BitcoinCash
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash, hash_to_hex_str
-from electrumx.lib.tx import Tx, TxInput, TxOutput, is_gen_outpoint
+from electrumx.lib.tx import Tx, TxInput, TxOutput
 from electrumx.lib.util import make_logger
 
 
@@ -35,8 +35,10 @@ def random_tx(hash160s, utxos):
         inputs.append(TxInput(prevout[0], prevout[1], b'', 4294967295))
         input_value += value
 
-    # Add a generation/coinbase like input that is present in some coins
-    inputs.append(TxInput(bytes(32), 4294967295, b'', 4294967295))
+    # Seomtimes add a generation/coinbase like input that is present
+    # in some coins
+    if randrange(0, 10) == 0:
+        inputs.append(TxInput(bytes(32), 4294967295, b'', 4294967295))
 
     fee = min(input_value, randrange(500))
     input_value -= fee
@@ -102,7 +104,8 @@ class API(MemPoolAPI):
 
     def mempool_spends(self):
         return [(input.prev_hash, input.prev_idx)
-                for tx in self.txs.values() for input in tx.inputs]
+                for tx in self.txs.values() for input in tx.inputs
+                if not input.is_generation()]
 
     def balance_deltas(self):
         # Return mempool balance deltas indexed by hashX
@@ -110,9 +113,9 @@ class API(MemPoolAPI):
         utxos = self.mempool_utxos()
         for tx_hash, tx in self.txs.items():
             for n, input in enumerate(tx.inputs):
-                prevout = (input.prev_hash, input.prev_idx)
-                if is_gen_outpoint(input.prev_hash, input.prev_idx):
+                if input.is_generation():
                     continue
+                prevout = (input.prev_hash, input.prev_idx)
                 if prevout in utxos:
                     utxos.pop(prevout)
                 else:
@@ -128,9 +131,9 @@ class API(MemPoolAPI):
         utxos = self.mempool_utxos()
         for tx_hash, tx in self.txs.items():
             for n, input in enumerate(tx.inputs):
-                prevout = (input.prev_hash, input.prev_idx)
-                if is_gen_outpoint(input.prev_hash, input.prev_idx):
+                if input.is_generation():
                     continue
+                prevout = (input.prev_hash, input.prev_idx)
                 if prevout in utxos:
                     hashX, value = utxos.pop(prevout)
                 else:
@@ -147,7 +150,7 @@ class API(MemPoolAPI):
             hashXs = set()
             has_ui = False
             for n, input in enumerate(tx.inputs):
-                if is_gen_outpoint(input.prev_hash, input.prev_idx):
+                if input.is_generation():
                     continue
                 has_ui = has_ui or (input.prev_hash in self.txs)
                 prevout = (input.prev_hash, input.prev_idx)
@@ -173,7 +176,7 @@ class API(MemPoolAPI):
         for tx_hash in tx_hashes:
             tx = self.txs[tx_hash]
             for n, input in enumerate(tx.inputs):
-                if is_gen_outpoint(input.prev_hash, input.prev_idx):
+                if input.is_generation():
                     continue
                 prevout = (input.prev_hash, input.prev_idx)
                 if prevout in utxos:
@@ -484,8 +487,6 @@ async def test_notifications():
         api._height = new_height
         api.db_utxos.update(first_utxos)
         for spend in first_spends:
-            if is_gen_outpoint(*spend):
-                continue
             del api.db_utxos[spend]
         api.raw_txs = {hash: raw_txs[hash] for hash in second_hashes}
         api.txs = {hash: txs[hash] for hash in second_hashes}

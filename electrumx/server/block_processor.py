@@ -18,7 +18,6 @@ from functools import partial
 from aiorpcx import TaskGroup, run_in_thread
 
 import electrumx
-from electrumx.lib.tx import is_gen_outpoint
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, class_logger
@@ -413,7 +412,7 @@ class BlockProcessor(object):
 
             # Spend the inputs
             for txin in tx.inputs:
-                if is_gen_outpoint(txin.prev_hash, txin.prev_idx):
+                if txin.is_generation():
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
@@ -493,7 +492,7 @@ class BlockProcessor(object):
 
             # Restore the inputs
             for txin in reversed(tx.inputs):
-                if is_gen_outpoint(txin.prev_hash, txin.prev_idx):
+                if txin.is_generation():
                     continue
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]

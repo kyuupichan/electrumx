@@ -17,7 +17,6 @@ import attr
 from aiorpcx import TaskGroup, run_in_thread, sleep
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
-from electrumx.lib.tx import is_gen_outpoint
 from electrumx.lib.util import class_logger, chunks
 from electrumx.server.db import UTXO
 
@@ -173,9 +172,6 @@ class MemPool(object):
             in_pairs = []
             try:
                 for prevout in tx.prevouts:
-                    # Skip generation like prevouts
-                    if is_gen_outpoint(*prevout):
-                        continue
                     utxo = utxo_map.get(prevout)
                     if not utxo:
                         prev_hash, prev_index = prevout
@@ -277,8 +273,10 @@ class MemPool(object):
                     continue
                 tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
                 # Convert the inputs and outputs into (hashX, value) pairs
+                # Drop generation-like inputs from MemPoolTx.prevouts
                 txin_pairs = tuple((txin.prev_hash, txin.prev_idx)
-                                   for txin in tx.inputs)
+                                   for txin in tx.inputs
+                                   if not txin.is_generation())
                 txout_pairs = tuple((to_hashX(txout.pk_script), txout.value)
                                     for txout in tx.outputs)
                 txs[hash] = MemPoolTx(txin_pairs, None, txout_pairs,
@@ -295,8 +293,7 @@ class MemPool(object):
         # generation-like.
         prevouts = tuple(prevout for tx in tx_map.values()
                          for prevout in tx.prevouts
-                         if (prevout[0] not in all_hashes and
-                             not is_gen_outpoint(*prevout)))
+                         if prevout[0] not in all_hashes)
         utxos = await self.api.lookup_utxos(prevouts)
         utxo_map = {prevout: utxo for prevout, utxo in zip(prevouts, utxos)}
 
