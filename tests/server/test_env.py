@@ -134,7 +134,10 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.PivxTestnet
     os.environ.pop('NET')
-
+    os.environ['NET'] = 'mainnet'
+    os.environ['COIN'] = ' TokenPay '
+    e = Env()
+    assert e.coin == lib_coins.TokenPay
 
 def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)

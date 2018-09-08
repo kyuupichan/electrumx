@@ -29,6 +29,7 @@ install:
 # hashes
   - pip install tribus-hash
   - pip install blake256
+  - pip install scrypt
   - pip install x11_hash
   - pip install xevan_hash
   - pip install quark_hash
