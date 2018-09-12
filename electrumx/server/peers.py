@@ -290,10 +290,10 @@ class PeerManager(object):
         peer.features['server_version'] = server_version
         ptuple = protocol_tuple(protocol_version)
 
-        # FIXME: Make concurrent preserving the exception
-        await self._send_headers_subscribe(session, peer, ptuple)
-        await self._send_server_features(session, peer)
-        await self._send_peers_subscribe(session, peer)
+        async with TaskGroup() as g:
+            await g.spawn(self._send_headers_subscribe(session, peer, ptuple))
+            await g.spawn(self._send_server_features(session, peer))
+            await g.spawn(self._send_peers_subscribe(session, peer))
 
     async def _send_headers_subscribe(self, session, peer, ptuple):
         message = 'blockchain.headers.subscribe'

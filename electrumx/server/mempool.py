@@ -305,7 +305,7 @@ class MemPool(object):
 
     async def keep_synchronized(self, synchronized_event):
         '''Keep the mempool synchronized with the daemon.'''
-        async with TaskGroup(wait=any) as group:
+        async with TaskGroup() as group:
             await group.spawn(self._refresh_hashes(synchronized_event))
             await group.spawn(self._refresh_histogram(synchronized_event))
             await group.spawn(self._logging(synchronized_event))
