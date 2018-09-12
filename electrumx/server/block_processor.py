@@ -240,10 +240,10 @@ class BlockProcessor(object):
         async def get_raw_blocks(last_height, hex_hashes):
             heights = range(last_height, last_height - len(hex_hashes), -1)
             try:
-                blocks = [self.read_raw_block(height) for height in heights]
+                blocks = [self.db.read_raw_block(height) for height in heights]
                 self.logger.info(f'read {len(blocks)} blocks from disk')
                 return blocks
-            except Exception:
+            except FileNotFoundError:
                 return await self.daemon.raw_blocks(hex_hashes)
 
         def flush_backup():
