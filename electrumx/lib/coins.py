@@ -1645,7 +1645,7 @@ class Decred(Coin):
     XPRV_VERBYTES = bytes.fromhex("02fda4e8")
     P2PKH_VERBYTE = bytes.fromhex("073f")
     P2SH_VERBYTES = [bytes.fromhex("071a")]
-    WIF_BYTE = bytes.fromhex("230e")
+    WIF_BYTE = bytes.fromhex("22de")
     GENESIS_HASH = ('298e5cc3d985bfe7f81dc135f360abe0'
                     '89edd4396b86d2de66b0cef42b21d980')
     BASIC_HEADER_SIZE = 180
@@ -1699,9 +1699,9 @@ class DecredTestnet(Decred):
     XPRV_VERBYTES = bytes.fromhex("04358397")
     P2PKH_VERBYTE = bytes.fromhex("0f21")
     P2SH_VERBYTES = [bytes.fromhex("0efc")]
-    WIF_BYTE = bytes.fromhex("22de")
+    WIF_BYTE = bytes.fromhex("230e")
     GENESIS_HASH = (
-        '4261602a9d07d80ad47621a64ba6a07754902e496777edc4ff581946bd7bc29c')
+        'a649dce53918caf422e9c711c858837e08d626ecfcd198969b24f7b634a49bac')
     BASIC_HEADER_SIZE = 180
     ALLOW_ADVANCING_ERRORS = True
     TX_COUNT = 217380620
