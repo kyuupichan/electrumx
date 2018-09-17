@@ -116,7 +116,7 @@ class Daemon(object):
             nonlocal last_error_log, retry
             now = time.time()
             if now - last_error_log > 60:
-                last_error_time = now
+                last_error_log = now
                 self.logger.error(f'{error}  Retrying occasionally...')
             if retry == self.max_retry and self.failover():
                 retry = 0
