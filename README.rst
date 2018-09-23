@@ -1,11 +1,9 @@
-.. image:: https://travis-ci.org/kyuupichan/electrumx.svg?branch=master
-    :target: https://travis-ci.org/kyuupichan/electrumx
-.. image:: https://coveralls.io/repos/github/kyuupichan/electrumx/badge.svg
-    :target: https://coveralls.io/github/kyuupichan/electrumx
 
 ===============================================
 ElectrumX - Reimplementation of electrum-server
 ===============================================
+
+*This version of ElectrumX has been slightly modified to support blocks with any order of transactions. It is compatible with both the Bitcoin ABC canonical transaction ordering that will activate in November 2018, and the traditional topological transaction ordering used in all other bitcoin consensus rules. Your ElectrumX server will identify as version **ElectronX**. Please submit bug reports relating to transaction ordering to [our repo](https://github.com/Electron-Cash/electrumx), otherwise send bug reports (and donations) to upstream author [Neil Booth](https://github.com/kyuupichan/electrumx).*
 
 For a future network with bigger blocks.
 
