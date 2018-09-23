@@ -402,34 +402,37 @@ class BlockProcessor(object):
         spend_utxo = self.spend_utxo
         undo_info_append = undo_info.append
         update_touched = self.touched.update
-        hashXs_by_tx = []
-        append_hashXs = hashXs_by_tx.append
 
-        for tx, tx_hash in txs:
-            hashXs = []
-            append_hashX = hashXs.append
+        hashXs_by_tx = [set() for _ in txs]
+
+        # Add the new UTXOs
+        for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
+            add_hashXs = hashXs.add
             tx_numb = s_pack('<I', tx_num)
 
-            # Spend the inputs
+            for idx, txout in enumerate(tx.outputs):
+                # Get the hashX. Ignore unspendable outputs.
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    add_hashXs(hashX)
+                    put_utxo(tx_hash + s_pack('<H', idx),
+                             hashX + tx_numb + s_pack('<Q', txout.value))
+            tx_num += 1
+
+        # Spend the inputs
+        # A separate for-loop here allows any tx ordering in block.
+        for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
+            add_hashXs = hashXs.add
             for txin in tx.inputs:
                 if txin.is_generation():
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
-                append_hashX(cache_value[:-12])
+                add_hashXs(cache_value[:-12])
 
-            # Add the new UTXOs
-            for idx, txout in enumerate(tx.outputs):
-                # Get the hashX.  Ignore unspendable outputs
-                hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    append_hashX(hashX)
-                    put_utxo(tx_hash + s_pack('<H', idx),
-                             hashX + tx_numb + s_pack('<Q', txout.value))
-
-            append_hashXs(hashXs)
+        # Update touched set for notifications
+        for hashXs in hashXs_by_tx:
             update_touched(hashXs)
-            tx_num += 1
 
         self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
 
@@ -465,42 +468,44 @@ class BlockProcessor(object):
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
     def backup_txs(self, txs):
-        # Prevout values, in order down the block (coinbase first if present)
-        # undo_info is in reverse block order
         undo_info = self.db.read_undo_info(self.height)
         if undo_info is None:
             raise ChainError('no undo information found for height {:,d}'
                              .format(self.height))
-        n = len(undo_info)
 
         # Use local vars for speed in the loops
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
-        touched = self.touched
+        add_touched = self.touched.add
         undo_entry_len = 12 + HASHX_LEN
 
-        for tx, tx_hash in reversed(txs):
-            for idx, txout in enumerate(tx.outputs):
-                # Spend the TX outputs.  Be careful with unspendable
-                # outputs - we didn't save those in the first place.
-                hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    cache_value = spend_utxo(tx_hash, idx)
-                    touched.add(cache_value[:-12])
-
-            # Restore the inputs
-            for txin in reversed(tx.inputs):
+        # Restore coins that had been spent
+        # (may include coins made then spent in this block)
+        n = 0
+        for tx, tx_hash in txs:
+            for txin in tx.inputs:
                 if txin.is_generation():
                     continue
-                n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
                 put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
                          undo_item)
-                touched.add(undo_item[:-12])
+                add_touched(undo_item[:-12])
+                n += undo_entry_len
 
-        assert n == 0
+        assert n == len(undo_info)
+
+        # Remove tx outputs made in this block, by spending them.
+        for tx, tx_hash in txs:
+            for idx, txout in enumerate(tx.outputs):
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    # Be careful with unspendable outputs- we didn't save those
+                    # in the first place.
+                    cache_value = spend_utxo(tx_hash, idx)
+                    add_touched(cache_value[:-12])
+
         self.tx_count -= len(txs)
 
     '''An in-memory UTXO cache, representing all changes to UTXO state
