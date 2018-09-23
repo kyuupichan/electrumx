@@ -111,7 +111,6 @@ class History(object):
         unflushed = self.unflushed
         count = 0
         for tx_num, hashXs in enumerate(hashXs_by_tx, start=first_tx_num):
-            hashXs = set(hashXs)
             for hashX in hashXs:
                 unflushed[hashX].append(tx_num)
             count += len(hashXs)
