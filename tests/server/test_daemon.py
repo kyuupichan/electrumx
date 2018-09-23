@@ -487,6 +487,6 @@ async def test_failover(daemon, caplog):
         with ClientSessionFailover(('getblockcount', [], height)):
             await daemon.height() == height
 
-    assert in_caplog(caplog, "disconnected", 3)
+    assert in_caplog(caplog, "disconnected", 1)
     assert in_caplog(caplog, "failing over")
     assert in_caplog(caplog, "connection restored")
