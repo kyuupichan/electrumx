@@ -197,6 +197,7 @@ class PeerManager(object):
                 pause = WAKEUP_SECS * 2 ** peer.try_count
             async with ignore_after(pause):
                 await peer.retry_event.wait()
+                peer.retry_event.clear()
 
     async def _should_drop_peer(self, peer):
         peer.try_count += 1
