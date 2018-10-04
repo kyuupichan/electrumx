@@ -499,7 +499,7 @@ class TxInputDcr(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
         prev_hash = hash_to_hex_str(self.prev_hash)
         return ("Input({}, {:d}, tree={}, sequence={:d})"
                 .format(prev_hash, self.prev_idx, self.tree, self.sequence))
-    
+
     def is_generation(self):
         '''Test if an input is generation/coinbase like'''
         return self.prev_idx == MINUS_1 and self.prev_hash == ZERO
