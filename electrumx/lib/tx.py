@@ -500,6 +500,10 @@ class TxInputDcr(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
         return ("Input({}, {:d}, tree={}, sequence={:d})"
                 .format(prev_hash, self.prev_idx, self.tree, self.sequence))
 
+    def is_generation(self):
+        '''Test if an input is generation/coinbase like'''
+        return self.prev_idx == MINUS_1 and self.prev_hash == ZERO
+
 
 class TxOutputDcr(namedtuple("TxOutput", "value version pk_script")):
     '''Class representing a Decred transaction output.'''
