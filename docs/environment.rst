@@ -418,6 +418,5 @@ your available physical RAM:
 
   I do not recommend raising this above 2000.
 
-.. _lib/coins.py:
-   https://github.com/kyuupichan/electrumx/blob/master/lib/coins.py
+.. _lib/coins.py: https://github.com/kyuupichan/electrumx/blob/master/electrumx/lib/coins.py
 .. _uvloop: https://pypi.python.org/pypi/uvloop
