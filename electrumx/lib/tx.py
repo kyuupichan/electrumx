@@ -41,6 +41,10 @@ ZERO = bytes(32)
 MINUS_1 = 4294967295
 
 
+def is_gen_outpoint(hash, index):
+    '''Test if an outpoint is a generation/coinbase like'''
+    return index == MINUS_1 and hash == ZERO
+
 class Tx(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a transaction.'''
 
