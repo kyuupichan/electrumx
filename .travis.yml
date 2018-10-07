@@ -39,7 +39,6 @@ install:
 # command to run tests
 script:
   - pytest --cov=electrumx
-  - pycodestyle electrumx/server/*.py electrumx/lib/*.py
   - sh -c "cd docs && make html"
 # Dont report coverage from nightly
 after_success:

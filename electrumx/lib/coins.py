@@ -2155,3 +2155,13 @@ class Zcoin(Coin):
     PEERS = [
         # 'host.example.com s t'
     ]
+
+class tZcoin(Zcoin):
+    NAME = "tZcoin"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("41")
+    P2SH_VERBYTES = [bytes.fromhex("b2")]
+    WIF_BYTE = bytes.fromhex("b9")
+    GENESIS_HASH = (
+	'7ac038c193c2158c428c59f9ae0c02a07115141c6e9dc244ae96132e99b4e642')
+    RPC_PORT = 18888
