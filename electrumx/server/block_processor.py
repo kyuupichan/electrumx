@@ -626,8 +626,6 @@ class BlockProcessor(object):
         if first_sync:
             self.logger.info(f'{electrumx.version} synced to '
                              f'height {self.height:,d}')
-        # Initialise the notification framework
-        await self.notifications.on_block(set(), self.height)
         # Reopen for serving
         await self.db.open_for_serving()
 
