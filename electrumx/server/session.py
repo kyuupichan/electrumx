@@ -155,7 +155,7 @@ class SessionManager(object):
         host, port = args[:2]
         try:
             self.servers[kind] = await server
-        except Exception as e:
+        except OSError as e:    # don't suppress CancelledError
             self.logger.error(f'{kind} server failed to listen on {host}:'
                               f'{port:d} :{e!r}')
         else:
