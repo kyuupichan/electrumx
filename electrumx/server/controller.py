@@ -119,14 +119,14 @@ class Controller(ServerBase):
         await daemon.height()
 
         caught_up_event = Event()
-        serve_externally_event = Event()
-        synchronized_event = Event()
-        async with TaskGroup() as group:
-            await group.spawn(session_mgr.serve(notifications,
-                                                serve_externally_event))
-            await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
+        mempool_event = Event()
+
+        async def wait_for_catchup():
             await caught_up_event.wait()
             await group.spawn(db.populate_header_merkle_cache())
-            await group.spawn(mempool.keep_synchronized(synchronized_event))
-            await synchronized_event.wait()
-            serve_externally_event.set()
+            await group.spawn(mempool.keep_synchronized(mempool_event))
+
+        async with TaskGroup() as group:
+            await group.spawn(session_mgr.serve(notifications, mempool_event))
+            await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
+            await group.spawn(wait_for_catchup())
