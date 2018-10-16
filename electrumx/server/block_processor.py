@@ -44,6 +44,7 @@ class Prefetcher(object):
         self.min_cache_size = 10 * 1024 * 1024
         # This makes the first fetch be 10 blocks
         self.ave_size = self.min_cache_size // 10
+        self.polling_delay = 5
 
     async def main_loop(self, bp_height):
         '''Loop forever polling for more blocks.'''
@@ -53,7 +54,7 @@ class Prefetcher(object):
                 # Sleep a while if there is nothing to prefetch
                 await self.refill_event.wait()
                 if not await self._prefetch_blocks():
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(self.polling_delay)
             except DaemonError as e:
                 self.logger.info(f'ignoring daemon error: {e}')
 
