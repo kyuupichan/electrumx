@@ -202,6 +202,7 @@ class SessionManager(object):
             # Start listening for incoming connections if paused and
             # session count has fallen
             if paused and len(self.sessions) <= low_watermark:
+                self.logger.info('resuming listening for incoming connections')
                 await self._start_external_servers()
                 paused = False
 
