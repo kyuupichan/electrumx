@@ -681,3 +681,33 @@ class DecredBlockProcessor(BlockProcessor):
             start -= 1
             count += 1
         return start, count
+
+
+class NamecoinBlockProcessor(BlockProcessor):
+    def advance_txs(self, txs):
+        result = super().advance_txs(txs)
+
+        tx_num = self.tx_count - len(txs)
+        script_name_hashX = self.coin.name_hashX_from_script
+        update_touched = self.touched.update
+        hashXs_by_tx = []
+        append_hashXs = hashXs_by_tx.append
+
+        for tx, tx_hash in txs:
+            hashXs = []
+            append_hashX = hashXs.append
+
+            # Add the new UTXOs and associate them with the name script
+            for idx, txout in enumerate(tx.outputs):
+                # Get the hashX of the name script.  Ignore non-name scripts.
+                hashX = script_name_hashX(txout.pk_script)
+                if hashX:
+                    append_hashX(hashX)
+
+            append_hashXs(hashXs)
+            update_touched(hashXs)
+            tx_num += 1
+
+        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count - len(txs))
+
+        return result
