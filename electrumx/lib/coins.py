@@ -709,6 +709,109 @@ class Namecoin(AuxPowMixin, Coin):
     PEERS = [
         'elec.luggs.co s446',
     ]
+    BLOCK_PROCESSOR = block_proc.NamecoinBlockProcessor
+
+    @classmethod
+    def split_name_script(cls, script):
+        from electrumx.lib.script import _match_ops, Script, ScriptError
+
+        try:
+            ops = Script.get_ops(script)
+        except ScriptError:
+            return None, script
+
+        match = _match_ops
+
+        # Name opcodes
+        OP_NAME_NEW = OpCodes.OP_1
+        OP_NAME_FIRSTUPDATE = OpCodes.OP_2
+        OP_NAME_UPDATE = OpCodes.OP_3
+
+        # Opcode sequences for name operations
+        NAME_NEW_OPS = [OP_NAME_NEW, -1, OpCodes.OP_2DROP]
+        NAME_FIRSTUPDATE_OPS = [OP_NAME_FIRSTUPDATE, -1, -1, -1,
+                                OpCodes.OP_2DROP, OpCodes.OP_2DROP]
+        NAME_UPDATE_OPS = [OP_NAME_UPDATE, -1, -1, OpCodes.OP_2DROP,
+                           OpCodes.OP_DROP]
+
+        name_script_op_count = None
+        name_pushdata = None
+
+        # Detect name operations; determine count of opcodes.
+        # Also extract the name field -- we might use that for something in a
+        # future version.
+        if match(ops[:len(NAME_NEW_OPS)], NAME_NEW_OPS):
+            name_script_op_count = len(NAME_NEW_OPS)
+        elif match(ops[:len(NAME_FIRSTUPDATE_OPS)], NAME_FIRSTUPDATE_OPS):
+            name_script_op_count = len(NAME_FIRSTUPDATE_OPS)
+            name_pushdata = ops[1]
+        elif match(ops[:len(NAME_UPDATE_OPS)], NAME_UPDATE_OPS):
+            name_script_op_count = len(NAME_UPDATE_OPS)
+            name_pushdata = ops[1]
+
+        if name_script_op_count is None:
+            return None, script
+
+        # Find the end position of the name data
+        n = 0
+        for i in range(name_script_op_count):
+            # Content of this loop is copied from Script.get_ops's loop
+            op = script[n]
+            n += 1
+
+            if op <= OpCodes.OP_PUSHDATA4:
+                # Raw bytes follow
+                if op < OpCodes.OP_PUSHDATA1:
+                    dlen = op
+                elif op == OpCodes.OP_PUSHDATA1:
+                    dlen = script[n]
+                    n += 1
+                elif op == OpCodes.OP_PUSHDATA2:
+                    dlen, = struct.unpack('<H', script[n: n + 2])
+                    n += 2
+                else:
+                    dlen, = struct.unpack('<I', script[n: n + 4])
+                    n += 4
+                if n + dlen > len(script):
+                    raise IndexError
+                op = (op, script[n:n + dlen])
+                n += dlen
+        # Strip the name data to yield the address script
+        address_script = script[n:]
+
+        if name_pushdata is None:
+            return None, address_script
+
+        normalized_name_op_script = bytearray()
+        normalized_name_op_script.append(OP_NAME_UPDATE)
+        normalized_name_op_script.extend(Script.push_data(name_pushdata[1]))
+        normalized_name_op_script.extend(Script.push_data(bytes([])))
+        normalized_name_op_script.append(OpCodes.OP_2DROP)
+        normalized_name_op_script.append(OpCodes.OP_DROP)
+        normalized_name_op_script.append(OpCodes.OP_RETURN)
+
+        return bytes(normalized_name_op_script), address_script
+
+    @classmethod
+    def hashX_from_script(cls, script):
+        name_op_script, address_script = cls.split_name_script(script)
+
+        return super().hashX_from_script(address_script)
+
+    @classmethod
+    def address_from_script(cls, script):
+        name_op_script, address_script = cls.split_name_script(script)
+
+        return super().address_from_script(address_script)
+
+    @classmethod
+    def name_hashX_from_script(cls, script):
+        name_op_script, address_script = cls.split_name_script(script)
+
+        if name_op_script is None:
+            return None
+
+        return super().hashX_from_script(name_op_script)
 
 
 class NamecoinTestnet(Namecoin):
