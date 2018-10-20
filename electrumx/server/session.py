@@ -1437,3 +1437,24 @@ class DashElectrumX(ElectrumX):
             return [mn for mn in cache if mn['payee'] in payees]
         else:
             return cache
+
+
+class RepBannerElectrumX(ElectrumX):
+    '''TCP server that handles incoming Electrum connections for some tokens.'''
+
+    async def replaced_banner(self, banner):
+        network_info = await self.daemon_request('getinfo')
+        ni_version = network_info['version']
+        daemon_version = (ni_version[:ni_version.find("-")]).replace("v","")
+        mmrb = daemon_version.split('.')
+        daemon_subversion = 0 if len(mmrb) < 4 else mmrb[3]
+
+        for pair in [
+                ('$SERVER_VERSION', electrumx.version_short),
+                ('$SERVER_SUBVERSION', electrumx.version),
+                ('$DAEMON_VERSION', daemon_version),
+                ('$DAEMON_SUBVERSION', daemon_subversion),
+                ('$DONATION_ADDRESS', self.env.donation_address),
+        ]:
+            banner = banner.replace(*pair)
+        return banner

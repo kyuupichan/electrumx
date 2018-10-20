@@ -240,6 +240,10 @@ class Daemon(object):
         '''Return the result of the 'getnetworkinfo' RPC call.'''
         return await self._send_single('getnetworkinfo')
 
+    async def getinfo(self):
+        '''Return the result of the 'getinfo' RPC call.'''
+        return await self._send_single('getinfo')
+
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
@@ -445,3 +449,15 @@ class DecredDaemon(Daemon):
         # FIXME allow self signed certificates
         connector = aiohttp.TCPConnector(verify_ssl=False)
         return aiohttp.ClientSession(connector=connector)
+
+
+class PreLegacyRPCDaemon(LegacyRPCDaemon):
+    '''Handles connections to a daemon at the given URL.
+
+    This class is useful for daemons that don't have the new 'getblock'
+    RPC call that returns the block in hex, and need the False parameter
+    for the getblock'''
+
+    async def deserialised_block(self, hex_hash):
+        '''Return the deserialised block with the given hex hash.'''
+        return await self._send_single('getblock', (hex_hash, False))

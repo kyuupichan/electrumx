@@ -39,13 +39,13 @@ from functools import partial
 import base64
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
+from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
-from electrumx.server.session import ElectrumX, DashElectrumX
+from electrumx.server.session import ElectrumX, DashElectrumX, RepBannerElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -2135,3 +2135,54 @@ class tBitg(Bitg):
     GENESIS_HASH = (
         '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
     RPC_PORT = 19332
+
+
+class CivX(Coin):
+    NAME = "CivX"
+    SHORTNAME = "CIVX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    GENESIS_HASH = ('00000036090a68c523471da7a4f0f958'
+                    'c1b4403fef74a003be7f71877699cab7')
+    P2PKH_VERBYTE = bytes.fromhex("1C")
+    P2SH_VERBYTE = [bytes.fromhex("57")]
+    WIF_BYTE = bytes.fromhex("9C")
+    RPC_PORT = 4561
+    TX_COUNT = 1000
+    TX_COUNT_HEIGHT = 10000
+    TX_PER_BLOCK = 4
+    DAEMON = daemon.PreLegacyRPCDaemon
+    SESSIONCLS = RepBannerElectrumX
+    DESERIALIZER = lib_tx.DeserializerTxTime
+
+    @classmethod
+    def header_hash(cls, header):
+        version, = util.unpack_le_uint32_from(header)
+
+        if version > 2:
+            return double_sha256(header)
+        else:
+            return hex_str_to_hash(CivX.GENESIS_HASH)
+
+
+class CivXTestnet(CivX):
+    SHORTNAME = "tCIVX"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    GENESIS_HASH = ('0000059bb2c2048493efcb0f1a034972'
+                    'b3ce4089d54c93b69aaab212fb369887')
+    P2PKH_VERBYTE = bytes.fromhex("4B")
+    P2SH_VERBYTE = [bytes.fromhex("CE")]
+    WIF_BYTE = bytes.fromhex("CB")
+    RPC_PORT = 14561
+
+    @classmethod
+    def header_hash(cls, header):
+        version, = util.unpack_le_uint32_from(header)
+
+        if version > 2:
+            return double_sha256(header)
+        else:
+            return hex_str_to_hash(CivXTestnet.GENESIS_HASH)
