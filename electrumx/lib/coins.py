@@ -45,7 +45,7 @@ from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
-from electrumx.server.session import ElectrumX, DashElectrumX, RepBannerElectrumX
+from electrumx.server.session import ElectrumX, DashElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -2153,7 +2153,6 @@ class CivX(Coin):
     TX_COUNT_HEIGHT = 10000
     TX_PER_BLOCK = 4
     DAEMON = daemon.PreLegacyRPCDaemon
-    SESSIONCLS = RepBannerElectrumX
     DESERIALIZER = lib_tx.DeserializerTxTime
 
     @classmethod

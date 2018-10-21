@@ -240,10 +240,6 @@ class Daemon(object):
         '''Return the result of the 'getnetworkinfo' RPC call.'''
         return await self._send_single('getnetworkinfo')
 
-    async def getinfo(self):
-        '''Return the result of the 'getinfo' RPC call.'''
-        return await self._send_single('getinfo')
-
     async def relayfee(self):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
