@@ -2238,3 +2238,32 @@ class tBitg(Bitg):
     GENESIS_HASH = (
         '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
     RPC_PORT = 19332
+
+class Ravencoin(Coin):
+    NAME="Ravencoin"
+    SHORTNAME = "RVN"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3c")
+    P2SH_VERBYTES = [bytes.fromhex("7a")]
+    WIF_BYTE = bytes.fromhex("c7")
+    GENESIS_HASH = ('0000006b444bc2f2ffe627be9d9e7e7a0730000870ef6eb6da46c8eae389df90')
+    TX_COUNT = 113638
+    TX_COUNT_HEIGHT = 3473674
+    TX_PER_BLOCK = 30
+    RPC_PORT = 19000
+    REORG_LIMIT = 5000
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    PEERS = [
+        'seed-raven.ravencoin.com s t',
+        'seed-raven.ravencoin.org s t',    
+    ]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''
+        Given a header return the hash for x16r.
+        Need to download `x16r_hash` module
+        Source code: https://github.com/brian112358/x16r_hash
+        '''
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
