@@ -12,7 +12,7 @@ setuptools.setup(
     # "blake256" package is required to sync Decred network.
     # "xevan_hash" package is required to sync Xuez network.
     # "groestlcoin_hash" package is required to sync Groestlcoin network.
-    install_requires=['aiorpcX>=0.8.1,<0.9', 'attrs',
+    install_requires=['aiorpcX>=0.9.0,<0.10', 'attrs',
                       'plyvel', 'pylru', 'aiohttp >= 2'],
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',

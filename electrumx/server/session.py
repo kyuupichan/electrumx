@@ -20,7 +20,7 @@ from collections import defaultdict
 from functools import partial
 
 from aiorpcx import (
-    ServerSession, JSONRPCAutoDetect, JSONRPCConnection,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
     TaskGroup, handler_invocation, RPCError, Request, ignore_after, sleep,
     Event
 )
@@ -289,7 +289,7 @@ class SessionManager(object):
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(group_map),
             'logged': len([s for s in self.sessions if s.log_me]),
-            'paused': sum(s.paused for s in self.sessions),
+            'paused': sum(not s.can_send.is_set() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
@@ -593,7 +593,7 @@ class SessionManager(object):
         self.subs_room -= 1
 
 
-class SessionBase(ServerSession):
+class SessionBase(RPCSession):
     '''Base class of ElectrumX JSON sessions.
 
     Each session runs its tasks in asynchronous parallelism with other
@@ -667,7 +667,7 @@ class SessionBase(ServerSession):
         super().connection_lost(exc)
         self.session_mgr.remove_session(self)
         msg = ''
-        if self.paused:
+        if not self.can_send.is_set():
             msg += ' whilst paused'
         if self.concurrency.max_concurrent != self.max_concurrent:
             msg += ' whilst throttled'

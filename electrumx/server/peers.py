@@ -1,4 +1,4 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2017-2018, Neil Booth
 #
 # All rights reserved.
 #
@@ -14,7 +14,7 @@ import ssl
 import time
 from collections import defaultdict, Counter
 
-from aiorpcx import (ClientSession, SOCKSProxy,
+from aiorpcx import (Connector, RPCSession, SOCKSProxy,
                      Notification, handler_invocation,
                      SOCKSError, RPCError, TaskTimeout, TaskGroup, Event,
                      sleep, run_in_thread, ignore_after, timeout_after)
@@ -37,7 +37,7 @@ def assert_good(message, result, instance):
                            f'{type(result).__name__}')
 
 
-class PeerSession(ClientSession):
+class PeerSession(RPCSession):
     '''An outgoing session to a peer.'''
 
     async def handle_request(self, request):
@@ -226,8 +226,8 @@ class PeerManager(object):
             peer_text = f'[{peer}:{port} {kind}]'
             try:
                 async with timeout_after(120 if peer.is_tor else 30):
-                    async with PeerSession(peer.host, port,
-                                           **kwargs) as session:
+                    async with Connector(PeerSession, peer.host, port,
+                                         **kwargs) as session:
                         await self._verify_peer(session, peer)
                 is_good = True
                 break

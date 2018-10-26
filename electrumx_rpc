@@ -10,7 +10,7 @@
 '''Script to send RPC commands to a running ElectrumX server.'''
 
 
-from aiorpcx import timeout_after, ClientSession, TaskTimeout
+from aiorpcx import timeout_after, Connector, RPCSession, TaskTimeout
 import argparse
 import asyncio
 import json
@@ -114,7 +114,7 @@ def main():
     async def send_request():
         try:
             async with timeout_after(15):
-                async with ClientSession('localhost', port) as session:
+                async with Connector(RPCSession, 'localhost', port) as session:
                     result = await session.send_request(method, args)
                     if method in ('query', ):
                         for line in result:
