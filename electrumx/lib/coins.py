@@ -1627,7 +1627,6 @@ class Newyorkcoin(AuxPowMixin, Coin):
     WIF_BYTE = bytes.fromhex("bc")
     GENESIS_HASH = ('5597f25c062a3038c7fd815fe46c67de'
                     'dfcb3c839fbc8e01ed4044540d08fe48')
-    DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 5161944
     TX_COUNT_HEIGHT = 3948743
     TX_PER_BLOCK = 2
@@ -1642,7 +1641,6 @@ class NewyorkcoinTestnet(Newyorkcoin):
     WIF_BYTE = bytes.fromhex("f1")
     GENESIS_HASH = ('24463e4d3c625b0a9059f309044c2cf0'
                     'd7e196cf2a6ecce901f24f681be33c8f')
-    DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 5161944
     TX_COUNT_HEIGHT = 3948743
     TX_PER_BLOCK = 2
