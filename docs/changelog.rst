@@ -7,6 +7,23 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+.. note:: Bitcoin ABC developers have hastily introduced controversial
+   changes that break ElectrumX's block processing by requiring it to
+   be non-sequential.  Unlike others with unique requirements they
+   refused to make their code coin-specific.  ElectrumX continues to
+   require blocks be naturally ordered, and is compatible with any
+   non-CToR daemon, such as Bitcoin SV, and Bitcoin Unlimited /
+   Bitcoin XT with CToR disabled.
+
+
+Version 1.8.8 (01 Nov 2018)
+===========================
+
+* require aiorpcX 0.9.0
+* coin additions / updates: decred (dajohi, bolapara), zcash (erasmospunk),
+  namecoin (JeremyRand),CivX (turcol), NewYorkCoin (erasmospunk)
+* fix `#603`_, `#608`_
+* other minor fixes and changes: FMCorz
 
 Version 1.8.7 (13 Sep 2018)
 ===========================
@@ -242,3 +259,5 @@ bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
 .. _#567: https://github.com/kyuupichan/electrumx/issues/567
 .. _#570: https://github.com/kyuupichan/electrumx/issues/570
 .. _#577: https://github.com/kyuupichan/electrumx/issues/577
+.. _#603: https://github.com/kyuupichan/electrumx/issues/603
+.. _#608: https://github.com/kyuupichan/electrumx/issues/608
