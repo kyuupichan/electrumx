@@ -48,11 +48,10 @@ class Notifications(object):
             # new block height
             return
         touched = tmp.pop(height)
-        touched.update(tbp.pop(height, set()))
         for old in [h for h in tmp if h <= height]:
             del tmp[old]
         for old in [h for h in tbp if h <= height]:
-            del tbp[old]
+            touched.update(tbp.pop(old))
         await self.notify(height, touched)
 
     async def notify(self, height, touched):
