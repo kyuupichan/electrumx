@@ -1009,6 +1009,7 @@ class Hush(EquihashMixin, Coin):
     RPC_PORT = 8822
     REORG_LIMIT = 800
 
+
 class ZelCash(EquihashMixin, Coin):
     NAME = "ZelCash"
     SHORTNAME = "ZEL"
