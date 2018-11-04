@@ -370,6 +370,7 @@ class BitcoinCash(BitcoinMixin, Coin):
     TX_COUNT = 246362688
     TX_COUNT_HEIGHT = 511484
     TX_PER_BLOCK = 400
+    BLOCK_PROCESSOR = block_proc.AnyOrderBlockProcessor
     PEERS = [
         'electroncash.cascharia.com s50002',
         'bch.electrumx.cash s t',
@@ -541,6 +542,7 @@ class BitcoinTestnetMixin(object):
 class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Bitcoin Cash daemons.'''
     NAME = "BitcoinCash"
+    BLOCK_PROCESSOR = block_proc.AnyOrderBlockProcessor
     PEERS = [
         'electrum-testnet-abc.criptolayer.net s50112',
         'bchtestnet.arihanc.com t53001 s53002',
@@ -556,6 +558,7 @@ class BitcoinCashRegtest(BitcoinCashTestnet):
     PEERS = []
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
+    BLOCK_PROCESSOR = block_proc.AnyOrderBlockProcessor
 
 
 class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
