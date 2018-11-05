@@ -82,8 +82,8 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start serving external clients.
         '''
-        if not (0, 9, 0) <= aiorpcx_version < (0, 10):
-            raise RuntimeError('aiorpcX version 0.9.x required')
+        if not (0, 9, 1) <= aiorpcx_version < (0, 10):
+            raise RuntimeError('aiorpcX version 0.9.x with x >= 1 required')
 
         env = self.env
         min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
