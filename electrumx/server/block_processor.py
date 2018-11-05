@@ -712,6 +712,7 @@ class NamecoinBlockProcessor(BlockProcessor):
 
         return result
 
+
 class AnyOrderBlockProcessor(BlockProcessor):
     '''Modified block processor that allows processing transactions in any
     order. (using outputs-then-inputs algorithm)'''
