@@ -262,8 +262,9 @@ class SessionManager(object):
                                  for session in stale_sessions)
                 self.logger.info(f'closing stale connections {text}')
                 # Give the sockets some time to close gracefully
-                for session in stale_sessions:
-                    await session.spawn(session.close())
+                async with TaskGroup() as group:
+                    for session in stale_sessions:
+                        await group.spawn(session.close())
 
             # Consolidate small groups
             bw_limit = self.env.bandwidth_limit
@@ -288,7 +289,7 @@ class SessionManager(object):
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(group_map),
             'logged': len([s for s in self.sessions if s.log_me]),
-            'paused': sum(not s.can_send.is_set() for s in self.sessions),
+            'paused': sum(not s._can_send.is_set() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
@@ -511,8 +512,9 @@ class SessionManager(object):
         finally:
             # Close servers and sessions
             await self._close_servers(list(self.servers.keys()))
-            for session in self.sessions:
-                await session.spawn(session.close(force_after=1))
+            async with TaskGroup() as group:
+                for session in self.sessions:
+                    await group.spawn(session.close(force_after=1))
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
