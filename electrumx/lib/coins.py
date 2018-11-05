@@ -558,7 +558,6 @@ class BitcoinCashRegtest(BitcoinCashTestnet):
     PEERS = []
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
-    BLOCK_PROCESSOR = block_proc.AnyOrderBlockProcessor
 
 
 class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
