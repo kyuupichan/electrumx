@@ -567,11 +567,9 @@ class SessionManager(object):
             for hashX in set(hc).intersection(touched):
                 del hc[hashX]
 
-        # FIXME
-        async with ignore_after(15):
-            async with TaskGroup() as group:
-                for session in self.sessions:
-                    await group.spawn(session.notify(touched, height_changed))
+        async with TaskGroup() as group:
+            for session in self.sessions:
+                await group.spawn(session.notify(touched, height_changed))
 
     def add_session(self, session):
         self.sessions.add(session)
