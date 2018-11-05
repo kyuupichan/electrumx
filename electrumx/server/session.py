@@ -262,9 +262,8 @@ class SessionManager(object):
                                  for session in stale_sessions)
                 self.logger.info(f'closing stale connections {text}')
                 # Give the sockets some time to close gracefully
-                async with TaskGroup() as group:
-                    for session in stale_sessions:
-                        await group.spawn(session.close())
+                for session in stale_sessions:
+                    await session.spawn(session.close())
 
             # Consolidate small groups
             bw_limit = self.env.bandwidth_limit
@@ -512,9 +511,8 @@ class SessionManager(object):
         finally:
             # Close servers and sessions
             await self._close_servers(list(self.servers.keys()))
-            async with TaskGroup() as group:
-                for session in list(self.sessions):
-                    await group.spawn(session.close(force_after=1))
+            for session in self.sessions:
+                await session.spawn(session.close(force_after=1))
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
@@ -567,9 +565,8 @@ class SessionManager(object):
             for hashX in set(hc).intersection(touched):
                 del hc[hashX]
 
-        async with TaskGroup() as group:
-            for session in self.sessions:
-                await group.spawn(session.notify(touched, height_changed))
+        for session in self.sessions:
+            await session.spawn(session.notify, touched, height_changed)
 
     def add_session(self, session):
         self.sessions.add(session)
@@ -649,7 +646,7 @@ class SessionBase(RPCSession):
             status += 'C'
         if self.log_me:
             status += 'L'
-        status += str(self.concurrency.max_concurrent)
+        status += str(self._concurrency.max_concurrent)
         return status
 
     def connection_made(self, transport):
@@ -664,12 +661,11 @@ class SessionBase(RPCSession):
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
-        super().connection_lost(exc)
         self.session_mgr.remove_session(self)
         msg = ''
-        if not self.can_send.is_set():
-            msg += ' whilst paused'
-        if self.concurrency.max_concurrent != self.max_concurrent:
+        if not self._can_send.is_set():
+            msg += ' with full socket buffer'
+        if self._concurrency.max_concurrent != self.max_concurrent:
             msg += ' whilst throttled'
         if self.send_size >= 1024*1024:
             msg += ('.  Sent {:,d} bytes in {:,d} messages'
@@ -677,12 +673,13 @@ class SessionBase(RPCSession):
         if msg:
             msg = 'disconnected' + msg
             self.logger.info(msg)
+        super().connection_lost(exc)
 
     def count_pending_items(self):
         return len(self.connection.pending_requests())
 
     def semaphore(self):
-        return Semaphores([self.concurrency.semaphore, self.group.semaphore])
+        return Semaphores([self._concurrency.semaphore, self.group.semaphore])
 
     def sub_count(self):
         return 0
