@@ -701,7 +701,7 @@ class SessionBase(RPCSession):
 class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
-    PROTOCOL_MIN = (1, 1)
+    PROTOCOL_MIN = (1, 2)
     PROTOCOL_MAX = (1, 4)
 
     def __init__(self, *args, **kwargs):
@@ -1226,6 +1226,7 @@ class ElectrumX(SessionBase):
         handlers = {
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.block.get_header': self.block_get_header,
+            'blockchain.block.headers': self.block_headers_12,
             'blockchain.estimatefee': self.estimatefee,
             'blockchain.relayfee': self.relayfee,
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
@@ -1236,22 +1237,15 @@ class ElectrumX(SessionBase):
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
+            'mempool.get_fee_histogram': self.mempool.compact_fee_histogram,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
             'server.features': self.server_features_async,
             'server.peers.subscribe': self.peers_subscribe,
+            'server.ping': self.ping,
             'server.version': self.server_version,
         }
-
-        if ptuple >= (1, 2):
-            # New handler as of 1.2
-            handlers.update({
-                'mempool.get_fee_histogram':
-                self.mempool.compact_fee_histogram,
-                'blockchain.block.headers': self.block_headers_12,
-                'server.ping': self.ping,
-            })
 
         if ptuple >= (1, 4):
             handlers.update({
