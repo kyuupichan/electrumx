@@ -15,6 +15,10 @@
    non-CToR daemon, such as Bitcoin SV, and Bitcoin Unlimited /
    Bitcoin XT with CToR disabled.
 
+Version 1.8.11 (07 Nov 2018)
+============================
+
+* require aiorpcX 0.10.1
 
 Version 1.8.10 (05 Nov 2018)
 ============================

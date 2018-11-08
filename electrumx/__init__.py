@@ -1,4 +1,4 @@
-version = 'ElectrumX 1.8.10'
+version = 'ElectrumX 1.8.11'
 version_short = version.split()[-1]
 
 from electrumx.server.controller import Controller
