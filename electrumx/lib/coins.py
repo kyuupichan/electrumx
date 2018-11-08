@@ -375,9 +375,7 @@ class BitcoinCash(BitcoinMixin, Coin):
         'bch.electrumx.cash s t',
         'bccarihace4jdcnt.onion t52001 s52002',
         'abc1.hsmiths.com t60001 s60002',
-        'electroncash.checksum0.com s t',
         'electrumx-cash.1209k.com s t',
-        'electrum.leblancnet.us t50011 s50012',
         'electroncash.dk s t',
         'electrum.imaginary.cash s t',
     ]
