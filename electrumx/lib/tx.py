@@ -364,6 +364,99 @@ class DeserializerZcash(DeserializerEquihash):
         return base_tx
 
 
+class DeserializerKoto(DeserializerZcash):
+    def read_header(self, height, static_header_size):
+        start = self.cursor
+        header_len = static_header_size
+        version = self._read_le_uint32()
+        if version >= 5:
+            header_len += 32
+        self.cursor = start
+        return self._read_nbytes(header_len)
+
+    def _read_inputs(self):
+        read_input = self._read_input
+        start = self.cursor
+        nvin = self._read_varint()
+        ser = self.binary[start:self.cursor]
+        inputs = []
+        for i in range(nvin):
+            txinput, ser_data = read_input()
+            inputs.append(txinput)
+            ser += ser_data
+        return inputs, ser
+
+    def _read_input(self):
+        start = self.cursor
+        prev_hash = self._read_nbytes(32)  # prev_hash
+        prev_idx = self._read_le_uint32()  # prev_idx
+        ser = self.binary[start:self.cursor]
+        script = self._read_varbytes()     # script
+        start = self.cursor
+        sequence = self._read_le_uint32()  # sequence
+        ser += self.binary[start:self.cursor]
+        return TxInput(prev_hash, prev_idx, script, sequence), ser
+
+    def _read_tx_parts(self):
+        orig_start = start = self.cursor
+        header = self._read_le_uint32()
+        overwintered = ((header >> 31) == 1)
+        if overwintered:
+            version = header & 0x7fffffff
+            self.cursor += 4  # versionGroupId
+        else:
+            version = header
+        orig_ser = self.binary[start:self.cursor]
+
+        is_overwinter_v3 = version == 3
+        is_sapling_v4 = version == 4
+
+        inputs, inputsnoScript = self._read_inputs()    # inputs
+        orig_ser += inputsnoScript
+        start = self.cursor
+        base_tx = TxJoinSplit(
+            version,
+            inputs,
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
+        )
+
+        if is_overwinter_v3 or is_sapling_v4:
+            self.cursor += 4  # expiryHeight
+
+        has_shielded = False
+        if is_sapling_v4:
+            self.cursor += 8  # valueBalance
+            shielded_spend_size = self._read_varint()
+            self.cursor += shielded_spend_size * 384  # vShieldedSpend
+            shielded_output_size = self._read_varint()
+            self.cursor += shielded_output_size * 948  # vShieldedOutput
+            has_shielded = shielded_spend_size > 0 or shielded_output_size > 0
+
+        if base_tx.version >= 2:
+            joinsplit_size = self._read_varint()
+            if joinsplit_size > 0:
+                joinsplit_desc_len = 1506 + (192 if is_sapling_v4 else 296)
+                # JSDescription
+                self.cursor += joinsplit_size * joinsplit_desc_len
+                self.cursor += 32  # joinSplitPubKey
+                self.cursor += 64  # joinSplitSig
+
+        if is_sapling_v4 and has_shielded:
+            self.cursor += 64  # bindingSig
+
+        orig_ser += self.binary[start:self.cursor]
+        is_coinbase = (len(inputs) == 1 and inputs[0].prev_hash == b'\x00'*32)
+        if is_sapling_v4 and not is_coinbase:
+            return base_tx, self.TX_HASH_FN(orig_ser)
+        else:
+            return base_tx, self.TX_HASH_FN(self.binary[orig_start:self.cursor])
+
+    def read_tx_and_hash(self):
+        tx, tx_hash = self._read_tx_parts()
+        return tx, tx_hash
+
+
 class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
     '''Class representing transaction that has a time field.'''
 

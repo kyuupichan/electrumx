@@ -1153,16 +1153,26 @@ class Koto(Coin):
     WIF_BYTE = bytes.fromhex("80")
     GENESIS_HASH = ('6d424c350729ae633275d51dc3496e16'
                     'cd1b1d195c164da00f39c499a2e9959e')
-    DESERIALIZER = lib_tx.DeserializerZcash
+    DESERIALIZER = lib_tx.DeserializerKoto
     TX_COUNT = 158914
     TX_COUNT_HEIGHT = 67574
     TX_PER_BLOCK = 3
     RPC_PORT = 8432
     REORG_LIMIT = 800
+    SAPLING_HDR_SIZE = 112
+    SAPLING_HEIGHT = 556500
     PEERS = [
         'fr.kotocoin.info s t',
         'electrum.kotocoin.info s t',
     ]
+    @classmethod
+    def static_header_offset(cls, height):
+        assert cls.STATIC_BLOCK_HEADERS
+        if height < cls.SAPLING_HEIGHT:
+            return height * cls.BASIC_HEADER_SIZE
+        else:
+            offset = (height - cls.SAPLING_HEIGHT) * cls.SAPLING_HDR_SIZE
+            return cls.SAPLING_HEIGHT * cls.BASIC_HEADER_SIZE + offset
 
 
 class KotoTestnet(Koto):
@@ -1177,6 +1187,7 @@ class KotoTestnet(Koto):
     TX_COUNT_HEIGHT = 89662
     TX_PER_BLOCK = 1
     RPC_PORT = 18432
+    SAPLING_HEIGHT = 275500
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     PEERS = [
         'testnet.kotocoin.info s t',
