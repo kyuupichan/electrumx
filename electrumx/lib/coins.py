@@ -378,6 +378,8 @@ class BitcoinCash(BitcoinMixin, Coin):
         'electrumx-cash.1209k.com s t',
         'electroncash.dk s t',
         'electrum.imaginary.cash s t',
+        'cash.theblains.org s52002 t52001',
+        'rczkgdx4s63jmyql.onion s52002 t52001',
     ]
 
 
@@ -400,6 +402,8 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'ozahtqwp25chjdjd.onion s t',
         'node.arihanc.com s t',
         'arihancckjge66iv.onion s t',
+        'btc.theblains.org s t',
+        'nmqnntvvjgwbjs35.onion s52002 t52001',
     ]
 
 
@@ -543,6 +547,9 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
         'bchtestnet.arihanc.com t53001 s53002',
         'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion '
         't53001 s53002',
+        'cash-test.theblains.org s53002 t53001',
+        'x4aynxyhp76lwhx3.onion s53002 t53001',
+        '
     ]
 
 
@@ -567,6 +574,8 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'testnetnode.arihanc.com s t',
         'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
         'testnet.qtornado.com s t',
+        'btctest.theblains.org s51002 t51001',
+        '2tyvpvmj3lw3zeq6.onion s51002 t51001',
     ]
 
 
