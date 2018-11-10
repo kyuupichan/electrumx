@@ -15,6 +15,11 @@
    non-CToR daemon, such as Bitcoin SV, and Bitcoin Unlimited /
    Bitcoin XT with CToR disabled.
 
+Version 1.8.12 (10 Nov 2018)
+============================
+
+* bug fix
+
 Version 1.8.11 (07 Nov 2018)
 ============================
 
