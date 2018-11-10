@@ -101,9 +101,9 @@ class Prefetcher(object):
                 # Try and catch up all blocks but limit to room in cache.
                 # Constrain fetch count to between 0 and 500 regardless;
                 # testnet can be lumpy.
-                cache_room = self.min_cache_size // self.ave_size
+                cache_room = max(self.min_cache_size // self.ave_size, 1)
                 count = min(daemon_height - self.fetched_height, cache_room)
-                count = min(500, max(count, 0))
+                count = min(500, count)
                 if not count:
                     self.caught_up = True
                     return False
