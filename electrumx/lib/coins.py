@@ -549,7 +549,6 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
         't53001 s53002',
         'cash-test.theblains.org s53002 t53001',
         'x4aynxyhp76lwhx3.onion s53002 t53001',
-        '
     ]
 
 
