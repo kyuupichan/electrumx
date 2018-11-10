@@ -403,7 +403,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'node.arihanc.com s t',
         'arihancckjge66iv.onion s t',
         'btc.theblains.org s t',
-        'nmqnntvvjgwbjs35.onion s52002 t52001',
+        'nmqnntvvjgwbjs35.onion s t',
     ]
 
 
