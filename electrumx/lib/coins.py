@@ -45,7 +45,7 @@ from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
-from electrumx.server.session import ElectrumX, DashElectrumX
+from electrumx.server.session import ElectrumX, DashElectrumX, SmartCashElectrumX
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -2300,3 +2300,30 @@ class CivXTestnet(CivX):
             return double_sha256(header)
         else:
             return hex_str_to_hash(CivXTestnet.GENESIS_HASH)
+
+
+class SmartCash(Coin):
+    NAME = "SmartCash"
+    SHORTNAME = "SMART"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3f")
+    P2SH_VERBYTES = [bytes.fromhex("12")]
+    WIF_BYTE = bytes.fromhex("bf")
+    GENESIS_HASH = ('000007acc6970b812948d14ea5a0a13d'
+                    'b0fdd07d5047c7e69101fa8b361e05a4')
+    DESERIALIZER = lib_tx.DeserializerSmartCash
+    RPC_PORT = 9679
+    REORG_LIMIT = 5000
+    TX_COUNT = 1115016
+    TX_COUNT_HEIGHT = 541656
+    TX_PER_BLOCK = 1
+    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=lib_tx.DeserializerSmartCash.keccak)
+    DECODE_CHECK = partial(Base58.decode_check, hash_fn=lib_tx.DeserializerSmartCash.keccak)
+    HEADER_HASH = lib_tx.DeserializerSmartCash.keccak
+    DAEMON = daemon.SmartCashDaemon
+    SESSIONCLS = SmartCashElectrumX
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        return cls.HEADER_HASH(header)

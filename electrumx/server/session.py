@@ -1430,3 +1430,162 @@ class DashElectrumX(ElectrumX):
             return [mn for mn in cache if mn['payee'] in payees]
         else:
             return cache
+
+
+class SmartCashElectrumX(ElectrumX):
+    '''A TCP server that handles incoming Electrum-SMART connections.'''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sns = set()
+
+    def set_request_handlers(self, ptuple):
+        super().set_request_handlers(ptuple)
+        self.request_handlers.update({
+            'smartnode.announce.broadcast': self.smartnode_announce_broadcast,
+            'smartnode.subscribe': self.smartnode_subscribe,
+            'smartnode.list': self.smartnode_list,
+            'smartrewards.current': self.smartrewards_current,
+            'smartrewards.check': self.smartrewards_check
+        })
+
+    async def notify(self, touched, height_changed):
+        '''Notify the client about changes in smartnode list.'''
+        await super().notify(touched, height_changed)
+        for sn in self.sns:
+            status = await self.daemon_request('smartnode_list', ['status', sn])
+            await self.send_notification('smartnode.subscribe', [sn, status.get(sn)])
+
+    # Smartnode command handlers
+    async def smartnode_announce_broadcast(self, signsnb):
+        '''Pass through the smartnode announce message to be broadcast by the daemon.
+        signsnb: signed smartnode broadcast message.'''
+        try:
+            return await self.daemon_request('smartnode_broadcast', ['relay', signsnb])
+        except DaemonError as e:
+            error, = e.args
+            message = error['message']
+            self.logger.info(f'smartnode_broadcast: {message}')
+            raise RPCError(BAD_REQUEST, 'the smartnode broadcast was '
+                                        f'rejected.\n\n{message}\n[{signsnb}]')
+
+    async def smartnode_subscribe(self, collateral):
+        '''Returns the status of smartnode.
+
+        collateral: smartnode collateral.'''
+        result = await self.daemon_request('smartnode_list', ['status', collateral])
+        if result is not None:
+            self.sns.add(collateral)
+            return result.get(collateral)
+        return None
+
+    async def smartnode_list(self, payees):
+        '''
+        Returns the list of smartnodes.
+
+        payees: a list of smartnode payee addresses.
+        '''
+        if not isinstance(payees, list):
+            raise RPCError(BAD_REQUEST, 'expected a list of payees')
+
+        def get_smartnode_payment_queue(sns):
+            '''Returns the calculated position in the payment queue for all the
+            valid smartnodes in the given mns list.
+
+            sns: a list of smartnodes information.
+            '''
+            now = int(datetime.datetime.utcnow().strftime("%s"))
+            sn_queue = []
+
+            # Only ENABLED masternodes are considered for the list.
+            for line in sns:
+                snstat = sns[line].split()
+                if snstat[0] == 'ENABLED':
+                    # if last paid time == 0
+                    if int(snstat[5]) == 0:
+                        # use active seconds
+                        snstat.append(int(snstat[4]))
+                    else:
+                        # now minus last paid
+                        delta = now - int(snstat[5])
+                        # if > active seconds, use active seconds
+                        if delta >= int(snstat[4]):
+                            snstat.append(int(snstat[4]))
+                        # use active seconds
+                        else:
+                            snstat.append(delta)
+                    sn_queue.append(snstat)
+            sn_queue = sorted(sn_queue, key=lambda x: x[8], reverse=True)
+            return sn_queue
+
+        def get_payment_position(payment_queue, address):
+            '''
+            Returns the position of the payment list for the given address.
+
+            payment_queue: position in the payment queue for the smartnode.
+            address: smartnode payee address.
+            '''
+            position = -1
+            for pos, mn in enumerate(payment_queue, start=1):
+                if mn[2] == address:
+                    position = pos
+                    break
+            return position
+
+        # Accordingly with the smartnode payment queue, a custom list
+        # with the smartnode information including the payment
+        # position is returned.
+        cache = self.session_mgr.mn_cache
+        if not cache or self.session_mgr.mn_cache_height != self.db.db_height:
+            full_sn_list = await self.daemon_request('smartnode_list',
+                                                     ['full'])
+            sn_payment_queue = get_smartnode_payment_queue(full_sn_list)
+            sn_payment_count = len(sn_payment_queue)
+            sn_list = []
+            for key, value in full_sn_list.items():
+                sn_data = value.split()
+                sn_info = {}
+                sn_info['vin'] = key
+                sn_info['status'] = sn_data[0]
+                sn_info['protocol'] = sn_data[1]
+                sn_info['payee'] = sn_data[2]
+                sn_info['lastseen'] = sn_data[3]
+                sn_info['activeseconds'] = sn_data[4]
+                sn_info['lastpaidtime'] = sn_data[5]
+                sn_info['lastpaidblock'] = sn_data[6]
+                sn_info['ip'] = sn_data[7]
+                sn_info['paymentposition'] = get_payment_position(
+                    sn_payment_queue, sn_info['payee'])
+                sn_info['inselection'] = (
+                    sn_info['paymentposition'] < sn_payment_count // 10)
+                balance = await self.address_get_balance(sn_info['payee'])
+                sn_info['balance'] = (sum(balance.values())
+                                      / self.coin.VALUE_PER_COIN)
+                sn_list.append(sn_info)
+            cache.clear()
+            cache.extend(sn_list)
+            self.session_mgr.mn_cache_height = self.db.db_height
+
+        # If payees is an empty list the whole masternode list is returned
+        if payees:
+            return [sn for sn in cache if sn['payee'] in payees]
+        else:
+            return cache
+
+    async def smartrewards_current(self):
+        '''Returns the current smartrewards info.'''
+        result = await self.daemon_request('smartrewards', ['current'])
+        if result is not None:
+            return result
+        return None
+
+    async def smartrewards_check(self, addr):
+        '''
+        Returns the status of an address
+
+        addr: a single smartcash address
+        '''
+        result = await self.daemon_request('smartrewards', ['check', addr])
+        if result is not None:
+            return result
+        return None
