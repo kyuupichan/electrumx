@@ -452,9 +452,15 @@ class DeserializerKoto(DeserializerZcash):
         else:
             return base_tx, self.TX_HASH_FN(self.binary[orig_start:self.cursor])
 
+    def read_tx(self):
+        return self._read_tx_parts()[0]
+
     def read_tx_and_hash(self):
         tx, tx_hash = self._read_tx_parts()
         return tx, tx_hash
+
+    def read_tx_and_vsize(self):
+        return self._read_tx_parts()[0], self.binary_length
 
 
 class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
