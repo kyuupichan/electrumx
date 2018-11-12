@@ -461,11 +461,11 @@ class PreLegacyRPCDaemon(LegacyRPCDaemon):
 
 class SmartCashDaemon(Daemon):
 
-    async def smartnode_broadcast(self, params):
+    async def masternode_broadcast(self, params):
         '''Broadcast a smartnode to the network.'''
         return await self._send_single('smartnodebroadcast', params)
 
-    async def smartnode_list(self, params):
+    async def masternode_list(self, params):
         '''Return the smartnode status.'''
         return await self._send_single('smartnodelist', params)
 
