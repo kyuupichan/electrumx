@@ -457,3 +457,18 @@ class PreLegacyRPCDaemon(LegacyRPCDaemon):
     async def deserialised_block(self, hex_hash):
         '''Return the deserialised block with the given hex hash.'''
         return await self._send_single('getblock', (hex_hash, False))
+
+
+class SmartCashDaemon(Daemon):
+
+    async def masternode_broadcast(self, params):
+        '''Broadcast a smartnode to the network.'''
+        return await self._send_single('smartnodebroadcast', params)
+
+    async def masternode_list(self, params):
+        '''Return the smartnode status.'''
+        return await self._send_single('smartnodelist', params)
+
+    async def smartrewards(self, params):
+        '''Return smartrewards data.'''
+        return await self._send_single('smartrewards', params)

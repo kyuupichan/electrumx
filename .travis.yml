@@ -36,6 +36,7 @@ install:
   - pip install groestlcoin_hash
   - pip install git+https://github.com/goacoincore/neoscrypt
   - pip install git+https://github.com/motioncrypto/x16r_hash
+  - pip install pycryptodomex
 # command to run tests
 script:
   - pytest --cov=electrumx
