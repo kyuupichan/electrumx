@@ -45,7 +45,8 @@ from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
-from electrumx.server.session import ElectrumX, DashElectrumX, SmartCashElectrumX
+from electrumx.server.session import (ElectrumX, DashElectrumX,
+                                      SmartCashElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -2317,8 +2318,10 @@ class SmartCash(Coin):
     TX_COUNT = 1115016
     TX_COUNT_HEIGHT = 541656
     TX_PER_BLOCK = 1
-    ENCODE_CHECK = partial(Base58.encode_check, hash_fn=lib_tx.DeserializerSmartCash.keccak)
-    DECODE_CHECK = partial(Base58.decode_check, hash_fn=lib_tx.DeserializerSmartCash.keccak)
+    ENCODE_CHECK = partial(Base58.encode_check,
+                           hash_fn=lib_tx.DeserializerSmartCash.keccak)
+    DECODE_CHECK = partial(Base58.decode_check,
+                           hash_fn=lib_tx.DeserializerSmartCash.keccak)
     HEADER_HASH = lib_tx.DeserializerSmartCash.keccak
     DAEMON = daemon.SmartCashDaemon
     SESSIONCLS = SmartCashElectrumX
