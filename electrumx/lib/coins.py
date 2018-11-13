@@ -2330,3 +2330,21 @@ class SmartCash(Coin):
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         return cls.HEADER_HASH(header)
+      
+  class NIX(Coin):
+    NAME = "NIX"
+    SHORTNAME = "NIX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("35")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('dd28ad86def767c3cfc34267a950d871'
+                    'fc7462bc57ea4a929fc3596d9b598e41')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 114240
+    TX_COUNT_HEIGHT = 87846
+    TX_PER_BLOCK = 3
+    RPC_PORT = 6215
+    REORG_LIMIT = 1000
