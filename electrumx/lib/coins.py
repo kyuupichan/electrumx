@@ -2330,8 +2330,9 @@ class SmartCash(Coin):
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         return cls.HEADER_HASH(header)
-      
-  class NIX(Coin):
+
+
+class NIX(Coin):
     NAME = "NIX"
     SHORTNAME = "NIX"
     NET = "mainnet"
