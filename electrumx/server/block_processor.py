@@ -729,11 +729,11 @@ class AnyOrderBlockProcessor(BlockProcessor):
         undo_info_append = undo_info.append
         update_touched = self.touched.update
 
-        hashXs_by_tx = [set() for _ in txs]
+        hashXs_by_tx = [list() for _ in txs]
 
         # Add the new UTXOs
         for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
-            add_hashXs = hashXs.add
+            add_hashXs = hashXs.append
             tx_numb = s_pack('<I', tx_num)
 
             for idx, txout in enumerate(tx.outputs):
@@ -748,7 +748,7 @@ class AnyOrderBlockProcessor(BlockProcessor):
         # Spend the inputs
         # A separate for-loop here allows any tx ordering in block.
         for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
-            add_hashXs = hashXs.add
+            add_hashXs = hashXs.append
             for txin in tx.inputs:
                 if txin.is_generation():
                     continue
