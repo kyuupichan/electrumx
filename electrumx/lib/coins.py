@@ -378,6 +378,20 @@ class BitcoinCash(BitcoinMixin, Coin):
     ]
 
 
+class BitcoinCashABC(BitcoinMixin, Coin):
+    NAME = "BitcoinCashABC"
+    SHORTNAME = "BCH"
+    TX_COUNT = 265479628
+    TX_COUNT_HEIGHT = 556592
+    TX_PER_BLOCK = 400
+    PEERS = [
+        'bch.imaginary.cash s t',
+        'electroncash.dk s t',
+        'wallet.satoshiscoffeehouse.com s t',
+    ]
+    BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
+
+
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit

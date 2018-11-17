@@ -684,6 +684,7 @@ class DecredBlockProcessor(BlockProcessor):
 
 
 class NamecoinBlockProcessor(BlockProcessor):
+
     def advance_txs(self, txs):
         result = super().advance_txs(txs)
 
@@ -711,3 +712,98 @@ class NamecoinBlockProcessor(BlockProcessor):
         self.db.history.add_unflushed(hashXs_by_tx, self.tx_count - len(txs))
 
         return result
+
+
+class LTORBlockProcessor(BlockProcessor):
+
+    def advance_txs(self, txs):
+        self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
+
+        # Use local vars for speed in the loops
+        undo_info = []
+        tx_num = self.tx_count
+        script_hashX = self.coin.hashX_from_script
+        s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        spend_utxo = self.spend_utxo
+        undo_info_append = undo_info.append
+        update_touched = self.touched.update
+
+        hashXs_by_tx = [set() for _ in txs]
+
+        # Add the new UTXOs
+        for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
+            add_hashXs = hashXs.add
+            tx_numb = s_pack('<I', tx_num)
+
+            for idx, txout in enumerate(tx.outputs):
+                # Get the hashX. Ignore unspendable outputs.
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    add_hashXs(hashX)
+                    put_utxo(tx_hash + s_pack('<H', idx),
+                             hashX + tx_numb + s_pack('<Q', txout.value))
+            tx_num += 1
+
+        # Spend the inputs
+        # A separate for-loop here allows any tx ordering in block.
+        for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
+            add_hashXs = hashXs.add
+            for txin in tx.inputs:
+                if txin.is_generation():
+                    continue
+                cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
+                undo_info_append(cache_value)
+                add_hashXs(cache_value[:-12])
+
+        # Update touched set for notifications
+        for hashXs in hashXs_by_tx:
+            update_touched(hashXs)
+
+        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
+
+        self.tx_count = tx_num
+        self.db.tx_counts.append(tx_num)
+
+        return undo_info
+
+    def backup_txs(self, txs):
+        undo_info = self.db.read_undo_info(self.height)
+        if undo_info is None:
+            raise ChainError('no undo information found for height {:,d}'
+                             .format(self.height))
+
+        # Use local vars for speed in the loops
+        s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        spend_utxo = self.spend_utxo
+        script_hashX = self.coin.hashX_from_script
+        add_touched = self.touched.add
+        undo_entry_len = 12 + HASHX_LEN
+
+        # Restore coins that had been spent
+        # (may include coins made then spent in this block)
+        n = 0
+        for tx, tx_hash in txs:
+            for txin in tx.inputs:
+                if txin.is_generation():
+                    continue
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                         undo_item)
+                add_touched(undo_item[:-12])
+                n += undo_entry_len
+
+        assert n == len(undo_info)
+
+        # Remove tx outputs made in this block, by spending them.
+        for tx, tx_hash in txs:
+            for idx, txout in enumerate(tx.outputs):
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    # Be careful with unspendable outputs- we didn't save those
+                    # in the first place.
+                    cache_value = spend_utxo(tx_hash, idx)
+                    add_touched(cache_value[:-12])
+
+        self.tx_count -= len(txs)
