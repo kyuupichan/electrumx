@@ -368,17 +368,13 @@ class HOdlcoin(Coin):
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
     SHORTNAME = "BCH"
-    TX_COUNT = 246362688
-    TX_COUNT_HEIGHT = 511484
+    TX_COUNT = 267318795
+    TX_COUNT_HEIGHT = 557037
     TX_PER_BLOCK = 400
     PEERS = [
-        'electroncash.cascharia.com s50002',
         'bch.electrumx.cash s t',
-        'bccarihace4jdcnt.onion t52001 s52002',
-        'abc1.hsmiths.com t60001 s60002',
-        'electrumx-cash.1209k.com s t',
-        'electroncash.dk s t',
-        'electrum.imaginary.cash s t',
+        'sv1.hsmiths.com t60003 s60004',
+        'electrumx-sv.1209k.com s t',
     ]
 
 
