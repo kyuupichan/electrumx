@@ -2346,3 +2346,17 @@ class NIX(Coin):
     TX_PER_BLOCK = 3
     RPC_PORT = 6215
     REORG_LIMIT = 1000
+
+
+class NIXTestnet(NIX):
+    SHORTNAME = "tNIX"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    GENESIS_HASH = ('dd28ad86def767c3cfc34267a950d871'
+                    'fc7462bc57ea4a929fc3596d9b598e41')
+    P2PKH_VERBYTE = bytes.fromhex("01")
+    P2SH_VERBYTE = [bytes.fromhex("03")]
+    WIF_BYTE = bytes.fromhex("80")
+    RPC_PORT = 16215
+    DESERIALIZER = lib_tx.DeserializerSegWit
