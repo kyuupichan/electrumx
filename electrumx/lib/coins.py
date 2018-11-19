@@ -1031,6 +1031,22 @@ class FairCoin(Coin):
         return h
 
 
+class Bitzec(EquihashMixin, Coin):
+    NAME = "Bitzec"
+    SHORTNAME = "BZC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1CB8")
+    P2SH_VERBYTES = [bytes.fromhex("1CBD")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('00055119765e0230f2a135ca8f897869'
+                    'c5e6b05dc371160042405da1f5c3906d')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 16435
+    TX_COUNT_HEIGHT = 11345
+    TX_PER_BLOCK = 5
+    RPC_PORT = 8732
+    REORG_LIMIT = 800
+
 class Zcash(EquihashMixin, Coin):
     NAME = "Zcash"
     SHORTNAME = "ZEC"
