@@ -43,6 +43,7 @@ from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
+import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
@@ -913,6 +914,7 @@ class Dash(Coin):
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx_dash.DeserializerDash
 
     @classmethod
     def header_hash(cls, header):
