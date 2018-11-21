@@ -21,8 +21,7 @@ setuptools.setup(
     license='MIT Licence',
     url='https://github.com/bitzec/electrumx',
     long_description='Server implementation for the Electrum protocol',
-    download_url=('https://github.com/bitzec/electrumX/archive/'
-                  f'{version}.tar.gz'),
+    download_url=('https://github.com/bitzec/electrumX/archive/{version}.tar.gz'),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Framework :: AsyncIO',
