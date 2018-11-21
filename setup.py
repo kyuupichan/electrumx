@@ -12,7 +12,6 @@ setuptools.setup(
     # "blake256" package is required to sync Decred network.
     # "xevan_hash" package is required to sync Xuez network.
     # "groestlcoin_hash" package is required to sync Groestlcoin network.
-    # "pycryptodomex" package is required to sync SmartCash network.
     install_requires=['aiorpcX>=0.10.1,<0.11', 'attrs',
                       'plyvel', 'pylru', 'aiohttp >= 2'],
     packages=setuptools.find_packages(include=('electrumx*',)),
@@ -20,9 +19,9 @@ setuptools.setup(
     author='Neil Booth',
     author_email='kyuupichan@gmail.com',
     license='MIT Licence',
-    url='https://github.com/kyuupichan/electrumx',
+    url='https://github.com/bitzec/electrumx',
     long_description='Server implementation for the Electrum protocol',
-    download_url=('https://github.com/kyuupichan/electrumX/archive/'
+    download_url=('https://github.com/bitzec/electrumX/archive/'
                   f'{version}.tar.gz'),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
