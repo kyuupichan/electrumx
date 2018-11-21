@@ -374,7 +374,8 @@ class BitcoinCash(BitcoinMixin, Coin):
     PEERS = [
         'bch.electrumx.cash s t',
         'sv1.hsmiths.com t60003 s60004',
-        'electrumx-sv.1209k.com s t',
+        'satoshi.vision.cash s',
+        'electroncash.cascharia.com s t',
     ]
 
 
