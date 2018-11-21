@@ -294,7 +294,17 @@ class PeerManager(object):
         async with TaskGroup() as g:
             await g.spawn(self._send_headers_subscribe(session, peer, ptuple))
             await g.spawn(self._send_server_features(session, peer))
-            await g.spawn(self._send_peers_subscribe(session, peer))
+            peers_task = await g.spawn(self._send_peers_subscribe
+                                       (session, peer))
+
+        # Process reported peers if remote peer is good
+        peers = peers_task.result()
+        await self._note_peers(peers)
+        features = self._features_to_register(peer, peers)
+        if features:
+            self.logger.info(f'registering ourself with {peer}')
+            # We only care to wait for the response
+            await session.send_request('server.add_peer', [features])
 
     async def _send_headers_subscribe(self, session, peer, ptuple):
         message = 'blockchain.headers.subscribe'
@@ -357,18 +367,10 @@ class PeerManager(object):
         # Call add_peer if the remote doesn't appear to know about us.
         try:
             real_names = [' '.join([u[1]] + u[2]) for u in raw_peers]
-            peers = [Peer.from_real_name(real_name, str(peer))
-                     for real_name in real_names]
+            return [Peer.from_real_name(real_name, str(peer))
+                    for real_name in real_names]
         except Exception:
             raise BadPeerError('bad server.peers.subscribe response')
-
-        await self._note_peers(peers)
-        features = self._features_to_register(peer, peers)
-        if not features:
-            return
-        self.logger.info(f'registering ourself with {peer}')
-        # We only care to wait for the response
-        await session.send_request('server.add_peer', [features])
 
     #
     # External interface
