@@ -77,7 +77,7 @@ class DashSubTxRegister(namedtuple("DashSubTxRegister",
 
 
 class DashSubTxTopup(namedtuple("DashSubTxTopup",
-                                   "version regTxHash")):
+                                "version regTxHash")):
     '''Class representing DIP5 SubTxTopup'''
 
 
@@ -88,8 +88,8 @@ class DashSubTxResetKey(namedtuple("DashSubTxResetKey",
 
 
 class DashSubTxCloseAccount(namedtuple("DashSubTxCloseAccount",
-                                   "version regTxHash hashPrevSubTx "
-                                   "creditFee payloadSig")):
+                                       "version regTxHash hashPrevSubTx "
+                                       "creditFee payloadSig")):
     '''Class representing DIP5 SubTxCloseAccount'''
 
 
@@ -100,14 +100,14 @@ class TxOutPoint(namedtuple("TxOutPoint", "hash index")):
 
 class DeserializerDash(Deserializer):
     '''Deserializer for Dash DIP2 special tx types'''
-    PRO_REG_TX           = 1
-    PRO_UP_SERV_TX       = 2
-    PRO_UP_REG_TX        = 3
-    PRO_UP_REV_TX        = 4
-    CB_TX                = 5
-    SUB_TX_REGISTER      = 8
-    SUB_TX_TOPUP         = 9
-    SUB_TX_RESET_KEY     = 10
+    PRO_REG_TX = 1
+    PRO_UP_SERV_TX = 2
+    PRO_UP_REG_TX = 3
+    PRO_UP_REV_TX = 4
+    CB_TX = 5
+    SUB_TX_REGISTER = 8
+    SUB_TX_TOPUP = 9
+    SUB_TX_RESET_KEY = 10
     SUB_TX_CLOSE_ACCOUNT = 11
 
     def read_tx(self):
