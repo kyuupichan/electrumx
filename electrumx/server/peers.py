@@ -202,10 +202,10 @@ class PeerManager(object):
     async def _should_drop_peer(self, peer):
         peer.try_count += 1
         is_good = False
-        for kind, port in peer.connection_port_pairs():
+        for kind, port, family in peer.connection_tuples():
             peer.last_try = time.time()
 
-            kwargs = {}
+            kwargs = {'family': family}
             if kind == 'SSL':
                 kwargs['ssl'] = ssl.SSLContext(ssl.PROTOCOL_TLS)
 
