@@ -48,21 +48,21 @@ class DashProRegTx(namedtuple("DashProRegTx",
 
 
 class DashProUpServTx(namedtuple("DashProUpServTx",
-                                 "version proTXHash ipAddress port "
+                                 "version proTxHash ipAddress port "
                                  "scriptOperatorPayout inputsHash "
                                  "payloadSig")):
     '''Class representing DIP3 ProUpServTx'''
 
 
 class DashProUpRegTx(namedtuple("DashProUpRegTx",
-                                "version proTXHash mode PubKeyOperator "
+                                "version proTxHash mode PubKeyOperator "
                                 "KeyIdVoting scriptPayout inputsHash "
                                 "payloadSig")):
     '''Class representing DIP3 ProUpRegTx'''
 
 
 class DashProUpRevTx(namedtuple("DashProUpRevTx",
-                                "version proTXHash reason "
+                                "version proTxHash reason "
                                 "inputsHash payloadSig")):
     '''Class representing DIP3 ProUpRevTx'''
 
@@ -180,21 +180,21 @@ class DeserializerDash(Deserializer):
     def _read_pro_up_serv_tx(self):
         return DashProUpServTx(
             self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # proTXHash
+            self._read_nbytes(32),      # proTxHash
             self._read_nbytes(16),      # ipAddress
             self._read_le_uint16(),     # port
             self._read_varbytes(),      # scriptOperatorPayout
             self._read_nbytes(32),      # inputsHash
-            self._read_nbytes(96)       # payloadSig BLSSig
+            self._read_nbytes(96)       # payloadSig
         )
 
     def _read_pro_up_reg_tx(self):
         return DashProUpRegTx(
             self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # proTXHash
+            self._read_nbytes(32),      # proTxHash
             self._read_le_uint16(),     # mode
             self._read_nbytes(48),      # PubKeyOperator
-            self._read_nbytes(20),      # KeyIdOwner
+            self._read_nbytes(20),      # KeyIdVoting
             self._read_varbytes(),      # scriptPayout
             self._read_nbytes(32),      # inputsHash
             self._read_varbytes()       # payloadSig
@@ -203,25 +203,25 @@ class DeserializerDash(Deserializer):
     def _read_pro_up_rev_tx(self):
         return DashProUpRevTx(
             self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # proTXHash
+            self._read_nbytes(32),      # proTxHash
             self._read_le_uint16(),     # reason
             self._read_nbytes(32),      # inputsHash
-            self._read_nbytes(96)       # payloadSig BLSSig
+            self._read_nbytes(96)       # payloadSig
         )
 
     def _read_cb_tx(self):
         return DashCbTx(
             self._read_le_uint16(),     # version
             self._read_le_uint32(),     # height
-            self._read_nbytes(32)       # merkleRootMNList as bytes
+            self._read_nbytes(32)       # merkleRootMNList
         )
 
     def _read_sub_tx_register(self):
         return DashSubTxRegister(
             self._read_le_uint16(),     # version
             self._read_varbytes(),      # userName
-            self._read_nbytes(48),      # pubKey BLSPubKey
-            self._read_nbytes(96)       # payloadSig BLSSig
+            self._read_nbytes(48),      # pubKey
+            self._read_nbytes(96)       # payloadSig
         )
 
     def _read_sub_tx_topup(self):
@@ -236,8 +236,8 @@ class DeserializerDash(Deserializer):
             self._read_nbytes(32),      # regTxHash
             self._read_nbytes(32),      # hashPrevSubTx
             self._read_le_int64(),      # creditFee
-            self._read_nbytes(48),      # newPubKey BLSPubKey
-            self._read_nbytes(96)       # payloadSig BLSSig
+            self._read_nbytes(48),      # newPubKey
+            self._read_nbytes(96)       # payloadSig
         )
 
     def _read_sub_tx_close_account(self):
@@ -246,5 +246,5 @@ class DeserializerDash(Deserializer):
             self._read_nbytes(32),      # regTxHash
             self._read_nbytes(32),      # hashPrevSubTx
             self._read_le_int64(),      # creditFee
-            self._read_nbytes(96)       # payloadSig BLSSig
+            self._read_nbytes(96)       # payloadSig
         )
