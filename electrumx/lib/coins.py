@@ -373,7 +373,7 @@ class BitcoinCash(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 557037
     TX_PER_BLOCK = 400
     PEERS = [
-        'bch.electrumx.cash s t',
+        'sv.electrumx.cash s t',
         'sv1.hsmiths.com t60003 s60004',
         'satoshi.vision.cash s',
         'electroncash.cascharia.com s t',
