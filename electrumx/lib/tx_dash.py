@@ -29,6 +29,8 @@
 from collections import namedtuple
 
 from electrumx.lib.tx import Deserializer
+from electrumx.lib.util import (pack_le_uint16, pack_le_int32, pack_le_uint32,
+                                pack_le_int64, pack_varint, pack_varbytes)
 
 
 # https://github.com/dashpay/dips/blob/master/dip-0002.md
@@ -36,6 +38,33 @@ class DashTx(namedtuple("DashTx",
                         "version inputs outputs locktime "
                         "tx_type extra_payload")):
     '''Class representing a Dash transaction'''
+    def serialize(self):
+        nLocktime = pack_le_uint32(self.locktime)
+        txins = (pack_varint(len(self.inputs)) +
+                 b''.join(tx_in.serialize() for tx_in in self.inputs))
+        txouts = (pack_varint(len(self.outputs)) +
+                  b''.join(tx_out.serialize() for tx_out in self.outputs))
+
+        if self.tx_type:
+            uVersion = pack_le_uint16(self.version)
+            uTxType = pack_le_uint16(self.tx_type)
+            vExtra = self._serialize_extra_payload()
+            return uVersion + uTxType + txins + txouts + nLocktime + vExtra
+        else:
+            nVersion = pack_le_int32(self.version)
+            return nVersion + txins + txouts + nLocktime
+
+    def _serialize_extra_payload(self):
+        extra = self.extra_payload
+        spec_tx_class = DeserializerDash.SPEC_TX_HANDLERS.get(self.tx_type)
+        if not spec_tx_class:
+            assert isinstance(extra, (bytes, bytearray))
+            return pack_varbytes(extra)
+
+        if not isinstance(extra, spec_tx_class):
+            raise ValueError('Dash tx_type does not conform with extra'
+                             ' payload class: %s, %s' % (self.tx_type, extra))
+        return pack_varbytes(extra.serialize())
 
 
 # https://github.com/dashpay/dips/blob/master/dip-0002-special-transactions.md
@@ -45,61 +74,280 @@ class DashProRegTx(namedtuple("DashProRegTx",
                               "KeyIdVoting operatorReward scriptPayout "
                               "inputsHash payloadSig")):
     '''Class representing DIP3 ProRegTx'''
+    def serialize(self):
+        assert (len(self.ipAddress) == 16
+                and len(self.KeyIdOwner) == 20
+                and len(self.PubKeyOperator) == 48
+                and len(self.KeyIdVoting) == 20
+                and len(self.inputsHash) == 32)
+        return (
+            pack_le_uint16(self.version) +              # version
+            pack_le_uint16(self.type) +                 # type
+            pack_le_uint16(self.mode) +                 # mode
+            self.collateralOutpoint.serialize() +       # collateralOutpoint
+            self.ipAddress +                            # ipAddress
+            pack_le_uint16(self.port) +                 # port
+            self.KeyIdOwner +                           # KeyIdOwner
+            self.PubKeyOperator +                       # PubKeyOperator
+            self.KeyIdVoting +                          # KeyIdVoting
+            pack_le_uint16(self.operatorReward) +       # operatorReward
+            pack_varbytes(self.scriptPayout) +          # scriptPayout
+            self.inputsHash +                           # inputsHash
+            pack_varbytes(self.payloadSig)              # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashProRegTx(
+            deser._read_le_uint16(),                    # version
+            deser._read_le_uint16(),                    # type
+            deser._read_le_uint16(),                    # mode
+            deser._read_outpoint(),                     # collateralOutpoint
+            deser._read_nbytes(16),                     # ipAddress
+            deser._read_le_uint16(),                    # port
+            deser._read_nbytes(20),                     # KeyIdOwner
+            deser._read_nbytes(48),                     # PubKeyOperator
+            deser._read_nbytes(20),                     # KeyIdVoting
+            deser._read_le_uint16(),                    # operatorReward
+            deser._read_varbytes(),                     # scriptPayout
+            deser._read_nbytes(32),                     # inputsHash
+            deser._read_varbytes()                      # payloadSig
+        )
 
 
 class DashProUpServTx(namedtuple("DashProUpServTx",
-                                 "version proTXHash ipAddress port "
+                                 "version proTxHash ipAddress port "
                                  "scriptOperatorPayout inputsHash "
                                  "payloadSig")):
     '''Class representing DIP3 ProUpServTx'''
+    def serialize(self):
+        assert (len(self.proTxHash) == 32
+                and len(self.ipAddress) == 16
+                and len(self.inputsHash) == 32
+                and len(self.payloadSig) == 96)
+        return (
+            pack_le_uint16(self.version) +              # version
+            self.proTxHash +                            # proTxHash
+            self.ipAddress +                            # ipAddress
+            pack_le_uint16(self.port) +                 # port
+            pack_varbytes(self.scriptOperatorPayout) +  # scriptOperatorPayout
+            self.inputsHash +                           # inputsHash
+            self.payloadSig                             # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashProUpServTx(
+            deser._read_le_uint16(),                    # version
+            deser._read_nbytes(32),                     # proTxHash
+            deser._read_nbytes(16),                     # ipAddress
+            deser._read_le_uint16(),                    # port
+            deser._read_varbytes(),                     # scriptOperatorPayout
+            deser._read_nbytes(32),                     # inputsHash
+            deser._read_nbytes(96)                      # payloadSig
+        )
 
 
 class DashProUpRegTx(namedtuple("DashProUpRegTx",
-                                "version proTXHash mode PubKeyOperator "
+                                "version proTxHash mode PubKeyOperator "
                                 "KeyIdVoting scriptPayout inputsHash "
                                 "payloadSig")):
     '''Class representing DIP3 ProUpRegTx'''
+    def serialize(self):
+        assert (len(self.proTxHash) == 32
+                and len(self.PubKeyOperator) == 48
+                and len(self.KeyIdVoting) == 20
+                and len(self.inputsHash) == 32)
+        return (
+            pack_le_uint16(self.version) +              # version
+            self.proTxHash +                            # proTxHash
+            pack_le_uint16(self.mode) +                 # mode
+            self.PubKeyOperator +                       # PubKeyOperator
+            self.KeyIdVoting +                          # KeyIdVoting
+            pack_varbytes(self.scriptPayout) +          # scriptPayout
+            self.inputsHash +                           # inputsHash
+            pack_varbytes(self.payloadSig)              # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashProUpRegTx(
+            deser._read_le_uint16(),                    # version
+            deser._read_nbytes(32),                     # proTxHash
+            deser._read_le_uint16(),                    # mode
+            deser._read_nbytes(48),                     # PubKeyOperator
+            deser._read_nbytes(20),                     # KeyIdVoting
+            deser._read_varbytes(),                     # scriptPayout
+            deser._read_nbytes(32),                     # inputsHash
+            deser._read_varbytes()                      # payloadSig
+        )
 
 
 class DashProUpRevTx(namedtuple("DashProUpRevTx",
-                                "version proTXHash reason "
+                                "version proTxHash reason "
                                 "inputsHash payloadSig")):
     '''Class representing DIP3 ProUpRevTx'''
+    def serialize(self):
+        assert (len(self.proTxHash) == 32
+                and len(self.inputsHash) == 32
+                and len(self.payloadSig) == 96)
+        return (
+            pack_le_uint16(self.version) +              # version
+            self.proTxHash +                            # proTxHash
+            pack_le_uint16(self.reason) +               # reason
+            self.inputsHash +                           # inputsHash
+            self.payloadSig                             # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashProUpRevTx(
+            deser._read_le_uint16(),                    # version
+            deser._read_nbytes(32),                     # proTxHash
+            deser._read_le_uint16(),                    # reason
+            deser._read_nbytes(32),                     # inputsHash
+            deser._read_nbytes(96)                      # payloadSig
+        )
 
 
 class DashCbTx(namedtuple("DashCbTx", "version height merkleRootMNList")):
     '''Class representing DIP4 coinbase special tx'''
+    def serialize(self):
+        assert len(self.merkleRootMNList) == 32
+        return (
+            pack_le_uint16(self.version) +              # version
+            pack_le_uint32(self.height) +               # height
+            self.merkleRootMNList                       # merkleRootMNList
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashCbTx(
+            deser._read_le_uint16(),                    # version
+            deser._read_le_uint32(),                    # height
+            deser._read_nbytes(32)                      # merkleRootMNList
+        )
 
 
 class DashSubTxRegister(namedtuple("DashSubTxRegister",
                                    "version userName pubKey payloadSig")):
     '''Class representing DIP5 SubTxRegister'''
+    def serialize(self):
+        assert (len(self.pubKey) == 48
+                and len(self.payloadSig) == 96)
+        return (
+            pack_le_uint16(self.version) +              # version
+            pack_varbytes(self.userName) +              # userName
+            self.pubKey +                               # pubKey
+            self.payloadSig                             # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashSubTxRegister(
+            deser._read_le_uint16(),                    # version
+            deser._read_varbytes(),                     # userName
+            deser._read_nbytes(48),                     # pubKey
+            deser._read_nbytes(96)                      # payloadSig
+        )
 
 
 class DashSubTxTopup(namedtuple("DashSubTxTopup",
                                 "version regTxHash")):
     '''Class representing DIP5 SubTxTopup'''
+    def serialize(self):
+        assert len(self.regTxHash) == 32
+        return (
+            pack_le_uint16(self.version) +              # version
+            self.regTxHash                              # regTxHash
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashSubTxTopup(
+            deser._read_le_uint16(),                    # version
+            deser._read_nbytes(32)                      # regTxHash
+        )
 
 
 class DashSubTxResetKey(namedtuple("DashSubTxResetKey",
                                    "version regTxHash hashPrevSubTx "
                                    "creditFee newPubKey payloadSig")):
     '''Class representing DIP5 SubTxResetKey'''
+    def serialize(self):
+        assert (len(self.regTxHash) == 32
+                and len(self.hashPrevSubTx) == 32
+                and len(self.newPubKey) == 48
+                and len(self.payloadSig) == 96)
+        return (
+            pack_le_uint16(self.version) +              # version
+            self.regTxHash +                            # regTxHash
+            self.hashPrevSubTx +                        # hashPrevSubTx
+            pack_le_int64(self.creditFee) +             # creditFee
+            self.newPubKey +                            # newPubKey
+            self.payloadSig                             # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashSubTxResetKey(
+            deser._read_le_uint16(),                    # version
+            deser._read_nbytes(32),                     # regTxHash
+            deser._read_nbytes(32),                     # hashPrevSubTx
+            deser._read_le_int64(),                     # creditFee
+            deser._read_nbytes(48),                     # newPubKey
+            deser._read_nbytes(96)                      # payloadSig
+        )
 
 
 class DashSubTxCloseAccount(namedtuple("DashSubTxCloseAccount",
                                        "version regTxHash hashPrevSubTx "
                                        "creditFee payloadSig")):
     '''Class representing DIP5 SubTxCloseAccount'''
+    def serialize(self):
+        assert (len(self.regTxHash) == 32
+                and len(self.hashPrevSubTx) == 32
+                and len(self.payloadSig) == 96)
+        return (
+            pack_le_uint16(self.version) +              # version
+            self.regTxHash +                            # regTxHash
+            self.hashPrevSubTx +                        # hashPrevSubTx
+            pack_le_int64(self.creditFee) +             # creditFee
+            self.payloadSig                             # payloadSig
+        )
+
+    @classmethod
+    def read_tx_extra(cls, deser):
+        return DashSubTxCloseAccount(
+            deser._read_le_uint16(),                    # version
+            deser._read_nbytes(32),                     # regTxHash
+            deser._read_nbytes(32),                     # hashPrevSubTx
+            deser._read_le_int64(),                     # creditFee
+            deser._read_nbytes(96)                      # payloadSig
+        )
 
 
 # https://dash-docs.github.io/en/developer-reference#outpoint
 class TxOutPoint(namedtuple("TxOutPoint", "hash index")):
     '''Class representing tx output outpoint'''
+    def serialize(self):
+        assert len(self.hash) == 32
+        return (
+            self.hash +                                 # hash
+            pack_le_uint32(self.index)                  # index
+        )
+
+    @classmethod
+    def read_outpoint(cls, deser):
+        return TxOutPoint(
+            deser._read_nbytes(32),                     # hash
+            deser._read_le_uint32()                     # index
+        )
 
 
 class DeserializerDash(Deserializer):
     '''Deserializer for Dash DIP2 special tx types'''
+    # Supported Spec Tx types and corresponding classes mapping
     PRO_REG_TX = 1
     PRO_UP_SERV_TX = 2
     PRO_UP_REG_TX = 3
@@ -109,6 +357,21 @@ class DeserializerDash(Deserializer):
     SUB_TX_TOPUP = 9
     SUB_TX_RESET_KEY = 10
     SUB_TX_CLOSE_ACCOUNT = 11
+
+    SPEC_TX_HANDLERS = {
+        PRO_REG_TX: DashProRegTx,
+        PRO_UP_SERV_TX: DashProUpServTx,
+        PRO_UP_REG_TX: DashProUpRegTx,
+        PRO_UP_REV_TX: DashProUpRevTx,
+        CB_TX: DashCbTx,
+        SUB_TX_REGISTER: DashSubTxRegister,
+        SUB_TX_TOPUP: DashSubTxTopup,
+        SUB_TX_RESET_KEY: DashSubTxResetKey,
+        SUB_TX_CLOSE_ACCOUNT: DashSubTxCloseAccount,
+    }
+
+    def _read_outpoint(self):
+        return TxOutPoint.read_outpoint(self)
 
     def read_tx(self):
         header = self._read_le_uint32()
@@ -128,24 +391,11 @@ class DeserializerDash(Deserializer):
         if tx_type:
             extra_payload_size = self._read_varint()
             end = self.cursor + extra_payload_size
-            if tx_type == DeserializerDash.CB_TX:
-                extra_payload = self._read_cb_tx()
-            elif tx_type == DeserializerDash.PRO_REG_TX:
-                extra_payload = self._read_pro_reg_tx()
-            elif tx_type == DeserializerDash.PRO_UP_SERV_TX:
-                extra_payload = self._read_pro_up_serv_tx()
-            elif tx_type == DeserializerDash.PRO_UP_REG_TX:
-                extra_payload = self._read_pro_up_reg_tx()
-            elif tx_type == DeserializerDash.PRO_UP_REV_TX:
-                extra_payload = self._read_pro_up_rev_tx()
-            elif tx_type == DeserializerDash.SUB_TX_REGISTER:
-                extra_payload = self._read_sub_tx_register()
-            elif tx_type == DeserializerDash.SUB_TX_TOPUP:
-                extra_payload = self._read_sub_tx_topup()
-            elif tx_type == DeserializerDash.SUB_TX_RESET_KEY:
-                extra_payload = self._read_sub_tx_reset_key()
-            elif tx_type == DeserializerDash.SUB_TX_CLOSE_ACCOUNT:
-                extra_payload = self._read_sub_tx_close_account()
+            spec_tx_class = DeserializerDash.SPEC_TX_HANDLERS.get(tx_type)
+            if spec_tx_class:
+                read_method = getattr(spec_tx_class, 'read_tx_extra', None)
+                extra_payload = read_method(self)
+                assert isinstance(extra_payload, spec_tx_class)
             else:
                 extra_payload = self._read_nbytes(extra_payload_size)
             assert self.cursor == end
@@ -153,98 +403,3 @@ class DeserializerDash(Deserializer):
             extra_payload = b''
         tx = DashTx(version, inputs, outputs, locktime, tx_type, extra_payload)
         return tx
-
-    def _read_outpoint(self):
-        return TxOutPoint(
-            self._read_nbytes(32),      # hash
-            self._read_le_uint32()      # index
-        )
-
-    def _read_pro_reg_tx(self):
-        return DashProRegTx(
-            self._read_le_uint16(),     # version
-            self._read_le_uint16(),     # type
-            self._read_le_uint16(),     # mode
-            self._read_outpoint(),      # collateralOutpoint
-            self._read_nbytes(16),      # ipAddress
-            self._read_le_uint16(),     # port
-            self._read_nbytes(20),      # KeyIdOwner
-            self._read_nbytes(48),      # PubKeyOperator
-            self._read_nbytes(20),      # KeyIdVoting
-            self._read_le_uint16(),     # operatorReward
-            self._read_varbytes(),      # scriptPayout
-            self._read_nbytes(32),      # inputsHash
-            self._read_varbytes()       # payloadSig
-        )
-
-    def _read_pro_up_serv_tx(self):
-        return DashProUpServTx(
-            self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # proTXHash
-            self._read_nbytes(16),      # ipAddress
-            self._read_le_uint16(),     # port
-            self._read_varbytes(),      # scriptOperatorPayout
-            self._read_nbytes(32),      # inputsHash
-            self._read_nbytes(96)       # payloadSig BLSSig
-        )
-
-    def _read_pro_up_reg_tx(self):
-        return DashProUpRegTx(
-            self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # proTXHash
-            self._read_le_uint16(),     # mode
-            self._read_nbytes(48),      # PubKeyOperator
-            self._read_nbytes(20),      # KeyIdOwner
-            self._read_varbytes(),      # scriptPayout
-            self._read_nbytes(32),      # inputsHash
-            self._read_varbytes()       # payloadSig
-        )
-
-    def _read_pro_up_rev_tx(self):
-        return DashProUpRevTx(
-            self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # proTXHash
-            self._read_le_uint16(),     # reason
-            self._read_nbytes(32),      # inputsHash
-            self._read_nbytes(96)       # payloadSig BLSSig
-        )
-
-    def _read_cb_tx(self):
-        return DashCbTx(
-            self._read_le_uint16(),     # version
-            self._read_le_uint32(),     # height
-            self._read_nbytes(32)       # merkleRootMNList as bytes
-        )
-
-    def _read_sub_tx_register(self):
-        return DashSubTxRegister(
-            self._read_le_uint16(),     # version
-            self._read_varbytes(),      # userName
-            self._read_nbytes(48),      # pubKey BLSPubKey
-            self._read_nbytes(96)       # payloadSig BLSSig
-        )
-
-    def _read_sub_tx_topup(self):
-        return DashSubTxTopup(
-            self._read_le_uint16(),     # version
-            self._read_nbytes(32)       # regTxHash
-        )
-
-    def _read_sub_tx_reset_key(self):
-        return DashSubTxResetKey(
-            self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # regTxHash
-            self._read_nbytes(32),      # hashPrevSubTx
-            self._read_le_int64(),      # creditFee
-            self._read_nbytes(48),      # newPubKey BLSPubKey
-            self._read_nbytes(96)       # payloadSig BLSSig
-        )
-
-    def _read_sub_tx_close_account(self):
-        return DashSubTxCloseAccount(
-            self._read_le_uint16(),     # version
-            self._read_nbytes(32),      # regTxHash
-            self._read_nbytes(32),      # hashPrevSubTx
-            self._read_le_int64(),      # creditFee
-            self._read_nbytes(96)       # payloadSig BLSSig
-        )

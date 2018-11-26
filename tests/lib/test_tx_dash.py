@@ -1,4 +1,9 @@
+import pytest
+
 import electrumx.lib.tx_dash as lib_tx_dash
+
+
+bfh = bytes.fromhex
 
 
 V2_TX = (
@@ -125,11 +130,11 @@ SUB_TX_RESET_KEY = (
     '3d0103f761cc69a211feffffff0189fa433e000000001976a914551ab8ca96a9142217'
     '4d22769c3a4f90b2dcd0de88ac00000000da0100d384e42374e8abfeffffff01570b00'
     '0000a40100b67ffbbd095de31ea3844675af3e98e9601210293360bf2a2e810673412b'
-    'c6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e9601210293360bf2a2e81067341'
+    'c6e8e0e358f3fb7bdbe9a667b3d0e803000000000000601210293360bf2a2e81067341'
     '2bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e9601210293360bf2a2e810673'
     '412bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e9601210293360bf2a2e8106'
     '73412bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e9601210293360bf2a2e81'
-    '0673412bc6e8e0e358f3fb7bdbe9a667b3d0103f761cabcdefabcdef')
+    '0673412bc6e8e0e358f3fb7bdbe9a667b3d0103f761cabcdefab')
 
 
 SUB_TX_CLOSE_ACCOUNT = (
@@ -140,10 +145,10 @@ SUB_TX_CLOSE_ACCOUNT = (
     '3d0103f761cc69a211feffffff0189fa433e000000001976a914551ab8ca96a9142217'
     '4d22769c3a4f90b2dcd0de88ac00000000aa0100d384e42374e8abfeffffff01570b00'
     '0000a40100b67ffbbd095de31ea3844675af3e98e9601210293360bf2a2e810673412b'
-    'c6e8e0e358f3fb7bdbe9a12bc6e8e0e358f3fb7bdbe9a62bc6e8e0e358f3fb7bdbe9a6'
+    'c6e8e0e358f3fb7bdbe9a12bc6e8e803000000000000a62bc6e8e0e358f3fb7bdbe9a6'
     '67b3d0103f761caf3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9'
     'a667b3d0103f761caf3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdb'
-    'e9a667b3d0103f761cabcdefabcdef')
+    'e9a667b3d0103f761cabcdefab')
 
 
 UNKNOWN_SPEC_TX = (
@@ -157,7 +162,7 @@ UNKNOWN_SPEC_TX = (
     'c6e8e0e358f3fb7bdbe9a12bc6e8e0e358f3fb7bdbe9a62bc6e8e0e358f3fb7bdbe9a6'
     '67b3d0103f761caf3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9'
     'a667b3d0103f761caf3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdb'
-    'e9a667b3d0103f761cabcdefabcdef')
+    'e9a667b3d0103f761cabcdefab')
 
 
 WRONG_SPEC_TX = (  # Tx version < 3
@@ -166,77 +171,294 @@ WRONG_SPEC_TX = (  # Tx version < 3
     '1171e06d7c372db92c65022061c1ec3c92f2e76bb7fb1b548d854f19a41e6421267231'
     '74150412caf3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9a667b'
     '3d0103f761cc69a211feffffff0189fa433e000000001976a914551ab8ca96a9142217'
-    '4d22769c3a4f90b2dcd0de88ac00000000aa0100d384e42374e8abfeffffff01570b00'
-    '0000')
+    '4d22769c3a4f90b2dcd0de88ac00000000')
 
 
 def test_dash_v2_tx():
-    test = bytes.fromhex(V2_TX)
+    test = bfh(V2_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 2
+    assert tx.tx_type == 0
+    assert tx.extra_payload == b''
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_cb_tx():
-    test = bytes.fromhex(CB_TX)
+    test = bfh(CB_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 5
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert extra.height == 264132
+    assert len(extra.merkleRootMNList) == 32
+    assert extra.merkleRootMNList == bfh(
+        '76629a6e42fb519188f65889fd3ac0201be87aa227462b5643e8bb2ec1d7a82a')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_pro_reg_tx():
-    test = bytes.fromhex(PRO_REG_TX)
+    test = bfh(PRO_REG_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 1
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert extra.type == 0
+    assert extra.mode == 0
+    assert len(extra.collateralOutpoint.hash) == 32
+    assert extra.collateralOutpoint.hash == bfh(
+        '4de1afa0a321bc88c34978d4eeba739256b86f8d8cdf47651b6f60e451f0a3de')
+    assert extra.collateralOutpoint.index == 1
+    assert len(extra.ipAddress) == 16
+    assert extra.ipAddress == bfh('00000000000000000000ffff12ca34aa')
+    assert extra.port == 12149
+    assert len(extra.KeyIdOwner) == 20
+    assert extra.KeyIdOwner == bfh(
+        '2b3edeed6842db1f59cf35de1ab5721094f049d0')
+    assert len(extra.PubKeyOperator) == 48
+    assert extra.PubKeyOperator == bfh(
+        '00ab986c589053b3f3bd720724e75e18581afdca54bce80d14750b1bcf920215'
+        '8fe6c596ce8391815265747bd4a2009e')
+    assert len(extra.KeyIdVoting) == 20
+    assert extra.KeyIdVoting == bfh(
+        '2b3edeed6842db1f59cf35de1ab5721094f049d0')
+    assert extra.operatorReward == 0
+    assert extra.scriptPayout == bfh(
+        '76a9149bf5948b901a1e3e54e42c6e10496a17cd4067e088ac')
+    assert len(extra.inputsHash) == 32
+    assert extra.inputsHash == bfh(
+        '54d046585434668b4ee664c597864248b8a6aac33a7b2f4fcd1cc1b5da474a8a')
+    assert extra.payloadSig == bfh(
+        '1fc1617ae83406c92a9132f14f9fff1487f2890f401e776fdddd639bc505'
+        '5c456268cf7497400d3196109c8cd31b94732caf6937d63de81d9a5be4db'
+        '5beb83f9aa')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_pro_up_serv_tx():
-    test = bytes.fromhex(PRO_UP_SERV_TX)
+    test = bfh(PRO_UP_SERV_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 2
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert len(extra.proTxHash) == 32
+    assert extra.proTxHash == bfh(
+        '3c6dca244f49f19d3f09889753ffff1fec5bb8f9f5bd5bc09dabd999da21198f')
+    assert len(extra.ipAddress) == 16
+    assert extra.ipAddress == bfh('00000000000000000000ffff5fb73580')
+    assert extra.port == 4391
+    assert extra.scriptOperatorPayout == bfh(
+        '76a91421851058431a7d722e8e8dd9509e7f2b8e7042ec88ac')
+    assert len(extra.inputsHash) == 32
+    assert extra.inputsHash == bfh(
+        'efcfe3d578914bb48c6bd71b3459d384e4237446d521c9e2c6'
+        'b6fcf019b5aafc')
+    assert len(extra.payloadSig) == 96
+    assert extra.payloadSig == bfh(
+        '99443fe14f644cfa47086e8897cf7b546a67723d4a8ec5353a82f962a96e'
+        'c3cea328343b647aace2897d6eddd0b8c8ee0f2e56f6733aed2e9f0006ca'
+        'afa6fc21c18a013c619d6e37af8d2f0985e3b769abc38ffa60e46c365a38'
+        'd9fa0d44fd62')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_pro_up_reg_tx():
-    test = bytes.fromhex(PRO_UP_REG_TX)
+    test = bfh(PRO_UP_REG_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 3
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert len(extra.proTxHash) == 32
+    assert extra.proTxHash == bfh(
+        'aeb817f94b8e699b58130a53d2fbe98d5519c2abe3b15e6f36c9abeb32e4dcce')
+    assert extra.mode == 0
+    assert len(extra.PubKeyOperator) == 48
+    assert extra.PubKeyOperator == bfh(
+        '1061eb559a64427ad239830742ef59591cdbbdffda7d3f5e7a2d95b9607a'
+        'd80e389191e44c59ea5987b85e6d0e3eb527')
+    assert len(extra.KeyIdVoting) == 20
+    assert extra.KeyIdVoting == bfh(
+        'b9e198fa7a745913c9278ec993d4472a95dac425')
+    assert extra.scriptPayout == bfh(
+        '76a914eebbacffff3a55437803e0efb68a7d591e0409d188ac')
+    assert len(extra.inputsHash) == 32
+    assert extra.inputsHash == bfh(
+        '0eb0067e6ccdd2acb96e7279113702218f3f0ab6f2287e14c11c5be6f2051d5a')
+    assert extra.payloadSig == bfh(
+        '20cb00124d838b02207097048cb668244cd79df825eb2d4d211fd2c4604c1'
+        '8b30e1ae9bb654787144d16856676efff180889f05b5c9121a483b4ae3f0e'
+        'a0ff3faf')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_pro_up_rev_tx():
-    test = bytes.fromhex(PRO_UP_REV_TX)
+    test = bfh(PRO_UP_REV_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 4
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert len(extra.proTxHash) == 32
+    assert extra.proTxHash == bfh(
+        'b67ffbbd095de31ea38446754b6bf251287936d2881d58b7c4efae0b54c75e9f')
+    assert extra.reason == 0
+    assert len(extra.inputsHash) == 32
+    assert extra.inputsHash == bfh(
+        'eb073521b60306717f1d4feb3e9022f886b97bf981137684716a7d3d7e45b7fe')
+    assert len(extra.payloadSig) == 96
+    assert extra.payloadSig == bfh(
+        '83f4bb5530f7c5954e8b1ad50a74a9e1d65dcdcbe4acb8cbe3671abc7911'
+        'e8c3954856c4da7e5fd242f2e4f5546f08d90849245bc593d1605654e1a9'
+        '9cd0a79e9729799742c48d4920044666ad25a85fd093559c43e4900e634c'
+        '371b9b8d89ba')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_sub_tx_register_tx():
-    test = bytes.fromhex(SUB_TX_REGISTER)
+    test = bfh(SUB_TX_REGISTER)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 8
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert extra.userName == b'abc'
+    assert len(extra.pubKey) == 48
+    assert extra.pubKey == bfh(
+        '8e7042ec88acefcfe3d578914bb48c6bd71b3459d384e42374e8abfeffff'
+        'ff01570b0000000000001976a91490c5ce9d')
+    assert len(extra.payloadSig) == 96
+    assert extra.payloadSig == bfh(
+        '8bc992a88ac00000000a40100b67ffbbd095de31ea38446754e8abfeffff'
+        'ff01570b0000000000001976a91490c5ce9d8bc992a88ac00000000a4010'
+        '0b67ffbbd095de31ea38446754e8abfeffffff01570b0000000000001976'
+        'a91490c5ce9d')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_sub_tx_topup_tx():
-    test = bytes.fromhex(SUB_TX_TOPUP)
+    test = bfh(SUB_TX_TOPUP)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 9
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert len(extra.regTxHash) == 32
+    assert extra.regTxHash == bfh(
+        'd384e42374e8abfeffffff01570b000000a40100b67ffbbd095de31ea3844675')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_sub_tx_reset_key_tx():
-    test = bytes.fromhex(SUB_TX_RESET_KEY)
+    test = bfh(SUB_TX_RESET_KEY)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 10
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert len(extra.regTxHash) == 32
+    assert extra.regTxHash == bfh(
+        'd384e42374e8abfeffffff01570b000000a40100b67ffbbd095de31ea3844675')
+    assert len(extra.hashPrevSubTx) == 32
+    assert extra.hashPrevSubTx == bfh(
+        'af3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9a667b3d0')
+    assert extra.creditFee == 1000
+    assert len(extra.newPubKey) == 48
+    assert extra.newPubKey == bfh(
+        '601210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9a667b3d0103f7'
+        '61caf3e98e9601210293360bf2a2e810673')
+    assert len(extra.payloadSig) == 96
+    assert extra.payloadSig == bfh(
+        '412bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e9601210293360b'
+        'f2a2e810673412bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e960'
+        '1210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9a667b3d0103f761'
+        'cabcdefab')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_sub_tx_close_account_tx():
-    test = bytes.fromhex(SUB_TX_CLOSE_ACCOUNT)
+    test = bfh(SUB_TX_CLOSE_ACCOUNT)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 11
+    extra = tx.extra_payload
+    assert extra.version == 1
+    assert len(extra.regTxHash) == 32
+    assert extra.regTxHash == bfh(
+        'd384e42374e8abfeffffff01570b000000a40100b67ffbbd095de31ea3844675')
+    assert len(extra.hashPrevSubTx) == 32
+    assert extra.hashPrevSubTx == bfh(
+        'af3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9a12bc6e8')
+    assert extra.creditFee == 1000
+    assert len(extra.payloadSig) == 96
+    assert extra.payloadSig == bfh(
+        'a62bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e9601210293360b'
+        'f2a2e810673412bc6e8e0e358f3fb7bdbe9a667b3d0103f761caf3e98e960'
+        '1210293360bf2a2e810673412bc6e8e0e358f3fb7bdbe9a667b3d0103f761'
+        'cabcdefab')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_unknown_spec_tx():
-    test = bytes.fromhex(UNKNOWN_SPEC_TX)
+    test = bfh(UNKNOWN_SPEC_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 3
+    assert tx.tx_type == 187
+    extra = tx.extra_payload
+    assert extra == bfh(
+        '0100d384e42374e8abfeffffff01570b000000a40100b67ffbbd095de31e'
+        'a3844675af3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7b'
+        'dbe9a12bc6e8e0e358f3fb7bdbe9a62bc6e8e0e358f3fb7bdbe9a667b3d0'
+        '103f761caf3e98e9601210293360bf2a2e810673412bc6e8e0e358f3fb7b'
+        'dbe9a667b3d0103f761caf3e98e9601210293360bf2a2e810673412bc6e8'
+        'e0e358f3fb7bdbe9a667b3d0103f761cabcdefab')
+    ser = tx.serialize()
+    assert ser == test
 
 
 def test_dash_tx_wrong_spec_tx():
-    test = bytes.fromhex(WRONG_SPEC_TX)
+    test = bfh(WRONG_SPEC_TX)
     deser = lib_tx_dash.DeserializerDash(test)
     tx = deser.read_tx()
+    assert tx.version == 12255234
+    assert tx.tx_type == 0
+    extra = tx.extra_payload
+    assert extra == b''
+    ser = tx.serialize()
+    assert ser == test
+
+
+def test_dash_tx_serialize_wrong_tx_type():
+    test = bfh(CB_TX)
+    deser = lib_tx_dash.DeserializerDash(test)
+    tx = deser.read_tx()
+    assert tx.tx_type == 5
+    tx = tx._replace(tx_type=4)
+    assert tx.tx_type == 4
+    with pytest.raises(ValueError) as excinfo:
+        ser = tx.serialize()
+    assert ('Dash tx_type does not conform'
+            ' with extra payload class' in str(excinfo.value))
