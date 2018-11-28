@@ -43,9 +43,11 @@ from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
 from electrumx.lib.script import ScriptPubKey, OpCodes
 import electrumx.lib.tx as lib_tx
+import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
-from electrumx.server.session import ElectrumX, DashElectrumX
+from electrumx.server.session import (ElectrumX, DashElectrumX,
+                                      SmartCashElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -367,18 +369,29 @@ class HOdlcoin(Coin):
 class BitcoinCash(BitcoinMixin, Coin):
     NAME = "BitcoinCash"
     SHORTNAME = "BCH"
-    TX_COUNT = 246362688
-    TX_COUNT_HEIGHT = 511484
+    TX_COUNT = 267318795
+    TX_COUNT_HEIGHT = 557037
     TX_PER_BLOCK = 400
     PEERS = [
-        'electroncash.cascharia.com s50002',
-        'bch.electrumx.cash s t',
-        'bccarihace4jdcnt.onion t52001 s52002',
-        'abc1.hsmiths.com t60001 s60002',
-        'electrumx-cash.1209k.com s t',
-        'electroncash.dk s t',
-        'electrum.imaginary.cash s t',
+        'sv.electrumx.cash s t',
+        'sv1.hsmiths.com t60003 s60004',
+        'satoshi.vision.cash s',
+        'electroncash.cascharia.com s t',
     ]
+
+
+class BitcoinCashABC(BitcoinMixin, Coin):
+    NAME = "BitcoinCashABC"
+    SHORTNAME = "BCH"
+    TX_COUNT = 265479628
+    TX_COUNT_HEIGHT = 556592
+    TX_PER_BLOCK = 400
+    PEERS = [
+        'bch.imaginary.cash s t',
+        'electroncash.dk s t',
+        'wallet.satoshiscoffeehouse.com s t',
+    ]
+    BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
 
 class BitcoinSegwit(BitcoinMixin, Coin):
@@ -902,6 +915,7 @@ class Dash(Coin):
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx_dash.DeserializerDash
 
     @classmethod
     def header_hash(cls, header):
@@ -2091,6 +2105,7 @@ class Minexcoin(EquihashMixin, Coin):
     RPC_PORT = 8022
     CHUNK_SIZE = 960
     PEERS = [
+        'electrumx.xpresit.net s t',
         'elex01-ams.turinex.eu s t',
         'eu.minexpool.nl s t'
     ]
@@ -2311,3 +2326,65 @@ class CivXTestnet(CivX):
             return double_sha256(header)
         else:
             return hex_str_to_hash(CivXTestnet.GENESIS_HASH)
+
+
+class SmartCash(Coin):
+    NAME = "SmartCash"
+    SHORTNAME = "SMART"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3f")
+    P2SH_VERBYTES = [bytes.fromhex("12")]
+    WIF_BYTE = bytes.fromhex("bf")
+    GENESIS_HASH = ('000007acc6970b812948d14ea5a0a13d'
+                    'b0fdd07d5047c7e69101fa8b361e05a4')
+    DESERIALIZER = lib_tx.DeserializerSmartCash
+    RPC_PORT = 9679
+    REORG_LIMIT = 5000
+    TX_COUNT = 1115016
+    TX_COUNT_HEIGHT = 541656
+    TX_PER_BLOCK = 1
+    ENCODE_CHECK = partial(Base58.encode_check,
+                           hash_fn=lib_tx.DeserializerSmartCash.keccak)
+    DECODE_CHECK = partial(Base58.decode_check,
+                           hash_fn=lib_tx.DeserializerSmartCash.keccak)
+    HEADER_HASH = lib_tx.DeserializerSmartCash.keccak
+    DAEMON = daemon.SmartCashDaemon
+    SESSIONCLS = SmartCashElectrumX
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        return cls.HEADER_HASH(header)
+
+
+class NIX(Coin):
+    NAME = "NIX"
+    SHORTNAME = "NIX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("35")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('dd28ad86def767c3cfc34267a950d871'
+                    'fc7462bc57ea4a929fc3596d9b598e41')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 114240
+    TX_COUNT_HEIGHT = 87846
+    TX_PER_BLOCK = 3
+    RPC_PORT = 6215
+    REORG_LIMIT = 1000
+
+
+class NIXTestnet(NIX):
+    SHORTNAME = "tNIX"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    GENESIS_HASH = ('dd28ad86def767c3cfc34267a950d871'
+                    'fc7462bc57ea4a929fc3596d9b598e41')
+    P2PKH_VERBYTE = bytes.fromhex("01")
+    P2SH_VERBYTE = [bytes.fromhex("03")]
+    WIF_BYTE = bytes.fromhex("80")
+    RPC_PORT = 16215
+    DESERIALIZER = lib_tx.DeserializerSegWit

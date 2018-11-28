@@ -1435,3 +1435,32 @@ class DashElectrumX(ElectrumX):
             return [mn for mn in cache if mn['payee'] in payees]
         else:
             return cache
+
+
+class SmartCashElectrumX(DashElectrumX):
+    '''A TCP server that handles incoming Electrum-SMART connections.'''
+
+    def set_request_handlers(self, ptuple):
+        super().set_request_handlers(ptuple)
+        self.request_handlers.update({
+            'smartrewards.current': self.smartrewards_current,
+            'smartrewards.check': self.smartrewards_check
+        })
+
+    async def smartrewards_current(self):
+        '''Returns the current smartrewards info.'''
+        result = await self.daemon_request('smartrewards', ['current'])
+        if result is not None:
+            return result
+        return None
+
+    async def smartrewards_check(self, addr):
+        '''
+        Returns the status of an address
+
+        addr: a single smartcash address
+        '''
+        result = await self.daemon_request('smartrewards', ['check', addr])
+        if result is not None:
+            return result
+        return None

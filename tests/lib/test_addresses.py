@@ -67,6 +67,8 @@ addresses = [
      "ab72728952c06dfc0f6cf21449dd645422731ec4", "eb3a3155215538d51de7cc"),
     (coins.TokenPay, "TDE2X28FGtckatxuP3d8s3V726G4TLNHpT",
      "23b5dd9b7b402388c7a40bc88c261f3178acf30d", "7c7bdf0e0713f3752f4b88"),
+    (coins.SmartCash, "SQFDM9NtRRmpHebq3H5RA3qpGJfGqp8Xgw",
+     "206168f5322583ff37f8e55665a4789ae8963532", "b8cb80b26e8932f5b12a7e"),
 ]
 
 
