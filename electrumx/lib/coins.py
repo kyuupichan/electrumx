@@ -1179,6 +1179,7 @@ class Koto(Coin):
     TX_PER_BLOCK = 3
     RPC_PORT = 8432
     REORG_LIMIT = 800
+    HDR_SIZE = 80
     SAPLING_HDR_SIZE = 112
     SAPLING_HEIGHT = 556500
     PEERS = [
@@ -1188,32 +1189,25 @@ class Koto(Coin):
     @classmethod
     def electrum_header(cls, header, height):
         if height < cls.SAPLING_HEIGHT:
-            BASIC_HEADER_SIZE = 80
             h = dict(zip(cls.HEADER_VALUES, cls.HEADER_UNPACK(header)))
-            # Add the height that is not present in the header itself
-            h['block_height'] = height
-            # Convert bytes to str
-            h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
-            h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
         else:
-            BASIC_HEADER_SIZE = 112
             h = dict(zip(cls.SAPLING_HEADER_VALUES, cls.SAPLING_HEADER_UNPACK(header)))
-            # Add the height that is not present in the header itself
-            h['block_height'] = height
-            # Convert bytes to str
-            h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
-            h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
             h['final_sapling_root'] = hash_to_hex_str(h['final_sapling_root'])
+        # Add the height that is not present in the header itself
+        h['block_height'] = height
+        # Convert bytes to str
+        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
+        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
         return h
 
     @classmethod
     def static_header_offset(cls, height):
         assert cls.STATIC_BLOCK_HEADERS
         if height < cls.SAPLING_HEIGHT:
-            return height * cls.BASIC_HEADER_SIZE
+            return height * cls.HDR_SIZE
         else:
             offset = (height - cls.SAPLING_HEIGHT) * cls.SAPLING_HDR_SIZE
-            return cls.SAPLING_HEIGHT * cls.BASIC_HEADER_SIZE + offset
+            return cls.SAPLING_HEIGHT * cls.HDR_SIZE + offset
 
 
 class KotoTestnet(Koto):
