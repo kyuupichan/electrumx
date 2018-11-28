@@ -1168,6 +1168,9 @@ class Koto(Coin):
     GENESIS_HASH = ('6d424c350729ae633275d51dc3496e16'
                     'cd1b1d195c164da00f39c499a2e9959e')
     DESERIALIZER = lib_tx.DeserializerKoto
+    HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root',
+                     'timestamp', 'bits', 'nonce', 'final_sapling_root')
+    HEADER_UNPACK = struct.Struct('< I 32s 32s I I I 32s').unpack_from
     TX_COUNT = 158914
     TX_COUNT_HEIGHT = 67574
     TX_PER_BLOCK = 3
@@ -1179,6 +1182,17 @@ class Koto(Coin):
         'fr.kotocoin.info s t',
         'electrum.kotocoin.info s t',
     ]
+    @classmethod
+    def electrum_header(cls, header, height):
+        h = dict(zip(cls.HEADER_VALUES, cls.HEADER_UNPACK(header)))
+        # Add the height that is not present in the header itself
+        h['block_height'] = height
+        # Convert bytes to str
+        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
+        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
+        h['final_sapling_root'] = hash_to_hex_str(h['final_sapling_root'])
+        return h
+
     @classmethod
     def static_header_offset(cls, height):
         assert cls.STATIC_BLOCK_HEADERS
