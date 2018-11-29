@@ -664,6 +664,17 @@ class LitecoinRegtest(LitecoinTestnet):
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
 
+class BitcoinCashABCRegtest(BitcoinTestnetMixin, Coin):
+    NAME = "BitcoinCashABC"
+    NET = "regtest"
+    PEERS = []
+    GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
+                    'bf5beb436012afca590b1a11466e2206')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
+
+
 class Viacoin(AuxPowMixin, Coin):
     NAME = "Viacoin"
     SHORTNAME = "VIA"
