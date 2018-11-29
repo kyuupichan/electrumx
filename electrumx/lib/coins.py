@@ -656,6 +656,7 @@ class LitecoinTestnet(Litecoin):
         'electrum.ltc.xurious.com s t',
     ]
 
+
 class LitecoinRegtest(LitecoinTestnet):
     NET = "regtest"
     GENESIS_HASH = ('530827f38f93b43ed12af0b3ad25a288'
@@ -663,6 +664,7 @@ class LitecoinRegtest(LitecoinTestnet):
     PEERS = []
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
+
 
 class BitcoinCashABCRegtest(BitcoinTestnetMixin, Coin):
     NAME = "BitcoinCashABC"
