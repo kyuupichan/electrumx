@@ -1872,6 +1872,7 @@ class Axe(Dash):
     GENESIS_HASH = ('00000c33631ca6f2f61368991ce2dc03'
                     '306b5bb50bf7cede5cfbba6db38e52e6')
     DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx_dash.DeserializerDash
     TX_COUNT = 18405
     TX_COUNT_HEIGHT = 30237
     TX_PER_BLOCK = 1
