@@ -1871,6 +1871,7 @@ class Axe(Dash):
     WIF_BYTE = bytes.fromhex("cc")
     GENESIS_HASH = ('00000c33631ca6f2f61368991ce2dc03'
                     '306b5bb50bf7cede5cfbba6db38e52e6')
+    SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
     DESERIALIZER = lib_tx_dash.DeserializerDash
     TX_COUNT = 18405
