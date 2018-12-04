@@ -2399,3 +2399,20 @@ class NIXTestnet(NIX):
     WIF_BYTE = bytes.fromhex("80")
     RPC_PORT = 16215
     DESERIALIZER = lib_tx.DeserializerSegWit
+
+
+class Noir(Coin):
+    NAME = "Noir"
+    SHORTNAME = "NOR"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("80")
+    P2SH_VERBYTES = [bytes.fromhex("07")]
+    WIF_BYTE = bytes.fromhex("D0")
+    GENESIS_HASH = ('23911212a525e3d149fcad6c559c8b17'
+                    'f1e8326a272a75ff9bb315c8d96433ef')
+    RPC_PORT = 8825
+    TX_COUNT = 586369
+    TX_COUNT_HEIGHT = 379290
+    TX_PER_BLOCK = 5
