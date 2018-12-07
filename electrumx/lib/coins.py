@@ -2416,3 +2416,29 @@ class Noir(Coin):
     TX_COUNT = 586369
     TX_COUNT_HEIGHT = 379290
     TX_PER_BLOCK = 5
+
+
+class BitcoinPlus(Coin):
+    NAME = "BitcoinPlus"
+    SHORTNAME = "XBC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('0000005f6a28e686f641c616e56182d1'
+                    'b43afbe08a223f23bda23cdf9d55b882')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1479247
+    TX_COUNT_HEIGHT = 749740
+    TX_PER_BLOCK = 2
+    RPC_PORT = 8885
+    REORG_LIMIT = 2000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x13_hash
+        return x13_hash.getPoWHash(header)
