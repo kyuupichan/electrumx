@@ -926,8 +926,11 @@ class Dash(Coin):
     TX_PER_BLOCK = 4
     RPC_PORT = 9998
     PEERS = [
-        'chain90a.chain s t',
-        'chain90b.chain s t',
+        'dnsseed1.jiulingo.net s t',
+        'dnsseed2.jiulingo.net s t',
+        'dnsseed3.jiulingo.net s t',
+        'dnsseed4.jiulingo.net s t',
+        'dnsseed5.jiulingo.net s t',
         'electrum.dash.org s t',
         'electrum.masternode.io s t',
         'electrum-drk.club s t',
