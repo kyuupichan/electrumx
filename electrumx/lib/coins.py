@@ -931,12 +931,6 @@ class Dash(Coin):
         'dnsseed3.jiulingo.net s t',
         'dnsseed4.jiulingo.net s t',
         'dnsseed5.jiulingo.net s t',
-        'electrum.dash.org s t',
-        'electrum.masternode.io s t',
-        'electrum-drk.club s t',
-        'dashcrypto.space s t',
-        'electrum.dash.siampm.com s t',
-        'wl4sfwq2hwxnodof.onion s t',
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
