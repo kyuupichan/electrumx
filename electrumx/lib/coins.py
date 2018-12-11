@@ -917,7 +917,7 @@ class Dash(Coin):
     XPUB_VERBYTES = bytes.fromhex("02fe52cc")
     XPRV_VERBYTES = bytes.fromhex("02fe52f8")
     GENESIS_HASH = ('00000d6f81d96969bfa1f195a1e349a6'
-		    '129c720c50a255c50ca38163d8286579')
+                    '129c720c50a255c50ca38163d8286579')
     P2PKH_VERBYTE = bytes.fromhex("4c")
     P2SH_VERBYTES = [bytes.fromhex("10")]
     WIF_BYTE = bytes.fromhex("cc")
@@ -926,6 +926,8 @@ class Dash(Coin):
     TX_PER_BLOCK = 4
     RPC_PORT = 9998
     PEERS = [
+        '47.104.25.28 s t',
+        '47.104.3.0 s t',
         'electrum.dash.org s t',
         'electrum.masternode.io s t',
         'electrum-drk.club s t',
