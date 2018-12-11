@@ -2442,3 +2442,35 @@ class BitcoinPlus(Coin):
         '''Given a header return the hash.'''
         import x13_hash
         return x13_hash.getPoWHash(header)
+
+
+class Myriadcoin(AuxPowMixin, Coin):
+    NAME = "Myriadcoin"
+    SHORTNAME = "XMY"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("09")]
+    WIF_BYTE = bytes.fromhex("b2")
+    GENESIS_HASH = ('00000ffde4c020b5938441a0ea3d314b'
+                    'f619eff0b38f32f78f7583cffa1ea485')
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
+    TX_COUNT = 1976629
+    TX_COUNT_HEIGHT = 2580356
+    TX_PER_BLOCK = 20
+    REORG_LIMIT = 2000
+    RPC_PORT = 10889
+
+
+class MyriadcoinTestnet(Myriadcoin):
+    NAME = "Myriadcoin"
+    SHORTNAME = "XMT"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("58")
+    P2SH_VERBYTES = [bytes.fromhex("bc")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('0000017ce2a79c8bddafbbe47c004aa9'
+                    '2b20678c354b34085f62b762084b9788')
