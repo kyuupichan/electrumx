@@ -916,13 +916,13 @@ class Dash(Coin):
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("02fe52cc")
     XPRV_VERBYTES = bytes.fromhex("02fe52f8")
-    GENESIS_HASH = ('00000ffd590b1485b3caadc19b22e637'
-                    '9c733355108f107a430458cdf3407ab6')
+    GENESIS_HASH = ('00000d6f81d96969bfa1f195a1e349a6'
+		    '129c720c50a255c50ca38163d8286579')
     P2PKH_VERBYTE = bytes.fromhex("4c")
     P2SH_VERBYTES = [bytes.fromhex("10")]
     WIF_BYTE = bytes.fromhex("cc")
-    TX_COUNT_HEIGHT = 569399
-    TX_COUNT = 2157510
+    TX_COUNT_HEIGHT = 8000
+    TX_COUNT = 4000
     TX_PER_BLOCK = 4
     RPC_PORT = 9998
     PEERS = [
