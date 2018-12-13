@@ -1177,9 +1177,10 @@ class ElectrumX(SessionBase):
         tx_hashes: ordered list of hex strings of tx hashes in a block
         tx_pos: index of transaction in tx_hashes to create branch for
         '''
-        txes = [await self.daemon_request('getrawtransaction', hash, True) for hash in tx_hashes]
-        merkle_hashes = [tx['hash'] for tx in txes]
-        tx_hashes = merkle_hashes
+        if self.coin.NAME == "Koto":
+            txes = [await self.daemon_request('getrawtransaction', hash, True) for hash in tx_hashes]
+            merkle_hashes = [tx['hash'] for tx in txes]
+            tx_hashes = merkle_hashes
 
         hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
         branch, root = self.db.merkle.branch_and_root(hashes, tx_pos)
@@ -1201,8 +1202,11 @@ class ElectrumX(SessionBase):
             raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
                            f'block {block_hash} at height {height:,d}')
         branch = await self._get_merkle_branch(tx_hashes, pos)
-        tx = await self.daemon_request('getrawtransaction', tx_hash, True)
-        return {"block_height": height, "merkle": branch, "pos": pos, "hash": tx['hash']}
+        if self.coin.NAME == "Koto":
+            tx = await self.daemon_request('getrawtransaction', tx_hash, True)
+            return {"block_height": height, "merkle": branch, "pos": pos, "hash": tx['hash']}
+        else:
+            return {"block_height": height, "merkle": branch, "pos": pos}
 
     async def transaction_id_from_pos(self, height, tx_pos, merkle=False):
         '''Return the txid and optionally a merkle proof, given
