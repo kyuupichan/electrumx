@@ -657,6 +657,26 @@ class LitecoinTestnet(Litecoin):
     ]
 
 
+class LitecoinRegtest(LitecoinTestnet):
+    NET = "regtest"
+    GENESIS_HASH = ('530827f38f93b43ed12af0b3ad25a288'
+                    'dc02ed74d6d7857862df51fc56c416f9')
+    PEERS = []
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+
+
+class BitcoinCashABCRegtest(BitcoinTestnetMixin, Coin):
+    NAME = "BitcoinCashABC"
+    NET = "regtest"
+    PEERS = []
+    GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
+                    'bf5beb436012afca590b1a11466e2206')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
+
+
 class Viacoin(AuxPowMixin, Coin):
     NAME = "Viacoin"
     SHORTNAME = "VIA"
@@ -1883,7 +1903,9 @@ class Axe(Dash):
     WIF_BYTE = bytes.fromhex("cc")
     GENESIS_HASH = ('00000c33631ca6f2f61368991ce2dc03'
                     '306b5bb50bf7cede5cfbba6db38e52e6')
+    SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx_dash.DeserializerDash
     TX_COUNT = 18405
     TX_COUNT_HEIGHT = 30237
     TX_PER_BLOCK = 1
@@ -2409,3 +2431,78 @@ class NIXTestnet(NIX):
     WIF_BYTE = bytes.fromhex("80")
     RPC_PORT = 16215
     DESERIALIZER = lib_tx.DeserializerSegWit
+
+
+class Noir(Coin):
+    NAME = "Noir"
+    SHORTNAME = "NOR"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("80")
+    P2SH_VERBYTES = [bytes.fromhex("07")]
+    WIF_BYTE = bytes.fromhex("D0")
+    GENESIS_HASH = ('23911212a525e3d149fcad6c559c8b17'
+                    'f1e8326a272a75ff9bb315c8d96433ef')
+    RPC_PORT = 8825
+    TX_COUNT = 586369
+    TX_COUNT_HEIGHT = 379290
+    TX_PER_BLOCK = 5
+
+
+class BitcoinPlus(Coin):
+    NAME = "BitcoinPlus"
+    SHORTNAME = "XBC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('0000005f6a28e686f641c616e56182d1'
+                    'b43afbe08a223f23bda23cdf9d55b882')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1479247
+    TX_COUNT_HEIGHT = 749740
+    TX_PER_BLOCK = 2
+    RPC_PORT = 8885
+    REORG_LIMIT = 2000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x13_hash
+        return x13_hash.getPoWHash(header)
+
+
+class Myriadcoin(AuxPowMixin, Coin):
+    NAME = "Myriadcoin"
+    SHORTNAME = "XMY"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("09")]
+    WIF_BYTE = bytes.fromhex("b2")
+    GENESIS_HASH = ('00000ffde4c020b5938441a0ea3d314b'
+                    'f619eff0b38f32f78f7583cffa1ea485')
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
+    TX_COUNT = 1976629
+    TX_COUNT_HEIGHT = 2580356
+    TX_PER_BLOCK = 20
+    REORG_LIMIT = 2000
+    RPC_PORT = 10889
+
+
+class MyriadcoinTestnet(Myriadcoin):
+    NAME = "Myriadcoin"
+    SHORTNAME = "XMT"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("58")
+    P2SH_VERBYTES = [bytes.fromhex("bc")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('0000017ce2a79c8bddafbbe47c004aa9'
+                    '2b20678c354b34085f62b762084b9788')
