@@ -1308,6 +1308,48 @@ class Peercoin(Coin):
     RPC_PORT = 9902
     REORG_LIMIT = 5000
 
+class Trezarcoin(Coin):
+    NAME = "Trezarcoin"
+    SHORTNAME = "TZC"
+    NET = "mainnet"
+    VALUE_PER_COIN = 1000000
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("42")
+    P2SH_VERBYTES = [bytes.fromhex("08")]
+    WIF_BYTE = bytes.fromhex("c2")
+    GENESIS_HASH = ('24502ba55d673d2ee9170d83dae2d1ad'
+                    'b3bfb4718e4f200db9951382cc4f6ee6')
+    DESERIALIZER = lib_tx.DeserializerTrezarcoin
+    HEADER_HASH = lib_tx.DeserializerTrezarcoin.blake2s
+    HEADER_HASH_GEN = lib_tx.DeserializerTrezarcoin.blake2s_gen
+    BASIC_HEADER_SIZE = 80
+    TX_COUNT = 742886
+    TX_COUNT_HEIGHT = 643128
+    TX_PER_BLOCK = 2
+    RPC_PORT = 17299
+    REORG_LIMIT = 2000
+    PEERS = [
+        'electrumx1.trezarcoin.com s t',
+    ]
+
+    @classmethod
+    def genesis_block(cls, block):
+        '''Check the Genesis block is the right one for this coin.
+
+        Return the block less its unspendable coinbase.
+        '''
+        header = cls.block_header(block, 0)
+        header_hex_hash = cls.HEADER_HASH_GEN(header)
+        if header_hex_hash != cls.GENESIS_HASH:
+            raise CoinError('genesis block has hash {} expected {}'
+                            .format(header_hex_hash, cls.GENESIS_HASH))
+        return header + bytes(1)
+    
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        return cls.HEADER_HASH(header)
 
 class Reddcoin(Coin):
     NAME = "Reddcoin"
