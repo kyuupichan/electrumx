@@ -378,9 +378,11 @@ class DeserializerTxTime(Deserializer):
             self._read_le_uint32(),  # locktime
         )
 
-class TxTrezarcoin(namedtuple("Tx", "version time inputs outputs locktime"
-                                    "txcomment")):
+
+class TxTrezarcoin(
+        namedtuple("Tx", "version time inputs outputs locktime txcomment")):
     '''Class representing transaction that has a time and txcomment field.'''
+
 
 class DeserializerTrezarcoin(Deserializer):
 
@@ -409,14 +411,12 @@ class DeserializerTrezarcoin(Deserializer):
         _full_merkle = data[36:68]
         _input112 = data + _full_merkle
         _key = keyTwo + ntime + _nBits + _nonce + keyOne
-
         '''Prepare 112Byte Header '''
         blake2s_hash = blake2s(key=_key, digest_size=32)
         blake2s_hash.update(_input112)
-
         '''TrezarFlips - Only for Genesis'''
         return "".join(map(str.__add__, blake2s_hash.hexdigest()[-2::-2], 
-                                        blake2s_hash.hexdigest()[-1::-2]))
+            blake2s_hash.hexdigest()[-1::-2]))
 
     @staticmethod
     def blake2s(data):
@@ -430,11 +430,9 @@ class DeserializerTrezarcoin(Deserializer):
         _full_merkle = data[36:68]
         _input112 = data + _full_merkle
         _key = keyTwo + ntime + _nBits + _nonce + keyOne
-
         '''Prepare 112Byte Header '''
         blake2s_hash = blake2s(key=_key, digest_size=32)
         blake2s_hash.update(_input112)
-
         '''TrezarFlips'''
         return blake2s_hash.digest()
 
