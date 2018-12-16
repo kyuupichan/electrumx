@@ -28,6 +28,7 @@
 '''Transaction-related classes and functions.'''
 
 from collections import namedtuple
+from hashlib import blake2s
 
 from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.script import OpCodes
@@ -377,6 +378,62 @@ class DeserializerTxTime(Deserializer):
             self._read_outputs(),    # outputs
             self._read_le_uint32(),  # locktime
         )
+
+
+class TxTrezarcoin(
+        namedtuple("Tx", "version time inputs outputs locktime txcomment")):
+    '''Class representing transaction that has a time and txcomment field.'''
+
+
+class DeserializerTrezarcoin(Deserializer):
+
+    def read_tx(self):
+        version = self._read_le_int32()
+        time = self._read_le_uint32()
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        if version >= 2:
+            txcomment = self._read_varbytes()
+        else:
+            txcomment = b''
+        return TxTrezarcoin(version, time, inputs, outputs, locktime,
+                            txcomment)
+
+    @staticmethod
+    def blake2s_gen(data):
+        version = data[0:1]
+        keyOne = data[36:46]
+        keyTwo = data[58:68]
+        ntime = data[68:72]
+        _nBits = data[72:76]
+        _nonce = data[76:80]
+        _full_merkle = data[36:68]
+        _input112 = data + _full_merkle
+        _key = keyTwo + ntime + _nBits + _nonce + keyOne
+        '''Prepare 112Byte Header '''
+        blake2s_hash = blake2s(key=_key, digest_size=32)
+        blake2s_hash.update(_input112)
+        '''TrezarFlips - Only for Genesis'''
+        return ''.join(map(str.__add__, blake2s_hash.hexdigest()[-2::-2],
+                           blake2s_hash.hexdigest()[-1::-2]))
+
+    @staticmethod
+    def blake2s(data):
+        version = data[0:1]
+        keyOne = data[36:46]
+        keyTwo = data[58:68]
+        ntime = data[68:72]
+        _nBits = data[72:76]
+        _nonce = data[76:80]
+        _full_merkle = data[36:68]
+        _input112 = data + _full_merkle
+        _key = keyTwo + ntime + _nBits + _nonce + keyOne
+        '''Prepare 112Byte Header '''
+        blake2s_hash = blake2s(key=_key, digest_size=32)
+        blake2s_hash.update(_input112)
+        '''TrezarFlips'''
+        return blake2s_hash.digest()
 
 
 class DeserializerReddcoin(Deserializer):
