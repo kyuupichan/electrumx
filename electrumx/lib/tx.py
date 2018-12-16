@@ -416,7 +416,7 @@ class DeserializerTrezarcoin(Deserializer):
         blake2s_hash.update(_input112)
         '''TrezarFlips - Only for Genesis'''
         return ''.join(map(str.__add__, blake2s_hash.hexdigest()[-2::-2],
-                        blake2s_hash.hexdigest()[-1::-2]))
+                           blake2s_hash.hexdigest()[-1::-2]))
 
     @staticmethod
     def blake2s(data):
