@@ -392,7 +392,7 @@ class DeserializerTrezarcoin(Deserializer):
         inputs = self._read_inputs()
         outputs = self._read_outputs()
         locktime = self._read_le_uint32()
-        if version >=2:
+        if version >= 2:
             txcomment = self._read_varbytes()
         else:
             txcomment = b''
@@ -415,8 +415,9 @@ class DeserializerTrezarcoin(Deserializer):
         blake2s_hash = blake2s(key=_key, digest_size=32)
         blake2s_hash.update(_input112)
         '''TrezarFlips - Only for Genesis'''
-        return "".join(map(str.__add__, blake2s_hash.hexdigest()[-2::-2], 
-            blake2s_hash.hexdigest()[-1::-2]))
+        return "".join(map(str.__add__,
+                            blake2s_hash.hexdigest()[-2::-2],
+                            blake2s_hash.hexdigest()[-1::-2]))
 
     @staticmethod
     def blake2s(data):
