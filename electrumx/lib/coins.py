@@ -366,9 +366,9 @@ class HOdlcoin(Coin):
     TX_PER_BLOCK = 5
 
 
-class BitcoinCash(BitcoinMixin, Coin):
-    NAME = "BitcoinCash"
-    SHORTNAME = "BCH"
+class BitcoinSV(BitcoinMixin, Coin):
+    NAME = "BitcoinSV"
+    SHORTNAME = "BSV"
     TX_COUNT = 267318795
     TX_COUNT_HEIGHT = 557037
     TX_PER_BLOCK = 400
@@ -380,8 +380,8 @@ class BitcoinCash(BitcoinMixin, Coin):
     ]
 
 
-class BitcoinCashABC(BitcoinMixin, Coin):
-    NAME = "BitcoinCashABC"
+class BitcoinCash(BitcoinMixin, Coin):
+    NAME = "BitcoinCashABC"   # Some releases later remove the ABC suffix
     SHORTNAME = "BCH"
     TX_COUNT = 265479628
     TX_COUNT_HEIGHT = 556592
@@ -548,18 +548,15 @@ class BitcoinTestnetMixin(object):
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
 
 
-class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
-    '''Bitcoin Testnet for Bitcoin Cash daemons.'''
-    NAME = "BitcoinCash"
+class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
+    '''Bitcoin Testnet for Bitcoin SV daemons.'''
+    NAME = "BitcoinSV"
     PEERS = [
-        'electrum-testnet-abc.criptolayer.net s50112',
-        'bchtestnet.arihanc.com t53001 s53002',
-        'ciiattqkgzebpp6jofjbrkhvhwmgnsfoayljdcrve2p3qmkbv3duaoyd.onion '
-        't53001 s53002',
+        'electrontest.cascharia.com t51001 s51002',
     ]
 
 
-class BitcoinCashRegtest(BitcoinCashTestnet):
+class BitcoinSVRegtest(BitcoinSVTestnet):
     NET = "regtest"
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
                     'bf5beb436012afca590b1a11466e2206')
@@ -666,8 +663,8 @@ class LitecoinRegtest(LitecoinTestnet):
     TX_COUNT_HEIGHT = 1
 
 
-class BitcoinCashABCRegtest(BitcoinTestnetMixin, Coin):
-    NAME = "BitcoinCashABC"
+class BitcoinCashRegtest(BitcoinTestnetMixin, Coin):
+    NAME = "BitcoinCashABC"   # Some releases later remove the ABC suffix
     NET = "regtest"
     PEERS = []
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
