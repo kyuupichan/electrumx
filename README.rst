@@ -29,9 +29,9 @@ Supported Coins
 
 - Argentum - ARG
 - Bitbay - BAY
+- Bitcoin - BTC
 - Bitcoin Cash - BCH
 - Bitcoin Gold - BTG
-- Bitcoin Segwit - BTC
 - Bitcoin SV - BSV
 - BitcoinAtom - BCA
 - BitcoinGreen - BITG
