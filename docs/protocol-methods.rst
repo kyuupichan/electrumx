@@ -695,7 +695,7 @@ Return a raw transaction.
 
     Whether a verbose coin-specific response is required.
 
-  *markle*
+  *merkle*
 
     Whether a merkle branch proof should be returned as well.
 
