@@ -464,7 +464,7 @@ async def test_notifications(caplog):
     second_hashes = api.ordered_adds[n:]
     second_touched = api.touched(second_hashes)
 
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.DEBUG)
 
     async with TaskGroup() as group:
         # First batch enters the mempool

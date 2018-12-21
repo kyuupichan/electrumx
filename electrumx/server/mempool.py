@@ -101,7 +101,7 @@ class MemPool(object):
        hashXs: hashX   -> set of all hashes of txs touching the hashX
     '''
 
-    def __init__(self, coin, api, refresh_secs=5.0, log_status_secs=120.0):
+    def __init__(self, coin, api, refresh_secs=5.0, log_status_secs=60.0):
         assert isinstance(api, MemPoolAPI)
         self.coin = coin
         self.api = api
@@ -224,7 +224,7 @@ class MemPool(object):
             except DBSyncError:
                 # The UTXO DB is not at the same height as the
                 # mempool; wait and try again
-                self.logger.info('waiting for DB to sync')
+                self.logger.debug('waiting for DB to sync')
             else:
                 synchronized_event.set()
                 synchronized_event.clear()
