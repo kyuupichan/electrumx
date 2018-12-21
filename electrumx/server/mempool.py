@@ -38,6 +38,10 @@ class MemPoolTxSummary(object):
     has_unconfirmed_inputs = attr.ib()
 
 
+class DBSyncError(Exception):
+    pass
+
+
 class MemPoolAPI(ABC):
     '''A concrete instance of this class is passed to the MemPool object
     and used by it to query DB and blockchain state.'''
@@ -51,6 +55,10 @@ class MemPoolAPI(ABC):
         '''Return the height of bitcoind the last time it was queried,
         for any reason, without actually querying it.
         '''
+
+    @abstractmethod
+    def db_height(self):
+        '''Return the height flushed to the on-disk DB.'''
 
     @abstractmethod
     async def mempool_hashes(self):
@@ -201,24 +209,36 @@ class MemPool(object):
 
     async def _refresh_hashes(self, synchronized_event):
         '''Refresh our view of the daemon's mempool.'''
+        # Touched accumulates between calls to on_mempool and each
+        # call transfers ownership
+        touched = set()
         while True:
             height = self.api.cached_height()
             hex_hashes = await self.api.mempool_hashes()
             if height != await self.api.height():
                 continue
             hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
-            async with self.lock:
-                touched = await self._process_mempool(hashes)
-            synchronized_event.set()
-            synchronized_event.clear()
-            await self.api.on_mempool(touched, height)
+            try:
+                async with self.lock:
+                    await self._process_mempool(hashes, touched, height)
+            except DBSyncError:
+                # The UTXO DB is not at the same height as the
+                # mempool; wait and try again
+                self.logger.info('waiting for DB to sync')
+            else:
+                synchronized_event.set()
+                synchronized_event.clear()
+                await self.api.on_mempool(touched, height)
+                touched = set()
             await sleep(self.refresh_secs)
 
-    async def _process_mempool(self, all_hashes):
+    async def _process_mempool(self, all_hashes, touched, mempool_height):
         # Re-sync with the new set of hashes
         txs = self.txs
         hashXs = self.hashXs
-        touched = set()
+
+        if mempool_height != self.api.db_height():
+            raise DBSyncError
 
         # First handle txs that have disappeared
         for tx_hash in set(txs).difference(all_hashes):
@@ -238,6 +258,9 @@ class MemPool(object):
             for hashes in chunks(new_hashes, 200):
                 coro = self._fetch_and_accept(hashes, all_hashes, touched)
                 await group.spawn(coro)
+            if mempool_height != self.api.db_height():
+                raise DBSyncError
+
             tx_map = {}
             utxo_map = {}
             async for task in group:
@@ -252,7 +275,7 @@ class MemPool(object):
                 tx_map, utxo_map = self._accept_transactions(tx_map, utxo_map,
                                                              touched)
             if tx_map:
-                self.logger.info(f'{len(tx_map)} txs dropped')
+                self.logger.error(f'{len(tx_map)} txs dropped')
 
         return touched
 

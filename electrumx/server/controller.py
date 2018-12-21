@@ -102,7 +102,10 @@ class Controller(ServerBase):
         bp = BlockProcessor(env, db, daemon, notifications)
 
         # Set notifications up to implement the MemPoolAPI
+        def get_db_height():
+            return db.db_height
         notifications.height = daemon.height
+        notifications.db_height = get_db_height
         notifications.cached_height = daemon.cached_height
         notifications.mempool_hashes = daemon.mempool_hashes
         notifications.raw_transactions = daemon.getrawtransactions
