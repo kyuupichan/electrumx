@@ -1183,7 +1183,7 @@ class ElectrumX(SessionBase):
         return branch
 
     async def transaction_merkle(self, tx_hash, height):
-        '''Return the markle branch to a confirmed transaction given its hash
+        '''Return the merkle branch to a confirmed transaction given its hash
         and height.
 
         tx_hash: the transaction hash as a hexadecimal string
