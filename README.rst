@@ -31,7 +31,7 @@ Supported Coins
 - Bitbay - BAY
 - Bitcoin Cash - BCH
 - Bitcoin Gold - BTG
-- Bitcoin Segwit - BTC
+- Bitcoin - BTC
 - Bitcoin SV - BSV
 - BitcoinAtom - BCA
 - BitcoinGreen - BITG
