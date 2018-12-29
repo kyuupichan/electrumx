@@ -30,6 +30,7 @@ Supported Coins
 - Argentum - ARG
 - Bitbay - BAY
 - Bitcoin Cash - BCH
+- Bitcoin Diamond - BCD
 - Bitcoin Gold - BTG
 - Bitcoin Segwit - BTC
 - Bitcoin SV - BSV
