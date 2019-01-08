@@ -288,6 +288,10 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
+    async def protx(self, params):
+        '''Set of commands to execute ProTx related actions.'''
+        return await self._send_single('protx', params)
+
 
 class FakeEstimateFeeDaemon(Daemon):
     '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that

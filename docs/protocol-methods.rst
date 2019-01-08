@@ -1354,3 +1354,107 @@ Returns the list of masternodes.
       ...,
       ...
     ]
+
+
+ProTx methods (Dash DIP3)
+==============================================
+
+
+protx.diff
+=============================
+
+Returns a diff between two deterministic masternode lists.
+The result also contains proof data.
+
+**Signature**
+
+  .. function:: protx.diff(base_height, height)
+
+  *base_height*
+
+    The starting block height
+
+      *1* <= *base_height*
+
+  *height*
+
+    The ending block height.
+
+      *base_height* <= *height*
+
+
+**Result**
+
+  A dictionary with deterministic masternode lists diff plus proof data
+
+**Example**::
+
+  protx.diff(1, 20000)
+
+**Example Result**::
+
+    {
+      "baseBlockHash": "000000000b866e7fefc7df2b4b37f236175cee9ab6dc925a30c62401d92b7406",
+      "blockHash": "0000000005b3f97e0af8c72f9a96eca720237e374ca860938ba0d7a68471c4d6",
+      "cbTxMerkleTree": "0200000002c9802d02435cfe09e4253bc1ba4875e9a2f920d5d6adf005d5b9306e5322e6f476d885273422c2fe18e8c420d09484f89eaeee7bb7f4e1ff54bddeb94e099a910103",
+      "cbTx": "03000500010000000000000000000000000000000000000000000000000000000000000000ffffffff4b02204e047867335c08fabe6d6d8b2b76b7000000000470393f63424273736170747365743a7265737574736574010000000000000010000015770000000d2f6e6f64655374726174756d2f000000000336c8a119010000001976a914cb594917ad4e5849688ec63f29a0f7f3badb5da688ac6c62c216010000001976a914a3c5284d3cd896815ac815f2dd76a3a71cb3d8e688acba65df02000000001976a9146d649e1c05e89d30809ef39cc8ee1002c0c8c84b88ac00000000260100204e0000b301c3d88e4072305bec5d09e2ed6b836b23af640bcdefd7b8ae7e2ca182dc17",
+      "deletedMNs": [
+      ],
+      "mnList": [
+        {
+          "proRegTxHash": "6f0bdd7034ce8d3a6976a15e4b4442c274b5c1739fb63fc0a50f01425580e17e",
+          "confirmedHash": "000000000be653cd1fbc213239cfec83ca68da657f24cc05305d0be75d34e392",
+          "service": "173.61.30.231:19023",
+          "pubKeyOperator": "8da7ee1a40750868badef2c17d5385480cae7543f8d4d6e5f3c85b37fdd00a6b4f47726b96e7e7c7a3ea68b5d5cb2196",
+          "keyIDVoting": "b35c75cbc69433175d3459843e1f6ebe145bf6a3",
+          "isValid": true
+        }
+      ],
+      "merkleRootMNList": "17dc82a12c7eaeb8d7efcd0b64af236b836bede2095dec5b3072408ed8c301b3"
+    }
+
+protx.info
+=============================
+
+Returns detailed information about a deterministic masternode.
+
+**Signature**
+
+  .. function:: protx.info(protx_hash)
+
+  *protx_hash*
+
+    The hash of the initial ProRegTx.
+
+**Result**
+
+  A dictionary with detailed deterministic masternode data
+
+**Example**::
+
+  protx.info("6f0bdd7034ce8d3a6976a15e4b4442c274b5c1739fb63fc0a50f01425580e17e")
+
+**Example Result**::
+
+  {
+    "proTxHash": "6f0bdd7034ce8d3a6976a15e4b4442c274b5c1739fb63fc0a50f01425580e17e",
+    "collateralHash": "b41439376b6117aebe6ad1ce31dcd217d4934fd00c104029ecb7d21c11d17c94",
+    "collateralIndex": 3,
+    "operatorReward": 0,
+    "state": {
+      "registeredHeight": 19525,
+      "lastPaidHeight": 20436,
+      "PoSePenalty": 0,
+      "PoSeRevivedHeight": -1,
+      "PoSeBanHeight": -1,
+      "revocationReason": 0,
+      "keyIDOwner": "b35c75cbc69433175d3459843e1f6ebe145bf6a3",
+      "pubKeyOperator": "8da7ee1a40750868badef2c17d5385480cae7543f8d4d6e5f3c85b37fdd00a6b4f47726b96e7e7c7a3ea68b5d5cb2196",
+      "keyIDVoting": "b35c75cbc69433175d3459843e1f6ebe145bf6a3",
+      "ownerKeyAddr": "ybGQ7a6e7dkJY2jxdbDwdBtyjKZJ8VB7YC",
+      "votingKeyAddr": "ybGQ7a6e7dkJY2jxdbDwdBtyjKZJ8VB7YC",
+      "addr": "173.61.30.231:19023",
+      "payoutAddress": "yWdXnYxGbouNoo8yMvcbZmZ3Gdp6BpySxL"
+    },
+    "confirmations": 984
+  }

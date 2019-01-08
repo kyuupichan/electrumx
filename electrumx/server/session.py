@@ -1298,7 +1298,9 @@ class DashElectrumX(ElectrumX):
             'masternode.announce.broadcast':
             self.masternode_announce_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
-            'masternode.list': self.masternode_list
+            'masternode.list': self.masternode_list,
+            'protx.diff': self.protx_diff,
+            'protx.info': self.protx_info,
         })
 
     async def notify(self, touched, height_changed):
@@ -1430,6 +1432,42 @@ class DashElectrumX(ElectrumX):
             return [mn for mn in cache if mn['payee'] in payees]
         else:
             return cache
+
+    async def protx_diff(self, base_height, height):
+        '''
+        Calculates a diff between two deterministic masternode lists.
+        The result also contains proof data.
+
+        base_height: The starting block height (starting from 1).
+        height: The ending block height.
+        '''
+        if not isinstance(base_height, int) or not isinstance(height, int):
+            raise RPCError(BAD_REQUEST, 'expected a int block heights')
+
+        max_height = self.db.db_height
+        if (not 1 <= base_height <= max_height or
+                not base_height <= height <= max_height):
+            raise RPCError(BAD_REQUEST,
+                           f'require 1 <= base_height {base_height:,d} <= '
+                           f'height {height:,d} <= '
+                           f'chain height {max_height:,d}')
+
+        return await self.daemon_request('protx',
+                                         ('diff', base_height, height))
+
+    async def protx_info(self, protx_hash):
+        '''
+        Returns detailed information about a deterministic masternode.
+
+        protx_hash: The hash of the initial ProRegTx
+        '''
+        if not isinstance(protx_hash, str):
+            raise RPCError(BAD_REQUEST, 'expected protx hash string')
+
+        res = await self.daemon_request('protx', ('info', protx_hash))
+        if 'wallet' in res:
+            del res['wallet']
+        return res
 
 
 class SmartCashElectrumX(DashElectrumX):
