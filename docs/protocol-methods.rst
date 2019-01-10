@@ -174,6 +174,7 @@ be confirmed within a certain number of blocks.
 
   0.00101079
 
+
 blockchain.headers.subscribe
 ============================
 
@@ -182,24 +183,10 @@ Subscribe to receive block headers when a new block is found.
 **Signature**
 
   .. function:: blockchain.headers.subscribe()
-  .. versionchanged:: 1.2
-     Optional *raw* parameter added, defaulting to :const:`false`.
-  .. versionchanged:: 1.3
-     *raw* parameter deafults to :const:`true`.
-  .. versionchanged:: 1.4
-     *raw* parameter removed; responses and notifications pass raw
-     headers.
-
-  * *raw*
-
-    This single boolean argument exists in protocol versions 1.2
-    (defaulting to :const:`false`) and 1.3 (defaulting to
-    :const:`true`) only.
 
 **Result**
 
-  The header of the current block chain tip.  If *raw* is
-  :const:`true` the result is a dictionary with two members:
+  The header of the current block chain tip.  The result is a dictionary with two members:
 
   * *hex*
 
@@ -209,24 +196,9 @@ Subscribe to receive block headers when a new block is found.
 
     The height of the header, an integer.
 
-  If *raw* is :const:`false` the result is the coin-specific
-  :ref:`deserialized header <deserialized header>`.
-
 **Example Result**
 
-  With *raw* :const:`false`::
-
-   {
-     "bits": 402858285,
-     "block_height": 520481,
-     "merkle_root": "8e8e932eb858fd53cf09943d7efc9a8f674dc1363010ee64907a292d2fb0c25d",
-     "nonce": 3288656012,
-     "prev_block_hash": "000000000000000000b512b5d9fc7c5746587268547c04aa92383aaea0080289",
-     "timestamp": 1520495819,
-     "version": 536870912
-   }
-
-  With *raw* :const:`true`::
+::
 
    {
      "height": 520481,
@@ -1169,17 +1141,11 @@ server.version
 ==============
 
 Identify the client to the server and negotiate the protocol version.
+Only the first :func:`server.version` message is accepted.
 
 **Signature**
 
-  .. function:: server.version(client_name="", protocol_version="1.1")
-  .. versionchanged:: 1.1
-     *protocol_version* is not ignored.
-  .. versionchanged:: 1.2
-     Use :func:`server.ping` rather than sending version requests as a
-     ping mechanism.
-  .. versionchanged:: 1.4
-     Only the first :func:`server.version` message is accepted.
+  .. function:: server.version(client_name="", protocol_version="1.4")
 
   * *client_name*
 
@@ -1213,17 +1179,13 @@ Identify the client to the server and negotiate the protocol version.
   identifying the server and the protocol version that will be used
   for future communication.
 
-  *Protocol version 1.0*: A string identifying the server software.
-
-**Examples**::
+**Example**::
 
   server.version("Electrum 3.0.6", ["1.1", "1.2"])
-  server.version("2.7.1", "1.0")
 
-**Example Results**::
+**Example Result**::
 
   ["ElectrumX 1.2.1", "1.2"]
-  "ElectrumX 1.2.1"
 
 
 Masternode methods (Dash and compatible coins)
