@@ -342,7 +342,7 @@ class SessionManager(object):
         # Paranoia: a reorg could race and leave db_height lower
         height = min(height, self.db.db_height)
         raw = await self.raw_header(height)
-        self.hsub_results = (electrum, {'hex': raw.hex(), 'height': height})
+        self.hsub_results = (electrumx, {'hex': raw.hex(), 'height': height})
         self.notified_height = height
 
     # --- LocalRPC command handlers
