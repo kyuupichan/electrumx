@@ -259,16 +259,6 @@ class Coin(object):
         return Decimal(value) / cls.VALUE_PER_COIN
 
     @classmethod
-    def electrum_header(cls, header, height):
-        h = dict(zip(cls.HEADER_VALUES, cls.HEADER_UNPACK(header)))
-        # Add the height that is not present in the header itself
-        h['block_height'] = height
-        # Convert bytes to str
-        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
-        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
-        return h
-
-    @classmethod
     def warn_old_client_on_tx_broadcast(cls, client_ver):
         return False
 
@@ -301,18 +291,6 @@ class EquihashMixin(object):
     HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'reserved',
                      'timestamp', 'bits', 'nonce')
     HEADER_UNPACK = struct.Struct('< I 32s 32s 32s I I 32s').unpack_from
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = dict(zip(cls.HEADER_VALUES, cls.HEADER_UNPACK(header)))
-        # Add the height that is not present in the header itself
-        h['block_height'] = height
-        # Convert bytes to str
-        h['prev_block_hash'] = hash_to_hex_str(h['prev_block_hash'])
-        h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
-        h['reserved'] = hash_to_hex_str(h['reserved'])
-        h['nonce'] = hash_to_hex_str(h['nonce'])
-        return h
 
     @classmethod
     def block_header(cls, block, height):
@@ -481,13 +459,6 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
             return double_sha256(header)
         else:
             return double_sha256(header[:68] + header[100:112])
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        h['reserved'] = hash_to_hex_str(header[72:100])
-        h['solution'] = hash_to_hex_str(header[140:])
-        return h
 
 
 class BitcoinGoldTestnet(BitcoinGold):
@@ -1191,12 +1162,6 @@ class FairCoin(Coin):
             return super().block(raw_block, height)
         else:
             return Block(raw_block, cls.block_header(raw_block, height), [])
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        h['payload_hash'] = hash_to_hex_str(h['payload_hash'])
-        return h
 
 
 class Zcash(EquihashMixin, Coin):
@@ -2072,14 +2037,6 @@ class Decred(Coin):
         else:
             return Block(raw_block, cls.block_header(raw_block, height), [])
 
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        h['stake_root'] = hash_to_hex_str(h['stake_root'])
-        h['final_state'] = hash_to_hex_str(h['final_state'])
-        h['extra_data'] = hash_to_hex_str(h['extra_data'])
-        return h
-
 
 class DecredTestnet(Decred):
     SHORTNAME = "tDCR"
@@ -2166,13 +2123,6 @@ class Xuez(Coin):
             return xevan_hash.getPoWHash(header[:80])
         else:
             return xevan_hash.getPoWHash(header)
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        if h['version'] > 1:
-            h['nAccumulatorCheckpoint'] = hash_to_hex_str(header[80:])
-        return h
 
 
 class Pac(Coin):
@@ -2446,12 +2396,6 @@ class Minexcoin(EquihashMixin, Coin):
         'elex01-ams.turinex.eu s t',
         'eu.minexpool.nl s t'
     ]
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        h['solution'] = hash_to_hex_str(header[cls.HEADER_SIZE_NO_SOLUTION:])
-        return h
 
     @classmethod
     def block_header(cls, block, height):

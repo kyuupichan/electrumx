@@ -61,13 +61,6 @@ def test_block(block_details):
 
     raw_block = unhexlify(block_info['block'])
     block = coin.block(raw_block, block_info['height'])
-    h = coin.electrum_header(block.header, block_info['height'])
-    assert block_info['merkleroot'] == h['merkle_root']
-    assert block_info['time'] == h['timestamp']
-    assert block_info['previousblockhash'] == h['prev_block_hash']
-    assert block_info['height'] == h['block_height']
-    assert block_info['nonce'] == h['nonce']
-    assert block_info['bits'] == pack_be_uint32(h['bits']).hex()
 
     assert coin.header_hash(
         block.header) == hex_str_to_hash(block_info['hash'])

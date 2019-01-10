@@ -22,7 +22,7 @@ from aiorpcx import (Connector, RPCSession, SOCKSProxy,
                      sleep, ignore_after, timeout_after)
 
 from electrumx.lib.peer import Peer
-from electrumx.lib.util import class_logger, protocol_tuple
+from electrumx.lib.util import class_logger
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
 STALE_SECS = 3 * 3600
@@ -362,10 +362,9 @@ class PeerManager(object):
         server_version, protocol_version = result
         peer.server_version = server_version
         peer.features['server_version'] = server_version
-        ptuple = protocol_tuple(protocol_version)
 
         async with TaskGroup() as g:
-            await g.spawn(self._send_headers_subscribe(session, peer, ptuple))
+            await g.spawn(self._send_headers_subscribe(session, peer))
             await g.spawn(self._send_server_features(session, peer))
             peers_task = await g.spawn(self._send_peers_subscribe
                                        (session, peer))
@@ -380,16 +379,13 @@ class PeerManager(object):
             # We only care to wait for the response
             await session.send_request('server.add_peer', [features])
 
-    async def _send_headers_subscribe(self, session, peer, ptuple):
+    async def _send_headers_subscribe(self, session, peer):
         message = 'blockchain.headers.subscribe'
         result = await session.send_request(message)
         assert_good(message, result, dict)
 
         our_height = self.db.db_height
-        if ptuple < (1, 3):
-            their_height = result.get('block_height')
-        else:
-            their_height = result.get('height')
+        their_height = result.get('height')
         if not isinstance(their_height, int):
             raise BadPeerError(f'invalid height {their_height}')
         if abs(our_height - their_height) > 5:
@@ -399,24 +395,13 @@ class PeerManager(object):
         # Check prior header too in case of hard fork.
         check_height = min(our_height, their_height)
         raw_header = await self.db.raw_header(check_height)
-        if ptuple >= (1, 4):
-            ours = raw_header.hex()
-            message = 'blockchain.block.header'
-            theirs = await session.send_request(message, [check_height])
-            assert_good(message, theirs, str)
-            if ours != theirs:
-                raise BadPeerError(f'our header {ours} and '
-                                   f'theirs {theirs} differ')
-        else:
-            ours = self.env.coin.electrum_header(raw_header, check_height)
-            ours = ours.get('prev_block_hash')
-            message = 'blockchain.block.get_header'
-            theirs = await session.send_request(message, [check_height])
-            assert_good(message, theirs, dict)
-            theirs = theirs.get('prev_block_hash')
-            if ours != theirs:
-                raise BadPeerError(f'our header hash {ours} and '
-                                   f'theirs {theirs} differ')
+        ours = raw_header.hex()
+        message = 'blockchain.block.header'
+        theirs = await session.send_request(message, [check_height])
+        assert_good(message, theirs, str)
+        if ours != theirs:
+            raise BadPeerError(f'our header {ours} and '
+                               f'theirs {theirs} differ')
 
     async def _send_server_features(self, session, peer):
         message = 'server.features'
