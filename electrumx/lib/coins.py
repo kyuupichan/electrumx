@@ -680,6 +680,19 @@ class Viacoin(AuxPowMixin, Coin):
         'viax1.bitops.me s t',
     ]
 
+    # Auxpow is redundant in SPV, truncate it from headers
+    @classmethod
+    def block_header(cls, block, height):
+        return super().block_header(block, height)[:cls.BASIC_HEADER_SIZE]
+
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        full_header = super().block_header(raw_block, height)
+        header = full_header[:cls.BASIC_HEADER_SIZE]
+        txs = cls.DESERIALIZER(raw_block, start=len(full_header)).read_tx_block()
+        return Block(raw_block, header, txs)
+
 
 class ViacoinTestnet(Viacoin):
     SHORTNAME = "TVI"
