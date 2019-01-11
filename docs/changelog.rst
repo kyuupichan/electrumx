@@ -8,6 +8,11 @@
    should not occur with Python 3.7.
 
 
+Version 1.9.1 (11 Jan 2019)
+===========================
+
+* fix `#684`_
+
 Version 1.9.0 (10 Jan 2019)
 ===========================
 
@@ -195,3 +200,4 @@ Version 1.6  (19 July 2018)
 .. _#632: https://github.com/kyuupichan/electrumx/issues/630
 .. _#653: https://github.com/kyuupichan/electrumx/issues/653
 .. _#655: https://github.com/kyuupichan/electrumx/issues/655
+.. _#684: https://github.com/kyuupichan/electrumx/issues/684
