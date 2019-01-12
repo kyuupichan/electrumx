@@ -1268,7 +1268,6 @@ class Peercoin(Coin):
     GENESIS_HASH = ('0000000032fe677166d54963b62a4677'
                     'd8957e87c508eaa4fd7eb1c880cd27e3')
     DESERIALIZER = lib_tx.DeserializerTxTime
-    DAEMON = daemon.LegacyRPCDaemon
     TX_COUNT = 1207356
     TX_COUNT_HEIGHT = 306425
     TX_PER_BLOCK = 4
