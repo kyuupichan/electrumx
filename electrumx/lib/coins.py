@@ -701,6 +701,28 @@ class ViacoinTestnetSegWit(ViacoinTestnet):
     DESERIALIZER = lib_tx.DeserializerSegWit
 
 
+class Unitus(Coin):
+    NAME = "Unitus"
+    SHORTNAME = "UIS"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("44")
+    P2SH_VERBYTES = [bytes.fromhex("0A")]
+    WIF_BYTE = bytes.fromhex("84")
+    GENESIS_HASH = ('d8a2b2439d013a59f3bfc626a33487a3'
+                    'd7d27e42a3c9e0b81af814cd8e592f31')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 3484561
+    TX_COUNT_HEIGHT = 1697605
+    TX_PER_BLOCK = 3
+    RPC_PORT = 50604
+    REORG_LIMIT = 2000
+    PEERS = [
+        'electrumx.unituscurrency.com s t',
+    ]
+
+
 # Source: namecoin.org
 class Namecoin(AuxPowMixin, Coin):
     NAME = "Namecoin"
