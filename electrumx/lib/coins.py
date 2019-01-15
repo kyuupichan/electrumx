@@ -539,6 +539,17 @@ class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
     ]
 
 
+class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
+    '''Bitcoin Testnet for Bitcoin Cash daemons.'''
+    NAME = "BitcoinCashABC"
+    PEERS = [
+        'bch0.kister.net t s',
+        'testnet.imaginary.cash t50001 s50002',
+        'blackie.c3-soft.com t60001 s60002',
+    ]
+    BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
+
+
 class BitcoinSVRegtest(BitcoinSVTestnet):
     NET = "regtest"
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
