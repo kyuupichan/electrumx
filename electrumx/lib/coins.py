@@ -1315,6 +1315,18 @@ class Peercoin(Coin):
     ]
 
 
+class PeercoinTestnet(Peercoin):
+    NAME = "PeercoinTestnet"
+    SHORTNAME = "tPPC"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("6f")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('00000001f757bb737f6596503e17cd17'
+                    'b0658ce630cc727c0cca81aec47c9f06')
+    ESTIMATE_FEE = 0.001
+
+
 class Trezarcoin(Coin):
     NAME = "Trezarcoin"
     SHORTNAME = "TZC"
