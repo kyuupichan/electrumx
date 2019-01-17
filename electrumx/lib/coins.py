@@ -1302,6 +1302,7 @@ class Peercoin(Coin):
                     'd8957e87c508eaa4fd7eb1c880cd27e3')
     DESERIALIZER = lib_tx.DeserializerTxTime
     DAEMON = daemon.FakeEstimateFeeDaemon
+    VALUE_PER_COIN = 1000000
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
     TX_COUNT = 1207356
