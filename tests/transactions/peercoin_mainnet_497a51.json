@@ -13,7 +13,7 @@
     ],
     "vout": [
      {
-      "value": 43.41,
+      "value": 43410000,
       "n": 0,
       "scriptPubKey": {
        "asm": "02b69c7e77f1db1fbf0cb9f0393e3058c8bbc660d1b2b03c5978a89576bca41890 OP_CHECKSIG",

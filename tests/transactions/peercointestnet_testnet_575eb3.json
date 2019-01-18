@@ -26,7 +26,7 @@
       }
     },
     {
-      "value": 1008.9,
+      "value": 1008900000,
       "n": 1,
       "scriptPubKey": {
         "asm": "02ed1b78f2dd015603be7d7a108ea26c1e9535f98a4e3c8ddd7dc6291e378009b0 OP_CHECKSIG",
@@ -39,7 +39,7 @@
       }
     },
     {
-      "value": 1008.9,
+      "value": 1008900000,
       "n": 2,
       "scriptPubKey": {
         "asm": "02ed1b78f2dd015603be7d7a108ea26c1e9535f98a4e3c8ddd7dc6291e378009b0 OP_CHECKSIG",
