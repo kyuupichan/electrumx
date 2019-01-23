@@ -56,7 +56,7 @@ def non_negative_integer(value):
         value = int(value)
         if value >= 0:
             return value
-    except ValueError:
+    except (ValueError, TypeError):
         pass
     raise RPCError(BAD_REQUEST,
                    f'{value} should be a non-negative integer')
@@ -1106,6 +1106,7 @@ class ElectrumX(SessionBase):
         height: the height of the block it is in
         '''
         assert_tx_hash(tx_hash)
+        height = non_negative_integer(height)
         block_hash, tx_hashes = await self._block_hash_and_tx_hashes(height)
         try:
             pos = tx_hashes.index(tx_hash)
@@ -1120,6 +1121,7 @@ class ElectrumX(SessionBase):
         a block height and position in the block.
         '''
         tx_pos = non_negative_integer(tx_pos)
+        height = non_negative_integer(height)
         if merkle not in (True, False):
             raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
 
