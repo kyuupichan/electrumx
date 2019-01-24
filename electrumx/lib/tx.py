@@ -34,6 +34,7 @@ from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.script import OpCodes
 from electrumx.lib.util import (
     unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
+    unpack_be_uint16_from,
     unpack_le_uint32_from, unpack_le_uint64_from, pack_le_int32, pack_varint,
     pack_le_uint32, pack_le_int64, pack_varbytes,
 )
@@ -191,6 +192,11 @@ class Deserializer(object):
 
     def _read_le_uint16(self):
         result, = unpack_le_uint16_from(self.binary, self.cursor)
+        self.cursor += 2
+        return result
+
+    def _read_be_uint16(self):
+        result, = unpack_be_uint16_from(self.binary, self.cursor)
         self.cursor += 2
         return result
 
