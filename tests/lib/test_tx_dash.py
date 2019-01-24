@@ -217,7 +217,7 @@ def test_dash_tx_pro_reg_tx():
     assert extra.collateralOutpoint.index == 1
     assert len(extra.ipAddress) == 16
     assert extra.ipAddress == bfh('00000000000000000000ffff12ca34aa')
-    assert extra.port == 12149
+    assert extra.port == 29999
     assert len(extra.KeyIdOwner) == 20
     assert extra.KeyIdOwner == bfh(
         '2b3edeed6842db1f59cf35de1ab5721094f049d0')
@@ -255,7 +255,7 @@ def test_dash_tx_pro_up_serv_tx():
         '3c6dca244f49f19d3f09889753ffff1fec5bb8f9f5bd5bc09dabd999da21198f')
     assert len(extra.ipAddress) == 16
     assert extra.ipAddress == bfh('00000000000000000000ffff5fb73580')
-    assert extra.port == 4391
+    assert extra.port == 10001
     assert extra.scriptOperatorPayout == bfh(
         '76a91421851058431a7d722e8e8dd9509e7f2b8e7042ec88ac')
     assert len(extra.inputsHash) == 32
