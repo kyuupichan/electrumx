@@ -692,7 +692,7 @@ class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
     PROTOCOL_MIN = (1, 4)
-    PROTOCOL_MAX = (1, 4)
+    PROTOCOL_MAX = (1, 4, 1)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1393,3 +1393,48 @@ class SmartCashElectrumX(DashElectrumX):
         if result is not None:
             return result
         return None
+
+
+class AuxPoWElectrumX(ElectrumX):
+    async def block_header(self, height, cp_height=0):
+        result = await super().block_header(height, cp_height)
+
+        # Older protocol versions don't truncate AuxPoW
+        if self.protocol_tuple < (1, 4, 1):
+            return result
+
+        # Not covered by a checkpoint; return full AuxPoW data
+        if cp_height == 0:
+            return result
+
+        # Covered by a checkpoint; truncate AuxPoW data
+        result['header'] = self.truncate_auxpow(result['header'], height)
+        return result
+
+    async def block_headers(self, start_height, count, cp_height=0):
+        result = await super().block_headers(start_height, count, cp_height)
+
+        # Older protocol versions don't truncate AuxPoW
+        if self.protocol_tuple < (1, 4, 1):
+            return result
+
+        # Not covered by a checkpoint; return full AuxPoW data
+        if cp_height == 0:
+            return result
+
+        # Covered by a checkpoint; truncate AuxPoW data
+        result['hex'] = self.truncate_auxpow(result['hex'], start_height)
+        return result
+
+    def truncate_auxpow(self, headers_full_hex, start_height):
+        height = start_height
+        headers_full = util.hex_to_bytes(headers_full_hex)
+        cursor = 0
+        headers = bytearray()
+
+        while cursor < len(headers_full):
+            headers.extend(headers_full[cursor:cursor+self.coin.BASIC_HEADER_SIZE])
+            cursor += self.db.dynamic_header_len(height)
+            height += 1
+
+        return headers.hex()

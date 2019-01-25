@@ -11,7 +11,7 @@ Return the block header at the given height.
 
   .. function:: blockchain.block.header(height, cp_height=0)
   .. versionadded:: 1.3
-  .. versionchanged:: 1.4
+  .. versionchanged:: 1.4.1
      *cp_height* parameter added
 
   *height*
@@ -40,7 +40,8 @@ Return the block header at the given height.
 
   * *header*
 
-    The raw block header as a hexadecimal string.
+    The raw block header as a hexadecimal string.  Starting with version 1.4.1,
+    AuxPoW data (if present in the original header) is truncated.
 
   * *root*
 
@@ -80,7 +81,7 @@ Return a concatenated chunk of block headers from the main chain.
 
   .. function:: blockchain.block.headers(start_height, count, cp_height=0)
   .. versionadded:: 1.2
-  .. versionchanged:: 1.4
+  .. versionchanged:: 1.4.1
      *cp_height* parameter added
 
   *start_height*
@@ -112,7 +113,8 @@ Return a concatenated chunk of block headers from the main chain.
   * *hex*
 
     The binary block headers concatenated together in-order as a
-    hexadecimal string.
+    hexadecimal string.  Starting with version 1.4.1, AuxPoW data (if present
+    in the original header) is truncated if *cp_height* is nonzero.
 
   * *max*
 

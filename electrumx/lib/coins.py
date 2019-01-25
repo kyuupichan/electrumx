@@ -46,7 +46,7 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -258,6 +258,7 @@ class Coin(object):
 class AuxPowMixin(object):
     STATIC_BLOCK_HEADERS = False
     DESERIALIZER = lib_tx.DeserializerAuxPow
+    SESSIONCLS = AuxPoWElectrumX
 
     @classmethod
     def header_hash(cls, header):
