@@ -749,6 +749,7 @@ class Namecoin(AuxPowMixin, Coin):
     TX_COUNT = 4415768
     TX_COUNT_HEIGHT = 329065
     TX_PER_BLOCK = 10
+    RPC_PORT = 8336
     PEERS = [
         'elec.luggs.co s446',
     ]
