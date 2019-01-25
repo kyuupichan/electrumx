@@ -751,6 +751,8 @@ class Namecoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 10
     PEERS = [
         'elec.luggs.co s446',
+        'luggscoqbymhvnkp.onion t82',
+        'ulrichard.ch s50006 t50005',
     ]
     BLOCK_PROCESSOR = block_proc.NamecoinBlockProcessor
 
