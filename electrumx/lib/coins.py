@@ -68,6 +68,7 @@ class Coin(object):
     BASIC_HEADER_SIZE = 80
     STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
+    DEFAULT_MAX_SEND = 1000000
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
     BLOCK_PROCESSOR = block_proc.BlockProcessor
@@ -259,6 +260,10 @@ class AuxPowMixin(object):
     STATIC_BLOCK_HEADERS = False
     DESERIALIZER = lib_tx.DeserializerAuxPow
     SESSIONCLS = AuxPoWElectrumX
+    # AuxPoW headers are significantly larger, so the DEFAULT_MAX_SEND from
+    # Bitcoin is insufficient.  In Namecoin mainnet, 5 MB wasn't enough to
+    # sync, while 10 MB worked fine.
+    DEFAULT_MAX_SEND = 10000000
 
     @classmethod
     def header_hash(cls, header):
