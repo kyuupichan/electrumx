@@ -1175,7 +1175,7 @@ class LocalRPC(SessionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = 'RPC'
-        self.connection._max_response_size = 0
+        self.connection.max_response_size = 0
 
     def protocol_version_string(self):
         return 'RPC'
