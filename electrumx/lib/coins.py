@@ -624,6 +624,17 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'testnet.qtornado.com s t',
     ]
 
+    @classmethod
+    def upgrade_required(cls, client_ver):
+        if client_ver < (3, 3, 3):
+            return ('<br/><br/>'
+                    'Your transaction was successfully broadcast.<br/><br/>'
+                    'However, you are using a VULNERABLE version of Electrum.<br/>'
+                    'Download the new version from the usual place:<br/>'
+                    'https://electrum.org/'
+                    '<br/><br/>')
+        return False
+
 
 class BitcoinSegwitRegtest(BitcoinSegwitTestnet):
     NAME = "BitcoinSegwit"
