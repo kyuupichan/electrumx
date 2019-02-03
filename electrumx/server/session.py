@@ -342,7 +342,7 @@ class SessionManager(object):
         # Paranoia: a reorg could race and leave db_height lower
         height = min(height, self.db.db_height)
         raw = await self.raw_header(height)
-        self.hsub_results = {'hex': raw.hex(), 'height': height}
+        self.hsub_results = (electrum, {'hex': raw.hex(), 'height': height})
         self.notified_height = height
 
     # --- LocalRPC command handlers
@@ -697,6 +697,7 @@ class ElectrumX(SessionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscribe_headers = False
+        self.subscribe_headers_raw = False
         self.connection.max_response_size = self.env.max_send
         self.max_subs = self.env.max_session_subs
         self.hashX_subs = {}
@@ -779,12 +780,17 @@ class ElectrumX(SessionBase):
 
     async def subscribe_headers_result(self):
         '''The result of a header subscription or notification.'''
-        return self.session_mgr.hsub_results
+        return self.session_mgr.hsub_results[self.subscribe_headers_raw]
+
+    async def _headers_subscribe(self, raw):
+        '''Subscribe to get headers of new blocks.'''
+        self.subscribe_headers_raw = assert_boolean(raw)
+        self.subscribe_headers = True
+        return await self.subscribe_headers_result()
 
     async def headers_subscribe(self):
         '''Subscribe to get raw headers of new blocks.'''
-        self.subscribe_headers = True
-        return await self.subscribe_headers_result()
+        return await self._headers_subscribe(True)
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
