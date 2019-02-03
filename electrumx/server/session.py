@@ -1149,7 +1149,7 @@ class ElectrumX(SessionBase):
                 msg = self.coin.upgrade_required(client_ver)
                 if msg:
                     self.logger.info(f'sent tx: {hex_hash}. and warned user to upgrade their '
-                                     'client from {self.client}')
+                                     f'client from {self.client}')
                     return msg
 
             self.logger.info(f'sent tx: {hex_hash}')
