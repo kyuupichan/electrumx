@@ -31,6 +31,7 @@ necessary for appropriate handling.
 '''
 
 from collections import namedtuple
+import base64
 import re
 import struct
 from decimal import Decimal
