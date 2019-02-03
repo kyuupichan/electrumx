@@ -272,11 +272,16 @@ def is_valid_hostname(hostname):
     return all(SEGMENT_REGEX.match(x) for x in hostname.split("."))
 
 
+VERSION_CLEANUP_REGEX = re.compile(r'([0-9.]*)')
+
+
 def protocol_tuple(s):
     '''Converts a protocol version number, such as "1.0" to a tuple (1, 0).
 
     If the version number is bad, (0, ) indicating version 0 is returned.'''
     try:
+        # clean up extra text at end of version e.g. '3.3.4CS' -> '3.3.4'
+        s = VERSION_CLEANUP_REGEX.match(s).group(1)
         return tuple(int(part) for part in s.split('.'))
     except Exception:
         return (0, )
