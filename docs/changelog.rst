@@ -8,6 +8,18 @@
    should not occur with Python 3.7.
 
 
+Version 1.9.2 (03 Feb 2019)
+===========================
+
+* restore protocol version 1.2 and send a warning for old BTC Electrum clients that they
+  need to upgrade.  This is an attempt to protect users of old versions of Electrum from
+  the ongoing phishing attacks
+* increase default MAX_SEND for AuxPow Chains.  Truncate AuxPow for block heights covered
+  by a checkpoint.  (jeremyrand)
+* coin additions / updates: NMC (jeremyrand), Dash (zebra-lucky), PeerCoin (peerchemist),
+  BCH testnet (Mark Lundeberg), Unitus (ChekaZ)
+* tighter RPC param checking (ghost43)
+
 Version 1.9.1 (11 Jan 2019)
 ===========================
 
