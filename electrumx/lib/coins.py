@@ -265,6 +265,10 @@ class Coin(object):
         h['merkle_root'] = hash_to_hex_str(h['merkle_root'])
         return h
 
+    @classmethod
+    def upgrade_required(cls, client_ver):
+        return False
+
 
 class AuxPowMixin(object):
     STATIC_BLOCK_HEADERS = False
@@ -419,6 +423,17 @@ class BitcoinSegwit(BitcoinMixin, Coin):
         'node.arihanc.com s t',
         'arihancckjge66iv.onion s t',
     ]
+
+    @classmethod
+    def upgrade_required(cls, client_ver):
+        if client_ver < (3, 3, 3):
+            return ('<br/><br/>'
+                    'Your transaction was successfully broadcast.<br/><br/>'
+                    'However, you are using a VULNERABLE version of Electrum.<br/>'
+                    'Download the new version from the usual place:<br/>'
+                    'https://electrum.org/'
+                    '<br/><br/>')
+        return False
 
 
 class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
