@@ -403,6 +403,17 @@ class BitcoinCash(BitcoinMixin, Coin):
     ]
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
+    @classmethod
+    def upgrade_required(cls, client_ver):
+        if client_ver < (3, 3, 4):
+            return ('<br/><br/>'
+                    'Your transaction was successfully broadcast.<br/><br/>'
+                    'However, you are using a VULNERABLE version of Electron Cash.<br/>'
+                    'Download the latest version from this web site ONLY:<br/>'
+                    'https://electroncash.org/'
+                    '<br/><br/>')
+        return False
+
 
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
@@ -599,6 +610,17 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
         'blackie.c3-soft.com t60001 s60002',
     ]
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
+
+    @classmethod
+    def upgrade_required(cls, client_ver):
+        if client_ver < (3, 3, 4):
+            return ('<br/><br/>'
+                    'Your transaction was successfully broadcast.<br/><br/>'
+                    'However, you are using a VULNERABLE version of Electron Cash.<br/>'
+                    'Download the latest version from this web site ONLY:<br/>'
+                    'https://electroncash.org/'
+                    '<br/><br/>')
+        return False
 
 
 class BitcoinSVRegtest(BitcoinSVTestnet):
