@@ -307,7 +307,7 @@ class PeerManager(object):
 
         # Process reported peers if remote peer is good
         peers = peers_task.result()
-        if await self._note_peers(peers, check_matches=True):
+        if await self._note_peers(peers, check_matches=not peer.is_tor):
             features = self._features_to_register(peer, peers)
             if features:
                 self.logger.info(f'registering ourself with {peer}')
