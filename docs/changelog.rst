@@ -8,6 +8,12 @@
    should not occur with Python 3.7.
 
 
+Version 1.9.3 (05 Feb 2019)
+===========================
+
+* ignore potential sybil peers
+* coin additions / updates: BitcoinCashABC (cculianu), Monacoin (wakiyamap)
+
 Version 1.9.2 (03 Feb 2019)
 ===========================
 
