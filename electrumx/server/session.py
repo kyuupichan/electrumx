@@ -714,6 +714,7 @@ class ElectrumX(SessionBase):
         self.sv_seen = False
         self.mempool_statuses = {}
         self.set_request_handlers(self.PROTOCOL_MIN)
+        self.is_peer = False
 
     @classmethod
     def protocol_min_max_strings(cls):
@@ -812,11 +813,12 @@ class ElectrumX(SessionBase):
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
+        self.is_peer = True
         return await self.peer_mgr.on_add_peer(features, self.peer_address())
 
     async def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
-        return self.peer_mgr.on_peers_subscribe(self.is_tor())
+        return self.peer_mgr.on_peers_subscribe(self.is_tor(), self.is_peer)
 
     async def address_status(self, hashX):
         '''Returns an address status.
