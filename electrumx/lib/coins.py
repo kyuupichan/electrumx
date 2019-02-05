@@ -2646,7 +2646,6 @@ class Sparks(Coin):
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
     XPRV_VERBYTES = bytes.fromhex("0488ADE4")
-
     GENESIS_HASH = ('00000a5c6ddfaac5097218560d5b92d4'
                     '16931cfeba1abf10c81d1d6a232fc8ea')
     P2PKH_VERBYTE = bytes.fromhex("26")
@@ -2656,9 +2655,6 @@ class Sparks(Coin):
     TX_COUNT = 162310
     TX_PER_BLOCK = 4
     RPC_PORT = 8818
-    PEERS = [
-    ]
-
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
 
@@ -2666,4 +2662,3 @@ class Sparks(Coin):
     def header_hash(cls, header):
         import neoscrypt
         return neoscrypt.getPoWHash(header)
-
