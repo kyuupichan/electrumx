@@ -2638,3 +2638,32 @@ class MyriadcoinTestnet(Myriadcoin):
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('0000017ce2a79c8bddafbbe47c004aa9'
                     '2b20678c354b34085f62b762084b9788')
+
+
+class Sparks(Coin):
+    NAME = "Sparks"
+    SHORTNAME = "SPK"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+
+    GENESIS_HASH = ('00000a5c6ddfaac5097218560d5b92d4'
+                    '16931cfeba1abf10c81d1d6a232fc8ea')
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("0A")]
+    WIF_BYTE = bytes.fromhex("C6")
+    TX_COUNT_HEIGHT = 117400
+    TX_COUNT = 162310
+    TX_PER_BLOCK = 4
+    RPC_PORT = 8818
+    PEERS = [
+    ]
+
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
+
