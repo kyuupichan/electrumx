@@ -115,6 +115,7 @@ def main():
         try:
             async with timeout_after(15):
                 async with Connector(RPCSession, 'localhost', port) as session:
+                    session.framer.max_size = 0
                     result = await session.send_request(method, args)
                     if method in ('query', ):
                         for line in result:
