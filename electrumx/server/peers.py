@@ -79,6 +79,7 @@ class PeerManager(object):
         self.group = TaskGroup()
         # refreshed
         self.blacklist = set()
+        self.sybils = set()
 
     def _my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -335,13 +336,13 @@ class PeerManager(object):
         # Process reported peers if remote peer is good
         peers = peers_task.result()
         if await self._note_peers(peers, check_matches=not peer.is_tor):
-            features = self._features_to_register(peer, peers)
-            if features:
-                self.logger.info(f'registering ourself with {peer}')
-                # We only care to wait for the response
-                await session.send_request('server.add_peer', [features])
-        else:
-            raise BadPeerError('potential sybil detected')
+            self.sybils.add(peer.host)
+
+        features = self._features_to_register(peer, peers)
+        if features:
+            self.logger.info(f'registering ourself with {peer}')
+            # We only care to wait for the response
+            await session.send_request('server.add_peer', [features])
 
     async def _send_headers_subscribe(self, session, peer, ptuple):
         message = 'blockchain.headers.subscribe'
@@ -507,6 +508,9 @@ class PeerManager(object):
 
         if not is_peer:
             recent = filter(self._is_allowed, recent)
+            recent = [peer for peer in self.peers
+                      if self._is_allowed(peer)
+                      and peer.host in self.sybils]
 
         # Always report ourselves if valid (even if not public)
         peers = set(myself for myself in self.myselves
