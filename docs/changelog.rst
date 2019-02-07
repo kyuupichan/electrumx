@@ -8,6 +8,12 @@
    should not occur with Python 3.7.
 
 
+Version 1.9.4 (07 Feb 2019)
+===========================
+
+* require aiorpcX 0.10.3
+* fix `#713`_
+
 Version 1.9.3 (05 Feb 2019)
 ===========================
 
@@ -142,67 +148,12 @@ Version 1.8  (06 Aug 2018)
   Decred (erasmonpsunk)
 * other minor (smmalis37)
 
-Version 1.7.3  (01 Aug 2018)
-============================
-
-* fix `#538`_
-
-Version 1.7.2  (29 Jul 2018)
-============================
-
-* require aiorpcX 0.5.9; 0.5.8 didn't work on Python 3.7
-
-Version 1.7.1  (28 Jul 2018)
-============================
-
-* switch to aiorpcX 0.5.8 which implements some curio task management
-  primitives on top of asyncio that make writing correct async code
-  much easier, as well as making it simpler to reason about
-* use those primitives to restructure the peer manager, which is now
-  fully concurrent again, as well as the block processor and
-  controller
-* fix `#534`_ introduced in 1.7
-* minor coin tweaks (ghost43, cipig)
-
-Version 1.7  (25 Jul 2018)
-==========================
-
-* completely overhauled mempool and address notifications
-  implementation.  Cleaner and a lot more efficient, especially for
-  initial synchronization of the mempool.  Mempool handling is fully
-  asynchronous and doesn't hinder client responses or block
-  processing.
-* peer discovery cleaned up, more work remains
-* cleaner shutdown process with clear guarantees
-* aiohttp min version requirement raised to 2.0
-* onion peers are ignored if no tor proxy is available
-* add Motion coin (ocruzv), MinexCoin (joesixpack)
-
-Version 1.6  (19 July 2018)
-===========================
-
-* implement :ref:`version 1.4` of the protocol, with benefit for light
-  clients, particularly mobile
-* implement header proofs and merkle caches
-* implement :func:`blockchain.transaction.id_from_pos` (ghost43)
-* large refactoring of session and controller classes
-* recent blocks are now stored on disk.  When backing up in a reorg
-  ElectrumX uses these rather than asking the daemon for the blocks --
-  some daemons cannot correctly handle orphaned block requests after
-  a reorg.  Fixes `#258`_, `#315`_, `#479`_
-* minor fixes: nijel
-
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
 1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
 
-.. _#258: https://github.com/kyuupichan/electrumx/issues/258
-.. _#315: https://github.com/kyuupichan/electrumx/issues/315
-.. _#479: https://github.com/kyuupichan/electrumx/issues/479
 .. _#521: https://github.com/kyuupichan/electrumx/issues/521
-.. _#534: https://github.com/kyuupichan/electrumx/issues/534
-.. _#538: https://github.com/kyuupichan/electrumx/issues/538
 .. _#552: https://github.com/kyuupichan/electrumx/issues/552
 .. _#554: https://github.com/kyuupichan/electrumx/issues/554
 .. _#557: https://github.com/kyuupichan/electrumx/issues/557
@@ -219,3 +170,4 @@ Version 1.6  (19 July 2018)
 .. _#653: https://github.com/kyuupichan/electrumx/issues/653
 .. _#655: https://github.com/kyuupichan/electrumx/issues/655
 .. _#684: https://github.com/kyuupichan/electrumx/issues/684
+.. _#713: https://github.com/kyuupichan/electrumx/issues/713

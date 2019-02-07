@@ -15,7 +15,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
-VERSION="ElectrumX 1.9.3"
+VERSION="ElectrumX 1.9.4"
 
 # -- Project information -----------------------------------------------------
 
