@@ -11,8 +11,9 @@ Return the block header at the given height.
 
   .. function:: blockchain.block.header(height, cp_height=0)
   .. versionadded:: 1.3
-  .. versionchanged:: 1.4.1
+  .. versionchanged:: 1.4
      *cp_height* parameter added
+  .. versionchanged:: 1.4.1
 
   *height*
 
@@ -81,8 +82,9 @@ Return a concatenated chunk of block headers from the main chain.
 
   .. function:: blockchain.block.headers(start_height, count, cp_height=0)
   .. versionadded:: 1.2
-  .. versionchanged:: 1.4.1
+  .. versionchanged:: 1.4
      *cp_height* parameter added
+  .. versionchanged:: 1.4.1
 
   *start_height*
 
