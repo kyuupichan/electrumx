@@ -171,3 +171,4 @@ Version 1.8  (06 Aug 2018)
 .. _#655: https://github.com/kyuupichan/electrumx/issues/655
 .. _#684: https://github.com/kyuupichan/electrumx/issues/684
 .. _#713: https://github.com/kyuupichan/electrumx/issues/713
+.. _#727: https://github.com/kyuupichan/electrumx/issues/727
