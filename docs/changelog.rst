@@ -8,6 +8,14 @@
    should not occur with Python 3.7.
 
 
+Version 1.9.5 (08 Feb 2019)
+===========================
+
+* server blacklist logic (ecdsa)
+* require aiorpcX 0.10.4
+* remove dead wallet code
+* fix `#727`_ - not listing same peer twice
+
 Version 1.9.4 (07 Feb 2019)
 ===========================
 
