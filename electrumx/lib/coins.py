@@ -2201,7 +2201,12 @@ class GINCoin(Coin):
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         import neoscrypt
-        return neoscrypt.getPoWHash(header)
+        import lyra2z_hash
+        height, = util.unpack_le_uint32_from(header, 68)
+        if height > 44211:
+            return lyra2z_hash.getPoWHash(header)
+        else:
+            return neoscrypt.getPoWHash(header)
 
 
 
