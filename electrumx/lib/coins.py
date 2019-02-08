@@ -2176,6 +2176,35 @@ class Polis(Coin):
         return x11_hash.getPoWHash(header)
 
 
+class GINCoin(Coin):
+    NAME = "GINCoin"
+    SHORTNAME = "GIN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('00000cd6bde619b2c3b23ad2e384328a'
+                    '450a37fa28731debf748c3b17f91f97d')
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("38")]
+    WIF_BYTE = bytes.fromhex("3c")
+    TX_COUNT_HEIGHT = 225000
+    TX_COUNT = 470784
+    TX_PER_BLOCK = 4
+    RPC_PORT = 10211
+    PEERS = [
+        'electrum.polispay.com'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
+
+
+
 class MNPCoin(Coin):
     NAME = "MNPCoin"
     SHORTNAME = "MNP"
