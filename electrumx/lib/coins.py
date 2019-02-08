@@ -2203,7 +2203,7 @@ class GINCoin(Coin):
         import neoscrypt
         import lyra2z_hash
         height, = util.unpack_le_uint32_from(header, 68)
-        if height > 44262:
+        if height > 44209:
             return lyra2z_hash.getPoWHash(header)
         else:
             return neoscrypt.getPoWHash(header)
