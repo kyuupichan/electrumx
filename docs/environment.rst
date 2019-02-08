@@ -347,7 +347,8 @@ some of this.
 
 .. envvar:: BLACKLIST_URL
 
-  URL to retrieve a list of blacklisted peers.
+  URL to retrieve a list of blacklisted peers.  If not set, a coin-
+  specific default is used.
 
 
 
