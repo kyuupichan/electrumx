@@ -2176,6 +2176,34 @@ class Polis(Coin):
         return x11_hash.getPoWHash(header)
 
 
+class MNPCoin(Coin):
+    NAME = "MNPCoin"
+    SHORTNAME = "MNP"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('00000924036c67d803ce606ded814312'
+                    '7e62fa2111dd3b063880a1067c69ccb1')
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("35")]
+    WIF_BYTE = bytes.fromhex("37")
+    TX_COUNT_HEIGHT = 248000
+    TX_COUNT = 506447
+    TX_PER_BLOCK = 4
+    RPC_PORT = 13373
+    PEERS = [
+        'electrum.polispay.com'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import quark_hash
+        return quark_hash.getPoWHash(header)
+
+
 class ColossusXT(Coin):
     NAME = "ColossusXT"
     SHORTNAME = "COLX"
