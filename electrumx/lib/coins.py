@@ -2179,7 +2179,7 @@ class Polis(Coin):
 class GINCoin(Coin):
     NAME = "GINCoin"
     SHORTNAME = "GIN"
-    LYRA2Z_FORK_HEIGHT = 44263
+    LYRA2Z_FORK_HEIGHT = 44264
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
     XPRV_VERBYTES = bytes.fromhex("0488ADE4")
