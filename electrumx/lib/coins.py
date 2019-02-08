@@ -2159,13 +2159,12 @@ class Polis(Coin):
     P2PKH_VERBYTE = bytes.fromhex("37")
     P2SH_VERBYTES = [bytes.fromhex("38")]
     WIF_BYTE = bytes.fromhex("3c")
-    TX_COUNT_HEIGHT = 111111
-    TX_COUNT = 256128
+    TX_COUNT_HEIGHT = 280600
+    TX_COUNT = 635415
     TX_PER_BLOCK = 4
     RPC_PORT = 24127
     PEERS = [
-        'electrum1-polis.polispay.org',
-        'electrum2-polis.polispay.org'
+        'electrum.polispay.com'
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
@@ -2181,8 +2180,8 @@ class ColossusXT(Coin):
     NAME = "ColossusXT"
     SHORTNAME = "COLX"
     NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("022D2533")
-    XPRV_VERBYTES = bytes.fromhex("0221312B")
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
     GENESIS_HASH = ('a0ce8206c908357008c1b9a8ba2813af'
                     'f0989ca7f72d62b14e652c55f02b4f5c')
     P2PKH_VERBYTE = bytes.fromhex("1E")
