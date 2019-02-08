@@ -174,20 +174,20 @@ class PeerManager(object):
     async def _note_peers(self, peers, limit=2, check_ports=False, source=None):
         '''Add a limited number of peers that are not already present.'''
         new_peers = []
-        known = []
+        match_set = self.peers.copy()
         for peer in peers:
             if not peer.is_public or (peer.is_tor and not self.proxy):
                 continue
 
-            matches = peer.matches(self.peers)
+            matches = peer.matches(match_set)
             if matches:
-                known.append(peer)
                 if check_ports:
                     for match in matches:
                         if match.check_ports(peer):
                             self.logger.info(f'ports changed for {peer}')
                             match.retry_event.set()
             else:
+                match_set.add(peer)
                 new_peers.append(peer)
 
         if new_peers:
