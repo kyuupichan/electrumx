@@ -12,6 +12,8 @@ import random
 import socket
 import ssl
 import time
+import json
+import aiohttp
 from collections import defaultdict, Counter
 
 from aiorpcx import (Connector, RPCSession, SOCKSProxy,
@@ -75,6 +77,9 @@ class PeerManager(object):
         self.permit_onion_peer_time = time.time()
         self.proxy = None
         self.group = TaskGroup()
+        # refreshed
+        self.blacklist = set()
+        self.sybils = set()
 
     def _my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -128,6 +133,29 @@ class PeerManager(object):
             imported_peers.extend(Peer.from_real_name(real_name, 'coins.py')
                                   for real_name in self.env.coin.PEERS)
         await self._note_peers(imported_peers, limit=None)
+
+    def _is_allowed(self, peer):
+        if peer.host in self.blacklist:
+            return False
+        if '*.' + '.'.join(peer.host.split('.')[-2:]) in self.blacklist:
+            return False
+        return True
+
+    async def _refresh_blacklist(self):
+        session = aiohttp.ClientSession()
+        url = self.env.blacklist_url
+        if url is None:
+            return
+        while True:
+            try:
+                async with session.get(url) as response:
+                    r = await response.text()
+                    self.blacklist = set(json.loads(r))
+                    self.logger.info('blacklist retrieved from "%s": %d'
+                                     % (url, len(self.blacklist)))
+            except Exception as e:
+                self.logger.info('could not retrieve blacklist, "%s"' % url)
+            await sleep(600)
 
     async def _detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
@@ -308,13 +336,13 @@ class PeerManager(object):
         # Process reported peers if remote peer is good
         peers = peers_task.result()
         if await self._note_peers(peers, check_matches=not peer.is_tor):
-            features = self._features_to_register(peer, peers)
-            if features:
-                self.logger.info(f'registering ourself with {peer}')
-                # We only care to wait for the response
-                await session.send_request('server.add_peer', [features])
-        else:
-            raise BadPeerError('potential sybil detected')
+            self.sybils.add(peer.host)
+
+        features = self._features_to_register(peer, peers)
+        if features:
+            self.logger.info(f'registering ourself with {peer}')
+            # We only care to wait for the response
+            await session.send_request('server.add_peer', [features])
 
     async def _send_headers_subscribe(self, session, peer, ptuple):
         message = 'blockchain.headers.subscribe'
@@ -401,6 +429,7 @@ class PeerManager(object):
         forever = Event()
         async with self.group as group:
             await group.spawn(forever.wait())
+            await group.spawn(self._refresh_blacklist())
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
             # Consume tasks as they complete, logging unexpected failures
@@ -464,7 +493,7 @@ class PeerManager(object):
 
         return permit
 
-    def on_peers_subscribe(self, is_tor):
+    def on_peers_subscribe(self, is_tor, is_peer):
         '''Returns the server peers as a list of (ip, host, details) tuples.
 
         We return all peers we've connected to in the last day.
@@ -476,6 +505,12 @@ class PeerManager(object):
                   if peer.last_good > cutoff and
                   not peer.bad and peer.is_public]
         onion_peers = []
+
+        if not is_peer:
+            recent = filter(self._is_allowed, recent)
+            recent = [peer for peer in self.peers
+                      if self._is_allowed(peer)
+                      and peer.host in self.sybils]
 
         # Always report ourselves if valid (even if not public)
         peers = set(myself for myself in self.myselves

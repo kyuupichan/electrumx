@@ -75,6 +75,10 @@ class Env(EnvBase):
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
+        self.blacklist_url = self.default('BLACKLIST_URL', None)
+        # temporary default
+        if self.blacklist_url is None and self.coin.NAME == 'BitcoinSegwit':
+            self.blacklist_url = 'https://electrum.org/blacklist.json'
 
         # Identities
         clearnet_identity = self.clearnet_identity()
