@@ -2220,8 +2220,7 @@ class ColossusXT(Coin):
     TX_PER_BLOCK = 4
     RPC_PORT = 51473
     PEERS = [
-        'electrum1-colx.polispay.org',
-        'electrum2-colx.polispay.org'
+        'electrum.polispay.com'
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
