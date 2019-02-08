@@ -407,7 +407,7 @@ def test_tor_identity():
 def test_ban_versions():
     e = Env()
     assert e.drop_client is None
-    ban_re = '1\.[0-2]\.\d+?[_\w]*'
+    ban_re = r'1\.[0-2]\.\d+?[_\w]*'
     os.environ['DROP_CLIENT'] = ban_re
     e = Env()
     assert e.drop_client == re.compile(ban_re)
