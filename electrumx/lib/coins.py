@@ -2179,6 +2179,7 @@ class Polis(Coin):
 class GINCoin(Coin):
     NAME = "GINCoin"
     SHORTNAME = "GIN"
+    LYRA2Z_FORK_HEIGHT = 44263
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
     XPRV_VERBYTES = bytes.fromhex("0488ADE4")
@@ -2203,7 +2204,7 @@ class GINCoin(Coin):
         import neoscrypt
         import lyra2z_hash
         height, = util.unpack_le_uint32_from(header, 68)
-        if height > 44209:
+        if height >= cls.LYRA2Z_FORK_HEIGHT:
             return lyra2z_hash.getPoWHash(header)
         else:
             return neoscrypt.getPoWHash(header)
