@@ -2216,6 +2216,10 @@ class ColossusXT(Coin):
     P2SH_VERBYTES = [bytes.fromhex("0D")]
     WIF_BYTE = bytes.fromhex("D4")
     TX_COUNT_HEIGHT = 356500
+    BASIC_HEADER_SIZE = 80
+    HDR_V5_HEIGHT = 500000
+    HDR_V5_SIZE = 112
+    HDR_V5_START_OFFSET = HDR_V5_HEIGHT * BASIC_HEADER_SIZE
     TX_COUNT = 761041
     TX_PER_BLOCK = 4
     RPC_PORT = 51473
@@ -2226,10 +2230,22 @@ class ColossusXT(Coin):
     DAEMON = daemon.DashDaemon
 
     @classmethod
+    def static_header_offset(cls, height):
+        assert cls.STATIC_BLOCK_HEADERS
+        if height >= cls.HDR_V5_HEIGHT:
+            relative_v4_offset = (height - cls.HDR_V5_HEIGHT) * cls.HDR_V5_SIZE
+            return cls.HDR_V5_START_OFFSET + relative_v4_offset
+        else:
+            return height * cls.BASIC_HEADER_SIZE
+
+    @classmethod
     def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import quark_hash
-        return quark_hash.getPoWHash(header)
+        version, = util.unpack_le_uint32_from(header)
+        if version >= 5:
+            return super().header_hash(header)
+        else:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
 
 
 class Minexcoin(EquihashMixin, Coin):
