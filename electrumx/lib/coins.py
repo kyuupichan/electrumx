@@ -2177,44 +2177,6 @@ class Polis(Coin):
         return x11_hash.getPoWHash(header)
 
 
-class GINCoin(Coin):
-    NAME = "GINCoin"
-    SHORTNAME = "GIN"
-    LYRA2Z_FORK_TIME = 1525651200
-    X16RT_FORK_TIME = 1550246400
-    NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("0488B21E")
-    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
-    GENESIS_HASH = ('00000cd6bde619b2c3b23ad2e384328a'
-                    '450a37fa28731debf748c3b17f91f97d')
-    P2PKH_VERBYTE = bytes.fromhex("37")
-    P2SH_VERBYTES = [bytes.fromhex("38")]
-    WIF_BYTE = bytes.fromhex("3c")
-    TX_COUNT_HEIGHT = 225000
-    TX_COUNT = 470784
-    TX_PER_BLOCK = 4
-    RPC_PORT = 10211
-    PEERS = [
-        'electrum.polispay.com'
-    ]
-    SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import neoscrypt
-        import lyra2z_hash
-        import x16rt_hash
-        timestamp, = util.unpack_le_uint32_from(header)
-        if timestamp > cls.X16RT_FORK_TIME:
-            return x16rt_hash.getPoWHash(header)
-        elif timestamp > cls.LYRA2Z_FORK_TIME:
-            return lyra2z_hash.getPoWHash(header)
-        else:
-            return neoscrypt.getPoWHash(header)
-
-
 class MNPCoin(Coin):
     NAME = "MNPCoin"
     SHORTNAME = "MNP"
