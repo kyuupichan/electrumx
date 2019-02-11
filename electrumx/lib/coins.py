@@ -1552,6 +1552,7 @@ class Monacoin(Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 9402
     REORG_LIMIT = 1000
+    BLACKLIST_URL = 'https://electrum-mona.org/blacklist.json'
     PEERS = [
         'electrumx.tamami-foundation.org s t',
         'electrumx2.tamami-foundation.org s t',
