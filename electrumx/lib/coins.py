@@ -2180,7 +2180,8 @@ class Polis(Coin):
 class GINCoin(Coin):
     NAME = "GINCoin"
     SHORTNAME = "GIN"
-    LYRA2Z_FORK_HEIGHT = 44264
+    LYRA2Z_FORK_TIME = 1525651200
+    X16RT_FORK_TIME = 1550246400
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
     XPRV_VERBYTES = bytes.fromhex("0488ADE4")
@@ -2204,12 +2205,14 @@ class GINCoin(Coin):
         '''Given a header return the hash.'''
         import neoscrypt
         import lyra2z_hash
-        height, = util.unpack_le_uint32_from(header, 68)
-        if height >= cls.LYRA2Z_FORK_HEIGHT:
+        import x16rt_hash
+        timestamp, = util.unpack_le_uint32_from(header)
+        if timestamp > cls.X16RT_FORK_TIME:
+            return x16rt_hash.getPoWHash(header)
+        elif timestamp > cls.LYRA2Z_FORK_TIME:
             return lyra2z_hash.getPoWHash(header)
         else:
             return neoscrypt.getPoWHash(header)
-
 
 
 class MNPCoin(Coin):
