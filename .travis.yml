@@ -37,6 +37,8 @@ install:
   - pip install groestlcoin_hash
   - pip install git+https://github.com/goacoincore/neoscrypt
   - pip install git+https://github.com/motioncrypto/x16r_hash
+  - pip install git+https://github.com/random-zebra/x16rt_hash
+  - pip install git+https://github.com/devwarrior777/lyra2z-py
   - pip install pycryptodomex
 # command to run tests
 script:
