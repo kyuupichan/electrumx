@@ -2149,6 +2149,61 @@ class PacTestnet(Pac):
     RPC_PORT = 17111
 
 
+class Zcoin(Coin):
+    NAME = "Zcoin"
+    SHORTNAME = "XZC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("52")
+    P2SH_VERBYTES = [bytes.fromhex("07")]
+    WIF_BYTE = bytes.fromhex("d2")
+    GENESIS_HASH = ('4381deb85b1b2c9843c222944b616d99'
+                    '7516dcbd6a964e1eaf0def0830695233')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 8888
+    PEERS = [
+        'electrum.polispay.com'
+    ]
+
+
+class GINCoin(Coin):
+    NAME = "GINCoin"
+    SHORTNAME = "GIN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('00000cd6bde619b2c3b23ad2e384328a'
+                    '450a37fa28731debf748c3b17f91f97d')
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("38")]
+    WIF_BYTE = bytes.fromhex("3c")
+    TX_COUNT_HEIGHT = 225000
+    TX_COUNT = 470784
+    TX_PER_BLOCK = 4
+    RPC_PORT = 10211
+    PEERS = [
+        'electrum.polispay.com'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        import neoscrypt
+        import lyra2z_hash
+        import x16r_hash
+        timestamp = util.unpack_le_uint32_from(header, 68)
+        if timestamp > 1550246400:
+            import x16r_hash
+            return x16r_hash.getPoWHash(header)
+        elif timestamp > 1525651200:
+            import lyra2z_hash
+            return lyra2z_hash.getPoWHash(header)
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
+
+
 class Polis(Coin):
     NAME = "Polis"
     SHORTNAME = "POLIS"
