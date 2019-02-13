@@ -2193,8 +2193,7 @@ class GINCoin(Coin):
         import neoscrypt
         import lyra2z_hash
         import x16rt_hash
-        timestamp = util.unpack_le_uint32_from(header, 68)
-        print(timestamp)
+        timestamp = util.unpack_le_uint32_from(header, 68)[0]
         if timestamp > 1550246400:
             import x16rt_hash
             return x16rt_hash.getPoWHash(header)
