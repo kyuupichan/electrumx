@@ -2194,6 +2194,7 @@ class GINCoin(Coin):
         import lyra2z_hash
         import x16rt_hash
         timestamp = util.unpack_le_uint32_from(header, 68)
+        print(timestamp)
         if timestamp > 1550246400:
             import x16rt_hash
             return x16rt_hash.getPoWHash(header)
