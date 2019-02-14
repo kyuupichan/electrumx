@@ -2158,13 +2158,61 @@ class Zcoin(Coin):
     WIF_BYTE = bytes.fromhex("d2")
     GENESIS_HASH = ('4381deb85b1b2c9843c222944b616d99'
                     '7516dcbd6a964e1eaf0def0830695233')
-    TX_COUNT = 1
-    TX_COUNT_HEIGHT = 1
-    TX_PER_BLOCK = 1
+    TX_COUNT = 667154
+    TX_COUNT_HEIGHT = 100266
+    TX_PER_BLOCK = 4000 # 2000 for 1MB block
+    IRC_PREFIX = None
     RPC_PORT = 8888
+    REORG_LIMIT = 5000
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
+    MTP_HEADER_EXTRA_SIZE = 100
+    MTP_HEADER_DATA_SIZE = 198864
+    MTP_HEADER_DATA_START = Coin.BASIC_HEADER_SIZE + MTP_HEADER_EXTRA_SIZE
+    MTP_HEADER_DATA_END = MTP_HEADER_DATA_START + MTP_HEADER_DATA_SIZE
+    STATIC_BLOCK_HEADERS = False
+    DAEMON = daemon.ZcoinMtpDaemon
     PEERS = [
         'electrum.polispay.com'
     ]
+    
+    @classmethod
+    def is_mtp(cls, header):
+        from electrumx.lib.util import unpack_le_uint32_from, hex_to_bytes
+        if isinstance(header, str):
+            nVersion, = unpack_le_uint32_from(hex_to_bytes(header[0:4*2]))
+        elif isinstance(header, bytes):
+            nVersion, = unpack_le_uint32_from(header[0:4])
+        else:
+            raise "Cannot handle the passed type"
+        return nVersion & 0x1000
+
+    @classmethod
+    def block_header(cls, block, height):
+        sz = cls.BASIC_HEADER_SIZE
+        if cls.is_mtp(block):
+            sz += cls.MTP_HEADER_EXTRA_SIZE
+        return block[:sz]
+
+    @classmethod
+    def header_hash(cls, header):
+        sz = cls.BASIC_HEADER_SIZE
+        if cls.is_mtp(header):
+            sz += cls.MTP_HEADER_EXTRA_SIZE
+        return double_sha256(header[:sz])
+
+
+class ZcoinTestnet(Zcoin):
+    SHORTNAME = "tXZC"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("41")
+    P2SH_VERBYTES = [bytes.fromhex("b2")]
+    WIF_BYTE = bytes.fromhex("b9")
+    GENESIS_HASH = '1e3487fdb1a7d46dac3e8f3e58339c6e' \
+                   'ff54abf6aef353485f3ed64250a35e89'
+    REORG_LIMIT = 8000
+    RPC_PORT = 18888
 
 
 class GINCoin(Coin):
