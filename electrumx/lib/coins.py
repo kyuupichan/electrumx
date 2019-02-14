@@ -2236,6 +2236,8 @@ class GINCoin(Coin):
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
 
+    # Seems that the main lyra2z_hash python package doesn't works.
+    # Tested and working with: https://github.com/LapoLab/lyra2z-py
     @classmethod
     def header_hash(cls, header):
         timestamp = util.unpack_le_uint32_from(header, 68)[0]
