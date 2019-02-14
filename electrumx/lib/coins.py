@@ -2160,7 +2160,7 @@ class Zcoin(Coin):
                     '7516dcbd6a964e1eaf0def0830695233')
     TX_COUNT = 667154
     TX_COUNT_HEIGHT = 100266
-    TX_PER_BLOCK = 4000 # 2000 for 1MB block
+    TX_PER_BLOCK = 4000  # 2000 for 1MB block
     IRC_PREFIX = None
     RPC_PORT = 8888
     REORG_LIMIT = 5000
@@ -2174,7 +2174,7 @@ class Zcoin(Coin):
     PEERS = [
         'electrum.polispay.com'
     ]
-    
+
     @classmethod
     def is_mtp(cls, header):
         from electrumx.lib.util import unpack_le_uint32_from, hex_to_bytes
