@@ -476,3 +476,20 @@ class SmartCashDaemon(Daemon):
     async def smartrewards(self, params):
         '''Return smartrewards data.'''
         return await self._send_single('smartrewards', params)
+
+
+class ZcoinMtpDaemon(Daemon):
+
+    def strip_mtp_data(self, raw_block):
+        if self.coin.is_mtp(raw_block):
+            return \
+                raw_block[:self.coin.MTP_HEADER_DATA_START*2] + \
+                raw_block[self.coin.MTP_HEADER_DATA_END*2:]
+        return raw_block
+
+    async def raw_blocks(self, hex_hashes):
+        '''Return the raw binary blocks with the given hex hashes.'''
+        params_iterable = ((h, False) for h in hex_hashes)
+        blocks = await self._send_vector('getblock', params_iterable)
+        # Convert hex string to bytes
+        return [hex_to_bytes(self.strip_mtp_data(block)) for block in blocks]

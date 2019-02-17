@@ -2149,6 +2149,108 @@ class PacTestnet(Pac):
     RPC_PORT = 17111
 
 
+class Zcoin(Coin):
+    NAME = "Zcoin"
+    SHORTNAME = "XZC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("52")
+    P2SH_VERBYTES = [bytes.fromhex("07")]
+    WIF_BYTE = bytes.fromhex("d2")
+    GENESIS_HASH = ('4381deb85b1b2c9843c222944b616d99'
+                    '7516dcbd6a964e1eaf0def0830695233')
+    TX_COUNT = 667154
+    TX_COUNT_HEIGHT = 100266
+    TX_PER_BLOCK = 4000  # 2000 for 1MB block
+    IRC_PREFIX = None
+    RPC_PORT = 8888
+    REORG_LIMIT = 5000
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
+    MTP_HEADER_EXTRA_SIZE = 100
+    MTP_HEADER_DATA_SIZE = 198864
+    MTP_HEADER_DATA_START = Coin.BASIC_HEADER_SIZE + MTP_HEADER_EXTRA_SIZE
+    MTP_HEADER_DATA_END = MTP_HEADER_DATA_START + MTP_HEADER_DATA_SIZE
+    STATIC_BLOCK_HEADERS = False
+    DAEMON = daemon.ZcoinMtpDaemon
+    PEERS = [
+        'electrum.polispay.com'
+    ]
+
+    @classmethod
+    def is_mtp(cls, header):
+        from electrumx.lib.util import unpack_le_uint32_from, hex_to_bytes
+        if isinstance(header, str):
+            nVersion, = unpack_le_uint32_from(hex_to_bytes(header[0:4*2]))
+        elif isinstance(header, bytes):
+            nVersion, = unpack_le_uint32_from(header[0:4])
+        else:
+            raise "Cannot handle the passed type"
+        return nVersion & 0x1000
+
+    @classmethod
+    def block_header(cls, block, height):
+        sz = cls.BASIC_HEADER_SIZE
+        if cls.is_mtp(block):
+            sz += cls.MTP_HEADER_EXTRA_SIZE
+        return block[:sz]
+
+    @classmethod
+    def header_hash(cls, header):
+        sz = cls.BASIC_HEADER_SIZE
+        if cls.is_mtp(header):
+            sz += cls.MTP_HEADER_EXTRA_SIZE
+        return double_sha256(header[:sz])
+
+
+class ZcoinTestnet(Zcoin):
+    SHORTNAME = "tXZC"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("41")
+    P2SH_VERBYTES = [bytes.fromhex("b2")]
+    WIF_BYTE = bytes.fromhex("b9")
+    GENESIS_HASH = '1e3487fdb1a7d46dac3e8f3e58339c6e' \
+                   'ff54abf6aef353485f3ed64250a35e89'
+    REORG_LIMIT = 8000
+    RPC_PORT = 18888
+
+
+class GINCoin(Coin):
+    NAME = "GINCoin"
+    SHORTNAME = "GIN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('00000cd6bde619b2c3b23ad2e384328a'
+                    '450a37fa28731debf748c3b17f91f97d')
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("38")]
+    WIF_BYTE = bytes.fromhex("3c")
+    TX_COUNT_HEIGHT = 225000
+    TX_COUNT = 470784
+    TX_PER_BLOCK = 4
+    RPC_PORT = 10211
+    PEERS = [
+        'electrum.polispay.com'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    # Seems that the main lyra2z_hash python package doesn't works.
+    # Tested and working with: https://github.com/LapoLab/lyra2z-py
+    @classmethod
+    def header_hash(cls, header):
+        timestamp = util.unpack_le_uint32_from(header, 68)[0]
+        if timestamp > 1550246400:
+            import x16rt_hash
+            return x16rt_hash.getPoWHash(header)
+        elif timestamp > 1525651200:
+            import lyra2z_hash
+            return lyra2z_hash.getPoWHash(header)
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
+
+
 class Polis(Coin):
     NAME = "Polis"
     SHORTNAME = "POLIS"
@@ -2160,13 +2262,12 @@ class Polis(Coin):
     P2PKH_VERBYTE = bytes.fromhex("37")
     P2SH_VERBYTES = [bytes.fromhex("38")]
     WIF_BYTE = bytes.fromhex("3c")
-    TX_COUNT_HEIGHT = 111111
-    TX_COUNT = 256128
+    TX_COUNT_HEIGHT = 280600
+    TX_COUNT = 635415
     TX_PER_BLOCK = 4
     RPC_PORT = 24127
     PEERS = [
-        'electrum1-polis.polispay.org',
-        'electrum2-polis.polispay.org'
+        'electrum.polispay.com'
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
@@ -2178,24 +2279,23 @@ class Polis(Coin):
         return x11_hash.getPoWHash(header)
 
 
-class ColossusXT(Coin):
-    NAME = "ColossusXT"
-    SHORTNAME = "COLX"
+class MNPCoin(Coin):
+    NAME = "MNPCoin"
+    SHORTNAME = "MNP"
     NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("022D2533")
-    XPRV_VERBYTES = bytes.fromhex("0221312B")
-    GENESIS_HASH = ('a0ce8206c908357008c1b9a8ba2813af'
-                    'f0989ca7f72d62b14e652c55f02b4f5c')
-    P2PKH_VERBYTE = bytes.fromhex("1E")
-    P2SH_VERBYTES = [bytes.fromhex("0D")]
-    WIF_BYTE = bytes.fromhex("D4")
-    TX_COUNT_HEIGHT = 356500
-    TX_COUNT = 761041
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('00000924036c67d803ce606ded814312'
+                    '7e62fa2111dd3b063880a1067c69ccb1')
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTES = [bytes.fromhex("35")]
+    WIF_BYTE = bytes.fromhex("37")
+    TX_COUNT_HEIGHT = 248000
+    TX_COUNT = 506447
     TX_PER_BLOCK = 4
-    RPC_PORT = 51473
+    RPC_PORT = 13373
     PEERS = [
-        'electrum1-colx.polispay.org',
-        'electrum2-colx.polispay.org'
+        'electrum.polispay.com'
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
@@ -2207,62 +2307,48 @@ class ColossusXT(Coin):
         return quark_hash.getPoWHash(header)
 
 
-class GoByte(Coin):
-    NAME = "GoByte"
-    SHORTNAME = "GBX"
+class ColossusXT(Coin):
+    NAME = "ColossusXT"
+    SHORTNAME = "COLX"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488B21E")
     XPRV_VERBYTES = bytes.fromhex("0488ADE4")
-    GENESIS_HASH = ('0000033b01055cf8df90b01a14734cae'
-                    '92f7039b9b0e48887b4e33a469d7bc07')
-    P2PKH_VERBYTE = bytes.fromhex("26")
-    P2SH_VERBYTES = [bytes.fromhex("0A")]
-    WIF_BYTE = bytes.fromhex("C6")
-    TX_COUNT_HEIGHT = 115890
-    TX_COUNT = 245030
+    GENESIS_HASH = ('a0ce8206c908357008c1b9a8ba2813af'
+                    'f0989ca7f72d62b14e652c55f02b4f5c')
+    P2PKH_VERBYTE = bytes.fromhex("1E")
+    P2SH_VERBYTES = [bytes.fromhex("0D")]
+    WIF_BYTE = bytes.fromhex("D4")
+    TX_COUNT_HEIGHT = 356500
+    BASIC_HEADER_SIZE = 80
+    HDR_V5_HEIGHT = 500000
+    HDR_V5_SIZE = 112
+    HDR_V5_START_OFFSET = HDR_V5_HEIGHT * BASIC_HEADER_SIZE
+    TX_COUNT = 761041
     TX_PER_BLOCK = 4
-    RPC_PORT = 12454
+    RPC_PORT = 51473
     PEERS = [
-        'electrum1-gbx.polispay.org',
-        'electrum2-gbx.polispay.org'
+        'electrum.polispay.com'
     ]
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
 
     @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import neoscrypt
-        return neoscrypt.getPoWHash(header)
-
-
-class Monoeci(Coin):
-    NAME = "Monoeci"
-    SHORTNAME = "XMCC"
-    NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("0488B21E")
-    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
-    GENESIS_HASH = ('0000005be1eb05b05fb45ae38ee9c144'
-                    '1514a65343cd146100a574de4278f1a3')
-    P2PKH_VERBYTE = bytes.fromhex("32")
-    P2SH_VERBYTES = [bytes.fromhex("49")]
-    WIF_BYTE = bytes.fromhex("4D")
-    TX_COUNT_HEIGHT = 140000
-    TX_COUNT = 140000
-    TX_PER_BLOCK = 4
-    RPC_PORT = 24156
-    PEERS = [
-        'electrum1-gbx.polispay.org',
-        'electrum2-gbx.polispay.org'
-    ]
-    SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
+    def static_header_offset(cls, height):
+        assert cls.STATIC_BLOCK_HEADERS
+        if height >= cls.HDR_V5_HEIGHT:
+            relative_v4_offset = (height - cls.HDR_V5_HEIGHT) * cls.HDR_V5_SIZE
+            return cls.HDR_V5_START_OFFSET + relative_v4_offset
+        else:
+            return height * cls.BASIC_HEADER_SIZE
 
     @classmethod
     def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import x11_hash
-        return x11_hash.getPoWHash(header)
+        version, = util.unpack_le_uint32_from(header)
+        if version >= 5:
+            return super().header_hash(header)
+        else:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
 
 
 class Minexcoin(EquihashMixin, Coin):
