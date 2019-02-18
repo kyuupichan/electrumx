@@ -2403,6 +2403,7 @@ class Groestlcoin(Coin):
     TX_COUNT_HEIGHT = 1601528
     TX_PER_BLOCK = 5
     RPC_PORT = 1441
+    BLACKLIST_URL = 'https://groestlcoin.org/blacklist.json'
     PEERS = [
         'electrum1.groestlcoin.org s t',
         'electrum2.groestlcoin.org s t',
