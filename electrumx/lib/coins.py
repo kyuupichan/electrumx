@@ -1875,6 +1875,12 @@ class Bitcore(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 126946
     TX_PER_BLOCK = 2
     RPC_PORT = 8556
+    PEERS = [
+        'ele1.bitcore.cc s t',
+        'ele2.bitcore.cc s t',
+        'ele3.bitcore.cc s t',
+        'ele4.bitcore.cc s t'
+    ]
 
 
 class GameCredits(Coin):
