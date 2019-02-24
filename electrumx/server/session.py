@@ -1319,7 +1319,7 @@ class DashElectrumX(ElectrumX):
     async def notify(self, touched, height_changed):
         '''Notify the client about changes in masternode list.'''
         await super().notify(touched, height_changed)
-        for mn in self.mns:
+        for mn in self.mns.copy():
             status = await self.daemon_request('masternode_list',
                                                ['status', mn])
             await self.send_notification('masternode.subscribe',
