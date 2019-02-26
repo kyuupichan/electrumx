@@ -210,7 +210,7 @@ class Peer(object):
 
     @cachedproperty
     def genesis_hash(self):
-        '''Returns None if no SSL port, otherwise the port as an integer.'''
+        '''Returns the network genesis block hash as a string if known, otherwise None.'''
         return self._string('genesis_hash')
 
     @cachedproperty
