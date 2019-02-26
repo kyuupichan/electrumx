@@ -8,7 +8,7 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import asyncio
-import websockets
+import asyncws
 from jsonrpcserver import method, async_dispatch as dispatch
 import codecs
 import datetime
@@ -145,36 +145,41 @@ class SessionManager(object):
                                      for cmd in cmds}
 
     async def _start_ws_server(self, *args, **kw_args):
-
-        instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'WS')
-
-        @method
-        async def server(query, client, protocol):
-            return {
-                'version': await instance.server_version(client, protocol),
-            }[query]
+        instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'TCP')
 
         @method
-        async def blockchain(query, data):
-            return {
-                'get_balance': await instance.scripthash_get_balance(data),
-                'get_history': await instance.scripthash_get_history(data),
-                'listunspent': await instance.scripthash_listunspent(data),
-                'estimatefee': await instance.estimatefee(data),
-            }[query]
+        async def server_version(client, protocol):
+            return await instance.server_version(client, protocol),
 
         @method
-        async def transaction(query, data):
-            return {
-                'broadcast': await instance.transaction_broadcast(data),
-            }[query]
+        async def blockchain_get_balance(scripthash):
+            return await instance.scripthash_get_balance(scripthash)
 
-        async def main(websocket, path):
-            response = await dispatch(await websocket.recv())
-            if response.wanted:
-                await websocket.send(str(response))
+        @method
+        async def blockchain_get_history(scripthash):
+            return await instance.scripthash_get_history(scripthash)
 
-        server = websockets.serve(main, *args, **kw_args)
+        @method
+        async def blockchain_listunspent(scripthash):
+            return await instance.scripthash_listunspent(scripthash)
+
+        @method
+        async def blockchain_estimatefee(blocks):
+            return await instance.estimatefee(blocks)
+
+        @method
+        async def transaction_broadcast(raw_tx):
+            return await instance.transaction_broadcast(raw_tx)
+
+
+        @asyncio.coroutine
+        async def websocket(websocket):
+            while True:
+                response = await dispatch(await websocket.recv())
+                if response.wanted:
+                    await websocket.send(str(response))
+
+        server = asyncws.start_server(websocket, *args, **kw_args)
 
         host, port = args[:2]
         try:

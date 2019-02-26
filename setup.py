@@ -16,7 +16,7 @@ setuptools.setup(
     # "pycryptodomex" package is required to sync SmartCash network.
     install_requires=['aiorpcX>=0.10.4,<0.11', 'attrs',
                       'plyvel', 'pylru', 'aiohttp >= 2',
-                      'websockets >= 7.0', 'jsonrpcserver >= 4.0.1'],
+                      'asyncws >= 0.1', 'jsonrpcserver >= 4.0.1'],
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',
     author='Neil Booth',
