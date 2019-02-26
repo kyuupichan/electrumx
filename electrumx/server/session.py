@@ -8,6 +8,8 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import asyncio
+import websockets
+from jsonrpcserver import method, async_dispatch as dispatch
 import codecs
 import datetime
 import itertools
@@ -142,6 +144,23 @@ class SessionManager(object):
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
+    async def _start_ws_server(self, *args, **kw_args):
+
+        async def main(websocket, path):
+            response = await dispatch(await websocket.recv())
+            if response.wanted:
+                await websocket.send(str(response))
+
+        server = websockets.serve(main, *args, **kw_args)
+        host, port = args[:2]
+        try:
+            await server
+        except OSError as e:    # don't suppress CancelledError
+            self.logger.error(f'WebSocket server failed to listen on {host}:'
+                              f'{port:d} :{e!r}')
+        else:
+            self.logger.info(f'WebSocket server listening on {host}:{port:d}')
+
     async def _start_server(self, kind, *args, **kw_args):
         loop = asyncio.get_event_loop()
         if kind == 'RPC':
@@ -162,7 +181,7 @@ class SessionManager(object):
             self.logger.info(f'{kind} server listening on {host}:{port:d}')
 
     async def _start_external_servers(self):
-        '''Start listening on TCP and SSL ports, but only if the respective
+        '''Start listening on TCP, SSL and WebSocket ports, but only if the respective
         port was given in the environment.
         '''
         env = self.env
@@ -173,7 +192,10 @@ class SessionManager(object):
             sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self._start_server('SSL', host, env.ssl_port, ssl=sslc)
+        if env.websocket_port is not None:
+            await self._start_ws_server(host, env.websocket_port)
         self.server_listening.set()
+
 
     async def _close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
