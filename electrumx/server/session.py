@@ -146,12 +146,29 @@ class SessionManager(object):
 
     async def _start_ws_server(self, *args, **kw_args):
 
+        instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'WS')
+
+        @method
+        async def server(query, client, protocol):
+            return {
+                'version': await instance.server_version(client, protocol),
+            }[query]
+
+        @method
+        async def blockchain(query, scripthash):
+            return {
+                'get_balance': await instance.scripthash_get_balance(scripthash),
+                'get_history': await instance.scripthash_get_history(scripthash),
+                'listunspent': await instance.scripthash_listunspent(scripthash),
+            }[query]
+
         async def main(websocket, path):
             response = await dispatch(await websocket.recv())
             if response.wanted:
                 await websocket.send(str(response))
 
         server = websockets.serve(main, *args, **kw_args)
+
         host, port = args[:2]
         try:
             await server
