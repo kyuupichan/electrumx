@@ -25,7 +25,8 @@
 
 '''Representation of a peer server.'''
 
-from ipaddress import ip_address
+from ipaddress import ip_address, IPv4Address, IPv6Address
+from socket import AF_INET, AF_INET6
 
 from electrumx.lib.util import cachedproperty
 import electrumx.lib.util as util
@@ -112,15 +113,24 @@ class Peer(object):
             for feature in self.FEATURES:
                 setattr(self, feature, getattr(peer, feature))
 
-    def connection_port_pairs(self):
-        '''Return a list of (kind, port) pairs to try when making a
-        connection.'''
+    def connection_tuples(self):
+        '''Return a list of (kind, port, family) tuples to try when making a
+        connection.
+        '''
         # Use a list not a set - it's important to try the registered
         # ports first.
         pairs = [('SSL', self.ssl_port), ('TCP', self.tcp_port)]
         while self.other_port_pairs:
             pairs.append(self.other_port_pairs.pop())
-        return [pair for pair in pairs if pair[1]]
+        if isinstance(self.ip_address, IPv4Address):
+            families = [AF_INET]
+        elif isinstance(self.ip_address, IPv6Address):
+            families = [AF_INET6]
+        else:
+            families = [AF_INET, AF_INET6]
+        return [(kind, port, family)
+                for kind, port in pairs if port
+                for family in families]
 
     def mark_bad(self):
         '''Mark as bad to avoid reconnects but also to remember for a

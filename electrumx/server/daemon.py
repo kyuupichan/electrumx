@@ -116,7 +116,7 @@ class Daemon(object):
             nonlocal last_error_log, retry
             now = time.time()
             if now - last_error_log > 60:
-                last_error_time = now
+                last_error_log = now
                 self.logger.error(f'{error}  Retrying occasionally...')
             if retry == self.max_retry and self.failover():
                 retry = 0
@@ -140,6 +140,9 @@ class Daemon(object):
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
                 on_good_message = 'connection restored'
+            except aiohttp.ClientError as e:
+                log_error(f'daemon error: {e}')
+                on_good_message = 'running normally'
             except WarmingUpError:
                 log_error('starting up checking blocks.')
                 on_good_message = 'running normally'
@@ -284,6 +287,10 @@ class DashDaemon(Daemon):
     async def masternode_list(self, params):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
+
+    async def protx(self, params):
+        '''Set of commands to execute ProTx related actions.'''
+        return await self._send_single('protx', params)
 
 
 class FakeEstimateFeeDaemon(Daemon):
@@ -442,3 +449,30 @@ class DecredDaemon(Daemon):
         # FIXME allow self signed certificates
         connector = aiohttp.TCPConnector(verify_ssl=False)
         return aiohttp.ClientSession(connector=connector)
+
+
+class PreLegacyRPCDaemon(LegacyRPCDaemon):
+    '''Handles connections to a daemon at the given URL.
+
+    This class is useful for daemons that don't have the new 'getblock'
+    RPC call that returns the block in hex, and need the False parameter
+    for the getblock'''
+
+    async def deserialised_block(self, hex_hash):
+        '''Return the deserialised block with the given hex hash.'''
+        return await self._send_single('getblock', (hex_hash, False))
+
+
+class SmartCashDaemon(Daemon):
+
+    async def masternode_broadcast(self, params):
+        '''Broadcast a smartnode to the network.'''
+        return await self._send_single('smartnodebroadcast', params)
+
+    async def masternode_list(self, params):
+        '''Return the smartnode status.'''
+        return await self._send_single('smartnodelist', params)
+
+    async def smartrewards(self, params):
+        '''Return smartrewards data.'''
+        return await self._send_single('smartrewards', params)

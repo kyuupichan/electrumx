@@ -228,9 +228,10 @@ raise them.
 .. envvar:: MAX_SEND
 
   The maximum size of a response message to send over the wire, in
-  bytes.  Defaults to 1,000,000.  Values smaller than 350,000 are
-  taken as 350,000 because standard Electrum protocol header "chunk"
-  requests are almost that large.
+  bytes.  Defaults to 1,000,000 (except for AuxPoW coins, which default
+  to 10,000,000).  Values smaller than 350,000 are taken as 350,000
+  because standard Electrum protocol header "chunk" requests are almost
+  that large.
 
   The Electrum protocol has a flaw in that address histories must be
   served all at once or not at all, an obvious avenue for abuse.
@@ -344,6 +345,12 @@ some of this.
   will autodetect any proxy running on the usual ports 9050 (Tor),
   9150 (Tor browser bundle) and 1080 (socks).
 
+.. envvar:: BLACKLIST_URL
+
+  URL to retrieve a list of blacklisted peers.  If not set, a coin-
+  specific default is used.
+
+
 
 Server Advertising
 ==================
@@ -418,6 +425,5 @@ your available physical RAM:
 
   I do not recommend raising this above 2000.
 
-.. _lib/coins.py:
-   https://github.com/kyuupichan/electrumx/blob/master/lib/coins.py
+.. _lib/coins.py: https://github.com/kyuupichan/electrumx/blob/master/electrumx/lib/coins.py
 .. _uvloop: https://pypi.python.org/pypi/uvloop

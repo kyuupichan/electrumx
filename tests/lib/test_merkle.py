@@ -234,7 +234,7 @@ async def test_truncation_bad():
 
 
 @pytest.mark.asyncio
-async def test_markle_cache_bad():
+async def test_merkle_cache_bad():
     length = 23
     source = Source(length).hashes
     cache = MerkleCache(merkle, source)

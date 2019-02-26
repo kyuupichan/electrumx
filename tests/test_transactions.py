@@ -11,8 +11,9 @@ from binascii import unhexlify
 
 import pytest
 
-from electrumx.lib.coins import Coin
+from electrumx.lib.coins import Coin, Namecoin
 from electrumx.lib.hash import hash_to_hex_str
+from electrumx.lib.script import OpCodes, Script
 
 TRANSACTION_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), 'transactions')
@@ -57,3 +58,16 @@ def test_transaction(transaction_details):
         assert spk['hex'] == tx_pks.hex()
         assert coin.address_to_hashX(spk['address']) == \
                coin.hashX_from_script(tx_pks)
+        if issubclass(coin, Namecoin):
+            if "nameOp" not in spk or "name" not in spk["nameOp"]:
+                assert coin.name_hashX_from_script(tx_pks) is None
+            else:
+                OP_NAME_UPDATE = OpCodes.OP_3
+                normalized_name_op_script = bytearray()
+                normalized_name_op_script.append(OP_NAME_UPDATE)
+                normalized_name_op_script.extend(Script.push_data(spk["nameOp"]["name"].encode("ascii")))
+                normalized_name_op_script.extend(Script.push_data(bytes([])))
+                normalized_name_op_script.append(OpCodes.OP_2DROP)
+                normalized_name_op_script.append(OpCodes.OP_DROP)
+                normalized_name_op_script.append(OpCodes.OP_RETURN)
+                assert coin.name_hashX_from_script(tx_pks) == Coin.hashX_from_script(normalized_name_op_script)

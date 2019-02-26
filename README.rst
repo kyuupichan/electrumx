@@ -21,4 +21,5 @@ See `readthedocs <https://electrumx.readthedocs.io/>`_.
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
-bitcoincash:qzxpdlt8ehu9ehftw6rqsy2jgfq4nsltxvhrdmdfpn
+
+1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj

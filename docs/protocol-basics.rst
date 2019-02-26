@@ -77,38 +77,6 @@ from and including the server's response to this call will use its
 negotiated protocol version.
 
 
-.. _deserialized header:
-
-Deserialized Headers
---------------------
-
-A :dfn:`deserialized header` is a dictionary describing a block at a
-given height.
-
-A typical example would be similar to this template::
-
-  {
-    "block_height": <integer>,
-    "version": <integer>,
-    "prev_block_hash": <hexadecimal string>,
-    "merkle_root":  <hexadecimal string>,
-    "timestamp": <integer>,
-    "bits": <integer>,
-    "nonce": <integer>
-  }
-
-.. note:: The precise format of a deserialized block header varies by
-  coin, and also potentially by height for the same coin.  Detailed
-  knowledge of the meaning of a block header is neither necessary nor
-  appropriate in the server.
-
-  Consequently deserialized headers are deprecated and will be removed
-  from the protocol in a future version.  Instead, raw headers (as
-  hexadecimal strings) along with their height will be returned by new
-  RPC calls, and it will be up to the client to interpret the meaning
-  of the raw header.
-
-
 .. _script hashes:
 
 Script Hashes

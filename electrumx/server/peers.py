@@ -1,4 +1,4 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2017-2018, Neil Booth
 #
 # All rights reserved.
 #
@@ -12,12 +12,14 @@ import random
 import socket
 import ssl
 import time
+import json
+import aiohttp
 from collections import defaultdict, Counter
 
-from aiorpcx import (ClientSession, SOCKSProxy,
+from aiorpcx import (Connector, RPCSession, SOCKSProxy,
                      Notification, handler_invocation,
                      SOCKSError, RPCError, TaskTimeout, TaskGroup, Event,
-                     sleep, run_in_thread, ignore_after, timeout_after)
+                     sleep, ignore_after, timeout_after)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
@@ -37,7 +39,7 @@ def assert_good(message, result, instance):
                            f'{type(result).__name__}')
 
 
-class PeerSession(ClientSession):
+class PeerSession(RPCSession):
     '''An outgoing session to a peer.'''
 
     async def handle_request(self, request):
@@ -75,6 +77,8 @@ class PeerManager(object):
         self.permit_onion_peer_time = time.time()
         self.proxy = None
         self.group = TaskGroup()
+        # refreshed
+        self.blacklist = set()
 
     def _my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -129,6 +133,21 @@ class PeerManager(object):
                                   for real_name in self.env.coin.PEERS)
         await self._note_peers(imported_peers, limit=None)
 
+    async def _refresh_blacklist(self):
+        url = self.env.blacklist_url
+        if not url:
+            return
+        while True:
+            session = aiohttp.ClientSession()
+            try:
+                async with session.get(url) as response:
+                    r = await response.text()
+                self.blacklist = set(json.loads(r))
+                self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
+            except Exception as e:
+                self.logger.error(f'could not retrieve blacklist from {url}: {e}')
+            await sleep(600)
+
     async def _detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
         the last attempt.
@@ -152,22 +171,24 @@ class PeerManager(object):
             self.logger.info('no proxy detected, will try later')
             await sleep(900)
 
-    async def _note_peers(self, peers, limit=2, check_ports=False,
-                          source=None):
+    async def _note_peers(self, peers, limit=2, check_ports=False, source=None):
         '''Add a limited number of peers that are not already present.'''
         new_peers = []
+        match_set = self.peers.copy()
         for peer in peers:
             if not peer.is_public or (peer.is_tor and not self.proxy):
                 continue
 
-            matches = peer.matches(self.peers)
-            if not matches:
+            matches = peer.matches(match_set)
+            if matches:
+                if check_ports:
+                    for match in matches:
+                        if match.check_ports(peer):
+                            self.logger.info(f'ports changed for {peer}')
+                            match.retry_event.set()
+            else:
+                match_set.add(peer)
                 new_peers.append(peer)
-            elif check_ports:
-                for match in matches:
-                    if match.check_ports(peer):
-                        self.logger.info(f'ports changed for {peer}')
-                        match.retry_event.set()
 
         if new_peers:
             source = source or new_peers[0].source
@@ -181,6 +202,8 @@ class PeerManager(object):
                 peer.retry_event = Event()
                 self.peers.add(peer)
                 await self.group.spawn(self._monitor_peer(peer))
+
+        return True
 
     async def _monitor_peer(self, peer):
         # Stop monitoring if we were dropped (a duplicate peer)
@@ -197,14 +220,15 @@ class PeerManager(object):
                 pause = WAKEUP_SECS * 2 ** peer.try_count
             async with ignore_after(pause):
                 await peer.retry_event.wait()
+                peer.retry_event.clear()
 
     async def _should_drop_peer(self, peer):
         peer.try_count += 1
         is_good = False
-        for kind, port in peer.connection_port_pairs():
+        for kind, port, family in peer.connection_tuples():
             peer.last_try = time.time()
 
-            kwargs = {}
+            kwargs = {'family': family}
             if kind == 'SSL':
                 kwargs['ssl'] = ssl.SSLContext(ssl.PROTOCOL_TLS)
 
@@ -225,8 +249,8 @@ class PeerManager(object):
             peer_text = f'[{peer}:{port} {kind}]'
             try:
                 async with timeout_after(120 if peer.is_tor else 30):
-                    async with PeerSession(peer.host, port,
-                                           **kwargs) as session:
+                    async with Connector(PeerSession, peer.host, port,
+                                         **kwargs) as session:
                         await self._verify_peer(session, peer)
                 is_good = True
                 break
@@ -290,10 +314,21 @@ class PeerManager(object):
         peer.features['server_version'] = server_version
         ptuple = protocol_tuple(protocol_version)
 
-        # FIXME: Make concurrent preserving the exception
-        await self._send_headers_subscribe(session, peer, ptuple)
-        await self._send_server_features(session, peer)
-        await self._send_peers_subscribe(session, peer)
+        async with TaskGroup() as g:
+            await g.spawn(self._send_headers_subscribe(session, peer, ptuple))
+            await g.spawn(self._send_server_features(session, peer))
+            peers_task = await g.spawn(self._send_peers_subscribe
+                                       (session, peer))
+
+        # Process reported peers if remote peer is good
+        peers = peers_task.result()
+        await self._note_peers(peers)
+
+        features = self._features_to_register(peer, peers)
+        if features:
+            self.logger.info(f'registering ourself with {peer}')
+            # We only care to wait for the response
+            await session.send_request('server.add_peer', [features])
 
     async def _send_headers_subscribe(self, session, peer, ptuple):
         message = 'blockchain.headers.subscribe'
@@ -356,18 +391,10 @@ class PeerManager(object):
         # Call add_peer if the remote doesn't appear to know about us.
         try:
             real_names = [' '.join([u[1]] + u[2]) for u in raw_peers]
-            peers = [Peer.from_real_name(real_name, str(peer))
-                     for real_name in real_names]
+            return [Peer.from_real_name(real_name, str(peer))
+                    for real_name in real_names]
         except Exception:
             raise BadPeerError('bad server.peers.subscribe response')
-
-        await self._note_peers(peers)
-        features = self._features_to_register(peer, peers)
-        if not features:
-            return
-        self.logger.info(f'registering ourself with {peer}')
-        # We only care to wait for the response
-        await session.send_request('server.add_peer', [features])
 
     #
     # External interface
@@ -388,6 +415,7 @@ class PeerManager(object):
         forever = Event()
         async with self.group as group:
             await group.spawn(forever.wait())
+            await group.spawn(self._refresh_blacklist())
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
             # Consume tasks as they complete, logging unexpected failures
@@ -443,8 +471,7 @@ class PeerManager(object):
                 reason = 'source-destination mismatch'
 
         if permit:
-            self.logger.info(f'accepted add_peer request from {source} '
-                             f'for {host}')
+            self.logger.info(f'accepted add_peer request from {source} for {host}')
             await self._note_peers([peer], check_ports=True)
         else:
             self.logger.warning(f'rejected add_peer request from {source} '
@@ -452,7 +479,7 @@ class PeerManager(object):
 
         return permit
 
-    def on_peers_subscribe(self, is_tor):
+    def on_peers_subscribe(self, is_tor, is_peer):
         '''Returns the server peers as a list of (ip, host, details) tuples.
 
         We return all peers we've connected to in the last day.
@@ -464,6 +491,13 @@ class PeerManager(object):
                   if peer.last_good > cutoff and
                   not peer.bad and peer.is_public]
         onion_peers = []
+
+        def is_blacklisted(host):
+            return any(item in self.blacklist
+                       for item in (host, '*.' + '.'.join(host.split('.')[-2:])))
+
+        if not is_peer:
+            recent = [peer for peer in recent if not is_blacklisted(peer.host)]
 
         # Always report ourselves if valid (even if not public)
         peers = set(myself for myself in self.myselves
