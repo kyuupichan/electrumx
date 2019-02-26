@@ -553,7 +553,7 @@ class SessionManager(object):
             # bytes when encoded as JSON.  This limits resource usage
             # on bloated history requests, and uses a smaller divisor
             # so large requests are logged before refusing them.
-            limit = 1000
+            limit = self.env.max_send // 97
             hc[hashX] = await self.db.limited_history(hashX, limit=limit)
         return hc[hashX]
 
