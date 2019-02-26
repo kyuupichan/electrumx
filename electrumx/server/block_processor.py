@@ -18,7 +18,6 @@ from functools import partial
 from aiorpcx import TaskGroup, run_in_thread
 
 import electrumx
-from electrumx.lib.tx import is_gen_outpoint
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, class_logger
@@ -45,6 +44,7 @@ class Prefetcher(object):
         self.min_cache_size = 10 * 1024 * 1024
         # This makes the first fetch be 10 blocks
         self.ave_size = self.min_cache_size // 10
+        self.polling_delay = 5
 
     async def main_loop(self, bp_height):
         '''Loop forever polling for more blocks.'''
@@ -54,7 +54,7 @@ class Prefetcher(object):
                 # Sleep a while if there is nothing to prefetch
                 await self.refill_event.wait()
                 if not await self._prefetch_blocks():
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(self.polling_delay)
             except DaemonError as e:
                 self.logger.info(f'ignoring daemon error: {e}')
 
@@ -99,11 +99,11 @@ class Prefetcher(object):
         async with self.semaphore:
             while self.cache_size < self.min_cache_size:
                 # Try and catch up all blocks but limit to room in cache.
-                # Constrain fetch count to between 0 and 500 regardless;
-                # testnet can be lumpy.
-                cache_room = self.min_cache_size // self.ave_size
+                # Constrain fetch count to between 0 and 100 regardless;
+                # some chains can be lumpy.
+                cache_room = max(self.min_cache_size // self.ave_size, 1)
                 count = min(daemon_height - self.fetched_height, cache_room)
-                count = min(500, max(count, 0))
+                count = min(100, max(count, 0))
                 if not count:
                     self.caught_up = True
                     return False
@@ -241,10 +241,10 @@ class BlockProcessor(object):
         async def get_raw_blocks(last_height, hex_hashes):
             heights = range(last_height, last_height - len(hex_hashes), -1)
             try:
-                blocks = [self.read_raw_block(height) for height in heights]
+                blocks = [self.db.read_raw_block(height) for height in heights]
                 self.logger.info(f'read {len(blocks)} blocks from disk')
                 return blocks
-            except Exception:
+            except FileNotFoundError:
                 return await self.daemon.raw_blocks(hex_hashes)
 
         def flush_backup():
@@ -413,7 +413,7 @@ class BlockProcessor(object):
 
             # Spend the inputs
             for txin in tx.inputs:
-                if is_gen_outpoint(txin.prev_hash, txin.prev_idx):
+                if txin.is_generation():
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
@@ -493,7 +493,7 @@ class BlockProcessor(object):
 
             # Restore the inputs
             for txin in reversed(tx.inputs):
-                if is_gen_outpoint(txin.prev_hash, txin.prev_idx):
+                if txin.is_generation():
                     continue
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
@@ -627,8 +627,6 @@ class BlockProcessor(object):
         if first_sync:
             self.logger.info(f'{electrumx.version} synced to '
                              f'height {self.height:,d}')
-        # Initialise the notification framework
-        await self.notifications.on_block(set(), self.height)
         # Reopen for serving
         await self.db.open_for_serving()
 
@@ -683,3 +681,129 @@ class DecredBlockProcessor(BlockProcessor):
             start -= 1
             count += 1
         return start, count
+
+
+class NamecoinBlockProcessor(BlockProcessor):
+
+    def advance_txs(self, txs):
+        result = super().advance_txs(txs)
+
+        tx_num = self.tx_count - len(txs)
+        script_name_hashX = self.coin.name_hashX_from_script
+        update_touched = self.touched.update
+        hashXs_by_tx = []
+        append_hashXs = hashXs_by_tx.append
+
+        for tx, tx_hash in txs:
+            hashXs = []
+            append_hashX = hashXs.append
+
+            # Add the new UTXOs and associate them with the name script
+            for idx, txout in enumerate(tx.outputs):
+                # Get the hashX of the name script.  Ignore non-name scripts.
+                hashX = script_name_hashX(txout.pk_script)
+                if hashX:
+                    append_hashX(hashX)
+
+            append_hashXs(hashXs)
+            update_touched(hashXs)
+            tx_num += 1
+
+        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count - len(txs))
+
+        return result
+
+
+class LTORBlockProcessor(BlockProcessor):
+
+    def advance_txs(self, txs):
+        self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
+
+        # Use local vars for speed in the loops
+        undo_info = []
+        tx_num = self.tx_count
+        script_hashX = self.coin.hashX_from_script
+        s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        spend_utxo = self.spend_utxo
+        undo_info_append = undo_info.append
+        update_touched = self.touched.update
+
+        hashXs_by_tx = [set() for _ in txs]
+
+        # Add the new UTXOs
+        for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
+            add_hashXs = hashXs.add
+            tx_numb = s_pack('<I', tx_num)
+
+            for idx, txout in enumerate(tx.outputs):
+                # Get the hashX. Ignore unspendable outputs.
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    add_hashXs(hashX)
+                    put_utxo(tx_hash + s_pack('<H', idx),
+                             hashX + tx_numb + s_pack('<Q', txout.value))
+            tx_num += 1
+
+        # Spend the inputs
+        # A separate for-loop here allows any tx ordering in block.
+        for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
+            add_hashXs = hashXs.add
+            for txin in tx.inputs:
+                if txin.is_generation():
+                    continue
+                cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
+                undo_info_append(cache_value)
+                add_hashXs(cache_value[:-12])
+
+        # Update touched set for notifications
+        for hashXs in hashXs_by_tx:
+            update_touched(hashXs)
+
+        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
+
+        self.tx_count = tx_num
+        self.db.tx_counts.append(tx_num)
+
+        return undo_info
+
+    def backup_txs(self, txs):
+        undo_info = self.db.read_undo_info(self.height)
+        if undo_info is None:
+            raise ChainError('no undo information found for height {:,d}'
+                             .format(self.height))
+
+        # Use local vars for speed in the loops
+        s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        spend_utxo = self.spend_utxo
+        script_hashX = self.coin.hashX_from_script
+        add_touched = self.touched.add
+        undo_entry_len = 12 + HASHX_LEN
+
+        # Restore coins that had been spent
+        # (may include coins made then spent in this block)
+        n = 0
+        for tx, tx_hash in txs:
+            for txin in tx.inputs:
+                if txin.is_generation():
+                    continue
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                         undo_item)
+                add_touched(undo_item[:-12])
+                n += undo_entry_len
+
+        assert n == len(undo_info)
+
+        # Remove tx outputs made in this block, by spending them.
+        for tx, tx_hash in txs:
+            for idx, txout in enumerate(tx.outputs):
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    # Be careful with unspendable outputs- we didn't save those
+                    # in the first place.
+                    cache_value = spend_utxo(tx_hash, idx)
+                    add_touched(cache_value[:-12])
+
+        self.tx_count -= len(txs)

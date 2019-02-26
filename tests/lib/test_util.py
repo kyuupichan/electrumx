@@ -164,6 +164,7 @@ def test_protocol_tuple():
     assert util.protocol_tuple("0.1") == (0, 1)
     assert util.protocol_tuple("0.10") == (0, 10)
     assert util.protocol_tuple("2.5.3") == (2, 5, 3)
+    assert util.protocol_tuple("11.2.33ExtraXYZ") == (11, 2, 33)
 
 def test_version_string():
     assert util.version_string(()) == "0.0"

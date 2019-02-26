@@ -9,7 +9,7 @@ from aiorpcx import (
     JSONRPCv1, JSONRPCLoose, RPCError, ignore_after,
     Request, Batch,
 )
-from electrumx.lib.coins import BitcoinCash, CoinError, Bitzeny
+from electrumx.lib.coins import BitcoinCash, CoinError, Bitzeny, Dash
 from electrumx.server.daemon import (
     Daemon, FakeEstimateFeeDaemon, DaemonError
 )
@@ -24,6 +24,12 @@ urls = ['http://rpc_user:rpc_pass@127.0.0.1:8332/',
 
 @pytest.fixture(params=[BitcoinCash, Bitzeny])
 def daemon(request):
+    coin = request.param
+    return coin.DAEMON(coin, ','.join(urls))
+
+
+@pytest.fixture(params=[Dash])
+def dash_daemon(request):
     coin = request.param
     return coin.DAEMON(coin, ','.join(urls))
 
@@ -334,6 +340,13 @@ async def test_getrawtransaction(daemon):
             hex_hash, True) == verbose
 
 
+@pytest.mark.asyncio
+async def test_protx(dash_daemon):
+    protx_hash = 'deadbeaf'
+    with ClientSessionGood(('protx', ['info', protx_hash], {})):
+        assert await dash_daemon.protx(['info', protx_hash]) == {}
+
+
 # Batch tests
 
 @pytest.mark.asyncio
@@ -487,6 +500,6 @@ async def test_failover(daemon, caplog):
         with ClientSessionFailover(('getblockcount', [], height)):
             await daemon.height() == height
 
-    assert in_caplog(caplog, "disconnected", 3)
+    assert in_caplog(caplog, "disconnected", 1)
     assert in_caplog(caplog, "failing over")
     assert in_caplog(caplog, "connection restored")

@@ -147,6 +147,17 @@ Removed methods
   * :func:`blockchain.block.get_header`
   * :func:`blockchain.block.get_chunk`
 
+Version 1.4.1
+=============
+
+Changes
+-------
+
+  * :func:`blockchain.block.header` and :func:`blockchain.block.headers` now
+    truncate AuxPoW data (if using an AuxPoW chain) when *cp_height* is
+    nonzero.  AuxPoW data is still present when *cp_height* is zero.
+    Non-AuxPoW chains are unaffected.
+
 Version 1.5
 ===========
 
