@@ -213,7 +213,6 @@ class SessionManager(object):
             await self._start_ws_server(host, env.websocket_port)
         self.server_listening.set()
 
-
     async def _close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
         if kinds:
