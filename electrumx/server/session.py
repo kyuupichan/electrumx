@@ -155,11 +155,18 @@ class SessionManager(object):
             }[query]
 
         @method
-        async def blockchain(query, scripthash):
+        async def blockchain(query, data):
             return {
-                'get_balance': await instance.scripthash_get_balance(scripthash),
-                'get_history': await instance.scripthash_get_history(scripthash),
-                'listunspent': await instance.scripthash_listunspent(scripthash),
+                'get_balance': await instance.scripthash_get_balance(data),
+                'get_history': await instance.scripthash_get_history(data),
+                'listunspent': await instance.scripthash_listunspent(data),
+                'estimatefee': await instance.estimatefee(data),
+            }[query]
+
+        @method
+        async def transaction(query, data):
+            return {
+                'broadcast': await instance.transaction_broadcast(data),
             }[query]
 
         async def main(websocket, path):
