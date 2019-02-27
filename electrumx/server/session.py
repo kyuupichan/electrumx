@@ -168,6 +168,10 @@ class SessionManager(object):
             return await instance.estimatefee(blocks)
 
         @method
+        async def transaction_get(txid, verbose):
+            return await instance.transaction_get(txid, verbose)
+
+        @method
         async def transaction_broadcast(raw_tx):
             return await instance.transaction_broadcast(raw_tx)
 
