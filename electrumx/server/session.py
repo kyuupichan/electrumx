@@ -175,7 +175,6 @@ class SessionManager(object):
         async def transaction_broadcast(raw_tx):
             return await instance.transaction_broadcast(raw_tx)
 
-
         @asyncio.coroutine
         async def websocket(websocket):
             while True:
