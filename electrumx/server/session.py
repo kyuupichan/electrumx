@@ -214,7 +214,7 @@ class SessionManager(object):
         if env.wss_port is not None:
             sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
-            await self._start_ws_server(None, host, env.wss_port)
+            await self._start_ws_server(sslc, host, env.wss_port)
         self.server_listening.set()
 
     async def _close_servers(self, kinds):
