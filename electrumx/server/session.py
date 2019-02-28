@@ -143,7 +143,7 @@ class SessionManager(object):
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
-    async def _start_ws_server(self, *args, **kw_args):
+    async def _start_ws_server(self, sslc, *args, **kw_args):
         instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'TCP')
 
         async def websocket(websocket, path):
@@ -164,7 +164,10 @@ class SessionManager(object):
                     response_msg = JSONRPCv2.response_message(error_msg, request_id)
                     await websocket.send(response_msg.decode())
 
-        server = websockets.serve(websocket, *args, **kw_args)
+        if sslc:
+            server = websockets.serve(websocket, *args, **kw_args, ssl=sslc)
+        else:
+            server = websockets.serve(websocket, *args, **kw_args)
 
         host, port = args[:2]
         try:
@@ -206,8 +209,12 @@ class SessionManager(object):
             sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
             sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
             await self._start_server('SSL', host, env.ssl_port, ssl=sslc)
-        if env.websocket_port is not None:
-            await self._start_ws_server(host, env.websocket_port)
+        if env.ws_port is not None:
+            await self._start_ws_server(None, host, env.ws_port)
+        if env.wss_port is not None:
+            sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
+            await self._start_ws_server(None, host, env.wss_port)
         self.server_listening.set()
 
     async def _close_servers(self, kinds):
