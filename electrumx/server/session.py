@@ -153,16 +153,32 @@ class SessionManager(object):
                     d = json.loads(message)
                     payload = JSONRPCv2.encode_payload(d)
                     request, request_id = JSONRPCv2.message_to_item(payload)
-                    instance_response = await instance.handle_request(request)
-                    response_msg = JSONRPCv2.response_message(instance_response, request_id)
-                    await websocket.send(response_msg.decode())
+
+                    if type(request) == list:
+                        messages_array = []
+                        for single_req in request:
+                            payload = JSONRPCv2.encode_payload(single_req)
+                            request, request_id = JSONRPCv2.message_to_item(payload)
+                            instance_response = await instance.handle_request(request)
+                            response_msg = JSONRPCv2.response_message(instance_response, request_id)
+                            messages_array.append(response_msg)
+
+                        response_batch = JSONRPCv2.batch_message_from_parts(messages_array)
+                        await websocket.send(response_batch.decode())
+
+                    else:
+                        print(type(request))
+                        instance_response = await instance.handle_request(request)
+                        response_msg = JSONRPCv2.response_message(instance_response, request_id)
+                        await websocket.send(response_msg.decode())
+
                 except ValueError:
                     error_msg = RPCError.invalid_request("Invalid JSON")
-                    response_msg = JSONRPCv2.response_message(error_msg, 0)
+                    response_msg = JSONRPCv2.response_message(error_msg, None)
                     await websocket.send(response_msg.decode())
                 except RPCError as err:
                     error_msg = RPCError.invalid_args(err.message)
-                    response_msg = JSONRPCv2.response_message(error_msg, request_id)
+                    response_msg = JSONRPCv2.response_message(error_msg, None)
                     await websocket.send(response_msg.decode())
 
         if sslc:
