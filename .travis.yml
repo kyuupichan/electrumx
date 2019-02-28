@@ -26,8 +26,7 @@ install:
   - pip install pytest-asyncio
   - pip install pytest-cov
   - pip install Sphinx
-  - pip install asyncws
-  - pip install jsonrpcserver
+  - pip install websockets
   # hashes
   - pip install tribus-hash
   - pip install blake256
