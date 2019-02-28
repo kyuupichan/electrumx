@@ -147,8 +147,9 @@ class SessionManager(object):
         instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'TCP')
 
         async def websocket(websocket, path):
-            async for message in websocket:
+            while True:
                 try:
+                    message = await websocket.recv()
                     d = json.loads(message)
                     payload = JSONRPCv2.encode_payload(d)
                     request, request_id = JSONRPCv2.message_to_item(payload)
