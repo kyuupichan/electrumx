@@ -137,6 +137,17 @@ These environment variables are optional:
   (e.g., 8000 for Bitcoin mainnet) if not set, as indicated in
   `lib/coins.py`_.
 
+.. envvar:: WEBSOCKET_PORT
+
+  If set ElectrumX will serve a WebSocket server
+  :envvar:`HOST`\::envvar:`WEBSOCKET_PORT`.
+
+  .. note:: ElectrumX will not serve WebSocket connections until it has
+            fully caught up with your daemon.
+
+  .. note:: If `SSL_CERTFILE` and `SSL_KEY` is specified, ElectrumX will
+            server a Secure WebSocket.
+
 .. envvar:: DONATION_ADDRESS
 
   The server donation address reported to Electrum clients.  Defaults
