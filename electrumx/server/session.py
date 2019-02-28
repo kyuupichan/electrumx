@@ -146,7 +146,6 @@ class SessionManager(object):
     async def _start_ws_server(self, *args, **kw_args):
         instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'TCP')
 
-        @asyncio.coroutine
         async def websocket(websocket, path):
             async for message in websocket:
                 try:
