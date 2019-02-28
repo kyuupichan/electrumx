@@ -8,8 +8,7 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import asyncio
-import asyncws
-from jsonrpcserver import method, async_dispatch as dispatch
+import websockets
 import codecs
 import datetime
 import itertools
@@ -22,7 +21,7 @@ from collections import defaultdict
 from functools import partial
 
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2,
     TaskGroup, handler_invocation, RPCError, Request, ignore_after, sleep,
     Event
 )
@@ -147,47 +146,29 @@ class SessionManager(object):
     async def _start_ws_server(self, *args, **kw_args):
         instance = ElectrumX(self, self.db, self.mempool, self.peer_mgr, 'TCP')
 
-        @method
-        async def server_version(client, protocol):
-            return await instance.server_version(client, protocol),
-
-        @method
-        async def blockchain_get_balance(scripthash):
-            return await instance.scripthash_get_balance(scripthash)
-
-        @method
-        async def blockchain_get_history(scripthash):
-            return await instance.scripthash_get_history(scripthash)
-
-        @method
-        async def blockchain_listunspent(scripthash):
-            return await instance.scripthash_listunspent(scripthash)
-
-        @method
-        async def blockchain_estimatefee(blocks):
-            return await instance.estimatefee(blocks)
-
-        @method
-        async def transaction_get(txid, verbose):
-            return await instance.transaction_get(txid, verbose)
-
-        @method
-        async def transaction_broadcast(raw_tx):
-            return await instance.transaction_broadcast(raw_tx)
-
         @asyncio.coroutine
-        async def websocket(websocket):
-            while True:
-                response = await dispatch(await websocket.recv())
-                if response.wanted:
-                    await websocket.send(str(response))
+        async def websocket(websocket, path):
+            async for message in websocket:
+                try:
+                    d = json.loads(message)
+                    payload = JSONRPCv2.encode_payload(d)
+                    request, request_id = JSONRPCv2.message_to_item(payload)
+                    instance_response = await instance.handle_request(request)
+                    response_msg = JSONRPCv2.response_message(instance_response, request_id)
+                    await websocket.send(response_msg.decode())
+                except ValueError:
+                    response_msg = JSONRPCv2.response_message(RPCError.invalid_request("Invalid JSON"), 0)
+                    await websocket.send(response_msg.decode())
+                except RPCError:
+                    response_msg = JSONRPCv2.response_message(RPCError.invalid_args("unknown method"), request_id)
+                    await websocket.send(response_msg.decode())
 
-        server = asyncws.start_server(websocket, *args, **kw_args)
+        server = websockets.serve(websocket, *args, **kw_args)
 
         host, port = args[:2]
         try:
             await server
-        except OSError as e:    # don't suppress CancelledError
+        except OSError as e:
             self.logger.error(f'WebSocket server failed to listen on {host}:'
                               f'{port:d} :{e!r}')
         else:
