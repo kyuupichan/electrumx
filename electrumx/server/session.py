@@ -157,10 +157,12 @@ class SessionManager(object):
                     response_msg = JSONRPCv2.response_message(instance_response, request_id)
                     await websocket.send(response_msg.decode())
                 except ValueError:
-                    response_msg = JSONRPCv2.response_message(RPCError.invalid_request("Invalid JSON"), 0)
+                    error_msg = RPCError.invalid_request("Invalid JSON")
+                    response_msg = JSONRPCv2.response_message(error_msg, 0)
                     await websocket.send(response_msg.decode())
                 except RPCError:
-                    response_msg = JSONRPCv2.response_message(RPCError.invalid_args("unknown method"), request_id)
+                    error_msg = RPCError.invalid_args("unknown method")
+                    response_msg = JSONRPCv2.response_message(error_msg, request_id)
                     await websocket.send(response_msg.decode())
 
         server = websockets.serve(websocket, *args, **kw_args)
