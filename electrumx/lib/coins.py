@@ -2806,6 +2806,7 @@ class Bitsend(Coin):
                             .format(header_hex_hash, cls.GENESIS_HASH))
         return header + bytes(1)
 
+
 class Ravencoin(Coin):
     NAME = "Ravencoin"
     SHORTNAME = "RVN"
@@ -2821,18 +2822,19 @@ class Ravencoin(Coin):
     TX_COUNT = 3911020
     TX_COUNT_HEIGHT = 602000
     TX_PER_BLOCK = 4
-    RPC_PORT =8766
+    RPC_PORT = 8766
     REORG_LIMIT = 55
     PEERS = [
-    'rvn.satoshi.org.uk s t',
-    'electrum-rvn.minermore.com s t',
-    '153.126.197.243 s t'
+        'rvn.satoshi.org.uk s t',
+        'electrum-rvn.minermore.com s t',
+        '153.126.197.243 s t'
     ]
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         import x16r_hash
         return x16r_hash.getPoWHash(header)
+
 
 class RavencoinTestnet(Ravencoin):
     NET = "testnet"
@@ -2846,9 +2848,9 @@ class RavencoinTestnet(Ravencoin):
     TX_COUNT = 108085
     TX_COUNT_HEIGHT = 60590
     TX_PER_BLOCK = 4
-    RPC_PORT =18766
+    RPC_PORT = 18766
     PEER_DEFAULT_PORTS = {'t': '50003', 's': '50004'}
     REORG_LIMIT = 55
     PEERS = [
-    'rvn.satoshi.org.uk s t'
+        'rvn.satoshi.org.uk s t'
     ]
