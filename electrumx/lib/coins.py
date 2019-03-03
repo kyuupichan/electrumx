@@ -2805,3 +2805,52 @@ class Bitsend(Coin):
             raise CoinError('genesis block has hash {} expected {}'
                             .format(header_hex_hash, cls.GENESIS_HASH))
         return header + bytes(1)
+
+
+class Ravencoin(Coin):
+    NAME = "Ravencoin"
+    SHORTNAME = "RVN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("3C")
+    P2SH_VERBYTES = [bytes.fromhex("7A")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('0000006b444bc2f2ffe627be9d9e7e7a'
+                    '0730000870ef6eb6da46c8eae389df90')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 3911020
+    TX_COUNT_HEIGHT = 602000
+    TX_PER_BLOCK = 4
+    RPC_PORT = 8766
+    REORG_LIMIT = 55
+    PEERS = [
+        'rvn.satoshi.org.uk s t',
+        'electrum-rvn.minermore.com s t',
+        '153.126.197.243 s t'
+    ]
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
+
+
+class RavencoinTestnet(Ravencoin):
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTES = [bytes.fromhex("C4")]
+    WIF_BYTE = bytes.fromhex("EF")
+    GENESIS_HASH = ('000000ecfc5e6324a079542221d00e10'
+                    '362bdc894d56500c414060eea8a3ad5a')
+    TX_COUNT = 108085
+    TX_COUNT_HEIGHT = 60590
+    TX_PER_BLOCK = 4
+    RPC_PORT = 18766
+    PEER_DEFAULT_PORTS = {'t': '50003', 's': '50004'}
+    REORG_LIMIT = 55
+    PEERS = [
+        'rvn.satoshi.org.uk s t'
+    ]
