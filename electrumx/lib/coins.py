@@ -2805,3 +2805,23 @@ class Bitsend(Coin):
             raise CoinError('genesis block has hash {} expected {}'
                             .format(header_hex_hash, cls.GENESIS_HASH))
         return header + bytes(1)
+
+class Onixcoin(Coin):
+    NAME = "Onixcoin"
+    SHORTNAME = "ONX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("4b")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('000007140b7a6ca0b64965824f5731f6'
+                    'e86daadf19eb299033530b1e61236e43')
+    TX_COUNT = 8908766
+    TX_COUNT_HEIGHT = 1105256
+    TX_PER_BLOCK = 10
+    RPC_PORT = 41019
+    REORG_LIMIT = 800
+    PEERS = []
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
