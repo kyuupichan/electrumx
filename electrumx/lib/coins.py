@@ -2806,6 +2806,7 @@ class Bitsend(Coin):
                             .format(header_hex_hash, cls.GENESIS_HASH))
         return header + bytes(1)
 
+
 class Ravencoin(Coin):
     NAME = "Ravencoin"
     SHORTNAME = "RVN"
@@ -2834,6 +2835,7 @@ class Ravencoin(Coin):
         import x16r_hash
         return x16r_hash.getPoWHash(header)
 
+
 class RavencoinTestnet(Ravencoin):
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587CF")
@@ -2852,6 +2854,7 @@ class RavencoinTestnet(Ravencoin):
     PEERS = [
         'rvn.satoshi.org.uk s t'
     ]
+
 
 class Onixcoin(Coin):
     NAME = "Onixcoin"
