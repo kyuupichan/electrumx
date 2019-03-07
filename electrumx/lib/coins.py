@@ -742,7 +742,29 @@ class LitecoinRegtest(LitecoinTestnet):
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
 
+    
+class LitecoinCash(Coin):
+    NAME = "LitecoinCash"
+    SHORTNAME = "LCC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1c")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("b0")
+    GENESIS_HASH = ('12a765e31ffd4059bada1e25190f6e98'
+                    'c99d9714d334efa41a195a7e7e04bfe2')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 8908766
+    TX_COUNT_HEIGHT = 1105256
+    TX_PER_BLOCK = 10
+    RPC_PORT = 9332
+    REORG_LIMIT = 800
+    PEERS = [
+        'lcc.mgnm.rocks s50020',
+    ]    
 
+    
 class BitcoinCashRegtest(BitcoinTestnetMixin, Coin):
     NAME = "BitcoinCashABC"   # Some releases later remove the ABC suffix
     NET = "regtest"
