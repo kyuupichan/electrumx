@@ -1189,7 +1189,7 @@ class ZcashTestnet(Zcash):
 
 class SnowGem(EquihashMixin, Coin):
     NAME = "SnowGem"
-    SHORTNAME = "SNG"
+    SHORTNAME = "XSG"
     NET = "mainnet"
     P2PKH_VERBYTE = bytes.fromhex("1C28")
     P2SH_VERBYTES = [bytes.fromhex("1C2D")]
@@ -1197,19 +1197,12 @@ class SnowGem(EquihashMixin, Coin):
     GENESIS_HASH = ('00068b35729d9d2b0c294ff1fe9af009'
                     '4740524311a131de40e7f705e4c29a5b')
     DESERIALIZER = lib_tx.DeserializerZcash
-    TX_COUNT = 140698
-    TX_COUNT_HEIGHT = 102802
+    TX_COUNT = 1680878
+    TX_COUNT_HEIGHT = 627250
     TX_PER_BLOCK = 2
     RPC_PORT = 16112
     REORG_LIMIT = 800
     CHUNK_SIZE = 200
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        h['n_solution'] = base64.b64encode(lib_tx.Deserializer(
-            header, start=140)._read_varbytes()).decode('utf8')
-        return h
 
 
 class BitcoinZ(EquihashMixin, Coin):
