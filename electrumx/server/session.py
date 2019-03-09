@@ -818,7 +818,7 @@ class ElectrumX(SessionBase):
 
     async def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
-        return self.peer_mgr.on_peers_subscribe(self.is_tor(), self.is_peer)
+        return self.peer_mgr.on_peers_subscribe(self.is_tor())
 
     async def address_status(self, hashX):
         '''Returns an address status.
