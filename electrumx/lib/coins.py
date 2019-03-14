@@ -268,7 +268,7 @@ class Coin(object):
         return h
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         return False
 
 
@@ -405,7 +405,7 @@ class BitcoinCash(BitcoinMixin, Coin):
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 4):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -439,7 +439,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     ]
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -614,7 +614,7 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 4):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -649,7 +649,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     ]
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
