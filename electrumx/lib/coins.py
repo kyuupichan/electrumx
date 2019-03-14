@@ -47,7 +47,8 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX,
+                                      BitcoinSegwitElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -419,6 +420,7 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    SESSIONCLS = BitcoinSegwitElectrumX
     MEMPOOL_HISTOGRAM_REFRESH_SECS = 120
     TX_COUNT = 318337769
     TX_COUNT_HEIGHT = 524213
@@ -638,6 +640,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.'''
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    SESSIONCLS = BitcoinSegwitElectrumX
     PEERS = [
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
