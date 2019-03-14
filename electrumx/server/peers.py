@@ -146,6 +146,11 @@ class PeerManager(object):
                 self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
             except Exception as e:
                 self.logger.error(f'could not retrieve blacklist from {url}: {e}')
+            else:
+                # Got new blacklist. Now check our current peers against it
+                for peer in self.peers:
+                    if self._is_blacklisted(peer.host):
+                        peer.retry_event.set()
             await sleep(600)
 
     def _is_blacklisted(self, host):
