@@ -47,7 +47,8 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX,
+                                      BitcoinSegwitElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -268,7 +269,7 @@ class Coin(object):
         return h
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         return False
 
 
@@ -405,7 +406,7 @@ class BitcoinCash(BitcoinMixin, Coin):
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 4):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -419,6 +420,7 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    SESSIONCLS = BitcoinSegwitElectrumX
     MEMPOOL_HISTOGRAM_REFRESH_SECS = 120
     TX_COUNT = 318337769
     TX_COUNT_HEIGHT = 524213
@@ -439,7 +441,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     ]
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -614,7 +616,7 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 4):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -638,6 +640,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.'''
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    SESSIONCLS = BitcoinSegwitElectrumX
     PEERS = [
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
@@ -649,7 +652,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     ]
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
