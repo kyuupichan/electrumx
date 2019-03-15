@@ -9,7 +9,6 @@
 
 
 import re
-import resource
 from collections import namedtuple
 from ipaddress import ip_address
 
@@ -89,13 +88,18 @@ class Env(EnvBase):
         is MAX_SESSIONS.  However, to prevent open file exhaustion, ajdust
         downwards if running with a small open file rlimit.'''
         env_value = self.integer('MAX_SESSIONS', 1000)
-        nofile_limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
-        # We give the DB 250 files; allow ElectrumX 100 for itself
-        value = max(0, min(env_value, nofile_limit - 350))
-        if value < env_value:
-            self.logger.warning('lowered maximum sessions from {:,d} to {:,d} '
-                                'because your open file limit is {:,d}'
-                                .format(env_value, value, nofile_limit))
+        # No resource module on Windows
+        try:
+            import resource
+            nofile_limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+            # We give the DB 250 files; allow ElectrumX 100 for itself
+            value = max(0, min(env_value, nofile_limit - 350))
+            if value < env_value:
+                self.logger.warning('lowered maximum sessions from {:,d} to {:,d} '
+                                    'because your open file limit is {:,d}'
+                                    .format(env_value, value, nofile_limit))
+        except ImportError:
+            value = 512 # that is what returned by stdio's _getmaxstdio()
         return value
 
     def clearnet_identity(self):
