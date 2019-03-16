@@ -89,9 +89,10 @@ class ServerBase(object):
                                 f'initiating shutdown')
 
         self.start_time = time.time()
-        for signame in ('SIGINT', 'SIGTERM'):
-            loop.add_signal_handler(getattr(signal, signame),
-                                    partial(on_signal, signame))
+        if os.name != 'nt':
+            for signame in ('SIGINT', 'SIGTERM'):
+                loop.add_signal_handler(getattr(signal, signame),
+                                        partial(on_signal, signame))
         loop.set_exception_handler(self.on_exception)
 
         shutdown_event = asyncio.Event()
