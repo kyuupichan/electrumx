@@ -51,7 +51,7 @@ class ServerBase(object):
             mvs = '.'.join(str(part) for part in self.PYTHON_MIN_VERSION)
             raise RuntimeError('Python version >= {} is required'.format(mvs))
 
-        if os.geteuid() == 0 and not env.allow_root:
+        if os.name != 'nt' and os.geteuid() == 0 and not env.allow_root:
             raise RuntimeError('RUNNING AS ROOT IS STRONGLY DISCOURAGED!\n'
                                'You shoud create an unprivileged user account '
                                'and use that.\n'
