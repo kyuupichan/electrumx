@@ -7,6 +7,7 @@
 
 import asyncio
 import os
+import platform
 import re
 import signal
 import sys
@@ -51,7 +52,9 @@ class ServerBase(object):
             mvs = '.'.join(str(part) for part in self.PYTHON_MIN_VERSION)
             raise RuntimeError('Python version >= {} is required'.format(mvs))
 
-        if os.name != 'nt' and os.geteuid() == 0 and not env.allow_root:
+        if platform.system() == 'Windows':
+            pass
+        elif os.geteuid() == 0 and not env.allow_root:
             raise RuntimeError('RUNNING AS ROOT IS STRONGLY DISCOURAGED!\n'
                                'You shoud create an unprivileged user account '
                                'and use that.\n'
@@ -89,7 +92,9 @@ class ServerBase(object):
                                 f'initiating shutdown')
 
         self.start_time = time.time()
-        if os.name != 'nt':
+        if platform.system() == 'Windows':
+            pass # No signals on Windows
+        else:
             for signame in ('SIGINT', 'SIGTERM'):
                 loop.add_signal_handler(getattr(signal, signame),
                                         partial(on_signal, signame))
@@ -111,5 +116,8 @@ class ServerBase(object):
         loop = asyncio.get_event_loop()
         try:
             loop.run_until_complete(self._main(loop))
+        except KeyboardInterrupt:
+            self.logger.warning(f'received interrupt signal, '
+                                f'initiating shutdown')
         finally:
             loop.run_until_complete(loop.shutdown_asyncgens())
