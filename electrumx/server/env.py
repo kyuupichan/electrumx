@@ -99,7 +99,7 @@ class Env(EnvBase):
                                     'because your open file limit is {:,d}'
                                     .format(env_value, value, nofile_limit))
         except ImportError:
-            value = 512 # that is what returned by stdio's _getmaxstdio()
+            value = 512  # that is what returned by stdio's _getmaxstdio()
         return value
 
     def clearnet_identity(self):
