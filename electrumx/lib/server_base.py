@@ -93,7 +93,7 @@ class ServerBase(object):
 
         self.start_time = time.time()
         if platform.system() == 'Windows':
-            pass # No signals on Windows
+            pass  # No signals on Windows
         else:
             for signame in ('SIGINT', 'SIGTERM'):
                 loop.add_signal_handler(getattr(signal, signame),
@@ -117,7 +117,7 @@ class ServerBase(object):
         try:
             loop.run_until_complete(self._main(loop))
         except KeyboardInterrupt:
-            self.logger.warning(f'received interrupt signal, '
-                                f'initiating shutdown')
+            self.logger.info(f'received interrupt signal, '
+                             f'initiating shutdown')
         finally:
             loop.run_until_complete(loop.shutdown_asyncgens())
