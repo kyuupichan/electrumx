@@ -149,14 +149,15 @@ class PeerManager(object):
             else:
                 # Got new blacklist. Now check our current peers against it
                 for peer in self.peers:
-                    if self._is_blacklisted(peer.host):
+                    if self._is_blacklisted(peer):
                         peer.retry_event.set()
             await sleep(600)
 
-    def _is_blacklisted(self, host):
-        host = host.lower()
+    def _is_blacklisted(self, peer):
+        host = peer.host.lower()
+        second_level_domain = '*.' + '.'.join(host.split('.')[-2:])
         return any(item in self.blacklist
-                   for item in (host, '*.' + '.'.join(host.split('.')[-2:])))
+                   for item in (host, second_level_domain, peer.ip_addr))
 
     async def _detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
@@ -306,13 +307,13 @@ class PeerManager(object):
         return False
 
     async def _verify_peer(self, session, peer):
-        if self._is_blacklisted(peer.host):
-            raise BadPeerError('blacklisted')
-
         if not peer.is_tor:
             address = session.peer_address()
             if address:
                 peer.ip_addr = address[0]
+
+        if self._is_blacklisted(peer):
+            raise BadPeerError('blacklisted')
 
         # server.version goes first
         message = 'server.version'
@@ -505,7 +506,7 @@ class PeerManager(object):
                   not peer.bad and peer.is_public]
         onion_peers = []
 
-        recent = [peer for peer in recent if not self._is_blacklisted(peer.host)]
+        recent = [peer for peer in recent if not self._is_blacklisted(peer)]
 
         # Always report ourselves if valid (even if not public)
         peers = set(myself for myself in self.myselves
