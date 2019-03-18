@@ -2878,6 +2878,7 @@ class Onixcoin(Coin):
         import x11_hash
         return x11_hash.getPoWHash(header)
 
+
 class Electra(Coin):
     NAME = "Electra"
     SHORTNAME = "ECA"
