@@ -798,6 +798,7 @@ class DeserializerBitcoinDiamondSegWit(DeserializerBitcoinDiamond,
         '''
         return self._read_tx_parts()[0]
 
+
 class DeserializerElectra(Deserializer):
     ELECTRA_TX_VERSION = 7
 
