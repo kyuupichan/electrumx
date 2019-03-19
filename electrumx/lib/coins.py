@@ -1448,7 +1448,32 @@ class PeercoinTestnet(Peercoin):
                     'b0658ce630cc727c0cca81aec47c9f06')
     ESTIMATE_FEE = 0.001
 
+    
+class BitcoinAir(Coin):
+    NAME = "BitcoinAir"
+    SHORTNAME = "XBA"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("4b")
+    P2SH_VERBYTES = [bytes.fromhex("75")]
+    WIF_BYTE = bytes.fromhex("cb")
+    GENESIS_HASH = ('000003e8d6924aba5397cfa6d8ababe4'
+                    'f89384b4334cca6f823565c3ccf7799b')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.FakeEstimateFeeDaemon
+    ESTIMATE_FEE = 0.01
+    RELAY_FEE = 0.01
+    TX_COUNT = 1207356
+    TX_COUNT_HEIGHT = 306425
+    TX_PER_BLOCK = 4
+    RPC_PORT = 9902
+    REORG_LIMIT = 5000
 
+    PEERS = [
+    ]
+
+    VALUE_PER_COIN = 1000000
+    
+    
 class Trezarcoin(Coin):
     NAME = "Trezarcoin"
     SHORTNAME = "TZC"
