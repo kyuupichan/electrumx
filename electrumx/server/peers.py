@@ -149,14 +149,23 @@ class PeerManager(object):
             else:
                 # Got new blacklist. Now check our current peers against it
                 for peer in self.peers:
-                    if self._is_blacklisted(peer.host):
+                    if self._is_blacklisted(peer):
                         peer.retry_event.set()
             await sleep(600)
 
-    def _is_blacklisted(self, host):
-        host = host.lower()
+    def _is_blacklisted(self, peer):
+        host = peer.host.lower()
+        second_level_domain = '*.' + '.'.join(host.split('.')[-2:])
         return any(item in self.blacklist
-                   for item in (host, '*.' + '.'.join(host.split('.')[-2:])))
+                   for item in (host, second_level_domain, peer.ip_addr))
+
+    def _get_recent_good_peers(self):
+        cutoff = time.time() - STALE_SECS
+        recent = [peer for peer in self.peers
+                  if peer.last_good > cutoff and
+                  not peer.bad and peer.is_public]
+        recent = [peer for peer in recent if not self._is_blacklisted(peer)]
+        return recent
 
     async def _detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
@@ -306,13 +315,37 @@ class PeerManager(object):
         return False
 
     async def _verify_peer(self, session, peer):
-        if self._is_blacklisted(peer.host):
-            raise BadPeerError('blacklisted')
-
+        # store IP address for peer
         if not peer.is_tor:
             address = session.peer_address()
             if address:
                 peer.ip_addr = address[0]
+
+        if self._is_blacklisted(peer):
+            raise BadPeerError('blacklisted')
+
+        # Bucket good recent peers; forbid many servers from similar IPs
+        # FIXME there's a race here, when verifying multiple peers
+        #       that belong to the same bucket ~simultaneously
+        recent_peers = self._get_recent_good_peers()
+        if peer in recent_peers:
+            recent_peers.remove(peer)
+        onion_peers = []
+        buckets = defaultdict(list)
+        for other_peer in recent_peers:
+            if other_peer.is_tor:
+                onion_peers.append(other_peer)
+            else:
+                buckets[other_peer.bucket_for_internal_purposes()].append(other_peer)
+        if peer.is_tor:
+            # keep number of onion peers below half of all peers,
+            # but up to 100 is OK regardless
+            if len(onion_peers) > len(recent_peers) // 2 >= 100:
+                raise BadPeerError('too many onion peers already')
+        else:
+            bucket = peer.bucket_for_internal_purposes()
+            if len(buckets[bucket]) > 0:
+                raise BadPeerError(f'too many peers already in bucket {bucket}')
 
         # server.version goes first
         message = 'server.version'
@@ -499,25 +532,21 @@ class PeerManager(object):
         Additionally, if we don't have onion routing, we return a few
         hard-coded onion servers.
         '''
-        cutoff = time.time() - STALE_SECS
-        recent = [peer for peer in self.peers
-                  if peer.last_good > cutoff and
-                  not peer.bad and peer.is_public]
-        onion_peers = []
-
-        recent = [peer for peer in recent if not self._is_blacklisted(peer.host)]
+        recent = self._get_recent_good_peers()
 
         # Always report ourselves if valid (even if not public)
+        cutoff = time.time() - STALE_SECS
         peers = set(myself for myself in self.myselves
                     if myself.last_good > cutoff)
 
         # Bucket the clearnet peers and select up to two from each
+        onion_peers = []
         buckets = defaultdict(list)
         for peer in recent:
             if peer.is_tor:
                 onion_peers.append(peer)
             else:
-                buckets[peer.bucket()].append(peer)
+                buckets[peer.bucket_for_external_interface()].append(peer)
         for bucket_peers in buckets.values():
             random.shuffle(bucket_peers)
             peers.update(bucket_peers[:2])
