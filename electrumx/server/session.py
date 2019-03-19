@@ -293,6 +293,7 @@ class SessionManager(object):
             'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
             'sessions': self.session_count(),
+            'sessions_with_subs': self.session_count_with_subs(),
             'subs': self._sub_count(),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
@@ -519,6 +520,11 @@ class SessionManager(object):
     def session_count(self):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
+
+    def session_count_with_subs(self):
+        '''The number of connections that have at least one hashX subscription.'''
+        return sum(len(session.hashX_subs) > 0 for session in self.sessions
+                   if hasattr(session, 'hashX_subs'))
 
     async def daemon_request(self, method, *args):
         '''Catch a DaemonError and convert it to an RPCError.'''
