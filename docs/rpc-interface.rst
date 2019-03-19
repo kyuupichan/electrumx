@@ -84,6 +84,7 @@ A typical result is as follows (with annotated comments)::
     "pid": 85861,                  # Server's process ID
     "requests": 0,                 # Unprocessed requests across all sessions
     "sessions": 43,                # Total number of sessions
+    "sessions_with_subs": 4,       # Number of sessions with history subscriptions
     "subs": 84,                    # Script hash subscriptions across all sessions
     "txs_sent": 4,                 # Transactions sent since server started
     "uptime": "06h 48m 00s"        # Time since server started
