@@ -797,3 +797,29 @@ class DeserializerBitcoinDiamondSegWit(DeserializerBitcoinDiamond,
         we process it in the natural serialized order.
         '''
         return self._read_tx_parts()[0]
+
+
+class DeserializerElectra(Deserializer):
+    ELECTRA_TX_VERSION = 7
+
+    def _get_version(self):
+        result, = unpack_le_int32_from(self.binary, self.cursor)
+        return result
+
+    def read_tx(self):
+        version = self._get_version()
+        if version != self.ELECTRA_TX_VERSION:
+            return TxTime(
+                self._read_le_int32(),   # version
+                self._read_le_uint32(),  # time
+                self._read_inputs(),     # inputs
+                self._read_outputs(),    # outputs
+                self._read_le_uint32(),  # locktime
+            )
+        else:
+            return Tx(
+                self._read_le_int32(),  # version
+                self._read_inputs(),    # inputs
+                self._read_outputs(),   # outputs
+                self._read_le_uint32()  # locktime
+            )

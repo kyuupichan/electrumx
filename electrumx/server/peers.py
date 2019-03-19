@@ -142,11 +142,21 @@ class PeerManager(object):
             try:
                 async with session.get(url) as response:
                     r = await response.text()
-                self.blacklist = set(json.loads(r))
+                self.blacklist = set([entry.lower() for entry in json.loads(r)])
                 self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
             except Exception as e:
                 self.logger.error(f'could not retrieve blacklist from {url}: {e}')
+            else:
+                # Got new blacklist. Now check our current peers against it
+                for peer in self.peers:
+                    if self._is_blacklisted(peer.host):
+                        peer.retry_event.set()
             await sleep(600)
+
+    def _is_blacklisted(self, host):
+        host = host.lower()
+        return any(item in self.blacklist
+                   for item in (host, '*.' + '.'.join(host.split('.')[-2:])))
 
     async def _detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
@@ -296,6 +306,9 @@ class PeerManager(object):
         return False
 
     async def _verify_peer(self, session, peer):
+        if self._is_blacklisted(peer.host):
+            raise BadPeerError('blacklisted')
+
         if not peer.is_tor:
             address = session.peer_address()
             if address:
@@ -479,7 +492,7 @@ class PeerManager(object):
 
         return permit
 
-    def on_peers_subscribe(self, is_tor, is_peer):
+    def on_peers_subscribe(self, is_tor):
         '''Returns the server peers as a list of (ip, host, details) tuples.
 
         We return all peers we've connected to in the last day.
@@ -492,12 +505,7 @@ class PeerManager(object):
                   not peer.bad and peer.is_public]
         onion_peers = []
 
-        def is_blacklisted(host):
-            return any(item in self.blacklist
-                       for item in (host, '*.' + '.'.join(host.split('.')[-2:])))
-
-        if not is_peer:
-            recent = [peer for peer in recent if not is_blacklisted(peer.host)]
+        recent = [peer for peer in recent if not self._is_blacklisted(peer.host)]
 
         # Always report ourselves if valid (even if not public)
         peers = set(myself for myself in self.myselves

@@ -47,7 +47,8 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX,
+                                      BitcoinSegwitElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -268,7 +269,7 @@ class Coin(object):
         return h
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         return False
 
 
@@ -405,7 +406,7 @@ class BitcoinCash(BitcoinMixin, Coin):
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 4):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -419,6 +420,7 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    SESSIONCLS = BitcoinSegwitElectrumX
     MEMPOOL_HISTOGRAM_REFRESH_SECS = 120
     TX_COUNT = 318337769
     TX_COUNT_HEIGHT = 524213
@@ -439,7 +441,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     ]
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -614,7 +616,7 @@ class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     BLOCK_PROCESSOR = block_proc.LTORBlockProcessor
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 4):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -638,6 +640,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.'''
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
+    SESSIONCLS = BitcoinSegwitElectrumX
     PEERS = [
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
@@ -649,7 +652,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     ]
 
     @classmethod
-    def upgrade_required(cls, client_ver):
+    def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
             return ('<br/><br/>'
                     'Your transaction was successfully broadcast.<br/><br/>'
@@ -1211,7 +1214,7 @@ class ZcashTestnet(Zcash):
 
 class SnowGem(EquihashMixin, Coin):
     NAME = "SnowGem"
-    SHORTNAME = "SNG"
+    SHORTNAME = "XSG"
     NET = "mainnet"
     P2PKH_VERBYTE = bytes.fromhex("1C28")
     P2SH_VERBYTES = [bytes.fromhex("1C2D")]
@@ -1219,19 +1222,12 @@ class SnowGem(EquihashMixin, Coin):
     GENESIS_HASH = ('00068b35729d9d2b0c294ff1fe9af009'
                     '4740524311a131de40e7f705e4c29a5b')
     DESERIALIZER = lib_tx.DeserializerZcash
-    TX_COUNT = 140698
-    TX_COUNT_HEIGHT = 102802
+    TX_COUNT = 1680878
+    TX_COUNT_HEIGHT = 627250
     TX_PER_BLOCK = 2
     RPC_PORT = 16112
     REORG_LIMIT = 800
     CHUNK_SIZE = 200
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        h = super().electrum_header(header, height)
-        h['n_solution'] = base64.b64encode(lib_tx.Deserializer(
-            header, start=140)._read_varbytes()).decode('utf8')
-        return h
 
 
 class BitcoinZ(EquihashMixin, Coin):
@@ -2903,3 +2899,33 @@ class Onixcoin(Coin):
         '''Given a header return the hash.'''
         import x11_hash
         return x11_hash.getPoWHash(header)
+
+
+class Electra(Coin):
+    NAME = "Electra"
+    SHORTNAME = "ECA"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("21")
+    P2SH_VERBYTES = [bytes.fromhex("28")]
+    WIF_BYTE = bytes.fromhex("A1")
+    GENESIS_HASH = ('00000f98da995de0ef1665c7d3338687'
+                    '923c1199230a44ecbdb5cec9306e4f4e')
+    RPC_PORT = 5788
+    TX_COUNT = 615729
+    TX_COUNT_HEIGHT = 205243
+    TX_PER_BLOCK = 3
+    REORG_LIMIT = 100
+    DESERIALIZER = lib_tx.DeserializerElectra
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        version, = util.unpack_le_uint32_from(header)
+        import nist5_hash
+
+        if version != 8:
+            return nist5_hash.getPoWHash(header)
+        else:
+            return double_sha256(header)
