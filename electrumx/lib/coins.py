@@ -764,7 +764,8 @@ class LitecoinCash(Coin):
     RPC_PORT = 9332
     REORG_LIMIT = 800
     PEERS = [
-        'lcc.mgnm.rocks s50020',
+        'hetzner01.fischl-online.de s50010',
+        'electrum.mgnm.rocks s3020',
     ]    
 
     
@@ -1469,6 +1470,7 @@ class BitcoinAir(Coin):
     REORG_LIMIT = 5000
 
     PEERS = [
+        'electrum.mgnm.rocks s3012',
     ]
 
     VALUE_PER_COIN = 1000000
