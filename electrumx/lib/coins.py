@@ -2908,6 +2908,7 @@ class Electra(Coin):
         else:
             return double_sha256(header)
 
+
 class ECCoin(Coin):
     NAME = "ECCoin"
     SHORTNAME = "ECC"
