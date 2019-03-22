@@ -2907,3 +2907,26 @@ class Electra(Coin):
             return nist5_hash.getPoWHash(header)
         else:
             return double_sha256(header)
+
+class ECCoin(Coin):
+    NAME = "ECCoin"
+    SHORTNAME = "ECC"
+    NET = "mainnet"
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("21")
+    P2SH_VERBYTES = [bytes.fromhex("08")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('a60ac43c88dbc44b826cf315352a8a7b373d2af8b6e1c4c4a0638859c5e9ecd1')
+    TX_COUNT = 4661197
+    TX_COUNT_HEIGHT = 2114846
+    TX_PER_BLOCK = 10
+    VALUE_PER_COIN = 1000000
+    RPC_PORT = 19119
+
+    @classmethod
+    def header_hash(cls, header):
+        # you have to install scryp python module (pip install scrypt)
+        import scrypt
+        return scrypt.hash(header, header, 1024, 1, 1, 32)
