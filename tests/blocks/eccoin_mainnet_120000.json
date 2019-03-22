@@ -1,0 +1,27 @@
+{
+   "hash": "8371f04354871c4093a802618f1c4e5fb153b14fa1a73d2b27f45208f14afb41",
+   "confirmations": 1994860,
+   "size": 446,
+   "height": 120000,
+   "version": 4,
+   "merkleroot": "543c076b56ccc14156f336b852451b69dcc52bf9d611fc646e6c7cfe0a1d698a",
+   "mint": 18.650684,
+   "tx": [
+      "dbaa5fc586560ec48d3d17c46a48718b0e5a88bc0c9caa39cd890dfa48b40ec4",
+      "260c31682199d58036d2a4c0b88b26cbac3f88b22d92bdd6a5206a883f3274cb"
+   ],
+   "time": 1399711315,
+   "mediantime": 1399711154,
+   "nonce": 0,
+   "bits": "1d349684",
+   "difficulty": 0.019015472359015,
+   "chainwork": "000000000000000000000000000000000000000000000000002635365d8d7de3",
+   "previousblockhash": "7fc769c6064646cf01007533a2576cacf0750b30752745685f906a647c4abb44",
+   "nextblockhash": "dc8ceed3959e71cf3c27d2075786ed145530ddaf9a0bda6235297fc935ab0a3a",
+   "flags": "proof-of-stake",
+   "nflags:": "3",
+   "proofhash": "a006c7f11bc0fe9c06613755977965bf9dceaf51ddfbe89aa3435c93db0e19a8",
+   "entropybit": 1,
+   "block entropybit": 1,
+   "modifier": "68e882e7c1a87f3e2c4e7ff6b3a0f08adfb7a4d000c3239b230d3705e9104a62"
+}
