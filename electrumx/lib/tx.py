@@ -823,3 +823,20 @@ class DeserializerElectra(Deserializer):
                 self._read_outputs(),   # outputs
                 self._read_le_uint32()  # locktime
             )
+
+
+class DeserializerECCoin(Deserializer):
+    def read_tx(self):
+        tx_version = self._read_le_int32()
+        tx = TxTime(
+            tx_version,
+            self._read_le_uint32(),
+            self._read_inputs(),
+            self._read_outputs(),
+            self._read_le_uint32(),
+        )
+
+        if tx_version > 1:
+            self.cursor += 32
+
+        return tx

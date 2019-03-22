@@ -2913,7 +2913,7 @@ class ECCoin(Coin):
     NAME = "ECCoin"
     SHORTNAME = "ECC"
     NET = "mainnet"
-    DESERIALIZER = lib_tx.DeserializerTxTime
+    DESERIALIZER = lib_tx.DeserializerECCoin
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
     P2PKH_VERBYTE = bytes.fromhex("21")
