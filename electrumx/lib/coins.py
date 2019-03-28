@@ -800,6 +800,25 @@ class ViacoinTestnetSegWit(ViacoinTestnet):
     NET = "testnet-segwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
 
+# Source: https://github.com/GravityCoinOfficial/GravityCoin/  
+class GravityCoin(Coin):
+    NAME = "GravityCoin"
+    SHORTNAME = "GXX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("28")
+    P2SH_VERBYTES = [bytes.fromhex("0a")]
+    WIF_BYTE = bytes.fromhex("d2")
+    GENESIS_HASH = ('322bad477efb4b33fa4b1f0b2861eaf543c61068da9898a95062fdb02ada486f')
+    TX_COUNT = 446050
+    TX_COUNT_HEIGHT = 547346
+    TX_PER_BLOCK = 2
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
+    RPC_PORT = 29200
+    REORG_LIMIT = 5000
+    PEERS = []
+
 
 class Unitus(Coin):
     NAME = "Unitus"
