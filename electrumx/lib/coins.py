@@ -800,7 +800,7 @@ class ViacoinTestnetSegWit(ViacoinTestnet):
     NET = "testnet-segwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
 
-# Source: https://github.com/GravityCoinOfficial/GravityCoin/  
+# Source: https://github.com/GravityCoinOfficial/GravityCoin/
 class GravityCoin(Coin):
     NAME = "GravityCoin"
     SHORTNAME = "GXX"
@@ -818,7 +818,6 @@ class GravityCoin(Coin):
     RPC_PORT = 29200
     REORG_LIMIT = 5000
     PEERS = []
-
 
 class Unitus(Coin):
     NAME = "Unitus"
