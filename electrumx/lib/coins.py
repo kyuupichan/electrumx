@@ -815,6 +815,7 @@ class GravityCoin(Coin):
     TX_COUNT = 446050
     TX_COUNT_HEIGHT = 547346
     TX_PER_BLOCK = 2
+    DESERIALIZER = lib_tx.DeserializerTxTime
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     RPC_PORT = 29200
     REORG_LIMIT = 5000
