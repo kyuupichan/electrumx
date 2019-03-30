@@ -2933,7 +2933,7 @@ class ECCoin(Coin):
         return scrypt.hash(header, header, 1024, 1, 1, 32)
 
       
-## Source: https://github.com/BitcoinZeroOfficial/bitcoinzero/
+# Source: https://github.com/BitcoinZeroOfficial/bitcoinzero/
 class Bitcoinzero(Coin):
     NAME = "Bitcoinzero"
     SHORTNAME = "BZX"
@@ -2950,6 +2950,6 @@ class Bitcoinzero(Coin):
     WIF_BYTE = bytes.fromhex("d2")
     RPC_PORT = 29200
     REORG_LIMIT = 5000
-    PEERS = { 'electrum.bitcoinzerox.net s t',
+    PEERS = ['electrum.bitcoinzerox.net s t',
               'electrum2.bitcoinzerox.net s t'
-    }
+    ]         
