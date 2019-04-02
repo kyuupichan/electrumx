@@ -1427,6 +1427,7 @@ class Bitbay(ScryptMixin, Coin):
     RPC_PORT = 19914
     REORG_LIMIT = 5000
 
+
 class DeepOnion(Coin):
     NAME = "DeepOnion"
     SHORTNAME = "ONION"
@@ -1456,6 +1457,7 @@ class DeepOnion(Coin):
         '''
         import x13_hash
         return x13_hash.getPoWHash(header)
+
 
 class Peercoin(Coin):
     NAME = "Peercoin"
