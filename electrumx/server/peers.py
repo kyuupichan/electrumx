@@ -27,6 +27,7 @@ from electrumx.lib.util import class_logger, protocol_tuple
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
 STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
+PEER_ADD_PAUSE = 600
 
 
 class BadPeerError(Exception):
@@ -77,6 +78,7 @@ class PeerManager(object):
         self.permit_onion_peer_time = time.time()
         self.proxy = None
         self.group = TaskGroup()
+        self.recent_peer_adds = {}
         # refreshed
         self.blacklist = set()
 
@@ -116,9 +118,8 @@ class PeerManager(object):
                 return None
         return my.features
 
-    def _permit_new_onion_peer(self):
+    def _permit_new_onion_peer(self, now):
         '''Accept a new onion peer only once per random time interval.'''
-        now = time.time()
         if now < self.permit_onion_peer_time:
             return False
         self.permit_onion_peer_time = now + random.randrange(0, 1200)
@@ -302,6 +303,9 @@ class PeerManager(object):
                         match.retry_event.set()
                 elif peer.host in match.features['hosts']:
                     match.update_features_from_peer(peer)
+            # Trim this data structure
+            self.recent_peer_adds = {k:v for k, v in self.recent_peer_adds.items()
+                                     if v + PEER_ADD_PAUSE < now}
         else:
             # Forget the peer if long-term unreachable
             if peer.last_good and not peer.bad:
@@ -502,8 +506,20 @@ class PeerManager(object):
         # Just look at the first peer, require it
         peer = peers[0]
         host = peer.host
+        now = time.time()
+
+        # Rate limit peer adds by domain to one every 10 minutes
+        if peer.ip_address is not None:
+            bucket = 'ip_addr'
+        else:
+            bucket = '.'.join(host.lower().split('.')[-2:])
+        last = self.recent_peer_adds.get(bucket, 0)
+        self.recent_peer_adds[bucket] = now
+        if last + PEER_ADD_PAUSE >= now:
+            return False
+
         if peer.is_tor:
-            permit = self._permit_new_onion_peer()
+            permit = self._permit_new_onion_peer(now)
             reason = 'rate limiting'
         else:
             getaddrinfo = asyncio.get_event_loop().getaddrinfo
