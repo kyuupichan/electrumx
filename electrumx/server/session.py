@@ -736,6 +736,8 @@ class SessionBase(RPCSession):
         bucket = self._bucket_for_resource_usage()
         res_usage = self.session_mgr.res_usage_of_ip[bucket]
         sleep_time = res_usage / self.res_usage_limit - 1
+        if sleep_time > 30:
+            raise FinalRPCError(BAD_REQUEST, 'session is using too much resources')
         if sleep_time > 0:
             await sleep(sleep_time)
 
