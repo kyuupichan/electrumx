@@ -115,6 +115,27 @@ Low-priority sessions have their requests served after higher priority
 sessions.  ElectrumX will start delaying responses to a session if it
 becomes sufficiently deprioritized.
 
+res_usage
+---------
+
+Return the state of the internal per-session-IP resource limit tracker.
+As a form of DOS limit, requests made by sessions have costs.
+These costs are incurred by the IP address of the session.
+The result is sorted in decreasing order of costs::
+
+  $ electrumx_rpc res_usage
+  [
+    [
+        "41.200.217.53/32",
+        3624050.0391892944
+    ],
+    [
+        "187.39.240.113/32",
+        3599832.8948473367
+    ],
+    ...
+  ]
+
 groups
 ------
 

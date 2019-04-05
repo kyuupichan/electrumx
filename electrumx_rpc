@@ -24,6 +24,7 @@ simple_commands = {
     'groups': 'Print current session groups',
     'peers': 'Print information about peer servers for the same coin',
     'sessions': 'Print information about client sessions',
+    'res_usage': 'Dump internal tracker of resource usage of IPs',
     'stop': 'Shut down the server cleanly',
 }
 

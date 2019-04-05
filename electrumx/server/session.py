@@ -18,6 +18,7 @@ import ssl
 import time
 from collections import defaultdict
 from functools import partial
+from ipaddress import ip_address, IPv4Network, IPv6Network
 
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
@@ -124,6 +125,8 @@ class SessionManager(object):
         self.cur_group = SessionGroup(0)
         self.txs_sent = 0
         self.start_time = time.time()
+        self.res_usage_of_ip = defaultdict(float)
+        self.res_usage_last = defaultdict(float)  # unix time
         self.history_cache = pylru.lrucache(256)
         self.notified_height = None
         # Cache some idea of room to avoid recounting on each subscription
@@ -138,7 +141,7 @@ class SessionManager(object):
 
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
-                'query reorg sessions stop'.split())
+                'query reorg sessions stop res_usage'.split())
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
@@ -403,6 +406,10 @@ class SessionManager(object):
         '''Return summary information about the server process.'''
         return self._get_info()
 
+    async def rpc_res_usage(self):
+        '''Return internal tracker of resource usage of IPs.'''
+        return sorted(self.res_usage_of_ip.items(), key=lambda kv: -kv[1])
+
     async def rpc_groups(self):
         '''Return statistics about the session groups.'''
         return self._group_data()
@@ -625,6 +632,7 @@ class SessionBase(RPCSession):
         self.txs_sent = 0
         self.log_me = False
         self.bw_limit = self.env.bandwidth_limit
+        self.res_usage_limit = self.env.res_usage_limit
         self.daemon_request = self.session_mgr.daemon_request
         # Hijack the connection so we can log messages
         self._receive_message_orig = self.connection.receive_message
@@ -667,6 +675,7 @@ class SessionBase(RPCSession):
         self.group = self.session_mgr.add_session(self)
         self.logger.info(f'{self.kind} {self.peer_address_str()}, '
                          f'{self.session_mgr.session_count():,d} total')
+        self.inc_resource_usage(5)
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
@@ -693,12 +702,51 @@ class SessionBase(RPCSession):
     def sub_count(self):
         return 0
 
+    def _bucket_for_resource_usage(self):
+        if not self.peer_address():
+            return
+        ip_addr = ip_address(self.peer_address()[0])
+        if ip_addr.is_private:
+            return
+        if ip_addr.version == 4:
+            slash32 = IPv4Network(ip_addr).supernet(prefixlen_diff=32-32)
+            return str(slash32)
+        elif ip_addr.version == 6:
+            slash64 = IPv6Network(ip_addr).supernet(prefixlen_diff=128-64)
+            return str(slash64)
+
+    def inc_resource_usage(self, cost):
+        if self.res_usage_limit == 0:
+            return
+        bucket = self._bucket_for_resource_usage()
+        if not bucket:
+            return
+        now = time.time()
+        last_time = self.session_mgr.res_usage_last[bucket] or now
+        res_usage = self.session_mgr.res_usage_of_ip[bucket]
+        # Reduce the recorded usage in proportion to the elapsed time
+        refund = (now - last_time) * (self.res_usage_limit / 86400)
+        res_usage = max(0, res_usage - refund) + cost
+        self.session_mgr.res_usage_of_ip[bucket] = res_usage
+        self.session_mgr.res_usage_last[bucket] = now
+
+    async def maybe_sleep_for_res_usage(self):
+        if self.res_usage_limit == 0:
+            return
+        bucket = self._bucket_for_resource_usage()
+        res_usage = self.session_mgr.res_usage_of_ip[bucket]
+        sleep_time = res_usage / self.res_usage_limit - 1
+        if sleep_time > 0:
+            await sleep(sleep_time)
+
     async def handle_request(self, request):
         '''Handle an incoming request.  ElectrumX doesn't receive
         notifications from client sessions.
         '''
         if isinstance(request, Request):
             handler = self.request_handlers.get(request.method)
+            self.inc_resource_usage(1)
+            await self.maybe_sleep_for_res_usage()
         else:
             handler = None
         coro = handler_invocation(handler, request)()
@@ -821,10 +869,12 @@ class ElectrumX(SessionBase):
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
         self.is_peer = True
+        self.inc_resource_usage(5)
         return await self.peer_mgr.on_add_peer(features, self.peer_address())
 
     async def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
+        self.inc_resource_usage(10)
         return self.peer_mgr.on_peers_subscribe(self.is_tor())
 
     async def address_status(self, hashX):
@@ -832,10 +882,13 @@ class ElectrumX(SessionBase):
 
         Status is a hex string, but must be None if there is no history.
         '''
+        self.inc_resource_usage(2)
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if it has unconfirmed inputs, otherwise 0
         db_history = await self.session_mgr.limited_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
+
+        self.inc_resource_usage(5 * (len(db_history) + len(mempool)))
 
         status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
                          f'{height:d}:'
@@ -862,6 +915,7 @@ class ElectrumX(SessionBase):
         utxos = sorted(utxos)
         utxos.extend(await self.mempool.unordered_UTXOs(hashX))
         spends = await self.mempool.potential_spends(hashX)
+        self.inc_resource_usage(10 * len(utxos))
 
         return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
                  'tx_pos': utxo.tx_pos,
@@ -916,6 +970,7 @@ class ElectrumX(SessionBase):
 
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
+        self.inc_resource_usage(10 * len(utxos))
         confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = await self.mempool.balance_delta(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
@@ -928,16 +983,19 @@ class ElectrumX(SessionBase):
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
         # height is -1 if it has unconfirmed inputs, otherwise 0
+        mempool_txns = await self.mempool.transaction_summaries(hashX)
+        self.inc_resource_usage(10 * len(mempool_txns))
         return [{'tx_hash': hash_to_hex_str(tx.hash),
                  'height': -tx.has_unconfirmed_inputs,
                  'fee': tx.fee}
-                for tx in await self.mempool.transaction_summaries(hashX)]
+                for tx in mempool_txns]
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
         history = await self.session_mgr.limited_history(hashX)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
+        self.inc_resource_usage(10 * len(conf))
         return conf + await self.unconfirmed_history(hashX)
 
     async def scripthash_get_history(self, scripthash):
@@ -1007,6 +1065,7 @@ class ElectrumX(SessionBase):
 
         max_size = self.MAX_CHUNK_SIZE
         count = min(count, max_size)
+        self.inc_resource_usage(count)
         headers, count = await self.db.read_headers(start_height, count)
         result = {'hex': headers.hex(), 'count': count, 'max': max_size}
         if count and cp_height:
@@ -1023,6 +1082,7 @@ class ElectrumX(SessionBase):
         index: the chunk index'''
         index = non_negative_integer(index)
         size = self.coin.CHUNK_SIZE
+        self.inc_resource_usage(size)
         start_height = index * size
         headers, _ = await self.db.read_headers(start_height, size)
         return headers.hex()
@@ -1176,6 +1236,7 @@ class ElectrumX(SessionBase):
         if verbose not in (True, False):
             raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
 
+        self.inc_resource_usage(5)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
     async def _block_hash_and_tx_hashes(self, height):
@@ -1186,6 +1247,7 @@ class ElectrumX(SessionBase):
         ordered list of hexadecimal strings.
         '''
         height = non_negative_integer(height)
+        self.inc_resource_usage(10)
         hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
         block_hash = hex_hashes[0]
         block = await self.daemon_request('deserialised_block', block_hash)
@@ -1197,6 +1259,7 @@ class ElectrumX(SessionBase):
         tx_hashes: ordered list of hex strings of tx hashes in a block
         tx_pos: index of transaction in tx_hashes to create branch for
         '''
+        self.inc_resource_usage(10)
         hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
         branch, root = self.db.merkle.branch_and_root(hashes, tx_pos)
         branch = [hash_to_hex_str(hash) for hash in branch]

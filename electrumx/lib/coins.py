@@ -86,6 +86,7 @@ class Coin(object):
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
     BLACKLIST_URL = None
+    RESOURCE_USAGE_LIMIT = 0
 
     @classmethod
     def lookup_coin_class(cls, name, net):
@@ -427,6 +428,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 524213
     TX_PER_BLOCK = 1400
     BLACKLIST_URL = 'https://electrum.org/blacklist.json'
+    RESOURCE_USAGE_LIMIT = 30_000
     PEERS = [
         'btc.smsys.me s995',
         'E-X.not.fyi s t',

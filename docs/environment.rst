@@ -274,6 +274,21 @@ raise them.
   Bandwidth usage is gradually reduced over time by "refunding" a
   proportional part of the limit every now and then.
 
+.. envvar:: RESOURCE_USAGE_LIMIT
+
+  Per IP address periodic resource usage limit.
+  Very similar to :envvar:`BANDWIDTH_LIMIT`, with a notable difference
+  being that this limit is based on the IP address of the session and
+  is persisted (only in memory) across reconnects.
+
+  Requests made by sessions incur costs. This cost is a naive heuristic
+  that tries to correlate with the CPU and DISK I/O usage of the request.
+
+  The time period is one day. The default resource limit is coin-specific.
+  For BTC, it is 30000. Set to zero for "unlimited".
+
+  See the :ref:`res_usage` RPC command.
+
 .. envvar:: SESSION_TIMEOUT
 
   An integer number of seconds defaulting to 600.  Sessions with no
