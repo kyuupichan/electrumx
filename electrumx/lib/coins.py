@@ -385,10 +385,11 @@ class BitcoinSV(BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 557037
     TX_PER_BLOCK = 400
     PEERS = [
-        'sv.electrumx.cash s t',
-        'sv1.hsmiths.com t60003 s60004',
+        'electrumx.bitcoinsv.io s',
         'satoshi.vision.cash s',
-        'electroncash.cascharia.com s t',
+        'sv.electrumx.cash s t',
+        'sv.jochen-hoenicke.de s t',
+        'sv.satoshi.io s t',
     ]
 
 
