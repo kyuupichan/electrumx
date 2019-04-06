@@ -22,7 +22,7 @@ from functools import partial
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
     TaskGroup, handler_invocation, RPCError, Request, ignore_after, sleep,
-    Event
+    Event, FinalRPCError
 )
 
 import electrumx
@@ -1117,9 +1117,8 @@ class ElectrumX(SessionBase):
             client_name = str(client_name)
             if self.env.drop_client is not None and \
                     self.env.drop_client.match(client_name):
-                self.close_after_send = True
-                raise RPCError(BAD_REQUEST,
-                               f'unsupported client: {client_name}')
+                raise FinalRPCError(BAD_REQUEST,
+                                    f'unsupported client: {client_name}')
             self.client = client_name[:17]
 
         # Find the highest common protocol version.  Disconnect if
@@ -1132,9 +1131,8 @@ class ElectrumX(SessionBase):
                 self.logger.info(f'client requested future protocol version '
                                  f'{util.version_string(client_min)} '
                                  f'- is your software out of date?')
-            self.close_after_send = True
-            raise RPCError(BAD_REQUEST,
-                           f'unsupported protocol version: {protocol_version}')
+            raise FinalRPCError(BAD_REQUEST,
+                                f'unsupported protocol version: {protocol_version}')
         self.set_request_handlers(ptuple)
 
         return (electrumx.version, self.protocol_version_string())
