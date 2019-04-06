@@ -8,6 +8,18 @@
    should not occur with Python 3.7.
 
 
+Version 1.10.0 (15 Mar 2019)
+============================
+
+* extra countermeasures to limit BTC phishing effectiveness (ghost43)
+* peers: mark blacklisted peers bad; force retry blacklisted peers (ghost43)
+* coin additions / updates: Monacoin (wakiyamap), Sparks (Mircea Rila), ColossusXT,
+  Polis, MNPCoin, Zcoin, GINCoin (cronos), Grosetlcoin (gruve-p), Dash (konez2k),
+  Bitsend (David), Ravencoin (standard-error), Onixcoin (Jose Estevez), SnowGem
+* coin removals: Gobyte, Moneci (cronos)
+* minor tweaks by d42
+* issues fixed `#660`_ - unclean shutdowns during initial sync
+
 Version 1.9.5 (08 Feb 2019)
 ===========================
 
@@ -177,6 +189,7 @@ Version 1.8  (06 Aug 2018)
 .. _#632: https://github.com/kyuupichan/electrumx/issues/630
 .. _#653: https://github.com/kyuupichan/electrumx/issues/653
 .. _#655: https://github.com/kyuupichan/electrumx/issues/655
+.. _#660: https://github.com/kyuupichan/electrumx/issues/660
 .. _#684: https://github.com/kyuupichan/electrumx/issues/684
 .. _#713: https://github.com/kyuupichan/electrumx/issues/713
 .. _#727: https://github.com/kyuupichan/electrumx/issues/727

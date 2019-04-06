@@ -27,6 +27,7 @@ from electrumx.lib.util import class_logger, protocol_tuple
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
 STALE_SECS = 24 * 3600
 WAKEUP_SECS = 300
+PEER_ADD_PAUSE = 600
 
 
 class BadPeerError(Exception):
@@ -77,6 +78,7 @@ class PeerManager(object):
         self.permit_onion_peer_time = time.time()
         self.proxy = None
         self.group = TaskGroup()
+        self.recent_peer_adds = {}
         # refreshed
         self.blacklist = set()
 
@@ -116,9 +118,8 @@ class PeerManager(object):
                 return None
         return my.features
 
-    def _permit_new_onion_peer(self):
+    def _permit_new_onion_peer(self, now):
         '''Accept a new onion peer only once per random time interval.'''
-        now = time.time()
         if now < self.permit_onion_peer_time:
             return False
         self.permit_onion_peer_time = now + random.randrange(0, 1200)
@@ -142,20 +143,30 @@ class PeerManager(object):
             try:
                 async with session.get(url) as response:
                     r = await response.text()
-                self.blacklist = set(json.loads(r))
+                self.blacklist = set([entry.lower() for entry in json.loads(r)])
                 self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
             except Exception as e:
                 self.logger.error(f'could not retrieve blacklist from {url}: {e}')
             else:
                 # Got new blacklist. Now check our current peers against it
                 for peer in self.peers:
-                    if self._is_blacklisted(peer.host):
+                    if self._is_blacklisted(peer):
                         peer.retry_event.set()
             await sleep(600)
 
-    def _is_blacklisted(self, host):
+    def _is_blacklisted(self, peer):
+        host = peer.host.lower()
+        second_level_domain = '*.' + '.'.join(host.split('.')[-2:])
         return any(item in self.blacklist
-                   for item in (host, '*.' + '.'.join(host.split('.')[-2:])))
+                   for item in (host, second_level_domain, peer.ip_addr))
+
+    def _get_recent_good_peers(self):
+        cutoff = time.time() - STALE_SECS
+        recent = [peer for peer in self.peers
+                  if peer.last_good > cutoff and
+                  not peer.bad and peer.is_public]
+        recent = [peer for peer in recent if not self._is_blacklisted(peer)]
+        return recent
 
     async def _detect_proxy(self):
         '''Detect a proxy if we don't have one and some time has passed since
@@ -292,6 +303,9 @@ class PeerManager(object):
                         match.retry_event.set()
                 elif peer.host in match.features['hosts']:
                     match.update_features_from_peer(peer)
+            # Trim this data structure
+            self.recent_peer_adds = {k: v for k, v in self.recent_peer_adds.items()
+                                     if v + PEER_ADD_PAUSE < now}
         else:
             # Forget the peer if long-term unreachable
             if peer.last_good and not peer.bad:
@@ -305,13 +319,37 @@ class PeerManager(object):
         return False
 
     async def _verify_peer(self, session, peer):
-        if self._is_blacklisted(peer.host):
-            raise BadPeerError('blacklisted')
-
+        # store IP address for peer
         if not peer.is_tor:
             address = session.peer_address()
             if address:
                 peer.ip_addr = address[0]
+
+        if self._is_blacklisted(peer):
+            raise BadPeerError('blacklisted')
+
+        # Bucket good recent peers; forbid many servers from similar IPs
+        # FIXME there's a race here, when verifying multiple peers
+        #       that belong to the same bucket ~simultaneously
+        recent_peers = self._get_recent_good_peers()
+        if peer in recent_peers:
+            recent_peers.remove(peer)
+        onion_peers = []
+        buckets = defaultdict(list)
+        for other_peer in recent_peers:
+            if other_peer.is_tor:
+                onion_peers.append(other_peer)
+            else:
+                buckets[other_peer.bucket_for_internal_purposes()].append(other_peer)
+        if peer.is_tor:
+            # keep number of onion peers below half of all peers,
+            # but up to 100 is OK regardless
+            if len(onion_peers) > len(recent_peers) // 2 >= 100:
+                raise BadPeerError('too many onion peers already')
+        else:
+            bucket = peer.bucket_for_internal_purposes()
+            if len(buckets[bucket]) > 0:
+                raise BadPeerError(f'too many peers already in bucket {bucket}')
 
         # server.version goes first
         message = 'server.version'
@@ -468,8 +506,20 @@ class PeerManager(object):
         # Just look at the first peer, require it
         peer = peers[0]
         host = peer.host
+        now = time.time()
+
+        # Rate limit peer adds by domain to one every 10 minutes
+        if peer.ip_address is not None:
+            bucket = 'ip_addr'
+        else:
+            bucket = '.'.join(host.lower().split('.')[-2:])
+        last = self.recent_peer_adds.get(bucket, 0)
+        self.recent_peer_adds[bucket] = now
+        if last + PEER_ADD_PAUSE >= now:
+            return False
+
         if peer.is_tor:
-            permit = self._permit_new_onion_peer()
+            permit = self._permit_new_onion_peer(now)
             reason = 'rate limiting'
         else:
             getaddrinfo = asyncio.get_event_loop().getaddrinfo
@@ -498,25 +548,21 @@ class PeerManager(object):
         Additionally, if we don't have onion routing, we return a few
         hard-coded onion servers.
         '''
-        cutoff = time.time() - STALE_SECS
-        recent = [peer for peer in self.peers
-                  if peer.last_good > cutoff and
-                  not peer.bad and peer.is_public]
-        onion_peers = []
-
-        recent = [peer for peer in recent if not self._is_blacklisted(peer.host)]
+        recent = self._get_recent_good_peers()
 
         # Always report ourselves if valid (even if not public)
+        cutoff = time.time() - STALE_SECS
         peers = set(myself for myself in self.myselves
                     if myself.last_good > cutoff)
 
         # Bucket the clearnet peers and select up to two from each
+        onion_peers = []
         buckets = defaultdict(list)
         for peer in recent:
             if peer.is_tor:
                 onion_peers.append(peer)
             else:
-                buckets[peer.bucket()].append(peer)
+                buckets[peer.bucket_for_external_interface()].append(peer)
         for bucket_peers in buckets.values():
             random.shuffle(bucket_peers)
             peers.update(bucket_peers[:2])

