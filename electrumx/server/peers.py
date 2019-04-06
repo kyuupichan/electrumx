@@ -25,7 +25,7 @@ from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger, protocol_tuple
 
 PEER_GOOD, PEER_STALE, PEER_NEVER, PEER_BAD = range(4)
-STALE_SECS = 24 * 3600
+STALE_SECS = 3600
 WAKEUP_SECS = 300
 PEER_ADD_PAUSE = 600
 
