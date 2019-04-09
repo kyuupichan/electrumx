@@ -1205,9 +1205,11 @@ class ElectrumX(SessionBase):
 
         raw_tx: the raw transaction as a hexadecimal string'''
         # This returns errors as JSON RPC errors, as is natural
+        self.inc_resource_usage(5)
         try:
             hex_hash = await self.session_mgr.broadcast_transaction(raw_tx)
         except DaemonError as e:
+            self.inc_resource_usage(50)
             error, = e.args
             message = error['message']
             self.logger.info(f'error sending transaction: {message}')
