@@ -1194,10 +1194,12 @@ class ElectrumX(SessionBase):
         ordered list of hexadecimal strings.
         '''
         height = non_negative_integer(height)
-        hex_hashes = await self.daemon_request('block_hex_hashes', height, 1)
-        block_hash = hex_hashes[0]
-        block = await self.daemon_request('deserialised_block', block_hash)
-        tx_hashes = block['tx']
+        try:
+            block_hash = hash_to_hex_str((await self.db.fs_block_hashes(height, 1))[0])
+            tx_hashes = await self.db.tx_hashes_at_blockheight(height)
+        except self.db.DBError as e:
+            raise RPCError(BAD_REQUEST, f'db error: {e!r}')
+        tx_hashes = [hash_to_hex_str(hash) for hash in tx_hashes]
         self.bump_cost(1.0 + len(tx_hashes) / 1000)
         return block_hash, tx_hashes
 
