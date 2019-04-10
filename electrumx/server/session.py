@@ -21,8 +21,7 @@ from functools import partial
 
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
-    TaskGroup, handler_invocation, RPCError, Request, ignore_after, sleep,
-    Event, FinalRPCError
+    TaskGroup, handler_invocation, RPCError, Request, sleep, Event, FinalRPCError
 )
 
 import electrumx
@@ -30,7 +29,6 @@ import electrumx.lib.text as text
 import electrumx.lib.util as util
 from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
                                 HASHX_LEN, Base58Error)
-from electrumx.lib.peer import Peer
 from electrumx.server.daemon import DaemonError
 from electrumx.server.peers import PeerManager
 
@@ -80,31 +78,6 @@ def assert_tx_hash(value):
     raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
 
 
-class Semaphores(object):
-    '''For aiorpcX's semaphore handling.'''
-
-    def __init__(self, semaphores):
-        self.semaphores = semaphores
-        self.acquired = []
-
-    async def __aenter__(self):
-        for semaphore in self.semaphores:
-            await semaphore.acquire()
-            self.acquired.append(semaphore)
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        for semaphore in self.acquired:
-            semaphore.release()
-
-
-class SessionGroup(object):
-
-    def __init__(self, gid):
-        self.gid = gid
-        # Concurrency per group
-        self.semaphore = asyncio.Semaphore(20)
-
-
 class SessionManager(object):
     '''Holds global state about all sessions.'''
 
@@ -119,8 +92,8 @@ class SessionManager(object):
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         self.servers = {}
-        self.sessions = set()
-        self.cur_group = SessionGroup(0)
+        self.sessions = {}               # Map of session to iterable of its groups
+        self.groups = defaultdict(set)   # Map of groups to set of sessions
         self.txs_sent = 0
         self.start_time = time.time()
         self.history_cache = pylru.lrucache(256)
@@ -214,12 +187,6 @@ class SessionManager(object):
                     self.logger.info(line)
                 self.logger.info(json.dumps(self._get_info()))
 
-    def _group_map(self):
-        group_map = defaultdict(list)
-        for session in self.sessions:
-            group_map[session.group].append(session)
-        return group_map
-
     def _sub_count(self):
         return sum(s.sub_count() for s in self.sessions)
 
@@ -258,32 +225,30 @@ class SessionManager(object):
                 text = ', '.join(str(session.session_id)
                                  for session in stale_sessions)
                 self.logger.info(f'closing stale connections {text}')
-                # Give the sockets some time to close gracefully
                 async with TaskGroup() as group:
                     for session in stale_sessions:
                         await group.spawn(session.close())
 
-            # Consolidate small groups
-            group_map = self._group_map()
-            groups = [group for group, sessions in group_map.items()
-                      if len(sessions) <= 5 and
-                      sum(s.cost for s in sessions) < self.env.cost_soft_limit]
-            if len(groups) > 1:
-                new_group = groups[-1]
-                for group in groups:
-                    for session in group_map[group]:
-                        session.group = new_group
+    async def _recalc_concurrency(self):
+        '''Periodically recalculate session concurrency.'''
+        session_class = self.env.coin.SESSIONCLS
+        while True:
+            await sleep(100)
+            for session in self.sessions:
+                # Subs have an on-going cost so decay more slowly with more subs
+                session.cost_decay_per_sec = (
+                    session_class.cost_hard_limit / (10000 + 5 * session.sub_count()))
+                session.recalc_concurrency()
 
     def _get_info(self):
         '''A summary of server state.'''
-        group_map = self._group_map()
         return {
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'daemon': self.daemon.logged_url(),
             'daemon_height': self.daemon.cached_height(),
             'db_height': self.db.db_height,
             'errors': sum(s.errors for s in self.sessions),
-            'groups': len(group_map),
+            'groups': len(self.groups),
             'logged': len([s for s in self.sessions if s.log_me]),
             'paused': sum(not s._can_send.is_set() for s in self.sessions),
             'pid': os.getpid(),
@@ -307,6 +272,7 @@ class SessionManager(object):
                  session.client,
                  session.protocol_version_string(),
                  session.cost,
+                 session.extra_cost(),
                  session.count_pending_items(),
                  session.txs_sent,
                  session.sub_count(),
@@ -318,9 +284,8 @@ class SessionManager(object):
     def _group_data(self):
         '''Returned to the RPC 'groups' call.'''
         result = []
-        group_map = self._group_map()
-        for group, sessions in group_map.items():
-            result.append([group.gid,
+        for group, sessions in self.groups.items():
+            result.append([group,
                            len(sessions),
                            sum(s.cost for s in sessions),
                            sum(s.count_pending_items() for s in sessions),
@@ -487,7 +452,7 @@ class SessionManager(object):
             session_class = self.env.coin.SESSIONCLS
             session_class.cost_soft_limit = self.env.cost_soft_limit
             session_class.cost_hard_limit = self.env.cost_hard_limit
-            session_class.cost_decay_per_sec = session_class.cost_hard_limit / 3600
+            session_class.cost_decay_per_sec = session_class.cost_hard_limit / 10000
             session_class.bw_cost_per_byte = 1.0 / self.env.bw_unit_cost
 
             self.logger.info(f'max session count: {self.env.max_sessions:,d}')
@@ -507,6 +472,7 @@ class SessionManager(object):
             async with TaskGroup() as group:
                 await group.spawn(self.peer_mgr.discover_peers())
                 await group.spawn(self._clear_stale_sessions())
+                await group.spawn(self._recalc_concurrency())
                 await group.spawn(self._log_sessions())
                 await group.spawn(self._manage_servers())
         finally:
@@ -515,6 +481,12 @@ class SessionManager(object):
             async with TaskGroup() as group:
                 for session in list(self.sessions):
                     await group.spawn(session.close(force_after=1))
+
+    def extra_cost(self, session):
+        # Add 3% of the cost of other sessions in its groups
+        groups = self.sessions[session]
+        groups_cost = sum(other.cost for group in groups for other in self.groups[group])
+        return (groups_cost - session.cost * len(groups)) * 0.03
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
@@ -576,18 +548,33 @@ class SessionManager(object):
             for session in self.sessions:
                 await group.spawn(session.notify, touched, height_changed)
 
+    def ip_addr_bucket(self, session):
+        ip_addr = session._address
+        if not ip_addr:
+            return 'unknown_ip_addr'
+        ip_addr = ip_addr[0]
+        if ':' in ip_addr:
+            return ':'.join(ip_addr.split(':')[:3])
+        return '.'.join(ip_addr.split('.')[:3])
+
     def add_session(self, session):
-        self.sessions.add(session)
         self.session_event.set()
-        gid = int(session.start_time - self.start_time) // 900
-        if self.cur_group.gid != gid:
-            self.cur_group = SessionGroup(gid)
-        return self.cur_group
+        # Return the session groups
+        time_slot = int(session.start_time - self.start_time) // 900
+        groups = (f't{time_slot}', self.ip_addr_bucket(session))
+        self.sessions[session] = groups
+        for group in groups:
+            self.groups[group].add(session)
 
     def remove_session(self, session):
         '''Remove a session from our sessions list if there.'''
-        self.sessions.remove(session)
         self.session_event.set()
+        groups = self.sessions.pop(session)
+        for group in groups:
+            group_set = self.groups[group]
+            group_set.remove(session)
+            if not group_set:
+                self.groups.pop(group)
 
 
 class SessionBase(RPCSession):
@@ -654,7 +641,7 @@ class SessionBase(RPCSession):
         self.session_id = next(self.session_counter)
         context = {'conn_id': f'{self.session_id}'}
         self.logger = util.ConnectionLogger(self.logger, context)
-        self.group = self.session_mgr.add_session(self)
+        self.session_mgr.add_session(self)
         self.logger.info(f'{self.kind} {self.peer_address_str()}, '
                          f'{self.session_mgr.session_count():,d} total')
 
@@ -676,9 +663,6 @@ class SessionBase(RPCSession):
 
     def count_pending_items(self):
         return len(self.connection.pending_requests())
-
-    def semaphore(self):
-        return Semaphores([self._concurrency.semaphore, self.group.semaphore])
 
     def sub_count(self):
         return 0
@@ -742,6 +726,9 @@ class ElectrumX(SessionBase):
 
     def protocol_version_string(self):
         return util.version_string(self.protocol_tuple)
+
+    def extra_cost(self):
+        return self.session_mgr.extra_cost(self)
 
     def sub_count(self):
         return len(self.hashX_subs)
