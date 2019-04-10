@@ -31,7 +31,7 @@ class Env(EnvBase):
 
     def __init__(self, coin=None):
         super().__init__()
-        self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
+        self.obsolete([])
         self.db_dir = self.required('DB_DIRECTORY')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
@@ -52,7 +52,6 @@ class Env(EnvBase):
             self.ssl_certfile = self.required('SSL_CERTFILE')
             self.ssl_keyfile = self.required('SSL_KEYFILE')
         self.rpc_port = self.integer('RPC_PORT', 8000)
-        self.max_subscriptions = self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = self.default('BANNER_FILE', None)
         self.tor_banner_file = self.default('TOR_BANNER_FILE',
                                             self.banner_file)
@@ -68,10 +67,10 @@ class Env(EnvBase):
         self.donation_address = self.default('DONATION_ADDRESS', '')
         # Server limits to help prevent DoS
         self.max_send = self.integer('MAX_SEND', self.coin.DEFAULT_MAX_SEND)
-        self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_sessions = self.sane_max_sessions()
-        self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
-        self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
+        self.cost_soft_limit = self.integer('COST_SOFT_LIMIT', 2000)
+        self.cost_hard_limit = self.integer('COST_HARD_LIMIT', 20000)
+        self.bw_unit_cost = self.integer('BANDWIDTH_UNIT_COST', 5000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
         self.blacklist_url = self.default('BLACKLIST_URL', self.coin.BLACKLIST_URL)

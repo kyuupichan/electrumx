@@ -246,33 +246,36 @@ raise them.
   hexadecimal ASCII characters on the wire.  Very few transactions on
   Bitcoin mainnet are over 500KB in size.
 
-.. envvar:: MAX_SUBS
+.. envvar:: COST_SOFT_LIMIT
+.. envvar:: COST_HARD_LIMIT
 
-  The maximum number of address subscriptions across all sessions.
-  Defaults to 250,000.
+  Session cost soft and hard limits as integers.  The default values are :const:`2,000`
+  and :const:`20,000` respectively.
 
-.. envvar:: MAX_SESSION_SUBS
+  The server prices each request made to it based upon an estimate of the resources needed
+  to process it .  Factors include whether the request uses bitcoind, how much bandwidth
+  it uses, and how hard it hits the databases.
 
-  The maximum number of address subscriptions permitted to a single
-  session.  Defaults to 50,000.
+  To set a base for the units, a :func:`blockchain.scripthash.subscribe` subscription to
+  an address with a history of 2 or fewer transactions is costed at :const:`1.0` before
+  considering the bandwidth consumed.  :func:`server.ping` is costed at :const:`0.1`.
 
-.. envvar:: BANDWIDTH_LIMIT
+  As the total cost of a session goes over the soft limit, its requests start to be
+  throttled in two ways.  First, each request sleeps a little before being handled.
+  Second, the number of requests that the server will handle concurrently reduces.  Both
+  effects increase as the hard limit is approached, at which point the session is
+  disconnected.
 
-  Per-session periodic bandwidth usage limit in bytes.  This is a soft,
-  not hard, limit.  Currently the period is hard-coded to be one hour.
-  The default limit value is 2 million bytes.
+  So non-abusive sessions can continue to be served, a session's cost gradually decays
+  over time.  Subscriptions have an ongoing servicing cost, so the decay is slower as the
+  number of subscriptions increases.
 
-  Bandwidth usage over each period is totalled, and when this limit is
-  exceeded each subsequent request is stalled by sleeping before
-  handling it, effectively giving higher processing priority to other
-  sessions.
+.. envvar:: BANDWIDTH_UNIT_COST
 
-  The more bandwidth usage exceeds this soft limit the longer the next
-  request will sleep.  Sleep times are a round number of seconds with
-  a minimum of 1.  Each time the delay changes the event is logged.
+  The number of bytes, sent and received, by a session that is deemed to cost 1.0.
 
-  Bandwidth usage is gradually reduced over time by "refunding" a
-  proportional part of the limit every now and then.
+  The default value :const:`5000` bytes, meaning the bandwidth cost assigned to a response
+  of 100KB is 20.  If your bandwidth is cheap you should probably raise this.
 
 .. envvar:: SESSION_TIMEOUT
 
