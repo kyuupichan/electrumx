@@ -197,15 +197,11 @@ def test_RPC_PORT():
 
 
 def test_COST_HARD_LIMIT():
-    assert_integer('COST_HARD_LIMIT', 'cost_hard_limit', 20000)
+    assert_integer('COST_HARD_LIMIT', 'cost_hard_limit', 10000)
 
 
 def test_COST_SOFT_LIMIT():
-    assert_integer('COST_SOFT_LIMIT', 'cost_soft_limit', 2000)
-
-
-def test_COST_SOFT_LIMIT():
-    assert_integer('COST_SOFT_LIMIT', 'cost_soft_limit', 2000)
+    assert_integer('COST_SOFT_LIMIT', 'cost_soft_limit', 500)
 
 
 def test_BANDWIDTH_UNIT_COST():
