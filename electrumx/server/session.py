@@ -18,6 +18,7 @@ import ssl
 import time
 from collections import defaultdict
 from functools import partial
+from ipaddress import ip_address
 
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
@@ -563,7 +564,8 @@ class SessionManager(object):
             return 'unknown_ip_addr'
         ip_addr = ip_addr[0]
         if ':' in ip_addr:
-            return ':'.join(ip_addr.split(':')[:3])
+            ip_addr = ip_address(ip_addr)
+            return ':'.join(ip_addr.exploded.split(':')[:3])
         return '.'.join(ip_addr.split('.')[:3])
 
     def add_session(self, session):
