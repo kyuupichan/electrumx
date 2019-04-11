@@ -518,9 +518,9 @@ class SessionManager(object):
         if groups is None:
             return 0
         other_sessions_cost = (sum(other.cost for group in groups for other in group.sessions)
-                               - session.cost * len(groups))
-        retained_cost = sum(group.retained_cost for group in groups)
-        return (other_sessions_cost + retained_cost) * 0.02
+                               - session.cost * len(groups)) * 0.03
+        retained_cost = sum(group.retained_cost / len(group.sessions) for group in groups)
+        return other_sessions_cost + retained_cost
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
