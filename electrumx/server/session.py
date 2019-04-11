@@ -234,7 +234,7 @@ class SessionManager(object):
         session_class = self.env.coin.SESSIONCLS
         while True:
             await sleep(100)
-            for session in self.sessions:
+            for session in sorted(self.sessions, key=lambda s: s.cost, reverse=True):
                 # Subs have an on-going cost so decay more slowly with more subs
                 session.cost_decay_per_sec = (
                     session_class.cost_hard_limit / (10000 + 5 * session.sub_count()))
