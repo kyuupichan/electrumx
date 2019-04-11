@@ -249,8 +249,8 @@ raise them.
 .. envvar:: COST_SOFT_LIMIT
 .. envvar:: COST_HARD_LIMIT
 
-  Session cost soft and hard limits as integers.  The default values are :const:`2,000`
-  and :const:`20,000` respectively.
+  Session cost soft and hard limits as integers.  The default values are :const:`500`
+  and :const:`10,000` respectively.
 
   The server prices each request made to it based upon an estimate of the resources needed
   to process it .  Factors include whether the request uses bitcoind, how much bandwidth
@@ -272,9 +272,9 @@ raise them.
 
 .. envvar:: BANDWIDTH_UNIT_COST
 
-  The number of bytes, sent and received, by a session that is deemed to cost 1.0.
+  The number of bytes, sent and received, by a session that is deemed to cost :const:`1.0`.
 
-  The default value :const:`5000` bytes, meaning the bandwidth cost assigned to a response
+  The default value :const:`5,000` bytes, meaning the bandwidth cost assigned to a response
   of 100KB is 20.  If your bandwidth is cheap you should probably raise this.
 
 .. envvar:: SESSION_TIMEOUT
