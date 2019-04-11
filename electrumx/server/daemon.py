@@ -288,6 +288,10 @@ class DashDaemon(Daemon):
         '''Return the masternode status.'''
         return await self._send_single('masternodelist', params)
 
+    async def protx(self, params):
+        '''Set of commands to execute ProTx related actions.'''
+        return await self._send_single('protx', params)
+
 
 class FakeEstimateFeeDaemon(Daemon):
     '''Daemon that simulates estimatefee and relayfee RPC calls. Coin that
@@ -457,3 +461,35 @@ class PreLegacyRPCDaemon(LegacyRPCDaemon):
     async def deserialised_block(self, hex_hash):
         '''Return the deserialised block with the given hex hash.'''
         return await self._send_single('getblock', (hex_hash, False))
+
+
+class SmartCashDaemon(Daemon):
+
+    async def masternode_broadcast(self, params):
+        '''Broadcast a smartnode to the network.'''
+        return await self._send_single('smartnodebroadcast', params)
+
+    async def masternode_list(self, params):
+        '''Return the smartnode status.'''
+        return await self._send_single('smartnodelist', params)
+
+    async def smartrewards(self, params):
+        '''Return smartrewards data.'''
+        return await self._send_single('smartrewards', params)
+
+
+class ZcoinMtpDaemon(Daemon):
+
+    def strip_mtp_data(self, raw_block):
+        if self.coin.is_mtp(raw_block):
+            return \
+                raw_block[:self.coin.MTP_HEADER_DATA_START*2] + \
+                raw_block[self.coin.MTP_HEADER_DATA_END*2:]
+        return raw_block
+
+    async def raw_blocks(self, hex_hashes):
+        '''Return the raw binary blocks with the given hex hashes.'''
+        params_iterable = ((h, False) for h in hex_hashes)
+        blocks = await self._send_vector('getblock', params_iterable)
+        # Convert hex string to bytes
+        return [hex_to_bytes(self.strip_mtp_data(block)) for block in blocks]

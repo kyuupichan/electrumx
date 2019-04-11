@@ -9,3 +9,5 @@ docs/_build
 /build
 /dist
 /electrumx.egg-info
+.vscode/
+.idea/

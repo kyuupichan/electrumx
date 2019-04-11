@@ -11,9 +11,10 @@ import re
 import signal
 import sys
 import time
+from contextlib import suppress
 from functools import partial
 
-from aiorpcx import spawn
+from aiorpcx import spawn, CancelledError
 
 from electrumx.lib.util import class_logger
 
@@ -95,14 +96,14 @@ class ServerBase(object):
 
         shutdown_event = asyncio.Event()
         server_task = await spawn(self.serve(shutdown_event))
+
         # Wait for shutdown, log on receipt of the event
         await shutdown_event.wait()
         self.logger.info('shutting down')
+
         server_task.cancel()
-
-        # Prevent some silly logs
-        await asyncio.sleep(0.01)
-
+        with suppress(CancelledError):
+            await server_task
         self.logger.info('shutdown complete')
 
     def run(self):

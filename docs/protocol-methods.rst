@@ -13,6 +13,7 @@ Return the block header at the given height.
   .. versionadded:: 1.3
   .. versionchanged:: 1.4
      *cp_height* parameter added
+  .. versionchanged:: 1.4.1
 
   *height*
 
@@ -40,7 +41,8 @@ Return the block header at the given height.
 
   * *header*
 
-    The raw block header as a hexadecimal string.
+    The raw block header as a hexadecimal string.  Starting with version 1.4.1,
+    AuxPoW data (if present in the original header) is truncated.
 
   * *root*
 
@@ -82,6 +84,7 @@ Return a concatenated chunk of block headers from the main chain.
   .. versionadded:: 1.2
   .. versionchanged:: 1.4
      *cp_height* parameter added
+  .. versionchanged:: 1.4.1
 
   *start_height*
 
@@ -112,7 +115,8 @@ Return a concatenated chunk of block headers from the main chain.
   * *hex*
 
     The binary block headers concatenated together in-order as a
-    hexadecimal string.
+    hexadecimal string.  Starting with version 1.4.1, AuxPoW data (if present
+    in the original header) is truncated if *cp_height* is nonzero.
 
   * *max*
 
@@ -174,6 +178,7 @@ be confirmed within a certain number of blocks.
 
   0.00101079
 
+
 blockchain.headers.subscribe
 ============================
 
@@ -182,24 +187,10 @@ Subscribe to receive block headers when a new block is found.
 **Signature**
 
   .. function:: blockchain.headers.subscribe()
-  .. versionchanged:: 1.2
-     Optional *raw* parameter added, defaulting to :const:`false`.
-  .. versionchanged:: 1.3
-     *raw* parameter deafults to :const:`true`.
-  .. versionchanged:: 1.4
-     *raw* parameter removed; responses and notifications pass raw
-     headers.
-
-  * *raw*
-
-    This single boolean argument exists in protocol versions 1.2
-    (defaulting to :const:`false`) and 1.3 (defaulting to
-    :const:`true`) only.
 
 **Result**
 
-  The header of the current block chain tip.  If *raw* is
-  :const:`true` the result is a dictionary with two members:
+  The header of the current block chain tip.  The result is a dictionary with two members:
 
   * *hex*
 
@@ -209,24 +200,9 @@ Subscribe to receive block headers when a new block is found.
 
     The height of the header, an integer.
 
-  If *raw* is :const:`false` the result is the coin-specific
-  :ref:`deserialized header <deserialized header>`.
-
 **Example Result**
 
-  With *raw* :const:`false`::
-
-   {
-     "bits": 402858285,
-     "block_height": 520481,
-     "merkle_root": "8e8e932eb858fd53cf09943d7efc9a8f674dc1363010ee64907a292d2fb0c25d",
-     "nonce": 3288656012,
-     "prev_block_hash": "000000000000000000b512b5d9fc7c5746587268547c04aa92383aaea0080289",
-     "timestamp": 1520495819,
-     "version": 536870912
-   }
-
-  With *raw* :const:`true`::
+::
 
    {
      "height": 520481,
@@ -695,7 +671,7 @@ Return a raw transaction.
 
     Whether a verbose coin-specific response is required.
 
-  *markle*
+  *merkle*
 
     Whether a merkle branch proof should be returned as well.
 
@@ -1169,17 +1145,11 @@ server.version
 ==============
 
 Identify the client to the server and negotiate the protocol version.
+Only the first :func:`server.version` message is accepted.
 
 **Signature**
 
-  .. function:: server.version(client_name="", protocol_version="1.1")
-  .. versionchanged:: 1.1
-     *protocol_version* is not ignored.
-  .. versionchanged:: 1.2
-     Use :func:`server.ping` rather than sending version requests as a
-     ping mechanism.
-  .. versionchanged:: 1.4
-     Only the first :func:`server.version` message is accepted.
+  .. function:: server.version(client_name="", protocol_version="1.4")
 
   * *client_name*
 
@@ -1213,17 +1183,13 @@ Identify the client to the server and negotiate the protocol version.
   identifying the server and the protocol version that will be used
   for future communication.
 
-  *Protocol version 1.0*: A string identifying the server software.
-
-**Examples**::
+**Example**::
 
   server.version("Electrum 3.0.6", ["1.1", "1.2"])
-  server.version("2.7.1", "1.0")
 
-**Example Results**::
+**Example Result**::
 
   ["ElectrumX 1.2.1", "1.2"]
-  "ElectrumX 1.2.1"
 
 
 Masternode methods (Dash and compatible coins)
@@ -1354,3 +1320,107 @@ Returns the list of masternodes.
       ...,
       ...
     ]
+
+
+ProTx methods (Dash DIP3)
+==============================================
+
+
+protx.diff
+=============================
+
+Returns a diff between two deterministic masternode lists.
+The result also contains proof data.
+
+**Signature**
+
+  .. function:: protx.diff(base_height, height)
+
+  *base_height*
+
+    The starting block height
+
+      *1* <= *base_height*
+
+  *height*
+
+    The ending block height.
+
+      *base_height* <= *height*
+
+
+**Result**
+
+  A dictionary with deterministic masternode lists diff plus proof data
+
+**Example**::
+
+  protx.diff(1, 20000)
+
+**Example Result**::
+
+    {
+      "baseBlockHash": "000000000b866e7fefc7df2b4b37f236175cee9ab6dc925a30c62401d92b7406",
+      "blockHash": "0000000005b3f97e0af8c72f9a96eca720237e374ca860938ba0d7a68471c4d6",
+      "cbTxMerkleTree": "0200000002c9802d02435cfe09e4253bc1ba4875e9a2f920d5d6adf005d5b9306e5322e6f476d885273422c2fe18e8c420d09484f89eaeee7bb7f4e1ff54bddeb94e099a910103",
+      "cbTx": "03000500010000000000000000000000000000000000000000000000000000000000000000ffffffff4b02204e047867335c08fabe6d6d8b2b76b7000000000470393f63424273736170747365743a7265737574736574010000000000000010000015770000000d2f6e6f64655374726174756d2f000000000336c8a119010000001976a914cb594917ad4e5849688ec63f29a0f7f3badb5da688ac6c62c216010000001976a914a3c5284d3cd896815ac815f2dd76a3a71cb3d8e688acba65df02000000001976a9146d649e1c05e89d30809ef39cc8ee1002c0c8c84b88ac00000000260100204e0000b301c3d88e4072305bec5d09e2ed6b836b23af640bcdefd7b8ae7e2ca182dc17",
+      "deletedMNs": [
+      ],
+      "mnList": [
+        {
+          "proRegTxHash": "6f0bdd7034ce8d3a6976a15e4b4442c274b5c1739fb63fc0a50f01425580e17e",
+          "confirmedHash": "000000000be653cd1fbc213239cfec83ca68da657f24cc05305d0be75d34e392",
+          "service": "173.61.30.231:19023",
+          "pubKeyOperator": "8da7ee1a40750868badef2c17d5385480cae7543f8d4d6e5f3c85b37fdd00a6b4f47726b96e7e7c7a3ea68b5d5cb2196",
+          "keyIDVoting": "b35c75cbc69433175d3459843e1f6ebe145bf6a3",
+          "isValid": true
+        }
+      ],
+      "merkleRootMNList": "17dc82a12c7eaeb8d7efcd0b64af236b836bede2095dec5b3072408ed8c301b3"
+    }
+
+protx.info
+=============================
+
+Returns detailed information about a deterministic masternode.
+
+**Signature**
+
+  .. function:: protx.info(protx_hash)
+
+  *protx_hash*
+
+    The hash of the initial ProRegTx.
+
+**Result**
+
+  A dictionary with detailed deterministic masternode data
+
+**Example**::
+
+  protx.info("6f0bdd7034ce8d3a6976a15e4b4442c274b5c1739fb63fc0a50f01425580e17e")
+
+**Example Result**::
+
+  {
+    "proTxHash": "6f0bdd7034ce8d3a6976a15e4b4442c274b5c1739fb63fc0a50f01425580e17e",
+    "collateralHash": "b41439376b6117aebe6ad1ce31dcd217d4934fd00c104029ecb7d21c11d17c94",
+    "collateralIndex": 3,
+    "operatorReward": 0,
+    "state": {
+      "registeredHeight": 19525,
+      "lastPaidHeight": 20436,
+      "PoSePenalty": 0,
+      "PoSeRevivedHeight": -1,
+      "PoSeBanHeight": -1,
+      "revocationReason": 0,
+      "keyIDOwner": "b35c75cbc69433175d3459843e1f6ebe145bf6a3",
+      "pubKeyOperator": "8da7ee1a40750868badef2c17d5385480cae7543f8d4d6e5f3c85b37fdd00a6b4f47726b96e7e7c7a3ea68b5d5cb2196",
+      "keyIDVoting": "b35c75cbc69433175d3459843e1f6ebe145bf6a3",
+      "ownerKeyAddr": "ybGQ7a6e7dkJY2jxdbDwdBtyjKZJ8VB7YC",
+      "votingKeyAddr": "ybGQ7a6e7dkJY2jxdbDwdBtyjKZJ8VB7YC",
+      "addr": "173.61.30.231:19023",
+      "payoutAddress": "yWdXnYxGbouNoo8yMvcbZmZ3Gdp6BpySxL"
+    },
+    "confirmations": 984
+  }

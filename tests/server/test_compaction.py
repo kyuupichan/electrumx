@@ -113,7 +113,7 @@ async def run_test(db_dir):
     environ.clear()
     environ['DB_DIRECTORY'] = db_dir
     environ['DAEMON_URL'] = ''
-    environ['COIN'] = 'BitcoinCash'
+    environ['COIN'] = 'BitcoinSV'
     db = DB(Env())
     await db.open_for_serving()
     history = db.history

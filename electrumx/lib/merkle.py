@@ -129,7 +129,7 @@ class Merkle(object):
         level cached.
 
         To maximally reduce the amount of data hashed in computing a
-        markle branch, cache a tree of depth N at level N // 2.
+        merkle branch, cache a tree of depth N at level N // 2.
 
         level is a list of hashes in the middle of the tree (returned
         by level())

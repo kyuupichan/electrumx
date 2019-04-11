@@ -20,7 +20,7 @@ from collections import defaultdict
 from functools import partial
 
 from aiorpcx import (
-    ServerSession, JSONRPCAutoDetect, JSONRPCConnection,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
     TaskGroup, handler_invocation, RPCError, Request, ignore_after, sleep,
     Event
 )
@@ -56,7 +56,7 @@ def non_negative_integer(value):
         value = int(value)
         if value >= 0:
             return value
-    except ValueError:
+    except (ValueError, TypeError):
         pass
     raise RPCError(BAD_REQUEST,
                    f'{value} should be a non-negative integer')
@@ -262,9 +262,8 @@ class SessionManager(object):
                                  for session in stale_sessions)
                 self.logger.info(f'closing stale connections {text}')
                 # Give the sockets some time to close gracefully
-                async with TaskGroup() as group:
-                    for session in stale_sessions:
-                        await group.spawn(session.close())
+                for session in stale_sessions:
+                    await session.spawn(session.close())
 
             # Consolidate small groups
             bw_limit = self.env.bandwidth_limit
@@ -289,7 +288,7 @@ class SessionManager(object):
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(group_map),
             'logged': len([s for s in self.sessions if s.log_me]),
-            'paused': sum(s.paused for s in self.sessions),
+            'paused': sum(not s._can_send.is_set() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
             'requests': sum(s.count_pending_items() for s in self.sessions),
@@ -510,11 +509,12 @@ class SessionManager(object):
                 await group.spawn(self._log_sessions())
                 await group.spawn(self._manage_servers())
         finally:
-            # Close servers and sessions
+            # Close servers then sessions
             await self._close_servers(list(self.servers.keys()))
-            async with TaskGroup() as group:
-                for session in list(self.sessions):
-                    await group.spawn(session.close(force_after=1))
+            for session in list(self.sessions):
+                await session.spawn(session.close(force_after=1))
+            for session in list(self.sessions):
+                await session.closed_event.wait()
 
     def session_count(self):
         '''The number of connections that we've sent something to.'''
@@ -567,9 +567,8 @@ class SessionManager(object):
             for hashX in set(hc).intersection(touched):
                 del hc[hashX]
 
-        async with TaskGroup() as group:
-            for session in self.sessions:
-                await group.spawn(session.notify(touched, height_changed))
+        for session in self.sessions:
+            await session.spawn(session.notify, touched, height_changed)
 
     def add_session(self, session):
         self.sessions.add(session)
@@ -593,7 +592,7 @@ class SessionManager(object):
         self.subs_room -= 1
 
 
-class SessionBase(ServerSession):
+class SessionBase(RPCSession):
     '''Base class of ElectrumX JSON sessions.
 
     Each session runs its tasks in asynchronous parallelism with other
@@ -649,7 +648,7 @@ class SessionBase(ServerSession):
             status += 'C'
         if self.log_me:
             status += 'L'
-        status += str(self.concurrency.max_concurrent)
+        status += str(self._concurrency.max_concurrent)
         return status
 
     def connection_made(self, transport):
@@ -664,12 +663,11 @@ class SessionBase(ServerSession):
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
-        super().connection_lost(exc)
         self.session_mgr.remove_session(self)
         msg = ''
-        if self.paused:
-            msg += ' whilst paused'
-        if self.concurrency.max_concurrent != self.max_concurrent:
+        if not self._can_send.is_set():
+            msg += ' with full socket buffer'
+        if self._concurrency.max_concurrent != self.max_concurrent:
             msg += ' whilst throttled'
         if self.send_size >= 1024*1024:
             msg += ('.  Sent {:,d} bytes in {:,d} messages'
@@ -677,12 +675,13 @@ class SessionBase(ServerSession):
         if msg:
             msg = 'disconnected' + msg
             self.logger.info(msg)
+        super().connection_lost(exc)
 
     def count_pending_items(self):
         return len(self.connection.pending_requests())
 
     def semaphore(self):
-        return Semaphores([self.concurrency.semaphore, self.group.semaphore])
+        return Semaphores([self._concurrency.semaphore, self.group.semaphore])
 
     def sub_count(self):
         return 0
@@ -702,8 +701,8 @@ class SessionBase(ServerSession):
 class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
-    PROTOCOL_MIN = (1, 1)
-    PROTOCOL_MAX = (1, 4)
+    PROTOCOL_MIN = (1, 2)
+    PROTOCOL_MAX = (1, 4, 1)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -715,6 +714,7 @@ class ElectrumX(SessionBase):
         self.sv_seen = False
         self.mempool_statuses = {}
         self.set_request_handlers(self.PROTOCOL_MIN)
+        self.is_peer = False
 
     @classmethod
     def protocol_min_max_strings(cls):
@@ -813,6 +813,7 @@ class ElectrumX(SessionBase):
 
     async def add_peer(self, features):
         '''Add a peer (but only if the peer resolves to the source).'''
+        self.is_peer = True
         return await self.peer_mgr.on_add_peer(features, self.peer_address())
 
     async def peers_subscribe(self):
@@ -1118,6 +1119,7 @@ class ElectrumX(SessionBase):
         # that protocol version in unsupported.
         ptuple, client_min = util.protocol_version(
             protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
+        await self.maybe_attempt_to_crash_old_client(ptuple)
         if ptuple is None:
             if client_min > self.PROTOCOL_MIN:
                 self.logger.info(f'client requested future protocol version '
@@ -1130,6 +1132,9 @@ class ElectrumX(SessionBase):
 
         return (electrumx.version, self.protocol_version_string())
 
+    async def maybe_attempt_to_crash_old_client(self, proto_ver):
+        return
+
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.
 
@@ -1137,15 +1142,24 @@ class ElectrumX(SessionBase):
         # This returns errors as JSON RPC errors, as is natural
         try:
             hex_hash = await self.session_mgr.broadcast_transaction(raw_tx)
-            self.txs_sent += 1
-            self.logger.info(f'sent tx: {hex_hash}')
-            return hex_hash
         except DaemonError as e:
             error, = e.args
             message = error['message']
             self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]')
+        else:
+            self.txs_sent += 1
+            client_ver = util.protocol_tuple(self.client)
+            if client_ver != (0, ):
+                msg = self.coin.warn_old_client_on_tx_broadcast(client_ver)
+                if msg:
+                    self.logger.info(f'sent tx: {hex_hash}. and warned user to upgrade their '
+                                     f'client from {self.client}')
+                    return msg
+
+            self.logger.info(f'sent tx: {hex_hash}')
+            return hex_hash
 
     async def transaction_get(self, tx_hash, verbose=False):
         '''Return the serialized raw transaction given its hash
@@ -1184,13 +1198,14 @@ class ElectrumX(SessionBase):
         return branch
 
     async def transaction_merkle(self, tx_hash, height):
-        '''Return the markle branch to a confirmed transaction given its hash
+        '''Return the merkle branch to a confirmed transaction given its hash
         and height.
 
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
         '''
         assert_tx_hash(tx_hash)
+        height = non_negative_integer(height)
         block_hash, tx_hashes = await self._block_hash_and_tx_hashes(height)
         try:
             pos = tx_hashes.index(tx_hash)
@@ -1205,6 +1220,7 @@ class ElectrumX(SessionBase):
         a block height and position in the block.
         '''
         tx_pos = non_negative_integer(tx_pos)
+        height = non_negative_integer(height)
         if merkle not in (True, False):
             raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
 
@@ -1227,6 +1243,7 @@ class ElectrumX(SessionBase):
         handlers = {
             'blockchain.block.get_chunk': self.block_get_chunk,
             'blockchain.block.get_header': self.block_get_header,
+            'blockchain.block.headers': self.block_headers_12,
             'blockchain.estimatefee': self.estimatefee,
             'blockchain.relayfee': self.relayfee,
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
@@ -1237,22 +1254,15 @@ class ElectrumX(SessionBase):
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
+            'mempool.get_fee_histogram': self.mempool.compact_fee_histogram,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
             'server.features': self.server_features_async,
             'server.peers.subscribe': self.peers_subscribe,
+            'server.ping': self.ping,
             'server.version': self.server_version,
         }
-
-        if ptuple >= (1, 2):
-            # New handler as of 1.2
-            handlers.update({
-                'mempool.get_fee_histogram':
-                self.mempool.compact_fee_histogram,
-                'blockchain.block.headers': self.block_headers_12,
-                'server.ping': self.ping,
-            })
 
         if ptuple >= (1, 4):
             handlers.update({
@@ -1286,7 +1296,7 @@ class LocalRPC(SessionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.client = 'RPC'
-        self.connection._max_response_size = 0
+        self.connection.max_response_size = 0
 
     def protocol_version_string(self):
         return 'RPC'
@@ -1305,13 +1315,15 @@ class DashElectrumX(ElectrumX):
             'masternode.announce.broadcast':
             self.masternode_announce_broadcast,
             'masternode.subscribe': self.masternode_subscribe,
-            'masternode.list': self.masternode_list
+            'masternode.list': self.masternode_list,
+            'protx.diff': self.protx_diff,
+            'protx.info': self.protx_info,
         })
 
     async def notify(self, touched, height_changed):
         '''Notify the client about changes in masternode list.'''
         await super().notify(touched, height_changed)
-        for mn in self.mns:
+        for mn in self.mns.copy():
             status = await self.daemon_request('masternode_list',
                                                ['status', mn])
             await self.send_notification('masternode.subscribe',
@@ -1437,3 +1449,127 @@ class DashElectrumX(ElectrumX):
             return [mn for mn in cache if mn['payee'] in payees]
         else:
             return cache
+
+    async def protx_diff(self, base_height, height):
+        '''
+        Calculates a diff between two deterministic masternode lists.
+        The result also contains proof data.
+
+        base_height: The starting block height (starting from 1).
+        height: The ending block height.
+        '''
+        if not isinstance(base_height, int) or not isinstance(height, int):
+            raise RPCError(BAD_REQUEST, 'expected a int block heights')
+
+        max_height = self.db.db_height
+        if (not 1 <= base_height <= max_height or
+                not base_height <= height <= max_height):
+            raise RPCError(BAD_REQUEST,
+                           f'require 1 <= base_height {base_height:,d} <= '
+                           f'height {height:,d} <= '
+                           f'chain height {max_height:,d}')
+
+        return await self.daemon_request('protx',
+                                         ('diff', base_height, height))
+
+    async def protx_info(self, protx_hash):
+        '''
+        Returns detailed information about a deterministic masternode.
+
+        protx_hash: The hash of the initial ProRegTx
+        '''
+        if not isinstance(protx_hash, str):
+            raise RPCError(BAD_REQUEST, 'expected protx hash string')
+
+        res = await self.daemon_request('protx', ('info', protx_hash))
+        if 'wallet' in res:
+            del res['wallet']
+        return res
+
+
+class SmartCashElectrumX(DashElectrumX):
+    '''A TCP server that handles incoming Electrum-SMART connections.'''
+
+    def set_request_handlers(self, ptuple):
+        super().set_request_handlers(ptuple)
+        self.request_handlers.update({
+            'smartrewards.current': self.smartrewards_current,
+            'smartrewards.check': self.smartrewards_check
+        })
+
+    async def smartrewards_current(self):
+        '''Returns the current smartrewards info.'''
+        result = await self.daemon_request('smartrewards', ['current'])
+        if result is not None:
+            return result
+        return None
+
+    async def smartrewards_check(self, addr):
+        '''
+        Returns the status of an address
+
+        addr: a single smartcash address
+        '''
+        result = await self.daemon_request('smartrewards', ['check', addr])
+        if result is not None:
+            return result
+        return None
+
+
+class AuxPoWElectrumX(ElectrumX):
+    async def block_header(self, height, cp_height=0):
+        result = await super().block_header(height, cp_height)
+
+        # Older protocol versions don't truncate AuxPoW
+        if self.protocol_tuple < (1, 4, 1):
+            return result
+
+        # Not covered by a checkpoint; return full AuxPoW data
+        if cp_height == 0:
+            return result
+
+        # Covered by a checkpoint; truncate AuxPoW data
+        result['header'] = self.truncate_auxpow(result['header'], height)
+        return result
+
+    async def block_headers(self, start_height, count, cp_height=0):
+        result = await super().block_headers(start_height, count, cp_height)
+
+        # Older protocol versions don't truncate AuxPoW
+        if self.protocol_tuple < (1, 4, 1):
+            return result
+
+        # Not covered by a checkpoint; return full AuxPoW data
+        if cp_height == 0:
+            return result
+
+        # Covered by a checkpoint; truncate AuxPoW data
+        result['hex'] = self.truncate_auxpow(result['hex'], start_height)
+        return result
+
+    def truncate_auxpow(self, headers_full_hex, start_height):
+        height = start_height
+        headers_full = util.hex_to_bytes(headers_full_hex)
+        cursor = 0
+        headers = bytearray()
+
+        while cursor < len(headers_full):
+            headers.extend(headers_full[cursor:cursor+self.coin.BASIC_HEADER_SIZE])
+            cursor += self.db.dynamic_header_len(height)
+            height += 1
+
+        return headers.hex()
+
+
+class BitcoinSegwitElectrumX(ElectrumX):
+
+    async def maybe_attempt_to_crash_old_client(self, proto_ver):
+        client_ver = util.protocol_tuple(self.client)
+        is_old_protocol = proto_ver is None or proto_ver <= (1, 2)
+        is_old_client = client_ver != (0,) and client_ver < (3, 2, 4)
+        if is_old_protocol and is_old_client:
+            self.logger.info(f'attempting to crash old client with version {self.client}')
+            # this can crash electrum client 2.6 <= v < 3.1.2
+            await self.send_notification('blockchain.relayfee', ())
+            # this can crash electrum client (v < 2.8.2) UNION (3.0.0 <= v < 3.3.0)
+            await self.send_notification('blockchain.estimatefee', ())

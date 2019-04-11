@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016-2018, Neil Booth
 #
 # All rights reserved.
 #
@@ -48,11 +48,10 @@ class Notifications(object):
             # new block height
             return
         touched = tmp.pop(height)
-        touched.update(tbp.pop(height, set()))
         for old in [h for h in tmp if h <= height]:
             del tmp[old]
         for old in [h for h in tbp if h <= height]:
-            del tbp[old]
+            touched.update(tbp.pop(old))
         await self.notify(height, touched)
 
     async def notify(self, height, touched):
@@ -83,8 +82,8 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start serving external clients.
         '''
-        if not (0, 8, 1) <= aiorpcx_version < (0, 9):
-            raise RuntimeError('aiorpcX version 0.8.x with x >= 1 required')
+        if not (0, 10, 4) <= aiorpcx_version < (0, 11):
+            raise RuntimeError('aiorpcX version 0.10.x, x >= 4, required')
 
         env = self.env
         min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
@@ -103,7 +102,10 @@ class Controller(ServerBase):
         bp = BlockProcessor(env, db, daemon, notifications)
 
         # Set notifications up to implement the MemPoolAPI
+        def get_db_height():
+            return db.db_height
         notifications.height = daemon.height
+        notifications.db_height = get_db_height
         notifications.cached_height = daemon.cached_height
         notifications.mempool_hashes = daemon.mempool_hashes
         notifications.raw_transactions = daemon.getrawtransactions

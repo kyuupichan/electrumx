@@ -68,13 +68,14 @@ class Env(EnvBase):
         # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
         # Server limits to help prevent DoS
-        self.max_send = self.integer('MAX_SEND', 1000000)
+        self.max_send = self.integer('MAX_SEND', self.coin.DEFAULT_MAX_SEND)
         self.max_subs = self.integer('MAX_SUBS', 250000)
         self.max_sessions = self.sane_max_sessions()
         self.max_session_subs = self.integer('MAX_SESSION_SUBS', 50000)
         self.bandwidth_limit = self.integer('BANDWIDTH_LIMIT', 2000000)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
+        self.blacklist_url = self.default('BLACKLIST_URL', self.coin.BLACKLIST_URL)
 
         # Identities
         clearnet_identity = self.clearnet_identity()
