@@ -488,7 +488,12 @@ class SessionManager(object):
 
     def extra_cost(self, session):
         # Add 3% of the cost of other sessions in its groups
-        groups = self.sessions[session]
+        # Note there is no guarantee that session is still in self.sessions.  Example traceback:
+        # notify_sessions->notify->address_status->bump_cost->recalc_concurrency->extra_cost
+        # during which there are many places the sesssion could be removed
+        groups = self.sessions.get(session)
+        if groups is None:
+            return 0
         groups_cost = sum(other.cost for group in groups for other in self.groups[group])
         return (groups_cost - session.cost * len(groups)) * 0.03
 
