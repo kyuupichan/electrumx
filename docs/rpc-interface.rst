@@ -203,11 +203,11 @@ sessions
 
 Return a list of all current sessions.  Takes no arguments::
 
-ID     Flags            Client Proto    Cost   XCost  Reqs   Txs    Subs    Recv Recv KB    Sent Sent KB      Time                  Peer
-1      S6                1.1.1   1.4       0      16     0     0       0       3       0       3       0    05m42s 165.255.191.213:22349
-2      S6       all_seeing_eye   1.4       0      16     0     0       0       2       0       2       0    05m40s   67.170.52.226:24995
-4      S6                3.3.2   1.4       0      16     0     0      34      45       5      45       3    05m40s 185.220.100.252:40463
-3      S6                1.1.2   1.4       0      16     0     0       0       3       0       3       0    05m40s    89.17.142.28:59241
+  ID     Flags            Client Proto    Cost   XCost  Reqs   Txs    Subs    Recv Recv KB    Sent Sent KB      Time                  Peer
+  1      S6                1.1.1   1.4       0      16     0     0       0       3       0       3       0    05m42s 165.255.191.213:22349
+  2      S6       all_seeing_eye   1.4       0      16     0     0       0       2       0       2       0    05m40s   67.170.52.226:24995
+  4      S6                3.3.2   1.4       0      16     0     0      34      45       5      45       3    05m40s 185.220.100.252:40463
+  3      S6                1.1.2   1.4       0      16     0     0       0       3       0       3       0    05m40s    89.17.142.28:59241
 
 The columns show information by session: the session ID, flags (see below), how the client
 identifies itself - typically the Electrum client version, the protocol version
