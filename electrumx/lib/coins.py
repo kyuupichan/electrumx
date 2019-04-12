@@ -47,8 +47,7 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX,
-                                      BitcoinSegwitElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -85,6 +84,7 @@ class Coin(object):
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
+    CRASH_CLIENT_VER = None
     BLACKLIST_URL = None
 
     @classmethod
@@ -399,11 +399,11 @@ class BitcoinCash(BitcoinMixin, Coin):
 class BitcoinSegwit(BitcoinMixin, Coin):
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
-    SESSIONCLS = BitcoinSegwitElectrumX
     MEMPOOL_HISTOGRAM_REFRESH_SECS = 120
     TX_COUNT = 318337769
     TX_COUNT_HEIGHT = 524213
     TX_PER_BLOCK = 1400
+    CRASH_CLIENT_VER = (3, 2, 3)
     BLACKLIST_URL = 'https://electrum.org/blacklist.json'
     PEERS = [
         'btc.smsys.me s995',
@@ -612,7 +612,7 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Core bitcoind >= 0.13.1.'''
     NAME = "BitcoinSegwit"
     DESERIALIZER = lib_tx.DeserializerSegWit
-    SESSIONCLS = BitcoinSegwitElectrumX
+    CRASH_CLIENT_VER = (3, 2, 3)
     PEERS = [
         'electrum.akinbo.org s t',
         'he36kyperp3kbuxu.onion s t',
