@@ -248,12 +248,15 @@ raise them.
 
 .. envvar:: COST_SOFT_LIMIT
 .. envvar:: COST_HARD_LIMIT
+.. envvar:: REQUEST_SLEEP
+.. envvar:: INITIAL_CONCURRENT
 
-  Session cost soft and hard limits as integers.  The default values are :const:`500`
-  and :const:`10,000` respectively.
+  All values are integers. :envar:`COST_SOFT_LIMIT` defaults to :const:`1,000`,
+  :envvar:`COST_HARD_LIMIT` to :const:`10,000`, :envvar:`REQUEST_SLEEP` to :const:`2,500`
+  milliseconds, and :envvar:`INITIAL_CONCURRENT` to :const:`10` concurrent requests.
 
   The server prices each request made to it based upon an estimate of the resources needed
-  to process it .  Factors include whether the request uses bitcoind, how much bandwidth
+  to process it.  Factors include whether the request uses bitcoind, how much bandwidth
   it uses, and how hard it hits the databases.
 
   To set a base for the units, a :func:`blockchain.scripthash.subscribe` subscription to
@@ -261,14 +264,28 @@ raise them.
   considering the bandwidth consumed.  :func:`server.ping` is costed at :const:`0.1`.
 
   As the total cost of a session goes over the soft limit, its requests start to be
-  throttled in two ways.  First, each request sleeps a little before being handled.
-  Second, the number of requests that the server will handle concurrently reduces.  Both
-  effects increase as the hard limit is approached, at which point the session is
-  disconnected.
+  throttled in two ways.  First, the number of requests for that session that the server
+  will process concurrently is reduced.  Second, each request starts to sleep a little
+  before being handled.
 
-  So non-abusive sessions can continue to be served, a session's cost gradually decays
-  over time.  Subscriptions have an ongoing servicing cost, so the decay is slower as the
-  number of subscriptions increases.
+  Before throttling starts, the server will process up to :envvar:`INITIAL_CONCURRENT`
+  requests concurrently without sleeping.  As the session cost ranges from
+  :envar:`COST_SOFT_LIMIT` to :envvar:`COST_HARD_LIMIT`, concurrency drops linearly to
+  zero and each request's sleep time increases linearly up to :envvar:`REQUEST_SLEEP`
+  milliseconds.  Once the hard limit is reached, the session is disconnected.
+
+  In order that non-abusive sessions can continue to be served, a session's cost gradually
+  decays over time.  Subscriptions have an ongoing servicing cost, so the decay is slower
+  as the number of subscriptions increases.
+
+  If a session disconnects, ElectrumX continues to associate its cost with its IP address,
+  so if it immediately reconnects it will re-acquire its previous cost allocation.
+
+  A server operator should experiment with different values according to server loads.  It
+  is not necessarily true that e.g. having a low soft limit, decreasing concurrency and
+  increasing sleep will help handling heavy loads, as it will also increase the backlog of
+  requests the server has to manage in memory.  It will also give a much worse experience
+  for genuine connections.
 
 .. envvar:: BANDWIDTH_UNIT_COST
 

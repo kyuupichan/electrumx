@@ -484,12 +484,17 @@ class SessionManager(object):
             session_class.cost_hard_limit = self.env.cost_hard_limit
             session_class.cost_decay_per_sec = session_class.cost_hard_limit / 10000
             session_class.bw_cost_per_byte = 1.0 / self.env.bw_unit_cost
+            session_class.cost_sleep = self.env.request_sleep / 1000
+            session_class.initial_concurrent = self.env.initial_concurrent
 
             self.logger.info(f'max session count: {self.env.max_sessions:,d}')
             self.logger.info(f'session timeout: {self.env.session_timeout:,d} seconds')
             self.logger.info(f'session cost hard limit {self.env.cost_hard_limit:,d}')
             self.logger.info(f'session cost soft limit {self.env.cost_soft_limit:,d}')
             self.logger.info(f'bandwidth unit cost {self.env.bw_unit_cost:,d}')
+            self.logger.info(f'request sleep {self.env.request_sleep:,d}ms')
+            self.logger.info(f'initial concurrent {self.env.initial_concurrent:,d}')
+
             self.logger.info(f'max response size {self.env.max_send:,d} bytes')
             if self.env.drop_client is not None:
                 self.logger.info('drop clients matching: {}'

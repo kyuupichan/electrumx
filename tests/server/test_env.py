@@ -201,7 +201,15 @@ def test_COST_HARD_LIMIT():
 
 
 def test_COST_SOFT_LIMIT():
-    assert_integer('COST_SOFT_LIMIT', 'cost_soft_limit', 500)
+    assert_integer('COST_SOFT_LIMIT', 'cost_soft_limit', 1000)
+
+
+def test_INITIAL_CONCURRENT():
+    assert_integer('INITIAL_CONCURRENT', 'initial_concurrent', 10)
+
+
+def test_REQUEST_SLEEP():
+    assert_integer('REQUEST_SLEEP', 'request_sleep', 2500)
 
 
 def test_BANDWIDTH_UNIT_COST():
