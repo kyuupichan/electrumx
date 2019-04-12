@@ -279,7 +279,7 @@ class SessionManager(object):
             'paused': sum(not s._can_send.is_set() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
-            'requests': sum(s.count_pending_items() for s in self.sessions),
+            'requests': sum(s.processing_count for s in self.sessions),
             'sessions': self.session_count(),
             'sessions_with_subs': self.session_count_with_subs(),
             'subs': self._sub_count(),
@@ -299,7 +299,7 @@ class SessionManager(object):
                  session.protocol_version_string(),
                  session.cost,
                  session.extra_cost(),
-                 session.count_pending_items(),
+                 session.processing_count,
                  session.txs_sent,
                  session.sub_count(),
                  session.recv_count, session.recv_size,
@@ -316,7 +316,7 @@ class SessionManager(object):
                            len(sessions),
                            sum(s.cost for s in sessions),
                            group.retained_cost,
-                           sum(s.count_pending_items() for s in sessions),
+                           sum(s.processing_count for s in sessions),
                            sum(s.txs_sent for s in sessions),
                            sum(s.sub_count() for s in sessions),
                            sum(s.recv_count for s in sessions),
@@ -696,9 +696,6 @@ class SessionBase(RPCSession):
             msg = 'disconnected' + msg
             self.logger.info(msg)
         super().connection_lost(exc)
-
-    def count_pending_items(self):
-        return len(self.connection.pending_requests())
 
     def sub_count(self):
         return 0
