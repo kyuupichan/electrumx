@@ -2560,9 +2560,9 @@ class tBitg(Bitg):
     RPC_PORT = 19332
 
 
-class CivX(Coin):
-    NAME = "CivX"
-    SHORTNAME = "CIVX"
+class EXOS(Coin):
+    NAME = "EXOS"
+    SHORTNAME = "EXOS"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
@@ -2585,11 +2585,11 @@ class CivX(Coin):
         if version > 2:
             return double_sha256(header)
         else:
-            return hex_str_to_hash(CivX.GENESIS_HASH)
+            return hex_str_to_hash(EXOS.GENESIS_HASH)
 
 
-class CivXTestnet(CivX):
-    SHORTNAME = "tCIVX"
+class EXOSTestnet(EXOS):
+    SHORTNAME = "tEXOS"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
     XPRV_VERBYTES = bytes.fromhex("04358394")
@@ -2607,7 +2607,7 @@ class CivXTestnet(CivX):
         if version > 2:
             return double_sha256(header)
         else:
-            return hex_str_to_hash(CivXTestnet.GENESIS_HASH)
+            return hex_str_to_hash(EXOSTestnet.GENESIS_HASH)
 
 
 class SmartCash(Coin):
