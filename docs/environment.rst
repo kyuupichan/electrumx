@@ -251,7 +251,7 @@ raise them.
 .. envvar:: REQUEST_SLEEP
 .. envvar:: INITIAL_CONCURRENT
 
-  All values are integers. :envar:`COST_SOFT_LIMIT` defaults to :const:`1,000`,
+  All values are integers. :envvar:`COST_SOFT_LIMIT` defaults to :const:`1,000`,
   :envvar:`COST_HARD_LIMIT` to :const:`10,000`, :envvar:`REQUEST_SLEEP` to :const:`2,500`
   milliseconds, and :envvar:`INITIAL_CONCURRENT` to :const:`10` concurrent requests.
 
@@ -270,7 +270,7 @@ raise them.
 
   Before throttling starts, the server will process up to :envvar:`INITIAL_CONCURRENT`
   requests concurrently without sleeping.  As the session cost ranges from
-  :envar:`COST_SOFT_LIMIT` to :envvar:`COST_HARD_LIMIT`, concurrency drops linearly to
+  :envvar:`COST_SOFT_LIMIT` to :envvar:`COST_HARD_LIMIT`, concurrency drops linearly to
   zero and each request's sleep time increases linearly up to :envvar:`REQUEST_SLEEP`
   milliseconds.  Once the hard limit is reached, the session is disconnected.
 
