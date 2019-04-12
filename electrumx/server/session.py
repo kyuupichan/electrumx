@@ -22,7 +22,8 @@ from ipaddress import ip_address
 import attr
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
-    TaskGroup, handler_invocation, RPCError, Request, sleep, Event, FinalRPCError
+    TaskGroup, handler_invocation, RPCError, Request, sleep, Event,
+    ExcessiveSessionCostError, FinalRPCError
 )
 
 import electrumx
@@ -262,7 +263,7 @@ class SessionManager(object):
                     session.cost_decay_per_sec = hard_limit / (10000 + 5 * session.sub_count())
                     try:
                         session.recalc_concurrency()
-                    except FinalRPCError:
+                    except ExcessiveSessionCostError:
                         await group.spawn(session.close())
 
     def _get_info(self):
