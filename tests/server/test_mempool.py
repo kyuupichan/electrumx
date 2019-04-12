@@ -275,7 +275,8 @@ async def test_keep_synchronized(caplog):
     assert in_caplog(caplog, 'beginning processing of daemon mempool')
     assert in_caplog(caplog, 'compact fee histogram')
     assert in_caplog(caplog, 'synced in ')
-    assert in_caplog(caplog, '0 txs touching 0 addresses')
+    assert in_caplog(caplog, '0 txs')
+    assert in_caplog(caplog, 'touching 0 addresses')
     assert not in_caplog(caplog, 'txs dropped')
 
 
