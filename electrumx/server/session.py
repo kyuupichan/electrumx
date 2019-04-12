@@ -1066,12 +1066,6 @@ class ElectrumX(SessionBase):
             raise RPCError(BAD_REQUEST, f'server.version already sent')
         self.sv_seen = True
 
-        # Find the highest common protocol version.  Disconnect if
-        # that protocol version in unsupported.
-        ptuple, client_min = util.protocol_version(
-            protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
-        await self.maybe_attempt_to_crash_old_client(ptuple)
-
         if client_name:
             client_name = str(client_name)
             if self.env.drop_client is not None and \
@@ -1080,6 +1074,11 @@ class ElectrumX(SessionBase):
                                     f'unsupported client: {client_name}')
             self.client = client_name[:17]
 
+        # Find the highest common protocol version.  Disconnect if
+        # that protocol version in unsupported.
+        ptuple, client_min = util.protocol_version(
+            protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
+        await self.maybe_attempt_to_crash_old_client(ptuple)
         if ptuple is None:
             if client_min > self.PROTOCOL_MIN:
                 self.logger.info(f'client requested future protocol version '
