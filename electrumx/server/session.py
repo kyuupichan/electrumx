@@ -265,7 +265,7 @@ class SessionManager(object):
                 self.session_groups.pop(group.name)
 
             async with TaskGroup() as group:
-                for session in sorted(self.sessions, key=lambda s: s.cost, reverse=True):
+                for session in list(self.sessions):
                     # Subs have an on-going cost so decay more slowly with more subs
                     session.cost_decay_per_sec = hard_limit / (10000 + 5 * session.sub_count())
                     try:
