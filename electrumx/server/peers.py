@@ -359,12 +359,12 @@ class PeerManager(object):
         # Protocol version 1.1 returns a pair with the version first
         if len(result) != 2 or not all(isinstance(x, str) for x in result):
             raise BadPeerError(f'bad server.version result: {result}')
-        server_version, protocol_version = result
+        server_version, _protocol_version = result
         peer.server_version = server_version
         peer.features['server_version'] = server_version
 
         async with TaskGroup() as g:
-            await g.spawn(self._send_headers_subscribe(session, peer))
+            await g.spawn(self._send_headers_subscribe(session))
             await g.spawn(self._send_server_features(session, peer))
             peers_task = await g.spawn(self._send_peers_subscribe
                                        (session, peer))
@@ -379,7 +379,7 @@ class PeerManager(object):
             # We only care to wait for the response
             await session.send_request('server.add_peer', [features])
 
-    async def _send_headers_subscribe(self, session, peer):
+    async def _send_headers_subscribe(self, session):
         message = 'blockchain.headers.subscribe'
         result = await session.send_request(message)
         assert_good(message, result, dict)
@@ -453,13 +453,6 @@ class PeerManager(object):
             await group.spawn(self._refresh_blacklist())
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
-            # Consume tasks as they complete, logging unexpected failures
-            async for task in group:
-                if not task.cancelled():
-                    try:
-                        task.result()
-                    except Exception:
-                        self.logger.exception('task failed unexpectedly')
 
     def info(self):
         '''The number of peers.'''
