@@ -264,18 +264,18 @@ class DeserializerSegWit(Deserializer):
         return self._read_tx_parts()[0]
 
     def read_tx_and_hash(self):
-        tx, tx_hash, vsize = self._read_tx_parts()
+        tx, tx_hash, _vsize = self._read_tx_parts()
         return tx, tx_hash
 
     def read_tx_and_vsize(self):
-        tx, tx_hash, vsize = self._read_tx_parts()
+        tx, _tx_hash, vsize = self._read_tx_parts()
         return tx, vsize
 
 
 class DeserializerAuxPow(Deserializer):
     VERSION_AUXPOW = (1 << 8)
 
-    def read_header(self, height, static_header_size):
+    def read_header(self, static_header_size):
         '''Return the AuxPow block header bytes'''
         start = self.cursor
         version = self._read_le_uint32()
@@ -304,7 +304,7 @@ class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
 
 
 class DeserializerEquihash(Deserializer):
-    def read_header(self, height, static_header_size):
+    def read_header(self, static_header_size):
         '''Return the block header bytes'''
         start = self.cursor
         # We are going to calculate the block size then read it as bytes
@@ -408,7 +408,6 @@ class DeserializerTrezarcoin(Deserializer):
 
     @staticmethod
     def blake2s_gen(data):
-        version = data[0:1]
         keyOne = data[36:46]
         keyTwo = data[58:68]
         ntime = data[68:72]
@@ -417,16 +416,15 @@ class DeserializerTrezarcoin(Deserializer):
         _full_merkle = data[36:68]
         _input112 = data + _full_merkle
         _key = keyTwo + ntime + _nBits + _nonce + keyOne
-        '''Prepare 112Byte Header '''
+        # Prepare 112Byte Header
         blake2s_hash = blake2s(key=_key, digest_size=32)
         blake2s_hash.update(_input112)
-        '''TrezarFlips - Only for Genesis'''
+        # TrezarFlips - Only for Genesis
         return ''.join(map(str.__add__, blake2s_hash.hexdigest()[-2::-2],
                            blake2s_hash.hexdigest()[-1::-2]))
 
     @staticmethod
     def blake2s(data):
-        version = data[0:1]
         keyOne = data[36:46]
         keyTwo = data[58:68]
         ntime = data[68:72]
@@ -435,10 +433,10 @@ class DeserializerTrezarcoin(Deserializer):
         _full_merkle = data[36:68]
         _input112 = data + _full_merkle
         _key = keyTwo + ntime + _nBits + _nonce + keyOne
-        '''Prepare 112Byte Header '''
+        # Prepare 112Byte Header
         blake2s_hash = blake2s(key=_key, digest_size=32)
         blake2s_hash.update(_input112)
-        '''TrezarFlips'''
+        # TrezarFlips
         return blake2s_hash.digest()
 
 
@@ -468,7 +466,7 @@ class DeserializerTxTimeAuxPow(DeserializerTxTime):
             return True
         return False
 
-    def read_header(self, height, static_header_size):
+    def read_header(self, static_header_size):
         '''Return the AuxPow block header bytes'''
         start = self.cursor
         version = self._read_le_uint32()
@@ -591,7 +589,6 @@ class TxInputDcr(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
 
 class TxOutputDcr(namedtuple("TxOutput", "value version pk_script")):
     '''Class representing a Decred transaction output.'''
-    pass
 
 
 class TxDcr(namedtuple("Tx", "version inputs outputs locktime expiry "
@@ -614,11 +611,11 @@ class DeserializerDecred(Deserializer):
         return self._read_tx_parts(produce_hash=False)[0]
 
     def read_tx_and_hash(self):
-        tx, tx_hash, vsize = self._read_tx_parts()
+        tx, tx_hash, _vsize = self._read_tx_parts()
         return tx, tx_hash
 
     def read_tx_and_vsize(self):
-        tx, tx_hash, vsize = self._read_tx_parts(produce_hash=False)
+        tx, _tx_hash, vsize = self._read_tx_parts(produce_hash=False)
         return tx, vsize
 
     def read_tx_block(self):
@@ -698,7 +695,6 @@ class DeserializerSmartCash(Deserializer):
         return keccak_hash.digest()
 
     def read_tx_and_hash(self):
-        from electrumx.lib.hash import sha256
         start = self.cursor
         return self.read_tx(), sha256(self.binary[start:self.cursor])
 

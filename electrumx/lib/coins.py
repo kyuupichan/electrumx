@@ -285,7 +285,7 @@ class AuxPowMixin(object):
     def block_header(cls, block, height):
         '''Return the AuxPow block header bytes'''
         deserializer = cls.DESERIALIZER(block)
-        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
+        return deserializer.read_header(cls.BASIC_HEADER_SIZE)
 
 
 class EquihashMixin(object):
@@ -300,7 +300,7 @@ class EquihashMixin(object):
     def block_header(cls, block, height):
         '''Return the block header bytes'''
         deserializer = cls.DESERIALIZER(block)
-        return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
+        return deserializer.read_header(cls.BASIC_HEADER_SIZE)
 
 
 class ScryptMixin(object):
@@ -539,7 +539,7 @@ class Emercoin(Coin):
         deserializer = cls.DESERIALIZER(block)
 
         if deserializer.is_merged_block():
-            return deserializer.read_header(height, cls.BASIC_HEADER_SIZE)
+            return deserializer.read_header(cls.BASIC_HEADER_SIZE)
         return block[:cls.static_header_len(height)]
 
     @classmethod
@@ -2369,7 +2369,7 @@ class Minexcoin(EquihashMixin, Coin):
     def block_header(cls, block, height):
         '''Return the block header bytes'''
         deserializer = cls.DESERIALIZER(block)
-        return deserializer.read_header(height, cls.HEADER_SIZE_NO_SOLUTION)
+        return deserializer.read_header(cls.HEADER_SIZE_NO_SOLUTION)
 
 
 class Groestlcoin(Coin):
