@@ -27,7 +27,7 @@ from aiorpcx import (
 )
 
 import electrumx
-import electrumx.lib.text as text
+from electrumx.lib.text import sessions_lines
 import electrumx.lib.util as util
 from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
                                 HASHX_LEN, Base58Error)
@@ -44,7 +44,7 @@ def scripthash_to_hashX(scripthash):
         bin_hash = hex_str_to_hash(scripthash)
         if len(bin_hash) == 32:
             return bin_hash[:HASHX_LEN]
-    except Exception:
+    except (ValueError, TypeError):
         pass
     raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')
 
@@ -75,7 +75,7 @@ def assert_tx_hash(value):
     try:
         if len(util.hex_to_bytes(value)) == 32:
             return
-    except Exception:
+    except (ValueError, TypeError):
         pass
     raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
 
@@ -114,6 +114,7 @@ class SessionManager(object):
         self.start_time = time.time()
         self.history_cache = pylru.lrucache(256)
         self.notified_height = None
+        self.hsub_results = None
         # Masternode stuff only for such coins
         if issubclass(env.coin.SESSIONCLS, DashElectrumX):
             self.mn_cache_height = 0
@@ -199,7 +200,7 @@ class SessionManager(object):
             while True:
                 await sleep(log_interval)
                 data = self._session_data(for_log=True)
-                for line in text.sessions_lines(data):
+                for line in sessions_lines(data):
                     self.logger.info(line)
                 self.logger.info(json.dumps(self._get_info()))
 
@@ -209,7 +210,7 @@ class SessionManager(object):
     def _lookup_session(self, session_id):
         try:
             session_id = int(session_id)
-        except Exception:
+        except (ValueError, TypeError):
             pass
         else:
             for session in self.sessions:
@@ -582,7 +583,7 @@ class SessionManager(object):
                 await group.spawn(session.notify, touched, height_changed)
 
     def _ip_addr_group_name(self, session):
-        ip_addr = session._address
+        ip_addr = session.peer_address()
         if not ip_addr:
             return 'unknown_ip'
         ip_addr = ip_addr[0]
@@ -646,6 +647,7 @@ class SessionBase(RPCSession):
         self.anon_logs = self.env.anon_logs
         self.txs_sent = 0
         self.log_me = False
+        self.session_id = None
         self.daemon_request = self.session_mgr.daemon_request
         # Hijack the connection so we can log messages
         self._receive_message_orig = self.connection.receive_message
@@ -1031,7 +1033,7 @@ class ElectrumX(SessionBase):
             try:
                 with codecs.open(banner_file, 'r', 'utf-8') as f:
                     banner = f.read()
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 self.logger.error(f'reading banner file {banner_file}: {e!r}')
             else:
                 banner = await self.replaced_banner(banner)
@@ -1175,7 +1177,7 @@ class ElectrumX(SessionBase):
         tx_pos: index of transaction in tx_hashes to create branch for
         '''
         hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch, root = self.db.merkle.branch_and_root(hashes, tx_pos)
+        branch, _root = self.db.merkle.branch_and_root(hashes, tx_pos)
         branch = [hash_to_hex_str(hash) for hash in branch]
         return branch
 
@@ -1400,7 +1402,8 @@ class DashElectrumX(ElectrumX):
                     mn_payment_queue, mn_info['payee'])
                 mn_info['inselection'] = (
                     mn_info['paymentposition'] < mn_payment_count // 10)
-                balance = await self.address_get_balance(mn_info['payee'])
+                hashX = self.coin.address_to_hashX(mn_info['payee'])
+                balance = await self.get_balance(hashX)
                 mn_info['balance'] = (sum(balance.values())
                                       / self.coin.VALUE_PER_COIN)
                 mn_list.append(mn_info)
