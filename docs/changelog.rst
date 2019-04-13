@@ -8,6 +8,24 @@
    should not occur with Python 3.7.
 
 
+Version 1.10.1 (13 Apr 2019)
+============================
+
+* introduce per-request costing.  See environment variables documentation for new
+  variables :envvar:`COST_SOFT_LIMIT`, :envvar:`COST_HARD_LIMIT`, :envvar:`REQUEST_SLEEP`,
+  :envvar:`INITIAL_CONCURRENT`, :envvar:`BANDWIDTH_UNIT_COST`.  Sessions are placed in groups
+  with which they share some of their costs.  Prior cost is remembered across reconnects.
+* require aiorpcX 0.13.5 for better concurrency handling
+* require clients use protocol 1.4 or higher
+* handle transaction.get_merkle requests more efficiently (ghost43)
+* Windows support (sancoder)
+* peers improvements (ghost43)
+* report mempool and block sizes in logs
+* electrumx_rpc: timeout raised to 30s, fix session request counts
+* other tweaks and improvements by Bjorge Dijkstra, ghost43, peleion,
+* coin additions / updates: ECA (Jenova7), ECCoin (smogm), GXX (DEVCØN), BZX (2INFINITY),
+  DeepOnion (Liam Alford), CivX / EXOS (turcol)
+
 Version 1.10.0 (15 Mar 2019)
 ============================
 
