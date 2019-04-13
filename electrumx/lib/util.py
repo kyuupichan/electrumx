@@ -34,7 +34,7 @@ import logging
 import re
 import sys
 from collections.abc import Container, Mapping
-from struct import pack, Struct
+from struct import Struct
 
 # Logging utilities
 
@@ -57,7 +57,7 @@ def make_logger(name, *, handler, level):
     '''Return the root ElectrumX logger.'''
     logger = logging.getLogger(name)
     logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
     logger.propagate = False
     return logger
 
@@ -283,7 +283,7 @@ def protocol_tuple(s):
         # clean up extra text at end of version e.g. '3.3.4CS' -> '3.3.4'
         s = VERSION_CLEANUP_REGEX.match(s).group(1)
         return tuple(int(part) for part in s.split('.'))
-    except Exception:
+    except (TypeError, ValueError, AttributeError):
         return (0, )
 
 
