@@ -296,10 +296,10 @@ raise them.
 
 .. envvar:: SESSION_TIMEOUT
 
-  An integer number of seconds defaulting to 600.  Sessions with no
-  activity for longer than this are disconnected.  Properly
-  functioning Electrum clients by default will send pings roughly
-  every 60 seconds.
+  An integer number of seconds defaulting to 600.  Sessions that have not sent a request
+  for longer than this are disconnected.  Properly functioning clients should send a
+  :func:`server.ping` request once roughly 450 seconds have passed since the previous
+  request, in order to avoid disconnection.
 
 
 Peer Discovery
