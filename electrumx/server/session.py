@@ -735,6 +735,7 @@ class ElectrumX(SessionBase):
         self.mempool_statuses = {}
         self.set_request_handlers(self.PROTOCOL_MIN)
         self.is_peer = False
+        self.recalc_concurrency()
 
     @classmethod
     def protocol_min_max_strings(cls):
