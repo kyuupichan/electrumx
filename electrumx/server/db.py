@@ -22,7 +22,7 @@ import attr
 from aiorpcx import run_in_thread, sleep
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import formatted_time
 from electrumx.server.storage import db_class
@@ -76,8 +76,18 @@ class DB(object):
         self.db_class = db_class(self.env.db_engine)
         self.history = History()
         self.utxo_db = None
+        self.utxo_flush_count = 0
+        self.fs_height = -1
+        self.fs_tx_count = 0
+        self.db_height = -1
+        self.db_tx_count = 0
+        self.db_tip = None
         self.tx_counts = None
         self.last_flush = time.time()
+        self.last_flush_tx_count = 0
+        self.wall_time = 0
+        self.first_sync = True
+        self.db_version = -1
 
         self.logger.info(f'using {self.env.db_engine} for DB backend')
 
@@ -512,7 +522,7 @@ class DB(object):
         prefix = b'U'
         min_height = self.min_undo_height(self.db_height)
         keys = []
-        for key, hist in self.utxo_db.iterator(prefix=prefix):
+        for key, _hist in self.utxo_db.iterator(prefix=prefix):
             height, = unpack('>I', key[-4:])
             if height >= min_height:
                 break
@@ -655,7 +665,7 @@ class DB(object):
                 for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
                     tx_num_packed = db_key[-4:]
                     tx_num, = unpack('<I', tx_num_packed)
-                    hash, height = self.fs_tx_hash(tx_num)
+                    hash, _height = self.fs_tx_hash(tx_num)
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed
                 return None, None
