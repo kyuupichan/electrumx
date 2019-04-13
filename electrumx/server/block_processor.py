@@ -9,11 +9,9 @@
 '''Block prefetcher and chain processor.'''
 
 
-import array
 import asyncio
 from struct import pack, unpack
 import time
-from functools import partial
 
 from aiorpcx import TaskGroup, run_in_thread
 
@@ -165,6 +163,10 @@ class BlockProcessor(object):
         self.next_cache_check = 0
         self.touched = set()
         self.reorg_count = 0
+        self.height = -1
+        self.tip = None
+        self.tx_count = 0
+        self._caught_up_event = None
 
         # Caches of unflushed items.
         self.headers = []
@@ -253,7 +255,7 @@ class BlockProcessor(object):
             self.touched.discard(None)
             self.db.flush_backup(self.flush_data(), self.touched)
 
-        start, last, hashes = await self.reorg_hashes(count)
+        _start, last, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
@@ -694,12 +696,12 @@ class NamecoinBlockProcessor(BlockProcessor):
         hashXs_by_tx = []
         append_hashXs = hashXs_by_tx.append
 
-        for tx, tx_hash in txs:
+        for tx, _tx_hash in txs:
             hashXs = []
             append_hashX = hashXs.append
 
             # Add the new UTXOs and associate them with the name script
-            for idx, txout in enumerate(tx.outputs):
+            for txout in tx.outputs:
                 # Get the hashX of the name script.  Ignore non-name scripts.
                 hashX = script_name_hashX(txout.pk_script)
                 if hashX:

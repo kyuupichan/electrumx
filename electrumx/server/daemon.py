@@ -43,10 +43,11 @@ class Daemon(object):
     WARMING_UP = -28
     id_counter = itertools.count()
 
-    def __init__(self, coin, url, max_workqueue=10, init_retry=0.25,
-                 max_retry=4.0):
+    def __init__(self, coin, url, max_workqueue=10, init_retry=0.25, max_retry=4.0):
         self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
+        self.url_index = None
+        self.urls = []
         self.set_url(url)
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
