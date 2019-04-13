@@ -202,7 +202,7 @@ class MemPool(object):
                              sum(v for _, v in tx.out_pairs)))
             txs[hash] = tx
 
-            for hashX, value in itertools.chain(tx.in_pairs, tx.out_pairs):
+            for hashX, _value in itertools.chain(tx.in_pairs, tx.out_pairs):
                 touched.add(hashX)
                 hashXs[hashX].add(hash)
 
