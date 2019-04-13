@@ -1164,7 +1164,8 @@ class ElectrumX(SessionBase):
         except self.db.DBError as e:
             raise RPCError(BAD_REQUEST, f'db error: {e!r}')
         tx_hashes = [hash_to_hex_str(hash) for hash in tx_hashes]
-        self.bump_cost(1.0 + len(tx_hashes) / 1000)
+        # Aim is to cost 3.0 for a 1MB block of 2,500 txs
+        self.bump_cost(0.5 + len(tx_hashes) / 2500)
         return block_hash, tx_hashes
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
