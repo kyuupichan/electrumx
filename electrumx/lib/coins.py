@@ -577,6 +577,15 @@ class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
     ]
 
 
+class BitcoinSVScalingTestnet(BitcoinSVTestnet):
+    NET = "scalingtest"
+    PEERS = [
+        '206.189.16.213 t51001 s51002',
+    ]
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+
+
 class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
     '''Bitcoin Testnet for Bitcoin Cash daemons.'''
     NAME = "BitcoinCashABC"
