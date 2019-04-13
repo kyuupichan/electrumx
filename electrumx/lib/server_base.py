@@ -46,6 +46,7 @@ class ServerBase(object):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.logger.info(f'Python version: {sys.version}')
         self.env = env
+        self.start_time = 0
 
         # Sanity checks
         if sys.version_info < self.PYTHON_MIN_VERSION:
