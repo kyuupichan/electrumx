@@ -102,7 +102,7 @@ class Peer(object):
         '''Update features in-place.'''
         try:
             tmp = Peer(self.host, features)
-        except Exception:
+        except AssertionError:
             pass
         else:
             self.update_features_from_peer(tmp)
