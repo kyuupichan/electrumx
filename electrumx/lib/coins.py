@@ -584,6 +584,7 @@ class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     ]
     TX_COUNT = 2015
     TX_COUNT_HEIGHT = 5711
+    TX_PER_BLOCK = 5000
 
 
 class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
