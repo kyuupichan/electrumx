@@ -164,14 +164,13 @@ class SessionManager(object):
 
     async def _close_servers(self, kinds):
         '''Close the servers of the given kinds (TCP etc.).'''
+        kinds = set(kinds).intersection(self.servers)
         if kinds:
-            self.logger.info('closing down {} listening servers'
-                             .format(', '.join(kinds)))
-        for kind in kinds:
-            server = self.servers.pop(kind, None)
-            if server:
-                server.close()
-                await server.wait_closed()
+            self.logger.info(f'closing down {", ".join(kinds)} listening servers')
+            servers = [self.servers.pop(kind) for kind in kinds]
+            # Close all before waiting
+            [server.close() for server in servers]
+            [await server.wait_closed() for server in servers]
 
     async def _manage_servers(self):
         paused = False
