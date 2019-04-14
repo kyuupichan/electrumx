@@ -656,9 +656,6 @@ class SessionBase(RPCSession):
         self.log_me = SessionBase.log_new
         self.session_id = None
         self.daemon_request = self.session_mgr.daemon_request
-        # Hijack the connection so we can log messages
-        self._receive_message_orig = self.connection.receive_message
-        self.connection.receive_message = self.receive_message
 
     async def notify(self, touched, height_changed):
         pass
@@ -669,11 +666,6 @@ class SessionBase(RPCSession):
         if for_log and self.anon_logs:
             return 'xx.xx.xx.xx:xx'
         return super().peer_address_str()
-
-    def receive_message(self, message):
-        if self.log_me:
-            self.logger.info(f'processing {message}')
-        return self._receive_message_orig(message)
 
     def toggle_logging(self):
         self.log_me = not self.log_me
