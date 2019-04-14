@@ -678,7 +678,7 @@ class SessionBase(RPCSession):
             status += 'C'
         if self.log_me:
             status += 'L'
-        status += str(self._concurrency.max_concurrent)
+        status += str(self._incoming_concurrency.max_concurrent)
         return status
 
     def connection_made(self, transport):
@@ -697,7 +697,7 @@ class SessionBase(RPCSession):
         msg = ''
         if not self._can_send.is_set():
             msg += ' with full socket buffer'
-        if self._concurrency.max_concurrent != self.initial_concurrent:
+        if self._incoming_concurrency.max_concurrent != self.initial_concurrent:
             msg += ' whilst throttled'
         if self.send_size >= 1024*1024:
             msg += ('.  Sent {:,d} bytes in {:,d} messages'
