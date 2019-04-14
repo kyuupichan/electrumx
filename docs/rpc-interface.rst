@@ -140,6 +140,17 @@ The return value shows this command turned off logging for sesssions
 0, 1 and 2.  It was turned on for sessions 3 and 4, and there was no
 session 5.
 
+lognew
+------
+
+Toggle logging of the new sessions.  Their requests are written to the
+server log::
+
+  $ electrumx_rpc lognew
+  "lognew: True"
+
+The return value shows that new session logging is now on.
+
 .. _peers:
 
 peers

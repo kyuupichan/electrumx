@@ -124,7 +124,7 @@ class SessionManager(object):
         self.session_event = Event()
 
         # Set up the RPC request handlers
-        cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
+        cmds = ('add_peer daemon_url disconnect getinfo groups log lognew peers '
                 'query reorg sessions stop'.split())
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
@@ -376,6 +376,11 @@ class SessionManager(object):
             return f'log {session.session_id}: {session.log_me}'
 
         return await self._for_each_session(session_ids, toggle_logging)
+
+    async def rpc_lognew(self):
+        '''Toggle logging of new sesssions.'''
+        SessionBase.log_new = not SessionBase.log_new
+        return f'lognew: {SessionBase.log_new}'
 
     async def rpc_daemon_url(self, daemon_url):
         '''Replace the daemon URL.'''
@@ -632,6 +637,7 @@ class SessionBase(RPCSession):
 
     MAX_CHUNK_SIZE = 2016
     session_counter = itertools.count()
+    log_new = False
 
     def __init__(self, session_mgr, db, mempool, peer_mgr, kind):
         connection = JSONRPCConnection(JSONRPCAutoDetect)
@@ -647,7 +653,7 @@ class SessionBase(RPCSession):
         self.client = 'unknown'
         self.anon_logs = self.env.anon_logs
         self.txs_sent = 0
-        self.log_me = False
+        self.log_me = SessionBase.log_new
         self.session_id = None
         self.daemon_request = self.session_mgr.daemon_request
         # Hijack the connection so we can log messages
