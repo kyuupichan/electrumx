@@ -294,11 +294,20 @@ raise them.
   The default value :const:`5,000` bytes, meaning the bandwidth cost assigned to a response
   of 100KB is 20.  If your bandwidth is cheap you should probably raise this.
 
+.. envvar:: REQUEST_TIMEOUT
+
+  An integer number of seconds defaulting to :const:`15`.  If a request takes longer than
+  this to respond to, either because of request limiting or because the request is
+  expensive, the server rejects it and returns a timeout error to the client indicating
+  that the server is busy.
+
+  This can help prevent large backlogs of unprocessed requests building up under heavy load.
+
 .. envvar:: SESSION_TIMEOUT
 
-  An integer number of seconds defaulting to 600.  Sessions that have not sent a request
-  for longer than this are disconnected.  Properly functioning clients should send a
-  :func:`server.ping` request once roughly 450 seconds have passed since the previous
+  An integer number of seconds defaulting to :const:`600`.  Sessions that have not sent a
+  request for longer than this are disconnected.  Properly functioning clients should send
+  a :func:`server.ping` request once roughly 450 seconds have passed since the previous
   request, in order to avoid disconnection.
 
 

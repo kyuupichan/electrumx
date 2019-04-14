@@ -236,6 +236,10 @@ def test_MAX_SESSIONS():
     # Cannot test default as it may be lowered by the open file limit cap
 
 
+def test_REQUEST_TIMEOUT():
+    assert_integer('REQUEST_TIMEOUT', 'request_timeout', 15)
+
+
 def test_SESSION_TIMEOUT():
     assert_integer('SESSION_TIMEOUT', 'session_timeout', 600)
 
