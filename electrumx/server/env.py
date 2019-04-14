@@ -31,7 +31,7 @@ class Env(EnvBase):
 
     def __init__(self, coin=None):
         super().__init__()
-        self.obsolete([])
+        self.obsolete(["MAX_SUBSCRIPTIONS", "MAX_SUBS", "MAX_SESSION_SUBS", "BANDWIDTH_LIMIT"])
         self.db_dir = self.required('DB_DIRECTORY')
         self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
