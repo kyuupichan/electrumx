@@ -1151,23 +1151,21 @@ class ElectrumX(SessionBase):
         self.bump_cost(1.0)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
-    async def _block_hash_and_tx_hashes(self, height):
+    async def _tx_hashes_at_blockheight(self, height):
         '''Returns a pair (block_hash, tx_hashes) for the main chain block at
         the given height.
 
-        block_hash is a hexadecimal string, and tx_hashes is an
-        ordered list of hexadecimal strings.
+        x_hashes is an ordered list of hexadecimal strings.
         '''
         height = non_negative_integer(height)
         try:
-            block_hash = hash_to_hex_str((await self.db.fs_block_hashes(height, 1))[0])
             tx_hashes = await self.db.tx_hashes_at_blockheight(height)
         except self.db.DBError as e:
             raise RPCError(BAD_REQUEST, f'db error: {e!r}')
         tx_hashes = [hash_to_hex_str(hash) for hash in tx_hashes]
         # Aim is to cost 3.0 for a 1MB block of 2,500 txs
         self.bump_cost(0.5 + len(tx_hashes) / 2500)
-        return block_hash, tx_hashes
+        return tx_hashes
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
         '''Return a merkle branch to a transaction.
@@ -1188,13 +1186,11 @@ class ElectrumX(SessionBase):
         height: the height of the block it is in
         '''
         assert_tx_hash(tx_hash)
-        height = non_negative_integer(height)
-        block_hash, tx_hashes = await self._block_hash_and_tx_hashes(height)
+        tx_hashes = await self._tx_hashes_at_blockheight(height)
         try:
             pos = tx_hashes.index(tx_hash)
         except ValueError:
-            raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
-                           f'block {block_hash} at height {height:,d}')
+            raise RPCError(BAD_REQUEST, f'tx {tx_hash} not in block at height {height:,d}')
         branch = self._get_merkle_branch(tx_hashes, pos)
         return {"block_height": height, "merkle": branch, "pos": pos}
 
@@ -1203,16 +1199,15 @@ class ElectrumX(SessionBase):
         a block height and position in the block.
         '''
         tx_pos = non_negative_integer(tx_pos)
-        height = non_negative_integer(height)
         if merkle not in (True, False):
             raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
 
-        block_hash, tx_hashes = await self._block_hash_and_tx_hashes(height)
+        tx_hashes = await self._tx_hashes_at_blockheight(height)
         try:
             tx_hash = tx_hashes[tx_pos]
         except IndexError:
-            raise RPCError(BAD_REQUEST, f'no tx at position {tx_pos:,d} in '
-                           f'block {block_hash} at height {height:,d}')
+            raise RPCError(BAD_REQUEST,
+                           f'no tx at position {tx_pos:,d} in block at height {height:,d}')
 
         if merkle:
             branch = self._get_merkle_branch(tx_hashes, tx_pos)
