@@ -115,7 +115,7 @@ class SessionManager(object):
         self.session_groups = {}    # group name->SessionGroup instance
         self.txs_sent = 0
         self.start_time = time.time()
-        self.history_cache = pylru.lrucache(256)
+        self.history_cache = pylru.lrucache(1000)
         self._tx_hashes_cache = pylru.lrucache(1000)
         self._tx_hashes_max_height = 0
         self._tx_hashes_lookups = 0
