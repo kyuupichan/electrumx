@@ -70,11 +70,14 @@ def assert_boolean(value):
 
 
 def assert_tx_hash(value):
-    '''Raise an RPCError if the value is not a valid transaction
-    hash.'''
+    '''Raise an RPCError if the value is not a valid hexadecimal transaction hash.
+
+    If it is valid, return it as 32-byte binary hash.
+    '''
     try:
-        if len(util.hex_to_bytes(value)) == 32:
-            return
+        raw_hash = hex_str_to_hash(value)
+        if len(raw_hash) == 32:
+            return raw_hash
     except (ValueError, TypeError):
         pass
     raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
@@ -1155,28 +1158,25 @@ class ElectrumX(SessionBase):
         '''Returns a pair (block_hash, tx_hashes) for the main chain block at
         the given height.
 
-        x_hashes is an ordered list of hexadecimal strings.
+        Returns an ordered list of binary hashes.
         '''
         height = non_negative_integer(height)
         try:
             tx_hashes = await self.db.tx_hashes_at_blockheight(height)
         except self.db.DBError as e:
             raise RPCError(BAD_REQUEST, f'db error: {e!r}')
-        tx_hashes = [hash_to_hex_str(hash) for hash in tx_hashes]
         # Aim is to cost 3.0 for a 1MB block of 2,500 txs
         self.bump_cost(0.5 + len(tx_hashes) / 2500)
         return tx_hashes
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
-        '''Return a merkle branch to a transaction.
+        '''Return a merkle branch to a transaction as a list of hexadecimal strings.
 
-        tx_hashes: ordered list of hex strings of tx hashes in a block
+        tx_hashes: ordered list of binary tx hashes in a block
         tx_pos: index of transaction in tx_hashes to create branch for
         '''
-        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
-        branch, _root = self.db.merkle.branch_and_root(hashes, tx_pos)
-        branch = [hash_to_hex_str(hash) for hash in branch]
-        return branch
+        branch, _root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
+        return [hash_to_hex_str(hash) for hash in branch]
 
     async def transaction_merkle(self, tx_hash, height):
         '''Return the merkle branch to a confirmed transaction given its hash
@@ -1185,10 +1185,10 @@ class ElectrumX(SessionBase):
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
         '''
-        assert_tx_hash(tx_hash)
+        tx_hash_bytes = assert_tx_hash(tx_hash)
         tx_hashes = await self._tx_hashes_at_blockheight(height)
         try:
-            pos = tx_hashes.index(tx_hash)
+            pos = tx_hashes.index(tx_hash_bytes)
         except ValueError:
             raise RPCError(BAD_REQUEST, f'tx {tx_hash} not in block at height {height:,d}')
         branch = self._get_merkle_branch(tx_hashes, pos)
@@ -1209,6 +1209,7 @@ class ElectrumX(SessionBase):
             raise RPCError(BAD_REQUEST,
                            f'no tx at position {tx_pos:,d} in block at height {height:,d}')
 
+        tx_hash = hash_to_hex_str(tx_hash)
         if merkle:
             branch = self._get_merkle_branch(tx_hashes, tx_pos)
             return {"tx_hash": tx_hash, "merkle": branch}
