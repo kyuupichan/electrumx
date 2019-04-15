@@ -116,6 +116,10 @@ class SessionManager(object):
         self.txs_sent = 0
         self.start_time = time.time()
         self.history_cache = pylru.lrucache(256)
+        self._tx_hashes_cache = pylru.lrucache(1000)
+        self._tx_hashes_max_height = 0
+        self._tx_hashes_lookups = 0
+        self._tx_hashes_hits = 0
         self.notified_height = None
         self.hsub_results = None
         # Masternode stuff only for such coins
@@ -278,6 +282,7 @@ class SessionManager(object):
 
     def _get_info(self):
         '''A summary of server state.'''
+        cache_fmt = '{:,d} lookups {:,d} hits {:,d} entries'
         return {
             'closing': len([s for s in self.sessions if s.is_closing()]),
             'daemon': self.daemon.logged_url(),
@@ -293,6 +298,8 @@ class SessionManager(object):
             'sessions': self.session_count(),
             'sessions_with_subs': self.session_count_with_subs(),
             'subs': self._sub_count(),
+            'tx_hashes_cache' : cache_fmt.format(
+                self._tx_hashes_lookups, self._tx_hashes_hits, len(self._tx_hashes)),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
             'version': electrumx.version,
@@ -536,6 +543,29 @@ class SessionManager(object):
             return 0
         return sum((group.cost() - session.cost) * group.weight for group in groups)
 
+    async def tx_hashes_at_blockheight(self, height):
+        '''Returns a pair (tx_hashes, cost).
+
+        tx_hashes is an ordered list of binary hashes, cost is an estimated cost of
+        getting the hashes; cheaper if in-cache.  Raises RPCError.
+        '''
+        height = non_negative_integer(height)
+        self._tx_hashes_lookups += 1
+        tx_hashes = self._tx_hashes_cache.get(height)
+        if tx_hashes:
+            self._tx_hashes_hits += 1
+            return tx_hashes, 0.1 + len(tx_hashes) * 0.00004
+
+        try:
+            tx_hashes = await self.db.tx_hashes_at_blockheight(height)
+        except self.db.DBError as e:
+            raise RPCError(BAD_REQUEST, f'db error: {e!r}')
+
+        self._tx_hashes_cache[height] = tx_hashes
+        self._tx_hashes_max_height = max(height, self._tx_hashes_max_height)
+
+        return tx_hashes, 0.25 + len(tx_hashes) * 0.0001
+
     def session_count(self):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
@@ -579,6 +609,12 @@ class SessionManager(object):
 
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
+        # Invalidate our tx hashes cache in case of a reorg
+        for key in range(height, self._tx_hashes_max_height + 1):
+            if key in self._tx_hashes_cache:
+                del self._tx_hashes_cache[key]
+        self._tx_hashes_max_height = height - 1
+
         height_changed = height != self.notified_height
         if height_changed:
             await self._refresh_hsub_results(height)
@@ -1154,27 +1190,13 @@ class ElectrumX(SessionBase):
         self.bump_cost(1.0)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
-    async def _tx_hashes_at_blockheight(self, height):
-        '''Returns a pair (block_hash, tx_hashes) for the main chain block at
-        the given height.
-
-        Returns an ordered list of binary hashes.
-        '''
-        height = non_negative_integer(height)
-        try:
-            tx_hashes = await self.db.tx_hashes_at_blockheight(height)
-        except self.db.DBError as e:
-            raise RPCError(BAD_REQUEST, f'db error: {e!r}')
-        # Aim is to cost 3.0 for a 1MB block of 2,500 txs
-        self.bump_cost(0.5 + len(tx_hashes) / 2500)
-        return tx_hashes
-
     def _get_merkle_branch(self, tx_hashes, tx_pos):
         '''Return a merkle branch to a transaction as a list of hexadecimal strings.
 
         tx_hashes: ordered list of binary tx hashes in a block
         tx_pos: index of transaction in tx_hashes to create branch for
         '''
+        self.bump_cost(len(tx_hashes) / 2500)
         branch, _root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
         return [hash_to_hex_str(hash) for hash in branch]
 
@@ -1186,7 +1208,9 @@ class ElectrumX(SessionBase):
         height: the height of the block it is in
         '''
         tx_hash_bytes = assert_tx_hash(tx_hash)
-        tx_hashes = await self._tx_hashes_at_blockheight(height)
+        tx_hashes, cost = await self.session_mgr.tx_hashes_at_blockheight(height)
+        self.bump_cost(cost)
+
         try:
             pos = tx_hashes.index(tx_hash_bytes)
         except ValueError:
@@ -1202,7 +1226,9 @@ class ElectrumX(SessionBase):
         if merkle not in (True, False):
             raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
 
-        tx_hashes = await self._tx_hashes_at_blockheight(height)
+        tx_hashes, cost = await self.session_mgr.tx_hashes_at_blockheight(height)
+        self.bump_cost(cost)
+
         try:
             tx_hash = tx_hashes[tx_pos]
         except IndexError:
