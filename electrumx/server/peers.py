@@ -272,10 +272,9 @@ class PeerManager(object):
 
             peer_text = f'[{peer}:{port} {kind}]'
             try:
-                async with timeout_after(120 if peer.is_tor else 30):
-                    async with Connector(PeerSession, peer.host, port,
-                                         **kwargs) as session:
-                        await self._verify_peer(session, peer)
+                async with Connector(PeerSession, peer.host, port, **kwargs) as session:
+                    session.sent_request_timeout = 120 if peer.is_tor else 30
+                    await self._verify_peer(session, peer)
                 is_good = True
                 break
             except BadPeerError as e:
