@@ -138,16 +138,20 @@ class PeerManager(object):
         url = self.env.blacklist_url
         if not url:
             return
-        while True:
-            session = aiohttp.ClientSession()
-            try:
+
+        async def read_blacklist():
+            async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
-                    r = await response.text()
-                self.blacklist = set([entry.lower() for entry in json.loads(r)])
-                self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
+                    text = await response.text()
+            return set(entry.lower() for entry in json.loads(text))
+
+        while True:
+            try:
+                self.blacklist = await read_blacklist()
             except Exception as e:
                 self.logger.error(f'could not retrieve blacklist from {url}: {e}')
             else:
+                self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
                 # Got new blacklist. Now check our current peers against it
                 for peer in self.peers:
                     if self._is_blacklisted(peer):
