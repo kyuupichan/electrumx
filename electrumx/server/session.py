@@ -12,6 +12,7 @@ import codecs
 import datetime
 import itertools
 import json
+import math
 import os
 import pylru
 import ssl
@@ -27,6 +28,7 @@ from aiorpcx import (
 )
 
 import electrumx
+from electrumx.lib.merkle import MerkleCache
 from electrumx.lib.text import sessions_lines
 import electrumx.lib.util as util
 from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
@@ -120,6 +122,10 @@ class SessionManager(object):
         self._tx_hashes_max_height = 0
         self._tx_hashes_lookups = 0
         self._tx_hashes_hits = 0
+        # Really a MerkleCache cache
+        self._merkle_cache = pylru.lrucache(1000)
+        self._merkle_lookups = 0
+        self._merkle_hits = 0
         self.notified_height = None
         self.hsub_results = None
         # Masternode stuff only for such coins
@@ -291,6 +297,8 @@ class SessionManager(object):
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(self.session_groups),
             'logged': len([s for s in self.sessions if s.log_me]),
+            'merkle_cache': cache_fmt.format(
+                self._merkle_lookups, self._merkle_hits, len(self._merkle_cache)),
             'paused': sum(not s._can_send.is_set() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
@@ -298,8 +306,8 @@ class SessionManager(object):
             'sessions': self.session_count(),
             'sessions_with_subs': self.session_count_with_subs(),
             'subs': self._sub_count(),
-            'tx_hashes_cache' : cache_fmt.format(
-                self._tx_hashes_lookups, self._tx_hashes_hits, len(self._tx_hashes)),
+            'tx_hashes_cache': cache_fmt.format(
+                self._tx_hashes_lookups, self._tx_hashes_hits, len(self._tx_hashes_cache)),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
             'version': electrumx.version,
@@ -543,13 +551,58 @@ class SessionManager(object):
             return 0
         return sum((group.cost() - session.cost) * group.weight for group in groups)
 
+    async def _merkle_branch(self, height, tx_hashes, tx_pos):
+        tx_hash_count = len(tx_hashes)
+        cost = tx_hash_count
+
+        if tx_hash_count >= 200:
+            self._merkle_lookups += 1
+            merkle_cache = self._merkle_cache.get(height)
+            if merkle_cache:
+                self._merkle_hits += 1
+                cost = 10 * math.sqrt(tx_hash_count)
+            else:
+                async def tx_hashes_func(start, count):
+                    return tx_hashes[start: start + count]
+
+                merkle_cache = MerkleCache(self.db.merkle, tx_hashes_func)
+                self._merkle_cache[height] = merkle_cache
+                await merkle_cache.initialize(len(tx_hashes))
+            branch, _root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos)
+        else:
+            branch, _root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
+
+        branch = [hash_to_hex_str(hash) for hash in branch]
+        return branch, cost / 2500
+
+    async def merkle_branch_for_tx_hash(self, height, tx_hash):
+        '''Return a triple (branch, tx_pos, cost).'''
+        tx_hashes, tx_hashes_cost = await self.tx_hashes_at_blockheight(height)
+        try:
+            tx_pos = tx_hashes.index(tx_hash)
+        except ValueError:
+            raise RPCError(BAD_REQUEST,
+                           f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}')
+        branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
+        return branch, tx_pos, tx_hashes_cost + merkle_cost
+
+    async def merkle_branch_for_tx_pos(self, height, tx_pos):
+        '''Return a triple (branch, tx_hash_hex, cost).'''
+        tx_hashes, tx_hashes_cost = await self.tx_hashes_at_blockheight(height)
+        try:
+            tx_hash = tx_hashes[tx_pos]
+        except IndexError:
+            raise RPCError(BAD_REQUEST,
+                           f'no tx at position {tx_pos:,d} in block at height {height:,d}')
+        branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
+        return branch, hash_to_hex_str(tx_hash), tx_hashes_cost + merkle_cost
+
     async def tx_hashes_at_blockheight(self, height):
         '''Returns a pair (tx_hashes, cost).
 
         tx_hashes is an ordered list of binary hashes, cost is an estimated cost of
         getting the hashes; cheaper if in-cache.  Raises RPCError.
         '''
-        height = non_negative_integer(height)
         self._tx_hashes_lookups += 1
         tx_hashes = self._tx_hashes_cache.get(height)
         if tx_hashes:
@@ -1190,16 +1243,6 @@ class ElectrumX(SessionBase):
         self.bump_cost(1.0)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
 
-    def _get_merkle_branch(self, tx_hashes, tx_pos):
-        '''Return a merkle branch to a transaction as a list of hexadecimal strings.
-
-        tx_hashes: ordered list of binary tx hashes in a block
-        tx_pos: index of transaction in tx_hashes to create branch for
-        '''
-        self.bump_cost(len(tx_hashes) / 2500)
-        branch, _root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
-        return [hash_to_hex_str(hash) for hash in branch]
-
     async def transaction_merkle(self, tx_hash, height):
         '''Return the merkle branch to a confirmed transaction given its hash
         and height.
@@ -1207,40 +1250,38 @@ class ElectrumX(SessionBase):
         tx_hash: the transaction hash as a hexadecimal string
         height: the height of the block it is in
         '''
-        tx_hash_bytes = assert_tx_hash(tx_hash)
-        tx_hashes, cost = await self.session_mgr.tx_hashes_at_blockheight(height)
+        tx_hash = assert_tx_hash(tx_hash)
+        height = non_negative_integer(height)
+
+        branch, tx_pos, cost = await self.session_mgr.merkle_branch_for_tx_hash(
+            height, tx_hash)
         self.bump_cost(cost)
 
-        try:
-            pos = tx_hashes.index(tx_hash_bytes)
-        except ValueError:
-            raise RPCError(BAD_REQUEST, f'tx {tx_hash} not in block at height {height:,d}')
-        branch = self._get_merkle_branch(tx_hashes, pos)
-        return {"block_height": height, "merkle": branch, "pos": pos}
+        return {"block_height": height, "merkle": branch, "pos": tx_pos}
 
     async def transaction_id_from_pos(self, height, tx_pos, merkle=False):
         '''Return the txid and optionally a merkle proof, given
         a block height and position in the block.
         '''
         tx_pos = non_negative_integer(tx_pos)
+        height = non_negative_integer(height)
         if merkle not in (True, False):
             raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
 
-        tx_hashes, cost = await self.session_mgr.tx_hashes_at_blockheight(height)
-        self.bump_cost(cost)
-
-        try:
-            tx_hash = tx_hashes[tx_pos]
-        except IndexError:
-            raise RPCError(BAD_REQUEST,
-                           f'no tx at position {tx_pos:,d} in block at height {height:,d}')
-
-        tx_hash = hash_to_hex_str(tx_hash)
         if merkle:
-            branch = self._get_merkle_branch(tx_hashes, tx_pos)
+            branch, tx_hash, cost = await self.session_mgr.merkle_branch_for_tx_pos(
+                height, tx_pos)
+            self.bump_cost(cost)
             return {"tx_hash": tx_hash, "merkle": branch}
         else:
-            return tx_hash
+            tx_hashes, cost = await self.session_mgr.tx_hashes_at_blockheight(height)
+            try:
+                tx_hash = tx_hashes[tx_pos]
+            except IndexError:
+                raise RPCError(BAD_REQUEST,
+                               f'no tx at position {tx_pos:,d} in block at height {height:,d}')
+            self.bump_cost(cost)
+            return hash_to_hex_str(tx_hash)
 
     async def compact_fee_histogram(self):
         self.bump_cost(1.0)
