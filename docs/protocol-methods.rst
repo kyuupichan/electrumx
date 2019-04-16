@@ -557,6 +557,27 @@ Subscribe to a script hash.
 
     .. function:: blockchain.scripthash.subscribe(scripthash, status)
 
+blockchain.scripthash.unsubscribe
+=================================
+
+Unsubscribe from a script hash, preventing future notifications if its :ref:`status
+<status>` changes.
+
+**Signature**
+
+  .. function:: blockchain.scripthash.unsubscribe(scripthash)
+  .. versionadded:: 1.4.2
+
+  *scripthash*
+
+    The script hash as a hexadecimal string.
+
+**Result**
+
+  Returns :const:`True` if the scripthash was subscribed to, otherwise :const:`False`.
+  Note that :const:`False` might be returned even for something subscribed to earlier,
+  becuase the server can drop subscriptions in rare circumstances.
+
 blockchain.scripthash.utxos
 ===========================
 

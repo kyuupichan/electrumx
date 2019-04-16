@@ -827,7 +827,7 @@ class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
     PROTOCOL_MIN = (1, 4)
-    PROTOCOL_MAX = (1, 4, 1)
+    PROTOCOL_MAX = (1, 4, 2)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -877,6 +877,10 @@ class ElectrumX(SessionBase):
     def sub_count(self):
         return len(self.hashX_subs)
 
+    def unsubscribe_hashX(self, hashX):
+        self.mempool_statuses.pop(hashX, None)
+        return self.hashX_subs.pop(hashX, None)
+
     async def notify(self, touched, height_changed):
         '''Notify the client about changes to touched addresses (from mempool
         updates or new blocks) and height.
@@ -892,11 +896,7 @@ class ElectrumX(SessionBase):
             for hashX in touched:
                 alias = self.hashX_subs.get(hashX)
                 if alias:
-<<<<<<< HEAD
                     status = await self.subscription_address_status(hashX)
-=======
-                    status = await self.subcription_address_status(hashX)
->>>>>>> Handle subscriptions whose history becomes too long
                     changed[alias] = status
 
             # Check mempool hashXs - the status is a function of the confirmed state of
@@ -976,8 +976,7 @@ class ElectrumX(SessionBase):
         try:
             return self.address_status(hashX)
         except RPCError:
-            self.hashX_subs.pop(hashX, None)
-            self.mempool_statuses.pop(hashX, None)
+            self.unsubscribe_hashX(hashX)
             return None
 
     async def hashX_listunspent(self, hashX):
@@ -1052,6 +1051,12 @@ class ElectrumX(SessionBase):
         scripthash: the SHA256 hash of the script to subscribe to'''
         hashX = scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
+
+    async def scripthash_unsubscribe(self, scripthash):
+        '''Unsubscribe from a script hash.'''
+        self.bump_cost(0.1)
+        hashX = scripthash_to_hashX(scripthash)
+        return self.unsubscribe_hashX(hashX) is not None
 
     async def _merkle_proof(self, cp_height, height):
         max_height = self.db.db_height
@@ -1337,6 +1342,9 @@ class ElectrumX(SessionBase):
             'server.ping': self.ping,
             'server.version': self.server_version,
         }
+
+        if ptuple >= (1, 4, 2):
+            handlers['blockchain.scripthash.unsubscribe'] = self.scripthash_unsubscribe
 
         self.request_handlers = handlers
 
