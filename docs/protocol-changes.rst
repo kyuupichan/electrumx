@@ -158,65 +158,11 @@ Changes
     nonzero.  AuxPoW data is still present when *cp_height* is zero.
     Non-AuxPoW chains are unaffected.
 
-Version 1.5
-===========
 
-.. note:: This is a draft of ideas for protocol 1.5; they are not
-           implemented
-
-This protocol version makes changes intended to allow clients and
-servers to more easily scale to support queries about busy addresses.
-It has changes to reduce the amount of round-trip queries made in
-common usage, and to make results more compact to reduce bandwidth
-consumption.
-
-RPC calls with potentially large responses have pagination support,
-and the return value of :func:`blockchain.scripthash.subscribe`
-changes.  Script hash :ref:`status <status>` had to be recalculated
-with each new transaction and was undefined if it included more than
-one mempool transaction.  Its calculation is linear in history length
-resulting in quadratic complexity as history grows.  Its calculation
-for large histories was demanding for both the server to compute and
-the client to check.
-
-RPC calls and notifications that combined the effects of the mempool
-and confirmed history are removed.
-
-The changes are beneficial to clients and servers alike, but will
-require changes to both client-side and server-side logic.  In
-particular, the client should track what block (by hash and height)
-wallet data is synchronized to, and if that hash is no longer part of
-the main chain, it will need to remove wallet data for blocks that
-were reorganized away and get updated information as of the first
-reorganized block.  The effects are limited to script hashes
-potentially affected by the reorg, and for most clients this will be
-the empty set.
+Version 1.4.1
+=============
 
 New methods
 -----------
 
-  * :func:`blockchain.scripthash.history`
-  * :func:`blockchain.scripthash.utxos`
-
-New notifications
------------------
-
-  * :func:`mempool.changes`
-
-Changes
--------
-
-  * :func:`blockchain.scripthash.subscribe` has changed its return value
-    and the notifications it sends
-  * :func:`blockchain.transaction.get` takes an additional optional
-    argument *merkle*
-
-Removed methods
----------------
-
-  * :func:`blockchain.scripthash.get_history`.  Switch to
-    :func:`blockchain.scripthash.history`
-  * :func:`blockchain.scripthash.get_mempool`.  Switch to
-    handling :func:`mempool.changes` notifications
-  * :func:`blockchain.scripthash.listunspent`.  Switch to
-    :func:`blockchain.scripthash.utxos`
+  * :func:`blockchain.scipthash.unsubscribe` to unsubscribe from a script hash.

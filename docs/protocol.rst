@@ -11,3 +11,4 @@ alike.
    protocol-methods
    protocol-changes
    protocol-removed
+   protocol-ideas
