@@ -905,11 +905,8 @@ class ElectrumX(SessionBase):
                     alias = self.hashX_subs[hashX]
                     changed[alias] = status
 
+            method = 'blockchain.scripthash.subscribe'
             for alias, status in changed.items():
-                if len(alias) == 64:
-                    method = 'blockchain.scripthash.subscribe'
-                else:
-                    method = 'blockchain.address.subscribe'
                 await self.send_notification(method, (alias, status))
 
             if changed:
