@@ -182,8 +182,10 @@ class SessionManager(object):
             self.logger.info(f'closing down {", ".join(kinds)} listening servers')
             servers = [self.servers.pop(kind) for kind in kinds]
             # Close all before waiting
-            [server.close() for server in servers]
-            [await server.wait_closed() for server in servers]
+            for server in servers:
+                server.close()
+            for server in servers:
+                await server.wait_closed()
 
     async def _manage_servers(self):
         paused = False
