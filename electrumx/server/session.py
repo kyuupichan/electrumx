@@ -892,7 +892,11 @@ class ElectrumX(SessionBase):
             for hashX in touched:
                 alias = self.hashX_subs.get(hashX)
                 if alias:
+<<<<<<< HEAD
                     status = await self.subscription_address_status(hashX)
+=======
+                    status = await self.subcription_address_status(hashX)
+>>>>>>> Handle subscriptions whose history becomes too long
                     changed[alias] = status
 
             # Check mempool hashXs - the status is a function of the confirmed state of
@@ -970,7 +974,7 @@ class ElectrumX(SessionBase):
         '''As for address_status, but if it can't be calculated the subscription is
         discarded.'''
         try:
-            return await self.address_status(hashX)
+            return self.address_status(hashX)
         except RPCError:
             self.hashX_subs.pop(hashX, None)
             self.mempool_statuses.pop(hashX, None)
