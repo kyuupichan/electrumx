@@ -475,6 +475,8 @@ class PeerManager(object):
 
     async def on_add_peer(self, features, source_info):
         '''Add a peer (but only if the peer resolves to the source).'''
+        if self.env.peer_discovery != self.env.PD_ON:
+            return False
         if not source_info:
             self.logger.info('ignored add_peer request: no source info')
             return False
