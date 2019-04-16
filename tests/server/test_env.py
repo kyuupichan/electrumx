@@ -228,6 +228,15 @@ def test_MAX_SEND():
     assert_integer('MAX_SEND', 'max_send', 1000000)
 
 
+def test_LOG_LEVEL():
+    setup_base_env()
+    e = Env()
+    assert e.log_level == 'INFO'
+    os.environ['LOG_LEVEL'] = 'warning'
+    e = Env()
+    assert e.log_level == 'WARNING'
+
+
 def test_MAX_SESSIONS():
     too_big = 1000000
     os.environ['MAX_SESSIONS'] = str(too_big)

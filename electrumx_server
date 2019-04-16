@@ -22,17 +22,20 @@ def main():
     log_fmt = Env.default('LOG_FORMAT', '%(levelname)s:%(name)s:%(message)s')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(CompactFormatter(log_fmt))
-    make_logger('electrumx', handler=handler, level=logging.INFO)
+    logger = make_logger('electrumx', handler=handler, level='INFO')
 
-    logging.info('ElectrumX server starting')
+    logger.info('ElectrumX server starting')
     try:
-        controller = Controller(Env())
+        env = Env()
+        logger.info(f'logging level: {env.log_level}')
+        logger.setLevel(env.log_level)
+        controller = Controller(env)
         controller.run()
     except Exception:
         traceback.print_exc()
-        logging.critical('ElectrumX server terminated abnormally')
+        logger.critical('ElectrumX server terminated abnormally')
     else:
-        logging.info('ElectrumX server terminated normally')
+        logger.info('ElectrumX server terminated normally')
 
 
 if __name__ == '__main__':

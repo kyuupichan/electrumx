@@ -72,6 +72,11 @@ These environment variables are optional:
   <https://docs.python.org/3/library/logging.html#logrecord-attributes>`_
   to use.  Defaults to ``%(levelname)s:%(name)s:%(message)s``.
 
+.. envvar:: LOG_LEVEL
+
+  The default Python logging level, a case-insensitive string.  Useful values
+  are 'debug', 'info', 'warning' and 'error'.
+
 .. envvar:: ALLOW_ROOT
 
   Set this environment variable to anything non-empty to allow running

@@ -57,6 +57,7 @@ class Env(EnvBase):
                                             self.banner_file)
         self.anon_logs = self.boolean('ANON_LOGS', False)
         self.log_sessions = self.integer('LOG_SESSIONS', 3600)
+        self.log_level = self.default('LOG_LEVEL', 'info').upper()
         # Peer discovery
         self.peer_discovery = self.peer_discovery_enum()
         self.peer_announce = self.boolean('PEER_ANNOUNCE', True)
