@@ -150,14 +150,6 @@ class Daemon(object):
             except WorkQueueFullError:
                 log_error('work queue full.')
                 on_good_message = 'running normally'
-            except asyncio.CancelledError as e:
-                # aiohttp bug - it raises a CancelledError (!!) if the transport is
-                # closing; presumably bitcoind is busy and closes the connection early.
-                # See https://github.com/aio-libs/aiohttp/issues/2499
-                if 'closing transport' not in str(e):
-                    raise
-                log_error('disconnected.')
-                on_good_message = 'connection restored'
 
             await asyncio.sleep(retry)
             retry = max(min(self.max_retry, retry * 2), self.init_retry)
