@@ -299,7 +299,7 @@ class SessionManager(object):
             'logged': len([s for s in self.sessions if s.log_me]),
             'merkle_cache': cache_fmt.format(
                 self._merkle_lookups, self._merkle_hits, len(self._merkle_cache)),
-            'paused': sum(not s._can_send.is_set() for s in self.sessions),
+            'paused': sum(s.is_send_buffer_full() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
             'requests': sum(s.unanswered_request_count() for s in self.sessions),
@@ -795,13 +795,12 @@ class SessionBase(RPCSession):
         '''Handle client disconnection.'''
         self.session_mgr.remove_session(self)
         msg = ''
-        if not self._can_send.is_set():
+        if self.is_send_buffer_full():
             msg += ' with full socket buffer'
-        if self._incoming_concurrency.max_concurrent != self.initial_concurrent:
+        if self._incoming_concurrency.max_concurrent < self.initial_concurrent * 0.8:
             msg += ' whilst throttled'
-        if self.send_size >= 1024*1024:
-            msg += ('.  Sent {:,d} bytes in {:,d} messages'
-                    .format(self.send_size, self.send_count))
+        if self.send_size >= 1_000_000:
+            msg += f'.  Sent {self.send_size:,d} bytes in {self.send_count:,d} messages'
         if msg:
             msg = 'disconnected' + msg
             self.logger.info(msg)
