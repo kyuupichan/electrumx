@@ -889,21 +889,20 @@ class ElectrumX(SessionBase):
             changed = {}
 
             for hashX in touched:
-                alias = self.hashX_subs[hashX]
-                status = await self.address_status(hashX)
-                changed[alias] = status
-
-            # Check mempool hashXs - the status is a function of the
-            # confirmed state of other transactions.  Note: we cannot
-            # iterate over mempool_statuses as it changes size.
-            for hashX in tuple(self.mempool_statuses):
-                # Items can be evicted whilst await-ing status; False
-                # ensures such hashXs are notified
-                old_status = self.mempool_statuses.get(hashX, False)
-                status = await self.address_status(hashX)
-                if status != old_status:
-                    alias = self.hashX_subs[hashX]
+                alias = self.hashX_subs.get(hashX)
+                if alias:
+                    status = await self.subscription_address_status(hashX)
                     changed[alias] = status
+
+            # Check mempool hashXs - the status is a function of the confirmed state of
+            # other transactions.
+            mempool_statuses = self.mempool_statuses.copy()
+            for hashX, old_status in mempool_statuses.items():
+                alias = self.hashX_subs.get(hashX)
+                if alias:
+                    status = await self.subscription_address_status(hashX)
+                    if status != old_status:
+                        changed[alias] = status
 
             method = 'blockchain.scripthash.subscribe'
             for alias, status in changed.items():
@@ -965,6 +964,16 @@ class ElectrumX(SessionBase):
             self.mempool_statuses.pop(hashX, None)
 
         return status
+
+    async def subscription_address_status(self, hashX):
+        '''As for address_status, but if it can't be calculated the subscription is
+        discarded.'''
+        try:
+            return await self.address_status(hashX)
+        except RPCError:
+            self.hashX_subs.pop(hashX, None)
+            self.mempool_statuses.pop(hashX, None)
+            return None
 
     async def hashX_listunspent(self, hashX):
         '''Return the list of UTXOs of a script hash, including mempool
