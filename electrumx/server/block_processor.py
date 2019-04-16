@@ -55,6 +55,9 @@ class Prefetcher(object):
                     await asyncio.sleep(self.polling_delay)
             except DaemonError as e:
                 self.logger.info(f'ignoring daemon error: {e}')
+            except Exception:
+                self.logger.exception(f'unexpected exception')
+                raise
 
     def get_prefetched_blocks(self):
         '''Called by block processor when it is processing queued blocks.'''
