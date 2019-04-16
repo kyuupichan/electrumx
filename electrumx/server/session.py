@@ -985,8 +985,10 @@ class ElectrumX(SessionBase):
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
     async def hashX_subscribe(self, hashX, alias):
+        # Store the subscription only after address_status succeeds
+        result = await self.address_status(hashX)
         self.hashX_subs[hashX] = alias
-        return await self.address_status(hashX)
+        return result
 
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
