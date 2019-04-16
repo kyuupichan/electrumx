@@ -44,7 +44,8 @@ class ServerBase(object):
         asyncio.set_event_loop_policy(env.loop_policy)
 
         self.logger = class_logger(__name__, self.__class__.__name__)
-        self.logger.info(f'Python version: {sys.version}')
+        version_str = ' '.join(sys.version.splitlines())
+        self.logger.info(f'Python version: {version_str}')
         self.env = env
         self.start_time = 0
 
