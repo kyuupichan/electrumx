@@ -607,7 +607,7 @@ class SessionManager(object):
         tx_hashes = self._tx_hashes_cache.get(height)
         if tx_hashes:
             self._tx_hashes_hits += 1
-            return tx_hashes, 0.1 + len(tx_hashes) * 0.00004
+            return tx_hashes, 0.1
 
         try:
             tx_hashes = await self.db.tx_hashes_at_blockheight(height)
@@ -649,16 +649,25 @@ class SessionManager(object):
         return hex_hash
 
     async def limited_history(self, hashX):
-        '''A caching layer.'''
-        hc = self.history_cache
-        if hashX not in hc:
-            # History DoS limit.  Each element of history is about 99
-            # bytes when encoded as JSON.  This limits resource usage
-            # on bloated history requests, and uses a smaller divisor
-            # so large requests are logged before refusing them.
-            limit = self.env.max_send // 97
-            hc[hashX] = await self.db.limited_history(hashX, limit=limit)
-        return hc[hashX]
+        '''Returns a pair (history, cost).
+
+        History is a sorted list of (tx_hash, height) tuples, or an RPCError.'''
+        # History DoS limit.  Each element of history is about 99 bytes when encoded
+        # as JSON.
+        limit = self.env.max_send // 99
+        cost = 0.1
+        try:
+            result = self.history_cache[hashX]
+        except KeyError:
+            result = await self.db.limited_history(hashX, limit=limit)
+            cost += 0.1 + len(result) * 0.001
+            if len(result) >= limit:
+                result = RPCError(BAD_REQUEST, f'history too large', cost=cost)
+            self.history_cache[hashX] = result
+
+        if isinstance(result, Exception):
+            raise result
+        return result, cost
 
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
@@ -935,7 +944,7 @@ class ElectrumX(SessionBase):
         '''
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if it has unconfirmed inputs, otherwise 0
-        db_history = await self.session_mgr.limited_history(hashX)
+        db_history, cost = await self.session_mgr.limited_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
 
         status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
@@ -945,8 +954,9 @@ class ElectrumX(SessionBase):
                           f'{-tx.has_unconfirmed_inputs:d}:'
                           for tx in mempool)
 
-        excess = max(len(db_history) + len(mempool) - 2, 0)
-        self.bump_cost(1.0 + excess / 50)
+        # Add status hashing cost
+        self.bump_cost(cost + 0.1 + len(status) * 0.00002)
+
         if status:
             status = sha256(status.encode()).hex()
         else:
@@ -1002,8 +1012,8 @@ class ElectrumX(SessionBase):
 
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
-        history = await self.session_mgr.limited_history(hashX)
-        self.bump_cost(0.25 + len(history) / 50)
+        history, cost = await self.session_mgr.limited_history(hashX)
+        self.bump_cost(cost)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                 for tx_hash, height in history]
         return conf + await self.unconfirmed_history(hashX)

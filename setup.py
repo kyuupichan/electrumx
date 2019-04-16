@@ -14,7 +14,7 @@ setuptools.setup(
     # "xevan_hash" package is required to sync Xuez network.
     # "groestlcoin_hash" package is required to sync Groestlcoin network.
     # "pycryptodomex" package is required to sync SmartCash network.
-    install_requires=['aiorpcX>=0.14.0,<0.15', 'attrs',
+    install_requires=['aiorpcX>=0.15.0,<0.16', 'attrs',
                       'plyvel', 'pylru', 'aiohttp >= 2'],
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',
