@@ -974,7 +974,7 @@ class ElectrumX(SessionBase):
         '''As for address_status, but if it can't be calculated the subscription is
         discarded.'''
         try:
-            return self.address_status(hashX)
+            return await self.address_status(hashX)
         except RPCError:
             self.unsubscribe_hashX(hashX)
             return None
