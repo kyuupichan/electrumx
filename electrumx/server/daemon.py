@@ -138,6 +138,9 @@ class Daemon(object):
             except aiohttp.ServerDisconnectedError:
                 log_error('disconnected.')
                 on_good_message = 'connection restored'
+            except ConnectionResetError:
+                log_error('connection reset')
+                on_good_message = 'connection restored'
             except aiohttp.ClientConnectionError:
                 log_error('connection problem - is your daemon running?')
                 on_good_message = 'connection restored'
