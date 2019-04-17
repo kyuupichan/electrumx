@@ -441,12 +441,10 @@ class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
     TX_COUNT_HEIGHT = 499923
     TX_PER_BLOCK = 50
     REORG_LIMIT = 1000
-    RPC_PORT = 8338
+    RPC_PORT = 8332
     PEERS = [
         'electrumx-eu.bitcoingold.org s50002 t50001',
-        'electrumx-us.bitcoingold.org s50002 t50001',
-        'electrumx-eu.btcgpu.org s50002 t50001',
-        'electrumx-us.btcgpu.org s50002 t50001'
+        'electrumx-us.bitcoingold.org s50002 t50001'
     ]
 
     @classmethod
@@ -470,16 +468,13 @@ class BitcoinGoldTestnet(BitcoinGold):
     TX_COUNT = 0
     TX_COUNT_HEIGHT = 1
     NET = 'testnet'
-    RPC_PORT = 18338
+    RPC_PORT = 18332
     GENESIS_HASH = ('00000000e0781ebe24b91eedc293adfe'
                     'a2f557b53ec379e78959de3853e6f9f6')
     PEERS = [
         'test-node1.bitcoingold.org s50002',
         'test-node2.bitcoingold.org s50002',
-        'test-node3.bitcoingold.org s50002',
-        'test-node1.btcgpu.org s50002',
-        'test-node2.btcgpu.org s50002',
-        'test-node3.btcgpu.org s50002'
+        'test-node3.bitcoingold.org s50002'
     ]
 
 
