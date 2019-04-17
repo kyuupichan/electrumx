@@ -14,15 +14,14 @@ import json
 import time
 from calendar import timegm
 from struct import pack
-from time import strptime
 
 import aiohttp
+from aiorpcx import JSONRPC
 
 from electrumx.lib.util import hex_to_bytes, class_logger,\
     unpack_le_uint16_from, pack_varint
 from electrumx.lib.hash import hex_str_to_hash, hash_to_hex_str
 from electrumx.lib.tx import DeserializerDecred
-from aiorpcx import JSONRPC
 
 
 class DaemonError(Exception):
@@ -368,7 +367,7 @@ class LegacyRPCDaemon(Daemon):
     def timestamp_safe(self, t):
         if isinstance(t, int):
             return t
-        return timegm(strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
+        return timegm(time.strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
 
 
 class DecredDaemon(Daemon):
