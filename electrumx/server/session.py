@@ -848,7 +848,11 @@ class SessionBase(RPCSession):
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
-        self.session_mgr.remove_session(self)
+        try:
+            self.session_mgr.remove_session(self)
+        except KeyError:
+            # uvloop has a bug where connection_lost() is called without a connection_made()
+            return
         msg = ''
         if self.is_send_buffer_full():
             msg += ' with full socket buffer'
