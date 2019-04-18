@@ -100,6 +100,15 @@ class SessionGroup(object):
         return self.retained_cost + self.session_cost()
 
 
+@attr.s(slots=True)
+class SessionReferences(object):
+    # All attributes are sets but groups is a list
+    sessions = attr.ib()
+    groups = attr.ib()
+    specials = attr.ib()    # Lower-case strings: 'none', 'new' and 'all'.
+    unknown = attr.ib()     # Strings
+
+
 class SessionManager(object):
     '''Holds global state about all sessions.'''
 
@@ -135,12 +144,13 @@ class SessionManager(object):
         if issubclass(env.coin.SESSIONCLS, DashElectrumX):
             self.mn_cache_height = 0
             self.mn_cache = []
+        self._task_group = TaskGroup()
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = Event()
         self.session_event = Event()
 
         # Set up the RPC request handlers
-        cmds = ('add_peer daemon_url disconnect getinfo groups log lognew peers '
+        cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
                 'query reorg sessions stop'.split())
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
@@ -221,29 +231,12 @@ class SessionManager(object):
                     self.logger.info(line)
                 self.logger.info(json.dumps(self._get_info()))
 
-    def _lookup_session(self, session_id):
-        try:
-            session_id = int(session_id)
-        except (ValueError, TypeError):
-            pass
-        else:
-            for session in self.sessions:
-                if session.session_id == session_id:
-                    return session
-        return None
-
-    async def _for_each_session(self, session_ids, operation):
-        if not isinstance(session_ids, list):
-            raise RPCError(BAD_REQUEST, 'expected a list of session IDs')
-
-        result = []
-        for session_id in session_ids:
-            session = self._lookup_session(session_id)
-            if session:
-                result.append(await operation(session))
-            else:
-                result.append(f'unknown session: {session_id}')
-        return result
+    async def _disconnect_sessions(self, sessions, reason, *, force_after=1.0):
+        if sessions:
+            session_ids = ', '.join(str(session.session_id) for session in sessions)
+            self.logger.info(f'{reason} session ids {session_ids}')
+            for session in sessions:
+                await self._task_group.spawn(session.close(force_after=force_after))
 
     async def _clear_stale_sessions(self):
         '''Cut off sessions that haven't done anything for 10 minutes.'''
@@ -252,13 +245,8 @@ class SessionManager(object):
             stale_cutoff = time.time() - self.env.session_timeout
             stale_sessions = [session for session in self.sessions
                               if session.last_recv < stale_cutoff]
-            if stale_sessions:
-                text = ', '.join(str(session.session_id)
-                                 for session in stale_sessions)
-                self.logger.info(f'closing stale connections {text}')
-                async with TaskGroup() as group:
-                    for session in stale_sessions:
-                        await group.spawn(session.close())
+            await self._disconnect_sessions(stale_sessions, 'closing stale')
+            del stale_sessions
 
     async def _recalc_concurrency(self):
         '''Periodically recalculate session concurrency.'''
@@ -279,14 +267,16 @@ class SessionManager(object):
             for group in dead_groups:
                 self.session_groups.pop(group.name)
 
-            async with TaskGroup() as group:
-                for session in list(self.sessions):
-                    # Subs have an on-going cost so decay more slowly with more subs
-                    session.cost_decay_per_sec = hard_limit / (10000 + 5 * session.sub_count())
-                    try:
-                        session.recalc_concurrency()
-                    except ExcessiveSessionCostError:
-                        await group.spawn(session.close())
+            sessions_to_close = []
+            for session in self.sessions:
+                # Subs have an on-going cost so decay more slowly with more subs
+                session.cost_decay_per_sec = hard_limit / (10000 + 5 * session.sub_count())
+                try:
+                    session.recalc_concurrency()
+                except ExcessiveSessionCostError:
+                    sessions_to_close.append(session)
+            await self._disconnect_sessions(sessions_to_close, 'closing expensive')
+            del sessions_to_close
 
     def _get_info(self):
         '''A summary of server state.'''
@@ -370,6 +360,39 @@ class SessionManager(object):
         self.hsub_results = {'hex': raw.hex(), 'height': height}
         self.notified_height = height
 
+    def _session_references(self, items, special_strings):
+        '''Return a SessionReferences object.'''
+        if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+            raise RPCError(BAD_REQUEST, 'expected a list of session IDs')
+
+        sessions_by_id = {session.session_id: session for session in self.sessions}
+        groups_by_name = self.session_groups
+
+        sessions = set()
+        groups = set()     # Names as groups are not hashable
+        specials = set()
+        unknown = set()
+
+        for item in items:
+            if item.isdigit():
+                session = sessions_by_id.get(int(item))
+                if session:
+                    sessions.add(session)
+                else:
+                    unknown.add(item)
+            else:
+                lc_item = item.lower()
+                if lc_item in special_strings:
+                    specials.add(lc_item)
+                else:
+                    if lc_item in groups_by_name:
+                        groups.add(lc_item)
+                    else:
+                        unknown.add(item)
+
+        groups = [groups_by_name[group] for group in groups]
+        return SessionReferences(sessions, groups, specials, unknown)
+
     # --- LocalRPC command handlers
 
     async def rpc_add_peer(self, real_name):
@@ -385,29 +408,61 @@ class SessionManager(object):
 
         session_ids: array of session IDs
         '''
-        async def close(session):
-            '''Close the session's transport.'''
-            await session.close(force_after=2)
-            return f'disconnected {session.session_id}'
+        refs = self._session_references(session_ids, {'all'})
+        result = []
 
-        return await self._for_each_session(session_ids, close)
+        if 'all' in refs.specials:
+            sessions = self.sessions
+            result.append('disconnecting all sessions')
+        else:
+            sessions = refs.sessions
+            result.extend(f'disconnecting session {session.session_id}' for session in sessions)
+            for group in refs.groups:
+                result.append(f'disconnecting group {group.name}')
+                sessions.update(group.sessions)
+        result.extend(f'unknown: {item}' for item in refs.unknown)
+
+        await self._disconnect_sessions(sessions, 'local RPC request to disconnect')
+        return result
 
     async def rpc_log(self, session_ids):
         '''Toggle logging of sesssions.
 
-        session_ids: array of session IDs
+        session_ids: array of session or group IDs, or 'all', 'none', 'new'
         '''
-        async def toggle_logging(session):
-            '''Toggle logging of the session.'''
-            session.toggle_logging()
-            return f'log {session.session_id}: {session.log_me}'
+        refs = self._session_references(session_ids, {'all', 'none', 'new'})
 
-        return await self._for_each_session(session_ids, toggle_logging)
+        result = []
+        if 'all' in refs.specials:
+            for session in self.sessions:
+                session.log_me = True
+            SessionBase.log_new = True
+            result.append('logging all sessions')
+        elif 'none' in refs.specials:
+            for session in self.sessions:
+                session.log_me = False
+            SessionBase.log_new = False
+            result.append('logging no sessions')
 
-    async def rpc_lognew(self):
-        '''Toggle logging of new sesssions.'''
-        SessionBase.log_new = not SessionBase.log_new
-        return f'lognew: {SessionBase.log_new}'
+        def add_result(text, value):
+            result.append(f'logging {text}' if value else f'not logging {text}')
+
+        if not result:
+            sessions = refs.sessions
+            if 'new' in refs.specials:
+                SessionBase.log_new = not SessionBase.log_new
+                add_result('new sessions', SessionBase.log_new)
+            for session in sessions:
+                session.log_me = not session.log_me
+                add_result(f'session {session.session_id}', session.log_me)
+            for group in refs.groups:
+                for session in group.sessions.difference(sessions):
+                    sessions.add(session)
+                    session.log_me = not session.log_me
+                    add_result(f'session {session.session_id}', session.log_me)
+
+        result.extend(f'unknown: {item}' for item in refs.unknown)
+        return result
 
     async def rpc_daemon_url(self, daemon_url):
         '''Replace the daemon URL.'''
@@ -538,7 +593,7 @@ class SessionManager(object):
             await self._start_external_servers()
             # Peer discovery should start after the external servers
             # because we connect to ourself
-            async with TaskGroup() as group:
+            async with self._task_group as group:
                 await group.spawn(self.peer_mgr.discover_peers())
                 await group.spawn(self._clear_stale_sessions())
                 await group.spawn(self._recalc_concurrency())
@@ -690,9 +745,8 @@ class SessionManager(object):
             for hashX in set(cache).intersection(touched):
                 del cache[hashX]
 
-        async with TaskGroup() as group:
-            for session in self.sessions:
-                await group.spawn(session.notify, touched, height_changed)
+        for session in self.sessions:
+            await self._task_group.spawn(session.notify, touched, height_changed)
 
     def _ip_addr_group_name(self, session):
         ip_addr = session.peer_address()
@@ -772,9 +826,6 @@ class SessionBase(RPCSession):
         if for_log and self.anon_logs:
             return 'xx.xx.xx.xx:xx'
         return super().peer_address_str()
-
-    def toggle_logging(self):
-        self.log_me = not self.log_me
 
     def flags(self):
         '''Status flags.'''

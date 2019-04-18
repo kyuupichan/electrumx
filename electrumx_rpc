@@ -22,7 +22,6 @@ import electrumx.lib.text as text
 simple_commands = {
     'getinfo': 'Print a summary of server state',
     'groups': 'Print current session groups',
-    'lognew': 'Toggle logging of new sessions',
     'peers': 'Print information about peer servers for the same coin',
     'sessions': 'Print information about client sessions',
     'stop': 'Shut down the server cleanly',
@@ -30,7 +29,7 @@ simple_commands = {
 
 session_commands = {
     'disconnect': 'Disconnect sessions',
-    'log': 'Toggle logging of sessions',
+    'log': 'Control logging of sessions',
 }
 
 other_commands = {
@@ -94,7 +93,7 @@ def main():
 
     for command, help in session_commands.items():
         parser = subparsers.add_parser(command, help=help)
-        parser.add_argument('session_ids', nargs='+', type=int,
+        parser.add_argument('session_ids', nargs='+', type=str,
                             help='list of session ids')
 
     for command, data in other_commands.items():
