@@ -74,7 +74,7 @@ class Env(EnvBase):
         self.bw_unit_cost = self.integer('BANDWIDTH_UNIT_COST', 5000)
         self.initial_concurrent = self.integer('INITIAL_CONCURRENT', 10)
         self.request_sleep = self.integer('REQUEST_SLEEP', 2500)
-        self.request_timeout = self.integer('REQUEST_TIMEOUT', 15)
+        self.request_timeout = self.integer('REQUEST_TIMEOUT', 30)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
         self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
         self.blacklist_url = self.default('BLACKLIST_URL', self.coin.BLACKLIST_URL)

@@ -246,7 +246,7 @@ def test_MAX_SESSIONS():
 
 
 def test_REQUEST_TIMEOUT():
-    assert_integer('REQUEST_TIMEOUT', 'request_timeout', 15)
+    assert_integer('REQUEST_TIMEOUT', 'request_timeout', 30)
 
 
 def test_SESSION_TIMEOUT():

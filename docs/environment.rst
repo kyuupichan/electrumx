@@ -301,7 +301,7 @@ raise them.
 
 .. envvar:: REQUEST_TIMEOUT
 
-  An integer number of seconds defaulting to :const:`15`.  If a request takes longer than
+  An integer number of seconds defaulting to :const:`30`.  If a request takes longer than
   this to respond to, either because of request limiting or because the request is
   expensive, the server rejects it and returns a timeout error to the client indicating
   that the server is busy.
