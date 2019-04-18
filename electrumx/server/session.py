@@ -17,6 +17,7 @@ import os
 import pylru
 import ssl
 import time
+from collections import defaultdict
 from functools import partial
 from ipaddress import ip_address
 
@@ -117,6 +118,7 @@ class SessionManager(object):
         self.session_groups = {}    # group name->SessionGroup instance
         self.txs_sent = 0
         self.start_time = time.time()
+        self._method_counts = defaultdict(int)
         self._history_cache = pylru.lrucache(1000)
         self._history_lookups = 0
         self._history_hits = 0
@@ -299,19 +301,21 @@ class SessionManager(object):
             'db_height': self.db.db_height,
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(self.session_groups),
-            'history_cache': cache_fmt.format(
+            'history cache': cache_fmt.format(
                 self._history_lookups, self._history_hits, len(self._history_cache)),
             'logged': len([s for s in self.sessions if s.log_me]),
-            'merkle_cache': cache_fmt.format(
+            'merkle cache': cache_fmt.format(
                 self._merkle_lookups, self._merkle_hits, len(self._merkle_cache)),
             'paused': sum(s.is_send_buffer_full() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
-            'requests': sum(s.unanswered_request_count() for s in self.sessions),
+            'request counts': self._method_counts,
+            'request total': sum(self._method_counts.values()),
+            'requests pending': sum(s.unanswered_request_count() for s in self.sessions),
             'sessions': self.session_count(),
             'sessions_with_subs': self.session_count_with_subs(),
             'subs': self._sub_count(),
-            'tx_hashes_cache': cache_fmt.format(
+            'tx hashes cache': cache_fmt.format(
                 self._tx_hashes_lookups, self._tx_hashes_hits, len(self._tx_hashes_cache)),
             'txs_sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
@@ -823,6 +827,8 @@ class SessionBase(RPCSession):
             handler = self.request_handlers.get(request.method)
         else:
             handler = None
+        method = 'invalid method' if handler is None else request.method
+        self.session_mgr._method_counts[method] += 1
         coro = handler_invocation(handler, request)()
         return await coro
 
