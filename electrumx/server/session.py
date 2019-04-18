@@ -117,9 +117,10 @@ class SessionManager(object):
         self.session_groups = {}    # group name->SessionGroup instance
         self.txs_sent = 0
         self.start_time = time.time()
-        self.history_cache = pylru.lrucache(1000)
+        self._history_cache = pylru.lrucache(1000)
+        self._history_lookups = 0
+        self._history_hits = 0
         self._tx_hashes_cache = pylru.lrucache(1000)
-        self._tx_hashes_max_height = 0
         self._tx_hashes_lookups = 0
         self._tx_hashes_hits = 0
         # Really a MerkleCache cache
@@ -298,6 +299,8 @@ class SessionManager(object):
             'db_height': self.db.db_height,
             'errors': sum(s.errors for s in self.sessions),
             'groups': len(self.session_groups),
+            'history_cache': cache_fmt.format(
+                self._history_lookups, self._history_hits, len(self._history_cache)),
             'logged': len([s for s in self.sessions if s.log_me]),
             'merkle_cache': cache_fmt.format(
                 self._merkle_lookups, self._merkle_hits, len(self._merkle_cache)),
@@ -617,7 +620,6 @@ class SessionManager(object):
             raise RPCError(BAD_REQUEST, f'db error: {e!r}')
 
         self._tx_hashes_cache[height] = tx_hashes
-        self._tx_hashes_max_height = max(height, self._tx_hashes_max_height)
 
         return tx_hashes, 0.25 + len(tx_hashes) * 0.0001
 
@@ -658,14 +660,16 @@ class SessionManager(object):
         # as JSON.
         limit = self.env.max_send // 99
         cost = 0.1
+        self._history_lookups += 1
         try:
-            result = self.history_cache[hashX]
+            result = self._history_cache[hashX]
+            self._history_hits += 1
         except KeyError:
             result = await self.db.limited_history(hashX, limit=limit)
             cost += 0.1 + len(result) * 0.001
             if len(result) >= limit:
                 result = RPCError(BAD_REQUEST, f'history too large', cost=cost)
-            self.history_cache[hashX] = result
+            self._history_cache[hashX] = result
 
         if isinstance(result, Exception):
             raise result
@@ -673,19 +677,19 @@ class SessionManager(object):
 
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        # Invalidate our tx hashes cache in case of a reorg
-        for key in range(height, self._tx_hashes_max_height + 1):
-            if key in self._tx_hashes_cache:
-                del self._tx_hashes_cache[key]
-        self._tx_hashes_max_height = height - 1
+        # Invalidate our height-based caches in case of a reorg
+        for cache in (self._tx_hashes_cache, self._merkle_cache):
+            for key in range(height, self.db.db_height + 1):
+                if key in cache:
+                    del cache[key]
 
         height_changed = height != self.notified_height
         if height_changed:
             await self._refresh_hsub_results(height)
             # Invalidate our history cache for touched hashXs
-            hc = self.history_cache
-            for hashX in set(hc).intersection(touched):
-                del hc[hashX]
+            cache = self._history_cache
+            for hashX in set(cache).intersection(touched):
+                del cache[hashX]
 
         async with TaskGroup() as group:
             for session in self.sessions:
