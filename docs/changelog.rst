@@ -8,6 +8,20 @@
    should not occur with Python 3.7.
 
 
+Version 1.11.0 (18 Apr 2019)
+============================
+
+* require aiorpcX 0.15.x
+* require aiohttp 3.3 or higher; earlier versions had a problematic bug
+* add :envvar:`REQUEST_TIMEOUT` and :envvar:`LOG_LEVEL` environment variables
+* mark 4 old environment variables obsolete.  ElectrumX won't start until they are removed
+* getinfo local RPC cleaned up and shows more stats
+* miscellaneous fixes and improvements
+* more efficient handling of some RPC methods, particularly
+  :func:`blockchain.transaction.get_merkle`
+* coin additions / updates: BitcoinSV scaling testnet (Roger Taylor), Dash (zebra lucky),
+* issues resolved: `#566`_, `#731`_, `#795`_
+
 Version 1.10.1 (13 Apr 2019)
 ============================
 
@@ -198,6 +212,7 @@ Version 1.8  (06 Aug 2018)
 .. _#559: https://github.com/kyuupichan/electrumx/issues/559
 .. _#564: https://github.com/kyuupichan/electrumx/issues/564
 .. _#565: https://github.com/kyuupichan/electrumx/issues/565
+.. _#566: https://github.com/kyuupichan/electrumx/issues/566
 .. _#567: https://github.com/kyuupichan/electrumx/issues/567
 .. _#570: https://github.com/kyuupichan/electrumx/issues/570
 .. _#577: https://github.com/kyuupichan/electrumx/issues/577
@@ -211,3 +226,5 @@ Version 1.8  (06 Aug 2018)
 .. _#684: https://github.com/kyuupichan/electrumx/issues/684
 .. _#713: https://github.com/kyuupichan/electrumx/issues/713
 .. _#727: https://github.com/kyuupichan/electrumx/issues/727
+.. _#731: https://github.com/kyuupichan/electrumx/issues/731
+.. _#795: https://github.com/kyuupichan/electrumx/issues/795
