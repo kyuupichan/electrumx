@@ -431,8 +431,8 @@ class SessionManager(object):
         session_ids: array of session or group IDs, or 'all', 'none', 'new'
         '''
         refs = self._session_references(session_ids, {'all', 'none', 'new'})
-
         result = []
+
         def add_result(text, value):
             result.append(f'logging {text}' if value else f'not logging {text}')
 
