@@ -105,7 +105,7 @@ class SessionReferences(object):
     # All attributes are sets but groups is a list
     sessions = attr.ib()
     groups = attr.ib()
-    specials = attr.ib()    # Lower-case strings: 'none', 'new' and 'all'.
+    specials = attr.ib()    # Lower-case strings
     unknown = attr.ib()     # Strings
 
 
@@ -433,33 +433,32 @@ class SessionManager(object):
         refs = self._session_references(session_ids, {'all', 'none', 'new'})
 
         result = []
+        def add_result(text, value):
+            result.append(f'logging {text}' if value else f'not logging {text}')
+
         if 'all' in refs.specials:
             for session in self.sessions:
                 session.log_me = True
             SessionBase.log_new = True
             result.append('logging all sessions')
-        elif 'none' in refs.specials:
+        if 'none' in refs.specials:
             for session in self.sessions:
                 session.log_me = False
             SessionBase.log_new = False
             result.append('logging no sessions')
+        if 'new' in refs.specials:
+            SessionBase.log_new = not SessionBase.log_new
+            add_result('new sessions', SessionBase.log_new)
 
-        def add_result(text, value):
-            result.append(f'logging {text}' if value else f'not logging {text}')
-
-        if not result:
-            sessions = refs.sessions
-            if 'new' in refs.specials:
-                SessionBase.log_new = not SessionBase.log_new
-                add_result('new sessions', SessionBase.log_new)
-            for session in sessions:
+        sessions = refs.sessions
+        for session in sessions:
+            session.log_me = not session.log_me
+            add_result(f'session {session.session_id}', session.log_me)
+        for group in refs.groups:
+            for session in group.sessions.difference(sessions):
+                sessions.add(session)
                 session.log_me = not session.log_me
                 add_result(f'session {session.session_id}', session.log_me)
-            for group in refs.groups:
-                for session in group.sessions.difference(sessions):
-                    sessions.add(session)
-                    session.log_me = not session.log_me
-                    add_result(f'session {session.session_id}', session.log_me)
 
         result.extend(f'unknown: {item}' for item in refs.unknown)
         return result

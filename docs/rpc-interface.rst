@@ -54,10 +54,11 @@ The special string :const:`all` disconnects all sessions.
 
 Example::
 
-  $ electrumx_rpc disconnect 2 3
+  $ electrumx_rpc disconnect 209.59.102 34 2
   [
-      "disconnected 2",
-      "disconnected 3"
+      "disconnecting session 34",
+      "disconnecting group 209.59.102"
+      "unknown: 2",
   ]
 
 getinfo
@@ -165,18 +166,18 @@ toggles logging of future sessions.
 
 Example::
 
-  $ electrumx_rpc log new 0 1 2 3 4 5
+  $ electrumx_rpc log new 6 t0 z
   [
-      "log 0: False",
-      "log 1: False",
-      "log 2: False",
-      "log 3: True",
-      "log 4: True",
-      "unknown session: 5"
+    "logging new sessions",
+    "logging session 6",
+    "logging session 3",
+    "logging session 57",
+    "logging session 12"
+    "unknown: z",
   ]
 
-The return value shows this command turned off logging for sesssions 0, 1 and 2.  It was
-turned on for sessions 3 and 4, and there was no session 5.
+In the above command sessions 3, 12 and 57 were in group `t0` (in fact, session 6 was
+too).
 
 .. _peers:
 
