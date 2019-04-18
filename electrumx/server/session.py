@@ -221,9 +221,6 @@ class SessionManager(object):
                     self.logger.info(line)
                 self.logger.info(json.dumps(self._get_info()))
 
-    def _sub_count(self):
-        return sum(s.sub_count() for s in self.sessions)
-
     def _lookup_session(self, session_id):
         try:
             session_id = int(session_id)
@@ -294,30 +291,33 @@ class SessionManager(object):
     def _get_info(self):
         '''A summary of server state.'''
         cache_fmt = '{:,d} lookups {:,d} hits {:,d} entries'
+        sessions = self.sessions
         return {
-            'closing': len([s for s in self.sessions if s.is_closing()]),
+            'coin': self.env.coin.__name__,
             'daemon': self.daemon.logged_url(),
-            'daemon_height': self.daemon.cached_height(),
-            'db_height': self.db.db_height,
-            'errors': sum(s.errors for s in self.sessions),
+            'daemon height': self.daemon.cached_height(),
+            'db height': self.db.db_height,
             'groups': len(self.session_groups),
             'history cache': cache_fmt.format(
                 self._history_lookups, self._history_hits, len(self._history_cache)),
-            'logged': len([s for s in self.sessions if s.log_me]),
             'merkle cache': cache_fmt.format(
                 self._merkle_lookups, self._merkle_hits, len(self._merkle_cache)),
-            'paused': sum(s.is_send_buffer_full() for s in self.sessions),
             'pid': os.getpid(),
             'peers': self.peer_mgr.info(),
             'request counts': self._method_counts,
             'request total': sum(self._method_counts.values()),
-            'requests pending': sum(s.unanswered_request_count() for s in self.sessions),
-            'sessions': self.session_count(),
-            'sessions_with_subs': self.session_count_with_subs(),
-            'subs': self._sub_count(),
+            'sessions': {
+                'count': len(sessions),
+                'count with subs': sum(len(getattr(s, 'hashX_subs', ())) > 0 for s in sessions),
+                'errors': sum(s.errors for s in sessions),
+                'logged': len([s for s in sessions if s.log_me]),
+                'paused': sum(s.is_send_buffer_full() for s in sessions),
+                'pending requests': sum(s.unanswered_request_count() for s in sessions),
+                'subs': sum(s.sub_count() for s in sessions),
+            },
             'tx hashes cache': cache_fmt.format(
                 self._tx_hashes_lookups, self._tx_hashes_hits, len(self._tx_hashes_cache)),
-            'txs_sent': self.txs_sent,
+            'txs sent': self.txs_sent,
             'uptime': util.formatted_time(time.time() - self.start_time),
             'version': electrumx.version,
         }
@@ -630,11 +630,6 @@ class SessionManager(object):
     def session_count(self):
         '''The number of connections that we've sent something to.'''
         return len(self.sessions)
-
-    def session_count_with_subs(self):
-        '''The number of connections that have at least one hashX subscription.'''
-        return sum(len(session.hashX_subs) > 0 for session in self.sessions
-                   if hasattr(session, 'hashX_subs'))
 
     async def daemon_request(self, method, *args):
         '''Catch a DaemonError and convert it to an RPCError.'''
