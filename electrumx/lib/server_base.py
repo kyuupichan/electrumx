@@ -5,6 +5,8 @@
 # See the file "LICENCE" for information about the copyright
 # and warranty status of this software.
 
+'''Base class of servers'''
+
 import asyncio
 import os
 import platform
@@ -15,12 +17,12 @@ import time
 from contextlib import suppress
 from functools import partial
 
-from aiorpcx import spawn, CancelledError
+from aiorpcx import spawn
 
 from electrumx.lib.util import class_logger
 
 
-class ServerBase(object):
+class ServerBase:
     '''Base class server implementation.
 
     Derived classes are expected to:
@@ -90,13 +92,11 @@ class ServerBase(object):
         '''
         def on_signal(signame):
             shutdown_event.set()
-            self.logger.warning(f'received {signame} signal, '
-                                f'initiating shutdown')
+            self.logger.warning(f'received {signame} signal, initiating shutdown')
 
         self.start_time = time.time()
-        if platform.system() == 'Windows':
-            pass  # No signals on Windows
-        else:
+        if platform.system() != 'Windows':
+            # No signals on Windows
             for signame in ('SIGINT', 'SIGTERM'):
                 loop.add_signal_handler(getattr(signal, signame),
                                         partial(on_signal, signame))
@@ -106,20 +106,22 @@ class ServerBase(object):
         server_task = await spawn(self.serve(shutdown_event))
 
         # Wait for shutdown, log on receipt of the event
-        await shutdown_event.wait()
-        self.logger.info('shutting down')
+        try:
+            await shutdown_event.wait()
+        except KeyboardInterrupt:
+            self.logger.warning(f'received keyboard interrupt, initiating shutdown')
+        finally:
+            self.logger.info('shutting down')
 
-        server_task.cancel()
-        with suppress(CancelledError):
-            await server_task
-        self.logger.info('shutdown complete')
+            server_task.cancel()
+            with suppress(Exception):
+                await server_task
+            self.logger.info('shutdown complete')
 
     def run(self):
+        '''Start the event loop.'''
         loop = asyncio.get_event_loop()
         try:
             loop.run_until_complete(self._main(loop))
-        except KeyboardInterrupt:
-            self.logger.info(f'received interrupt signal, '
-                             f'initiating shutdown')
         finally:
             loop.run_until_complete(loop.shutdown_asyncgens())
