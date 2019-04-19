@@ -845,6 +845,7 @@ class SessionBase(RPCSession):
         self.session_mgr.add_session(self)
         self.logger.info(f'{self.kind} {self.peer_address_str()}, '
                          f'{self.session_mgr.session_count():,d} total')
+        self.recalc_concurrency()
 
     def connection_lost(self, exc):
         '''Handle client disconnection.'''
@@ -897,7 +898,7 @@ class ElectrumX(SessionBase):
         self.mempool_statuses = {}
         self.set_request_handlers(self.PROTOCOL_MIN)
         self.is_peer = False
-        self.recalc_concurrency()
+        self.cost = 5.0   # Connection cost
 
     @classmethod
     def protocol_min_max_strings(cls):
