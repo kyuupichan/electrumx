@@ -6,8 +6,7 @@ setuptools.setup(
     version=version,
     scripts=['electrumx_server', 'electrumx_rpc', 'electrumx_compact_history'],
     python_requires='>=3.6',
-    # via environment variables, in which case I've tested with 15.0.4
-    install_requires=['aiorpcX>=0.15.0,<0.16', 'attrs',
+    install_requires=['aiorpcX>=0.16.0,<0.17', 'attrs',
                       'plyvel', 'pylru', 'aiohttp>=3.3'],
     extras_require={
         'rocksdb': ['python-rocksdb>=0.6.9'],

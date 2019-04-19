@@ -25,7 +25,7 @@ import attr
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event,
-    ExcessiveSessionCostError, FinalRPCError
+    ExcessiveSessionCostError, ReplyAndDisconnect
 )
 
 import electrumx
@@ -1257,8 +1257,8 @@ class ElectrumX(SessionBase):
             client_name = str(client_name)
             if self.env.drop_client is not None and \
                     self.env.drop_client.match(client_name):
-                raise FinalRPCError(BAD_REQUEST,
-                                    f'unsupported client: {client_name}')
+                raise ReplyAndDisconnect(RPCError(
+                    BAD_REQUEST, f'unsupported client: {client_name}'))
             self.client = client_name[:17]
 
         # Find the highest common protocol version.  Disconnect if
@@ -1273,8 +1273,8 @@ class ElectrumX(SessionBase):
                 self.logger.info(f'client requested future protocol version '
                                  f'{util.version_string(client_min)} '
                                  f'- is your software out of date?')
-            raise FinalRPCError(BAD_REQUEST,
-                                f'unsupported protocol version: {protocol_version}')
+            raise ReplyAndDisconnect(RPCError(
+                BAD_REQUEST, f'unsupported protocol version: {protocol_version}'))
         self.set_request_handlers(ptuple)
 
         return (electrumx.version, self.protocol_version_string())
