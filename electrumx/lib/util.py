@@ -255,22 +255,6 @@ def address_string(address):
             fmt = '[{}]:{:d}'
     return fmt.format(host, port)
 
-# See http://stackoverflow.com/questions/2532053/validate-a-hostname-string
-# Note underscores are valid in domain names, but strictly invalid in host
-# names.  We ignore that distinction.
-
-
-SEGMENT_REGEX = re.compile("(?!-)[A-Z_\\d-]{1,63}(?<!-)$", re.IGNORECASE)
-
-
-def is_valid_hostname(hostname):
-    if len(hostname) > 255:
-        return False
-    # strip exactly one dot from the right, if present
-    if hostname and hostname[-1] == ".":
-        hostname = hostname[:-1]
-    return all(SEGMENT_REGEX.match(x) for x in hostname.split("."))
-
 
 VERSION_CLEANUP_REGEX = re.compile(r'([0-9.]*)')
 

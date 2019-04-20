@@ -28,8 +28,8 @@
 from ipaddress import ip_address, IPv4Address, IPv6Address, IPv4Network, IPv6Network
 from socket import AF_INET, AF_INET6
 
-from electrumx.lib.util import cachedproperty
-import electrumx.lib.util as util
+from aiorpcx import is_valid_hostname
+from electrumx.lib.util import cachedproperty, protocol_tuple, version_string
 
 
 class Peer(object):
@@ -156,7 +156,7 @@ class Peer(object):
         if ip:
             return ((ip.is_global or ip.is_private)
                     and not (ip.is_multicast or ip.is_unspecified))
-        return util.is_valid_hostname(self.host)
+        return is_valid_hostname(self.host)
 
     @cachedproperty
     def is_public(self):
@@ -265,8 +265,8 @@ class Peer(object):
 
     def _protocol_version_string(self, key):
         version_str = self.features.get(key)
-        ptuple = util.protocol_tuple(version_str)
-        return util.version_string(ptuple)
+        ptuple = protocol_tuple(version_str)
+        return version_string(ptuple)
 
     @cachedproperty
     def protocol_min(self):
