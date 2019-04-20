@@ -367,7 +367,6 @@ def test_clearnet_identity():
     assert ident.host == 'foo.com'
     assert ident.tcp_port == 456
     assert ident.ssl_port == 457
-    assert ident.nick_suffix == ''
 
 
 def test_tor_identity():
@@ -388,7 +387,6 @@ def test_tor_identity():
     assert ident.host == tor_host
     assert ident.tcp_port == 456
     assert ident.ssl_port == 123
-    assert ident.nick_suffix == '_tor'
     os.environ['REPORT_TCP_PORT_TOR'] = os.environ['REPORT_SSL_PORT_TOR']
     with pytest.raises(Env.Error):
         Env()

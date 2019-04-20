@@ -18,7 +18,7 @@ from electrumx.lib.env_base import EnvBase
 import electrumx.lib.util as lib_util
 
 
-NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')
+NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port')
 
 
 class Env(EnvBase):
@@ -131,7 +131,6 @@ class Env(EnvBase):
             str(host),
             tcp_port,
             ssl_port,
-            ''
         )
 
     def tor_identity(self, clearnet):
@@ -162,7 +161,6 @@ class Env(EnvBase):
             host,
             tcp_port,
             ssl_port,
-            '_tor',
         )
 
     def hosts_dict(self):
