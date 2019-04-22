@@ -363,7 +363,7 @@ class BitcoinSV(BitcoinMixin, Coin):
     PEERS = [
         'electrumx.bitcoinsv.io s',
         'satoshi.vision.cash s',
-        'sv.electrumx.cash s t',
+        'sv.usebsv.com s t',
         'sv.jochen-hoenicke.de s t',
         'sv.satoshi.io s t',
     ]
