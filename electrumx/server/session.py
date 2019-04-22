@@ -14,12 +14,11 @@ import itertools
 import json
 import math
 import os
-import pylru
 import ssl
 import time
 from collections import defaultdict
 from functools import partial
-from ipaddress import ip_address
+from ipaddress import ip_address, IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
@@ -27,6 +26,7 @@ from aiorpcx import (
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event,
     ExcessiveSessionCostError, ReplyAndDisconnect
 )
+import pylru
 
 import electrumx
 from electrumx.lib.merkle import MerkleCache
@@ -318,7 +318,7 @@ class SessionManager(object):
         sessions = sorted(self.sessions, key=lambda s: s.start_time)
         return [(session.session_id,
                  session.flags(),
-                 session.peer_address_str(for_log=for_log),
+                 session.remote_address_string(for_log=for_log),
                  session.client,
                  session.protocol_version_string(),
                  session.cost,
@@ -748,14 +748,12 @@ class SessionManager(object):
             await self._task_group.spawn(session.notify, touched, height_changed)
 
     def _ip_addr_group_name(self, session):
-        ip_addr = session.peer_address()
-        if not ip_addr:
-            return 'unknown_ip'
-        ip_addr = ip_addr[0]
-        if ':' in ip_addr:
-            ip_addr = ip_address(ip_addr)
-            return ':'.join(ip_addr.exploded.split(':')[:3])
-        return '.'.join(ip_addr.split('.')[:3])
+        host = session.remote_address().host
+        if isinstance(host, IPv4Address):
+            return '.'.join(str(host).split('.')[:3])
+        if isinstance(host, IPv6Address):
+            return ':'.join(host.exploded.split(':')[:3])
+        return 'unknown_addr'
 
     def _timeslice_name(self, session):
         return f't{int(session.start_time - self.start_time) // 300}'
@@ -819,12 +817,12 @@ class SessionBase(RPCSession):
     async def notify(self, touched, height_changed):
         pass
 
-    def peer_address_str(self, *, for_log=True):
+    def remote_address_string(self, *, for_log=True):
         '''Returns the peer's IP address and port as a human-readable
         string, respecting anon logs if the output is for a log.'''
         if for_log and self.anon_logs:
             return 'xx.xx.xx.xx:xx'
-        return super().peer_address_str()
+        return str(self.remote_address())
 
     def flags(self):
         '''Status flags.'''
@@ -843,7 +841,7 @@ class SessionBase(RPCSession):
         context = {'conn_id': f'{self.session_id}'}
         self.logger = util.ConnectionLogger(self.logger, context)
         self.session_mgr.add_session(self)
-        self.logger.info(f'{self.kind} {self.peer_address_str()}, '
+        self.logger.info(f'{self.kind} {self.remote_address_string()}, '
                          f'{self.session_mgr.session_count():,d} total')
         self.recalc_concurrency()
 
@@ -991,7 +989,7 @@ class ElectrumX(SessionBase):
         '''Add a peer (but only if the peer resolves to the source).'''
         self.is_peer = True
         self.bump_cost(100.0)
-        return await self.peer_mgr.on_add_peer(features, self.peer_address())
+        return await self.peer_mgr.on_add_peer(features, self.remote_address_string(for_log=False))
 
     async def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
@@ -1174,8 +1172,7 @@ class ElectrumX(SessionBase):
         peername = self.peer_mgr.proxy_peername()
         if not peername:
             return False
-        peer_address = self.peer_address()
-        return peer_address and peer_address[0] == peername[0]
+        return self.remote_address().host == peername[0]
 
     async def replaced_banner(self, banner):
         network_info = await self.daemon_request('getnetworkinfo')
