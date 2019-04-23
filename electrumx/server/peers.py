@@ -472,14 +472,14 @@ class PeerManager:
         '''Add a peer passed by the admin over LocalRPC.'''
         await self._note_peers([Peer.from_real_name(real_name, 'RPC')])
 
-    async def on_add_peer(self, features, source_info):
+    async def on_add_peer(self, features, source_addr):
         '''Add a peer (but only if the peer resolves to the source).'''
         if self.env.peer_discovery != self.env.PD_ON:
             return False
-        if not source_info:
+        if not source_addr:
             self.logger.info('ignored add_peer request: no source info')
             return False
-        source = source_info[0]
+        source = str(source_addr.host)
         peers = Peer.peers_from_features(features, source)
         if not peers:
             self.logger.info('ignored add_peer request: no peers given')
@@ -557,10 +557,10 @@ class PeerManager:
 
         return [peer.to_tuple() for peer in peers]
 
-    def proxy_peername(self):
-        '''Return the peername of the proxy, if there is a proxy, otherwise
+    def proxy_address(self):
+        '''Return the NetAddress of the proxy, if there is a proxy, otherwise
         None.'''
-        return self.proxy.peername if self.proxy else None
+        return self.proxy.address if self.proxy else None
 
     def rpc_data(self):
         '''Peer data for the peers RPC method.'''
