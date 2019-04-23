@@ -989,7 +989,7 @@ class ElectrumX(SessionBase):
         '''Add a peer (but only if the peer resolves to the source).'''
         self.is_peer = True
         self.bump_cost(100.0)
-        return await self.peer_mgr.on_add_peer(features, self.remote_address_string(for_log=False))
+        return await self.peer_mgr.on_add_peer(features, self.remote_address())
 
     async def peers_subscribe(self):
         '''Return the server peers as a list of (ip, host, details) tuples.'''
@@ -1169,10 +1169,10 @@ class ElectrumX(SessionBase):
     def is_tor(self):
         '''Try to detect if the connection is to a tor hidden service we are
         running.'''
-        peername = self.peer_mgr.proxy_peername()
-        if not peername:
+        proxy_address = self.peer_mgr.proxy_address()
+        if not proxy_address:
             return False
-        return self.remote_address().host == peername[0]
+        return self.remote_address().host == proxy_address.host
 
     async def replaced_banner(self, banner):
         network_info = await self.daemon_request('getnetworkinfo')
