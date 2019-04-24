@@ -70,8 +70,8 @@ class Env(EnvBase):
         # Server limits to help prevent DoS
         self.max_send = self.integer('MAX_SEND', self.coin.DEFAULT_MAX_SEND)
         self.max_sessions = self.sane_max_sessions()
-        self.cost_soft_limit = self.integer('COST_SOFT_LIMIT', 1000)
-        self.cost_hard_limit = self.integer('COST_HARD_LIMIT', 10000)
+        self.cost_soft_limit = self.integer('COST_SOFT_LIMIT', self.coin.DEFAULT_COST_SOFT_LIMIT)
+        self.cost_hard_limit = self.integer('COST_HARD_LIMIT', self.coin.DEFAULT_COST_HARD_LIMIT)
         self.bw_unit_cost = self.integer('BANDWIDTH_UNIT_COST', 5000)
         self.initial_concurrent = self.integer('INITIAL_CONCURRENT', 10)
         self.request_sleep = self.integer('REQUEST_SLEEP', 2500)

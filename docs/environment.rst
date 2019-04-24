@@ -256,9 +256,12 @@ raise them.
 .. envvar:: REQUEST_SLEEP
 .. envvar:: INITIAL_CONCURRENT
 
-  All values are integers. :envvar:`COST_SOFT_LIMIT` defaults to :const:`1,000`,
-  :envvar:`COST_HARD_LIMIT` to :const:`10,000`, :envvar:`REQUEST_SLEEP` to :const:`2,500`
-  milliseconds, and :envvar:`INITIAL_CONCURRENT` to :const:`10` concurrent requests.
+  All values are integers. For most coins, :envvar:`COST_SOFT_LIMIT` defaults
+  to :const:`1,000`, :envvar:`COST_HARD_LIMIT` to :const:`10,000`,
+  :envvar:`REQUEST_SLEEP` to :const:`2,500` milliseconds, and
+  :envvar:`INITIAL_CONCURRENT` to :const:`10` concurrent requests.  AuxPoW
+  coins are the same, except that :envvar:`COST_SOFT_LIMIT` defaults to
+  :const:`10,000` and :envvar:`COST_HARD_LIMIT` to :const:`100,000`.
 
   The server prices each request made to it based upon an estimate of the resources needed
   to process it.  Factors include whether the request uses bitcoind, how much bandwidth
