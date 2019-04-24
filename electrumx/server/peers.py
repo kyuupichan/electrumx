@@ -443,15 +443,16 @@ class PeerManager:
           2) Verifying connectivity of new peers.
           3) Retrying old peers at regular intervals.
         '''
+        self.logger.info(f'peer discovery: {self.env.peer_discovery}')
         if self.env.peer_discovery != self.env.PD_ON:
             self.logger.info('peer discovery is disabled')
             return
 
-        self.logger.info(f'beginning peer discovery. Force use of '
-                         f'proxy: {self.env.force_proxy}')
-        forever = Event()
+        self.logger.info(f'announce ourself: {self.env.peer_announce}')
+        self.logger.info(f'my clearnet self: {self._my_clearnet_peer()}')
+        self.logger.info(f'force use of proxy: {self.env.force_proxy}')
+        self.logger.info(f'beginning peer discovery...')
         async with self.group as group:
-            await group.spawn(forever.wait())
             await group.spawn(self._refresh_blacklist())
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())

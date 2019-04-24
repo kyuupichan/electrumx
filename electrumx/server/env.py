@@ -28,7 +28,7 @@ class Env(EnvBase):
     '''
 
     # Peer discovery
-    PD_OFF, PD_SELF, PD_ON = range(3)
+    PD_OFF, PD_SELF, PD_ON = ('OFF', 'SELF', 'ON')
 
     def __init__(self, coin=None):
         super().__init__()
