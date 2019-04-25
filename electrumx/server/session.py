@@ -23,8 +23,7 @@ from ipaddress import ip_address, IPv4Address, IPv6Address
 import attr
 from aiorpcx import (
     RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
-    TaskGroup, handler_invocation, RPCError, Request, sleep, Event,
-    ExcessiveSessionCostError, ReplyAndDisconnect
+    TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
 
@@ -251,7 +250,7 @@ class SessionManager(object):
     async def _recalc_concurrency(self):
         '''Periodically recalculate session concurrency.'''
         session_class = self.env.coin.SESSIONCLS
-        period = 100
+        period = 300
         while True:
             await sleep(period)
             hard_limit = session_class.cost_hard_limit
@@ -267,16 +266,12 @@ class SessionManager(object):
             for group in dead_groups:
                 self.session_groups.pop(group.name)
 
-            sessions_to_close = []
+            # Recalc concurrency for sessions where cost is changing gradually, and update
+            # cost_decay_per_sec.
             for session in self.sessions:
                 # Subs have an on-going cost so decay more slowly with more subs
                 session.cost_decay_per_sec = hard_limit / (10000 + 5 * session.sub_count())
-                try:
-                    session.recalc_concurrency()
-                except ExcessiveSessionCostError:
-                    sessions_to_close.append(session)
-            await self._disconnect_sessions(sessions_to_close, 'closing expensive')
-            del sessions_to_close
+                session.recalc_concurrency()
 
     def _get_info(self):
         '''A summary of server state.'''
