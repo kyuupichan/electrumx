@@ -2830,6 +2830,33 @@ class RavencoinTestnet(Ravencoin):
     ]
 
 
+class Bolivarcoin(Coin):
+    NAME = "Bolivarcoin"
+    SHORTNAME = "BOLI"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("55")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("D5")
+    GENESIS_HASH = ('00000e4fc293a1912b9d73cbb8d8f727'
+                    '0007a7d84382f1370661e65d5d57b1f6')
+    TX_COUNT = 1082515
+    TX_COUNT_HEIGHT = 540410
+    TX_PER_BLOCK = 10
+    RPC_PORT = 3563
+    REORG_LIMIT = 800
+    PEERS = []
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x11_hash
+        return x11_hash.getPoWHash(header)
+
+
 class Onixcoin(Coin):
     NAME = "Onixcoin"
     SHORTNAME = "ONX"
