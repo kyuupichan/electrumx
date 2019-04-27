@@ -406,7 +406,7 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     PEERS = [
         'btc.smsys.me s995',
         'E-X.not.fyi s t',
-        'elec.luggs.co s443',
+        'ex.lug.gs s443',
         'electrum.vom-stausee.de s t',
         'electrum.hsmiths.com s t',
         'helicarrier.bauerj.eu s t',
@@ -679,7 +679,7 @@ class Litecoin(Coin):
     RPC_PORT = 9332
     REORG_LIMIT = 800
     PEERS = [
-        'elec.luggs.co s444',
+        'ex.lug.gs s444',
         'electrum-ltc.bysh.me s t',
         'electrum-ltc.ddns.net s t',
         'electrum-ltc.wilv.in s t',
@@ -853,7 +853,7 @@ class Namecoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 10
     RPC_PORT = 8336
     PEERS = [
-        'elec.luggs.co s446',
+        'ex.lug.gs s446',
         'luggscoqbymhvnkp.onion t82',
         'ulrichard.ch s50006 t50005',
     ]
