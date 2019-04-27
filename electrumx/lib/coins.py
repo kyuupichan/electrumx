@@ -406,12 +406,10 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     PEERS = [
         'btc.smsys.me s995',
         'E-X.not.fyi s t',
-        'ex.lug.gs s443',
         'electrum.vom-stausee.de s t',
         'electrum.hsmiths.com s t',
         'helicarrier.bauerj.eu s t',
         'hsmiths4fyqlw5xw.onion s t',
-        'luggscoqbymhvnkp.onion t80',
         'ozahtqwp25chjdjd.onion s t',
         'node.arihanc.com s t',
         'arihancckjge66iv.onion s t',
