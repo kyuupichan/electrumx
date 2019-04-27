@@ -614,13 +614,12 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
     DESERIALIZER = lib_tx.DeserializerSegWit
     CRASH_CLIENT_VER = (3, 2, 3)
     PEERS = [
-        'electrum.akinbo.org s t',
-        'he36kyperp3kbuxu.onion s t',
         'testnet.hsmiths.com t53011 s53012',
         'hsmithsxurybd7uh.onion t53011 s53012',
-        'testnetnode.arihanc.com s t',
-        'w3e2orjpiiv2qwem3dw66d7c4krink4nhttngkylglpqe5r22n6n5wid.onion s t',
         'testnet.qtornado.com s t',
+        'testnet1.bauerj.eu t50001 s50002',
+        'tn.not.fyi t55001 s55002',
+        'bitcoin.cluelessperson.com s t',
     ]
 
     @classmethod
