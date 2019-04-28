@@ -41,6 +41,14 @@ other_commands = {
             'help': 'e.g. "a.domain.name s995 t"',
         },
     ),
+    'drop_peer': (
+        'drop a peer from the peers list',
+        [], {
+            'type': str,
+            'dest': 'host',
+            'help': 'e.g. "a.domain.name"',
+        },
+    ),
     'daemon_url': (
         "replace the daemon's URL at run-time, and forecefully rotate "
         " to the first URL in the list",

@@ -473,6 +473,17 @@ class PeerManager:
         '''Add a peer passed by the admin over LocalRPC.'''
         await self._note_peers([Peer.from_real_name(real_name, 'RPC')])
 
+    def drop_localRPC_peer(self, host):
+        '''Drop a peer passed by the admin over LocalRPC.'''
+        dropped = False
+        for peer in self.peers:
+            if peer.host == host:
+                self.logger.info(f'forgetting {peer}')
+                self.peers.discard(peer)
+                dropped = True
+                break
+        return dropped
+
     async def on_add_peer(self, features, source_addr):
         '''Add a peer (but only if the peer resolves to the source).'''
         if self.env.peer_discovery != self.env.PD_ON:

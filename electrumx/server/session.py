@@ -149,8 +149,8 @@ class SessionManager(object):
         self.session_event = Event()
 
         # Set up the RPC request handlers
-        cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
-                'query reorg sessions stop'.split())
+        cmds = ('add_peer drop_peer daemon_url disconnect getinfo groups log '
+                'peers query reorg sessions stop'.split())
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
@@ -397,6 +397,14 @@ class SessionManager(object):
         '''
         await self.peer_mgr.add_localRPC_peer(real_name)
         return "peer '{}' added".format(real_name)
+
+    async def rpc_drop_peer(self, host):
+        '''Drop a peer.
+
+        host: "bch.electrumx.cash" for example
+        '''
+        dropped = self.peer_mgr.drop_localRPC_peer(host)
+        return "peer '{}' {}".format(host, 'forgotten' if dropped else 'not found')
 
     async def rpc_disconnect(self, session_ids):
         '''Disconnect sesssions.

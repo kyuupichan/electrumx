@@ -26,6 +26,15 @@ connection attempt.  This command takes a single argument: the peer's
   $ electrumx_rpc add_peer "ecdsa.net v1.0 s110 t"
   "peer 'ecdsa.net v1.0 s110 t' added"
 
+drop_peer
+---------
+
+Drop a peer from the peers list, if found.  This command takes a single
+argument: the peer's hostname (or IP) as it appears in the list::
+
+  $ electrumx_rpc drop_peer ecdsa.net
+  "peer 'ecdsa.net' forgotten"
+
 daemon_url
 ----------
 
