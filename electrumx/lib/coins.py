@@ -814,7 +814,7 @@ class Bitcoinzero(Coin):
 # Source: https://github.com/BitcoinCZ/bitcoincz
 class BitcoinCZ(Coin):
     NAME = "BitcoinCZ"
-    SHORTNAME = “BCZ”
+    SHORTNAME = "BCZ"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
