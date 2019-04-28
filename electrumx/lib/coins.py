@@ -821,7 +821,7 @@ class BitcoinCZ(Coin):
     P2PKH_VERBYTE = bytes.fromhex("19")
     P2SH_VERBYTES = [bytes.fromhex("14")]
     WIF_BYTE = bytes.fromhex("d2")
-    GENESIS_HASH = ("00000fca55bd94508769f48d6d17c4aa3f9ae40b072036a3691752f1b70ef2dd")
+    GENESIS_HASH = '00000fca55bd94508769f48d6d17c4aa3f9ae40b072036a3691752f1b70ef2dd'
     TX_COUNT = 1024
     TX_COUNT_HEIGHT = 2048
     TX_PER_BLOCK = 2
