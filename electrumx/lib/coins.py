@@ -2930,6 +2930,7 @@ class ECCoin(Coin):
         # you have to install scryp python module (pip install scrypt)
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
+      
 class Cryptoescudo(Coin):
     NAME = "Cryptoescudo"
     SHORTNAME = "CESC"
