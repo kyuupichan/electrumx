@@ -2097,6 +2097,51 @@ class Xuez(Coin):
             return xevan_hash.getPoWHash(header)
 
 
+# Source: https://github.com/odinblockchain/odin
+class Odin(Coin):
+    NAME = "ODIN"
+    SHORTNAME = "ODIN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("27561872")
+    XPRV_VERBYTES = bytes.fromhex("27256746")
+    P2PKH_VERBYTE = bytes.fromhex("73")
+    P2SH_VERBYTES = [bytes.fromhex("39")]
+    WIF_BYTE = bytes.fromhex("8a")
+    GENESIS_HASH = ('31ca29566549e444cf227a0e2e067aed'
+                    '847c2acc541d3bbf9ca1ae89f4fd57d7')
+
+    TX_COUNT = 340000
+    TX_COUNT_HEIGHT = 340000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 22101
+    REORG_LIMIT = 100
+
+    BASIC_HEADER_SIZE = 80
+    HDR_V4_SIZE = 112
+    HDR_V4_HEIGHT = 143447
+    HDR_V4_START_OFFSET = HDR_V4_HEIGHT * BASIC_HEADER_SIZE
+
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def static_header_offset(cls, height):
+        assert cls.STATIC_BLOCK_HEADERS
+        if height >= cls.HDR_V4_HEIGHT:
+            relative_v4_offset = (height - cls.HDR_V4_HEIGHT) * cls.HDR_V4_SIZE
+            return cls.HDR_V4_START_OFFSET + relative_v4_offset
+        else:
+            return height * cls.BASIC_HEADER_SIZE
+
+    @classmethod
+    def header_hash(cls, header):
+        version, = util.unpack_le_uint32_from(header)
+        if version >= 4:
+            return super().header_hash(header)
+        else:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
+
 class Pac(Coin):
     NAME = "PAC"
     SHORTNAME = "PAC"
