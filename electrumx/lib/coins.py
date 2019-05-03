@@ -1679,6 +1679,7 @@ class Bitzeny(Coin):
     ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.001
     DAEMON = daemon.FakeEstimateFeeDaemon
+    DESERIALIZER = lib_tx.DeserializerSegWit
     TX_COUNT = 1408733
     TX_COUNT_HEIGHT = 1015115
     TX_PER_BLOCK = 1
@@ -1688,8 +1689,8 @@ class Bitzeny(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import zny_yescrypt
-        return zny_yescrypt.getPoWHash(header)
+        import zny_yespower_0_5
+        return zny_yespower_0_5.getPoWHash(header)
 
 
 class CanadaeCoin(AuxPowMixin, Coin):
