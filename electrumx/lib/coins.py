@@ -2142,6 +2142,7 @@ class Odin(Coin):
             import quark_hash
             return quark_hash.getPoWHash(header)
 
+
 class Pac(Coin):
     NAME = "PAC"
     SHORTNAME = "PAC"
