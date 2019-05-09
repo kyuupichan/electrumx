@@ -6,7 +6,8 @@ import re
 
 import pytest
 
-from electrumx.server.env import Env, NetIdentity
+from aiorpcx import Service, NetAddress
+from electrumx.server.env import Env, ServiceError
 import electrumx.lib.coins as lib_coins
 
 
@@ -42,6 +43,7 @@ def assert_default(env_var, attr, default):
 
 
 def assert_integer(env_var, attr, default=''):
+    setup_base_env()
     if default != '':
         e = Env()
         assert getattr(e, attr) == default
@@ -143,57 +145,132 @@ def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)
 
 
-def test_HOST():
-    assert_default('HOST', 'host', 'localhost')
-    os.environ['HOST'] = ''
+def test_SERVICES():
+    setup_base_env()
     e = Env()
-    assert e.cs_host(for_rpc=False) == ''
-    os.environ['HOST'] = '192.168.0.1,23.45.67.89'
+    assert e.services == []
+    # This has a blank entry between commas
+    os.environ['SERVICES'] = 'tcp://foo.bar:1234,,ws://1.2.3.4:567,rpc://[::1]:700'
     e = Env()
-    assert e.cs_host(for_rpc=False) == ['192.168.0.1', '23.45.67.89']
-    os.environ['HOST'] = '192.168.0.1 , 23.45.67.89 '
+    assert e.services == [
+        Service('tcp', NetAddress('foo.bar', 1234)),
+        Service('ws', NetAddress('1.2.3.4', 567)),
+        Service('rpc', NetAddress('::1', 700)),
+    ]
+
+def test_SERVICES_default_rpc():
+    # This has a blank entry between commas
+    os.environ['SERVICES'] = 'rpc://foo.bar'
     e = Env()
-    assert e.cs_host(for_rpc=False) == ['192.168.0.1', '23.45.67.89']
+    assert e.services[0].host == 'foo.bar'
+    assert e.services[0].port == 8000
+    os.environ['SERVICES'] = 'rpc://:800'
+    e = Env()
+    assert e.services[0].host == 'localhost'
+    assert e.services[0].port == 800
+    os.environ['SERVICES'] = 'rpc://'
+    e = Env()
+    assert e.services[0].host == 'localhost'
+    assert e.services[0].port == 8000
 
 
-def test_RPC_HOST():
-    assert_default('RPC_HOST', 'rpc_host', 'localhost')
-    os.environ['RPC_HOST'] = ''
+def test_bad_SERVICES():
+    setup_base_env()
+    os.environ['SERVICES'] = 'tcp:foo.bar:1234'
+    with pytest.raises(ServiceError) as err:
+         Env()
+    assert 'invalid service string' in str(err.value)
+    os.environ['SERVICES'] = 'xxx://foo.com:50001'
+    with pytest.raises(ServiceError) as err:
+        Env()
+    assert 'unknown protocol' in str(err.value)
+
+
+def test_onion_SERVICES():
+    setup_base_env()
+    os.environ['SERVICES'] = 'tcp://foo.bar.onion:1234'
+    with pytest.raises(ServiceError) as err:
+        Env()
+    assert 'bad host' in str(err.value)
+
+
+def test_duplicate_SERVICES():
+    setup_base_env()
+    os.environ['SERVICES'] = 'tcp://foo.bar:1234,ws://foo.bar:1235'
     e = Env()
-    # Blank reverts to localhost
-    assert e.cs_host(for_rpc=True) == 'localhost'
-    os.environ['RPC_HOST'] = '127.0.0.1, ::1'
+    os.environ['SERVICES'] = 'tcp://foo.bar:1234,ws://foo.bar:1234'
+    with pytest.raises(ServiceError) as err:
+        Env()
+    assert 'multiple services' in str(err.value)
+
+
+@pytest.mark.parametrize("service", (
+    'ssl://foo.bar:1234',
+    'wss://foo.bar:1234',
+))
+def test_ssl_SERVICES(service):
+    setup_base_env()
+    os.environ['SERVICES'] = service
+    with pytest.raises(Env.Error) as err:
+        Env()
+    assert 'SSL_CERTFILE' in str(err.value)
+    os.environ['SSL_CERTFILE'] = 'certfile'
+    with pytest.raises(Env.Error) as err:
+        Env()
+    assert 'SSL_KEYFILE' in str(err.value)
+    os.environ['SSL_KEYFILE'] = 'keyfile'
+    Env()
+    setup_base_env()
+    os.environ['SERVICES'] = service
+    os.environ['SSL_KEYFILE'] = 'keyfile'
+    with pytest.raises(Env.Error) as err:
+        Env()
+    assert 'SSL_CERTFILE' in str(err.value)
+
+
+def test_REPORT_SERVICES():
+    setup_base_env()
     e = Env()
-    assert e.cs_host(for_rpc=True) == ['127.0.0.1', '::1']
+    assert e.report_services == []
+    # This has a blank entry between commas
+    os.environ['REPORT_SERVICES'] = 'tcp://foo.bar:1234,,ws://1.2.3.4:567'
+    e = Env()
+    assert e.report_services == [
+        Service('tcp', NetAddress('foo.bar', 1234)),
+        Service('ws', NetAddress('1.2.3.4', 567)),
+    ]
+
+
+def test_REPORT_SERVICES_rpc():
+    setup_base_env()
+    os.environ['REPORT_SERVICES'] = 'rpc://foo.bar:1234'
+    with pytest.raises(ServiceError) as err:
+        Env()
+    assert 'bad protocol' in str(err.value)
+
+
+def test_REPORT_SERVICES_private():
+    setup_base_env()
+    os.environ['REPORT_SERVICES'] = 'tcp://192.168.0.1:1234'
+    with pytest.raises(ServiceError) as err:
+        Env()
+    assert 'bad IP address' in str(err.value)
+    # Accept it not PEER_ANNOUNCE
+    os.environ['PEER_ANNOUNCE'] = ''
+    Env()
+
+
+def test_REPORT_SERVICES_localhost():
+    setup_base_env()
+    os.environ['REPORT_SERVICES'] = 'tcp://localhost:1234'
+    with pytest.raises(ServiceError) as err:
+        Env()
+    assert 'bad host' in str(err.value)
 
 
 def test_REORG_LIMIT():
     assert_integer('REORG_LIMIT', 'reorg_limit',
                    lib_coins.BitcoinSV.REORG_LIMIT)
-
-
-def test_TCP_PORT():
-    assert_integer('TCP_PORT', 'tcp_port', None)
-
-
-def test_SSL_PORT():
-    # Requires both SSL_CERTFILE and SSL_KEYFILE to be set
-    os.environ['SSL_PORT'] = '50002'
-    os.environ['SSL_CERTFILE'] = 'certfile'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ.pop('SSL_CERTFILE')
-    os.environ['SSL_KEYFILE'] = 'keyfile'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['SSL_CERTFILE'] = 'certfile'
-    Env()
-    os.environ.pop('SSL_PORT')
-    assert_integer('SSL_PORT', 'ssl_port', None)
-
-
-def test_RPC_PORT():
-    assert_integer('RPC_PORT', 'rpc_port', 8000)
 
 
 def test_COST_HARD_LIMIT():
@@ -313,106 +390,6 @@ def test_TOR_PROXY_HOST():
 
 def test_TOR_PROXY_PORT():
     assert_integer('TOR_PROXY_PORT', 'tor_proxy_port', None)
-
-
-def test_clearnet_identity():
-    os.environ['REPORT_TCP_PORT'] = '456'
-    e = Env()
-    assert len(e.identities) == 0
-    os.environ['REPORT_HOST'] = '8.8.8.8'
-    e = Env()
-    assert len(e.identities) == 1
-    assert e.identities[0].host == '8.8.8.8'
-    os.environ['REPORT_HOST'] = 'localhost'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST'] = ''
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST'] = '127.0.0.1'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST'] = '0.0.0.0'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST'] = '224.0.0.2'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST'] = '$HOST'
-    with pytest.raises(Env.Error):
-        Env()
-    # Accept private IP, unless PEER_ANNOUNCE
-    os.environ['PEER_ANNOUNCE'] = ''
-    os.environ['REPORT_HOST'] = '192.168.0.1'
-    os.environ['SSL_CERTFILE'] = 'certfile'
-    os.environ['SSL_KEYFILE'] = 'keyfile'
-    Env()
-    os.environ['PEER_ANNOUNCE'] = 'OK'
-    with pytest.raises(Env.Error) as err:
-        Env()
-    os.environ.pop('PEER_ANNOUNCE', None)
-    assert 'not a valid REPORT_HOST' in str(err)
-
-    os.environ['REPORT_HOST'] = '1.2.3.4'
-    os.environ['REPORT_SSL_PORT'] = os.environ['REPORT_TCP_PORT']
-    with pytest.raises(Env.Error) as err:
-        Env()
-    assert 'both resolve' in str(err)
-
-    os.environ['REPORT_SSL_PORT'] = '457'
-    os.environ['REPORT_HOST'] = 'foo.com'
-    e = Env()
-    assert len(e.identities) == 1
-    ident = e.identities[0]
-    assert ident.host == 'foo.com'
-    assert ident.tcp_port == 456
-    assert ident.ssl_port == 457
-
-
-def test_tor_identity():
-    tor_host = 'something.onion'
-    os.environ.pop('REPORT_HOST', None)
-    os.environ.pop('REPORT_HOST_TOR', None)
-    e = Env()
-    assert len(e.identities) == 0
-    os.environ['REPORT_HOST_TOR'] = 'foo'
-    os.environ['REPORT_SSL_PORT_TOR'] = '123'
-    os.environ['TCP_PORT'] = '456'
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST_TOR'] = tor_host
-    e = Env()
-    assert len(e.identities) == 1
-    ident = e.identities[0]
-    assert ident.host == tor_host
-    assert ident.tcp_port == 456
-    assert ident.ssl_port == 123
-    os.environ['REPORT_TCP_PORT_TOR'] = os.environ['REPORT_SSL_PORT_TOR']
-    with pytest.raises(Env.Error):
-        Env()
-    os.environ['REPORT_HOST'] = 'foo.com'
-    os.environ['TCP_PORT'] = '456'
-    os.environ['SSL_PORT'] = '789'
-    os.environ['REPORT_TCP_PORT'] = '654'
-    os.environ['REPORT_SSL_PORT'] = '987'
-    os.environ['SSL_CERTFILE'] = 'certfile'
-    os.environ['SSL_KEYFILE'] = 'keyfile'
-    os.environ.pop('REPORT_TCP_PORT_TOR', None)
-    os.environ.pop('REPORT_SSL_PORT_TOR', None)
-    e = Env()
-    assert len(e.identities) == 2
-    ident = e.identities[1]
-    assert ident.host == tor_host
-    assert ident.tcp_port == 654
-    assert ident.ssl_port == 987
-    os.environ['REPORT_TCP_PORT_TOR'] = '234'
-    os.environ['REPORT_SSL_PORT_TOR'] = '432'
-    e = Env()
-    assert len(e.identities) == 2
-    ident = e.identities[1]
-    assert ident.host == tor_host
-    assert ident.tcp_port == 234
-    assert ident.ssl_port == 432
 
 
 def test_ban_versions():

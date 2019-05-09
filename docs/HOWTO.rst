@@ -371,6 +371,8 @@ The ETA shown is just a rough guide and in the short term can be quite
 volatile.  It tends to be a little optimistic at first; once you get
 to height 280,000 is should be fairly accurate.
 
+.. _SSL certificates:
+
 Creating a self-signed SSL certificate
 ======================================
 

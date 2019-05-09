@@ -9,16 +9,15 @@
 
 
 import re
-from collections import namedtuple
 from ipaddress import IPv4Address, IPv6Address
 
-from aiorpcx import classify_host
+from aiorpcx import Service, ServicePart
 from electrumx.lib.coins import Coin
 from electrumx.lib.env_base import EnvBase
-import electrumx.lib.util as lib_util
 
 
-NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port')
+class ServiceError(Exception):
+    pass
 
 
 class Env(EnvBase):
@@ -29,12 +28,19 @@ class Env(EnvBase):
 
     # Peer discovery
     PD_OFF, PD_SELF, PD_ON = ('OFF', 'SELF', 'ON')
+    SSL_PROTOCOLS = {'ssl', 'wss'}
+    KNOWN_PROTOCOLS = {'ssl', 'tcp', 'ws', 'wss', 'rpc'}
 
     def __init__(self, coin=None):
         super().__init__()
-        self.obsolete(["MAX_SUBSCRIPTIONS", "MAX_SUBS", "MAX_SESSION_SUBS", "BANDWIDTH_LIMIT"])
+        self.obsolete(["MAX_SUBSCRIPTIONS", "MAX_SUBS", "MAX_SESSION_SUBS", "BANDWIDTH_LIMIT",
+                       "HOST", "TCP_PORT", "SSL_PORT", "RPC_HOST", "RPC_PORT", "REPORT_HOST",
+                       "REPORT_TCP_PORT", "REPORT_SSL_PORT", "REPORT_HOST_TOR",
+                       "REPORT_TCP_PORT_TOR", "REPORT_SSL_PORT_TOR"])
+
+        # Core items
+
         self.db_dir = self.required('DB_DIRECTORY')
-        self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.daemon_url = self.required('DAEMON_URL')
         if coin is not None:
             assert issubclass(coin, Coin)
@@ -43,31 +49,32 @@ class Env(EnvBase):
             coin_name = self.required('COIN').strip()
             network = self.default('NET', 'mainnet').strip()
             self.coin = Coin.lookup_coin_class(coin_name, network)
-        self.cache_MB = self.integer('CACHE_MB', 1200)
-        self.host = self.default('HOST', 'localhost')
-        self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
-        # Server stuff
-        self.tcp_port = self.integer('TCP_PORT', None)
-        self.ssl_port = self.integer('SSL_PORT', None)
-        if self.ssl_port:
-            self.ssl_certfile = self.required('SSL_CERTFILE')
-            self.ssl_keyfile = self.required('SSL_KEYFILE')
-        self.rpc_port = self.integer('RPC_PORT', 8000)
+
+        # Peer discovery
+
+        self.peer_discovery = self.peer_discovery_enum()
+        self.peer_announce = self.boolean('PEER_ANNOUNCE', True)
+        self.force_proxy = self.boolean('FORCE_PROXY', False)
+        self.tor_proxy_host = self.default('TOR_PROXY_HOST', 'localhost')
+        self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
+
+        # Misc
+
+        self.db_engine = self.default('DB_ENGINE', 'leveldb')
         self.banner_file = self.default('BANNER_FILE', None)
         self.tor_banner_file = self.default('TOR_BANNER_FILE',
                                             self.banner_file)
         self.anon_logs = self.boolean('ANON_LOGS', False)
         self.log_sessions = self.integer('LOG_SESSIONS', 3600)
         self.log_level = self.default('LOG_LEVEL', 'info').upper()
-        # Peer discovery
-        self.peer_discovery = self.peer_discovery_enum()
-        self.peer_announce = self.boolean('PEER_ANNOUNCE', True)
-        self.force_proxy = self.boolean('FORCE_PROXY', False)
-        self.tor_proxy_host = self.default('TOR_PROXY_HOST', 'localhost')
-        self.tor_proxy_port = self.integer('TOR_PROXY_PORT', None)
-        # The electrum client takes the empty string as unspecified
         self.donation_address = self.default('DONATION_ADDRESS', '')
+        self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
+        self.blacklist_url = self.default('BLACKLIST_URL', self.coin.BLACKLIST_URL)
+        self.cache_MB = self.integer('CACHE_MB', 1200)
+        self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
+
         # Server limits to help prevent DoS
+
         self.max_send = self.integer('MAX_SEND', self.coin.DEFAULT_MAX_SEND)
         self.max_sessions = self.sane_max_sessions()
         self.cost_soft_limit = self.integer('COST_SOFT_LIMIT', 1000)
@@ -77,15 +84,14 @@ class Env(EnvBase):
         self.request_sleep = self.integer('REQUEST_SLEEP', 2500)
         self.request_timeout = self.integer('REQUEST_TIMEOUT', 30)
         self.session_timeout = self.integer('SESSION_TIMEOUT', 600)
-        self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
-        self.blacklist_url = self.default('BLACKLIST_URL', self.coin.BLACKLIST_URL)
 
-        # Identities
-        clearnet_identity = self.clearnet_identity()
-        tor_identity = self.tor_identity(clearnet_identity)
-        self.identities = [identity
-                           for identity in (clearnet_identity, tor_identity)
-                           if identity is not None]
+        # Services last - uses some env vars above
+
+        self.services = self.services_to_run()
+        if {service.protocol for service in self.services}.intersection(self.SSL_PROTOCOLS):
+            self.ssl_certfile = self.required('SSL_CERTFILE')
+            self.ssl_keyfile = self.required('SSL_KEYFILE')
+        self.report_services = self.services_to_report()
 
     def sane_max_sessions(self):
         '''Return the maximum number of sessions to permit.  Normally this
@@ -106,67 +112,60 @@ class Env(EnvBase):
             value = 512  # that is what returned by stdio's _getmaxstdio()
         return value
 
-    def clearnet_identity(self):
-        host = self.default('REPORT_HOST', None)
-        if host is None:
-            return None
-        try:
-            host = classify_host(host)
-        except ValueError:
-            bad = True
-        else:
-            if isinstance(host, (IPv4Address, IPv6Address)):
-                bad = (host.is_multicast or host.is_unspecified
-                       or (host.is_private and self.peer_announce))
-            else:
-                bad = host.lower() == 'localhost'
-        if bad:
-            raise self.Error('"{}" is not a valid REPORT_HOST'.format(host))
-        tcp_port = self.integer('REPORT_TCP_PORT', self.tcp_port) or None
-        ssl_port = self.integer('REPORT_SSL_PORT', self.ssl_port) or None
-        if tcp_port == ssl_port:
-            raise self.Error('REPORT_TCP_PORT and REPORT_SSL_PORT '
-                             'both resolve to {}'.format(tcp_port))
-        return NetIdentity(
-            str(host),
-            tcp_port,
-            ssl_port,
-        )
+    def _parse_services(self, services_str, default_func):
+        result = []
+        for service_str in services_str.split(','):
+            if not service_str:
+                continue
+            try:
+                service = Service.from_string(service_str, default_func=default_func)
+            except Exception as e:
+                raise ServiceError(f'"{service_str}" invalid: {e}') from None
+            if service.protocol not in self.KNOWN_PROTOCOLS:
+                raise ServiceError(f'"{service_str}" invalid: unknown protocol')
+            result.append(service)
 
-    def tor_identity(self, clearnet):
-        host = self.default('REPORT_HOST_TOR', None)
-        if host is None:
-            return None
-        if not host.endswith('.onion'):
-            raise self.Error('tor host "{}" must end with ".onion"'
-                             .format(host))
+        # Find duplicate addresses
+        service_map = {service.address: [] for service in result}
+        for service in result:
+            service_map[service.address].append(service)
+        for address, services in service_map.items():
+            if len(services) > 1:
+                raise ServiceError(f'address {address} has multiple services')
 
-        def port(port_kind):
-            '''Returns the clearnet identity port, if any and not zero,
-            otherwise the listening port.'''
-            result = 0
-            if clearnet:
-                result = getattr(clearnet, port_kind)
-            return result or getattr(self, port_kind)
+        return result
 
-        tcp_port = self.integer('REPORT_TCP_PORT_TOR',
-                                port('tcp_port')) or None
-        ssl_port = self.integer('REPORT_SSL_PORT_TOR',
-                                port('ssl_port')) or None
-        if tcp_port == ssl_port:
-            raise self.Error('REPORT_TCP_PORT_TOR and REPORT_SSL_PORT_TOR '
-                             'both resolve to {}'.format(tcp_port))
+    def services_to_run(self):
+        def default_part(protocol, part):
+            return default_services.get(protocol, {}).get(part)
 
-        return NetIdentity(
-            host,
-            tcp_port,
-            ssl_port,
-        )
+        default_services = {protocol: {ServicePart.HOST: 'all_interfaces'}
+                            for protocol in self.KNOWN_PROTOCOLS}
+        default_services['rpc'] = {ServicePart.HOST: 'localhost', ServicePart.PORT: 8000}
+        services = self._parse_services(self.default('SERVICES', ''), default_part)
 
-    def hosts_dict(self):
-        return {identity.host: {'tcp_port': identity.tcp_port,
-                                'ssl_port': identity.ssl_port}
-                for identity in self.identities}
+        # Find onion hosts
+        for service in services:
+            if str(service.host).endswith('.onion'):
+                raise ServiceError(f'bad host for SERVICES: {service}')
+
+        return services
+
+    def services_to_report(self):
+        services = self._parse_services(self.default('REPORT_SERVICES', ''), None)
+
+        for service in services:
+            if service.protocol == 'rpc':
+                raise ServiceError(f'bad protocol for REPORT_SERVICES: {service.protocol}')
+            if isinstance(service.host, (IPv4Address, IPv6Address)):
+                ip_addr = service.host
+                if (ip_addr.is_multicast or ip_addr.is_unspecified or
+                        (ip_addr.is_private and self.peer_announce)):
+                    raise ServiceError(f'bad IP address for REPORT_SERVICES: {ip_addr}')
+            elif service.host.lower() == 'localhost':
+                raise ServiceError(f'bad host for REPORT_SERVICES: {service.host}')
+
+        return services
 
     def peer_discovery_enum(self):
         pd = self.default('PEER_DISCOVERY', 'on').strip().lower()

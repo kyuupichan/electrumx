@@ -22,7 +22,7 @@ from ipaddress import IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
@@ -121,7 +121,7 @@ class SessionManager:
         self.peer_mgr = PeerManager(env, db)
         self.shutdown_event = shutdown_event
         self.logger = util.class_logger(__name__, self.__class__.__name__)
-        self.servers = {}
+        self.servers = {}           # service->server
         self.sessions = {}          # session->iterable of its SessionGroups
         self.session_groups = {}    # group name->SessionGroup instance
         self.txs_sent = 0
@@ -140,6 +140,7 @@ class SessionManager:
         self.notified_height = None
         self.hsub_results = None
         self._task_group = TaskGroup()
+        self._sslc = None
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = Event()
         self.session_event = Event()
@@ -150,48 +151,58 @@ class SessionManager:
         LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
-    async def _start_server(self, kind, *args, **kw_args):
-        loop = asyncio.get_event_loop()
-        if kind == 'RPC':
-            session_class = LocalRPC
-        else:
-            session_class = self.env.coin.SESSIONCLS
-        session_factory = partial(session_class, self, self.db,
-                                  self.mempool, self.peer_mgr, kind)
-        host, port = args[:2]
-        try:
-            self.servers[kind] = await serve_rs(session_factory, *args, **kw_args)
-        except OSError as e:    # don't suppress CancelledError
-            self.logger.error(f'{kind} server failed to listen on {host}:'
-                              f'{port:d} :{e!r}')
-        else:
-            self.logger.info(f'{kind} server listening on {host}:{port:d}')
+    def _ssl_context(self):
+        if self._sslc is None:
+            self._sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            self._sslc.load_cert_chain(self.env.ssl_certfile, keyfile=self.env.ssl_keyfile)
+        return self._sslc
+
+    async def _start_servers(self, services):
+        for service in services:
+            kind = service.protocol.upper()
+            if service.protocol in self.env.SSL_PROTOCOLS:
+                sslc = self._ssl_context()
+            else:
+                sslc = None
+            if service.protocol == 'rpc':
+                session_class = LocalRPC
+            else:
+                session_class = self.env.coin.SESSIONCLS
+            if service.protocol in ('ws', 'wss'):
+                serve = serve_ws
+            else:
+                serve = serve_rs
+            # FIXME: pass the service not the kind
+            session_factory = partial(session_class, self, self.db, self.mempool,
+                                      self.peer_mgr, kind)
+            host = None if service.host == 'all_interfaces' else service.host
+            try:
+                self.servers[service] = await serve(session_factory, host,
+                                                    service.port, ssl=sslc)
+            except OSError as e:    # don't suppress CancelledError
+                self.logger.error(f'{kind} server failed to listen on {service.address}: {e}')
+            else:
+                self.logger.info(f'{kind} server listening on {service.address}')
 
     async def _start_external_servers(self):
         '''Start listening on TCP and SSL ports, but only if the respective
         port was given in the environment.
         '''
-        env = self.env
-        host = env.cs_host(for_rpc=False)
-        if env.tcp_port is not None:
-            await self._start_server('TCP', host, env.tcp_port)
-        if env.ssl_port is not None:
-            sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
-            sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
-            await self._start_server('SSL', host, env.ssl_port, ssl=sslc)
+        await self._start_servers(service for service in self.env.services
+                                  if service.protocol != 'rpc')
         self.server_listening.set()
 
-    async def _close_servers(self, kinds):
-        '''Close the servers of the given kinds (TCP etc.).'''
-        kinds = set(kinds).intersection(self.servers)
-        if kinds:
-            self.logger.info(f'closing down {", ".join(kinds)} listening servers')
-            servers = [self.servers.pop(kind) for kind in kinds]
-            # Close all before waiting
-            for server in servers:
-                server.close()
-            for server in servers:
-                await server.wait_closed()
+    async def _stop_servers(self, services):
+        '''Stop the servers of the given protocols.'''
+        server_map = {service: self.servers.pop(service)
+                      for service in set(services).intersection(self.servers)}
+        # Close all before waiting
+        for service, server in server_map.items():
+            self.logger.info(f'closing down server for {service}')
+            server.close()
+        # No value in doing these concurrently
+        for server in server_map.values():
+            await server.wait_closed()
 
     async def _manage_servers(self):
         paused = False
@@ -204,7 +215,8 @@ class SessionManager:
                 self.logger.info(f'maximum sessions {max_sessions:,d} '
                                  f'reached, stopping new connections until '
                                  f'count drops to {low_watermark:,d}')
-                await self._close_servers(['TCP', 'SSL'])
+                await self._stop_servers(service for service in self.servers
+                                         if service.protocol != 'rpc')
                 paused = True
             # Start listening for incoming connections if paused and
             # session count has fallen
@@ -548,9 +560,8 @@ class SessionManager:
         '''Start the RPC server if enabled.  When the event is triggered,
         start TCP and SSL servers.'''
         try:
-            if self.env.rpc_port is not None:
-                await self._start_server('RPC', self.env.cs_host(for_rpc=True),
-                                         self.env.rpc_port)
+            await self._start_servers(service for service in self.env.services
+                                      if service.protocol == 'rpc')
             await event.wait()
 
             session_class = self.env.coin.SESSIONCLS
@@ -588,7 +599,7 @@ class SessionManager:
                 await group.spawn(self._manage_servers())
         finally:
             # Close servers then sessions
-            await self._close_servers(list(self.servers.keys()))
+            await self._stop_servers(self.servers.keys())
             async with TaskGroup() as group:
                 for session in list(self.sessions):
                     await group.spawn(session.close(force_after=1))
@@ -884,15 +895,22 @@ class ElectrumX(SessionBase):
     @classmethod
     def server_features(cls, env):
         '''Return the server features dictionary.'''
+        hosts_dict = {}
+        for service in env.report_services:
+            port_dict = hosts_dict.setdefault(str(service.host), {})
+            if service.protocol not in port_dict:
+                port_dict[f'{service.protocol}_port'] = service.port
+
         min_str, max_str = cls.protocol_min_max_strings()
         return {
-            'hosts': env.hosts_dict(),
+            'hosts': hosts_dict,
             'pruning': None,
             'server_version': electrumx.version,
             'protocol_min': min_str,
             'protocol_max': max_str,
             'genesis_hash': env.coin.GENESIS_HASH,
             'hash_function': 'sha256',
+            'services': [str(service) for service in env.services],
         }
 
     async def server_features_async(self):

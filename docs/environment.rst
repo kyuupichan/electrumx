@@ -61,6 +61,108 @@ The following are required if you use the ``run`` script:
   The username the server will run as.
 
 
+Services
+========
+
+These two environment variables are comma-separated lists of individual *services*.
+
+A **service** has the general form::
+
+  protocol://host:port
+
+*protocol* is case-insensitive.  A protocol can be specified multiple times, with
+different hosts or ports.  This might be useful for multi-homed hosts, or if you offer
+both Tor and clearnet services.  The recognised protocols are::
+
+   tcp    Plaintext TCP sockets
+   ssl    SSL-encrypted TCP sockets
+   ws     Plaintext websockets
+   wss    SSL-encrypted websockets
+   rpc    Plaintext RPC
+
+*host* can be a hostname, an IPv4 address, or an IPv6 address enclosed in square brackets.
+
+*port* is an integer from :const:`1` to :const:`65535` inclusive.
+
+Where documented, one or more of *protocol*, *host* and *port* can be omitted, in which
+case a default value will be assumed.
+
+Here are some examples of valid services::
+
+  tcp://host.domain.tld:50001           # Hostname, lowercase protocol, port
+  SSL://23.45.67.78:50002               # An IPv4 address, upper-case protocol, port
+  rpC://localhost                       # Host as a string, mixed-case protocol, default port
+  ws://[1234:5678:abcd::5601]:8000      # Host as an IPv6 address
+  wss://h3ubaasdlkheryasd.onion:50001   # Host as a Tor ".onion" address
+  rpc://:8000                           # Default host, port given
+  host.domain.tld:5151                  # Default protocol, hostname, port
+  rpc://                                # RPC protocol, default host and port
+
+.. note:: ElectrumX will not serve any incoming connections until it has fully caught up
+          with your bitcoin daemon.  The only exception is local **RPC** connections,
+          which are served at any time after the server has initialized.
+
+.. envvar:: SERVICES
+
+  A comma-separated list of services ElectrumX will accept incoming connections for.
+
+  This environment variable determines what interfaces and ports the server listens on, so
+  must be set correctly for any connection to the server to succeed.
+
+  *protocol* can be any recognised protocol.
+
+  *host* defaults to all of the machine's interfaces, except if the protocol is **rpc**,
+  when it defaults to :const:`localhost`.
+
+  *port* can only be defaulted for **rpc** where the default is :const:`8000`.
+
+  If any listed service has protocol **ssl** or **wss** then :envvar:`SSL_CERTFILE` and
+  :envvar:`SSL_KEYFILE` must be defined.
+
+  Tor **onion** addresses are invalid in :envvar:`SERVICES`.
+
+  Here is an example value of this environment variable::
+
+    tcp://:50001,ssl://:50002,wss://:50004,rpc://
+
+  This serves **tcp**, **ssl**, **wss** on all interfaces on ports 50001, 50002 and 50004
+  respectively.  **rpc** is served on :const:`localhost` port :const:`8000`.
+
+.. envvar:: REPORT_SERVICES
+
+  A comma-separated list of services ElectrumX will advertise and other servers in the
+  server network (if peer discovery is enabled), and any successful connection.
+
+  This environment variable must be set correctly, taking account of your network,
+  firewall and router setup, for clients and other servers to see how to connect to your
+  server.
+
+  The **rpc** protocol, special IP addresses (inlcuding private ones if peer discovery is
+  enabled), and :const:`localhost` are invalid in :envvar:`REPORT_SERVICES`.
+
+  Here is an example value of this environment variable::
+
+    tcp://sv.usebsv.com:50001,ssl://sv.usebsv.com:50002,wss://sv.usebsv.com:50004
+
+  This advertizes **tcp**, **ssl**, **wss** services at :const:`sv.usebsv.com` on ports
+  50001, 50002 and 50004 respectively.
+
+.. note:: Certificate Authority-signed certificates don't work over Tor, so you should
+          only have Tor services` in :envvar:`REPORT_SERVICES` if yours is self-signed.
+
+.. envvar:: SSL_CERTFILE
+
+  The filesystem path to your SSL certificate file.
+
+  :ref:`SSL certificates`
+
+.. envvar:: SSL_KEYFILE
+
+  The filesystem path to your SSL key file.
+
+  :ref:`SSL certificates`
+
+
 Miscellaneous
 =============
 
@@ -93,54 +195,6 @@ These environment variables are optional:
   ``leveldb``.  The other alternative is ``rocksdb``.  You will need
   to install the appropriate python package for your engine.  The
   value is not case sensitive.
-
-.. envvar:: HOST
-
-  The host or IP address that the TCP and SSL servers will use when
-  binding listening sockets.  Defaults to ``localhost``.  To listen on
-  multiple specific addresses specify a comma-separated list.  Set to
-  an empty string to listen on all available interfaces (likely both
-  IPv4 and IPv6).
-
-.. envvar:: TCP_PORT
-
-  If set ElectrumX will serve TCP clients on
-  :envvar:`HOST`\::envvar:`TCP_PORT`.
-
-  .. note:: ElectrumX will not serve TCP connections until it has
-            fully caught up with your daemon.
-
-.. envvar:: SSL_PORT
-
-  If set ElectrumX will serve SSL clients on
-  :envvar:`HOST`\::envvar:`SSL_PORT`.  If set then
-  :envvar:`SSL_CERTFILE` and :envvar:`SSL_KEYFILE` must be defined
-  environment variables with values the filesystem paths to those SSL
-  files.
-
-  .. note:: ElectrumX will not serve SSL connections until it has
-            fully caught up with your daemon.
-
-.. envvar:: RPC_HOST
-
-  The host or IP address that the RPC server will listen on and
-  defaults to ``localhost``.  To listen on multiple specific addresses
-  specify a comma-separated list.  Servers with unusual networking
-  setups might want to specify e.g. ``::1`` or ``127.0.0.1``
-  explicitly rather than defaulting to ``localhost``.
-
-  An empty string (normally indicating all interfaces) is interpreted
-  as ``localhost``, because allowing access to the server's RPC
-  interface to arbitrary connections across the internet is not a good
-  idea.
-
-.. envvar:: RPC_PORT
-
-  ElectrumX will listen on this port for local RPC connections.
-  ElectrumX listens for RPC connections unless this is explicitly set
-  to blank.  The default depends on :envvar:`COIN` and :envvar:`NET`
-  (e.g., 8000 for Bitcoin mainnet) if not set, as indicated in
-  `lib/coins.py`_.
 
 .. envvar:: DONATION_ADDRESS
 
@@ -383,52 +437,6 @@ some of this.
 
   URL to retrieve a list of blacklisted peers.  If not set, a coin-
   specific default is used.
-
-
-
-Server Advertising
-==================
-
-These environment variables affect how your server is advertised
-by peer discovery (if enabled).
-
-.. envvar:: REPORT_HOST
-
-  The clearnet host to advertise.  If not set, no clearnet host is
-  advertised.
-
-.. envvar:: REPORT_TCP_PORT
-
-  The clearnet TCP port to advertise if :envvar:`REPORT_HOST` is set.
-  Defaults to :envvar:`TCP_PORT`.  ``0`` disables publishing a TCP
-  port.
-
-.. envvar:: REPORT_SSL_PORT
-
-  The clearnet SSL port to advertise if :envvar:`REPORT_HOST` is set.
-  Defaults to :envvar:`SSL_PORT`.  ``0`` disables publishing an SSL
-  port.
-
-.. envvar:: REPORT_HOST_TOR
-
-  If you wish run a Tor service, this is the Tor host name to
-  advertise and must end with ``.onion``.
-
-.. envvar:: REPORT_TCP_PORT_TOR
-
-  The Tor TCP port to advertise.  The default is the clearnet
-  :envvar:`REPORT_TCP_PORT`, unless disabled or it is ``0``, otherwise
-  :envvar:`TCP_PORT`.  ``0`` disables publishing a Tor TCP port.
-
-.. envvar:: REPORT_SSL_PORT_TOR
-
-  The Tor SSL port to advertise.  The default is the clearnet
-  :envvar:`REPORT_SSL_PORT`, unless disabled or it is ``0``, otherwise
-  :envvar:`SSL_PORT`.  ``0`` disables publishing a Tor SSL port.
-
-  .. note:: Certificate-Authority signed certificates don't work over
-            Tor, so you should set :envvar:`REPORT_SSL_PORT_TOR` to
-            ``0`` if yours is not self-signed.
 
 
 Cache

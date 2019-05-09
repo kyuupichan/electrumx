@@ -65,10 +65,10 @@ class PeerManager:
         self.env = env
         self.db = db
 
-        # Our clearnet and Tor Peers, if any
+        # Our reported clearnet and Tor Peers, if any
         sclass = env.coin.SESSIONCLS
-        self.myselves = [Peer(ident.host, sclass.server_features(env), 'env')
-                         for ident in env.identities]
+        self.myselves = [Peer(str(service.host), sclass.server_features(env), 'env')
+                         for service in env.report_services]
         self.server_version_args = sclass.server_version_args()
         # Peers have one entry per hostname.  Once connected, the
         # ip_addr property is either None, an onion peer, or the
@@ -255,19 +255,20 @@ class PeerManager:
             if kind == 'SSL':
                 kwargs['ssl'] = ssl.SSLContext(ssl.PROTOCOL_TLS)
 
-            host = self.env.cs_host(for_rpc=False)
-            if isinstance(host, list):
-                host = host[0]
+            if self.env.report_services:
+                local_addr_host = self.env.report_services[0].host
+            else:
+                local_addr_host = None
 
             if self.env.force_proxy or peer.is_tor:
                 if not self.proxy:
                     return
                 kwargs['proxy'] = self.proxy
                 kwargs['resolve'] = not peer.is_tor
-            elif host:
+            elif local_addr_host:
                 # Use our listening Host/IP for outgoing non-proxy
                 # connections so our peers see the correct source.
-                kwargs['local_addr'] = (host, None)
+                kwargs['local_addr'] = (str(local_addr_host), None)
 
             peer_text = f'[{peer}:{port} {kind}]'
             try:
