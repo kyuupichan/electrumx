@@ -18,11 +18,11 @@ import ssl
 import time
 from collections import defaultdict
 from functools import partial
-from ipaddress import ip_address, IPv4Address, IPv6Address
+from ipaddress import IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
@@ -86,7 +86,7 @@ def assert_tx_hash(value):
 
 
 @attr.s(slots=True)
-class SessionGroup(object):
+class SessionGroup:
     name = attr.ib()
     weight = attr.ib()
     sessions = attr.ib()
@@ -100,7 +100,7 @@ class SessionGroup(object):
 
 
 @attr.s(slots=True)
-class SessionReferences(object):
+class SessionReferences:
     # All attributes are sets but groups is a list
     sessions = attr.ib()
     groups = attr.ib()
@@ -108,7 +108,7 @@ class SessionReferences(object):
     unknown = attr.ib()     # Strings
 
 
-class SessionManager(object):
+class SessionManager:
     '''Holds global state about all sessions.'''
 
     def __init__(self, env, db, bp, daemon, mempool, shutdown_event):
@@ -139,10 +139,6 @@ class SessionManager(object):
         self._merkle_hits = 0
         self.notified_height = None
         self.hsub_results = None
-        # Masternode stuff only for such coins
-        if issubclass(env.coin.SESSIONCLS, DashElectrumX):
-            self.mn_cache_height = 0
-            self.mn_cache = []
         self._task_group = TaskGroup()
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = Event()
@@ -157,16 +153,14 @@ class SessionManager(object):
     async def _start_server(self, kind, *args, **kw_args):
         loop = asyncio.get_event_loop()
         if kind == 'RPC':
-            protocol_class = LocalRPC
+            session_class = LocalRPC
         else:
-            protocol_class = self.env.coin.SESSIONCLS
-        protocol_factory = partial(protocol_class, self, self.db,
-                                   self.mempool, self.peer_mgr, kind)
-        server = loop.create_server(protocol_factory, *args, **kw_args)
-
+            session_class = self.env.coin.SESSIONCLS
+        session_factory = partial(session_class, self, self.db,
+                                  self.mempool, self.peer_mgr, kind)
         host, port = args[:2]
         try:
-            self.servers[kind] = await server
+            self.servers[kind] = await serve_rs(session_factory, *args, **kw_args)
         except OSError as e:    # don't suppress CancelledError
             self.logger.error(f'{kind} server failed to listen on {host}:'
                               f'{port:d} :{e!r}')
@@ -296,7 +290,6 @@ class SessionManager(object):
                 'count with subs': sum(len(getattr(s, 'hashX_subs', ())) > 0 for s in sessions),
                 'errors': sum(s.errors for s in sessions),
                 'logged': len([s for s in sessions if s.log_me]),
-                'paused': sum(s.is_send_buffer_full() for s in sessions),
                 'pending requests': sum(s.unanswered_request_count() for s in sessions),
                 'subs': sum(s.sub_count() for s in sessions),
             },
@@ -791,10 +784,9 @@ class SessionBase(RPCSession):
     session_counter = itertools.count()
     log_new = False
 
-    def __init__(self, session_mgr, db, mempool, peer_mgr, kind):
+    def __init__(self, session_mgr, db, mempool, peer_mgr, kind, transport):
         connection = JSONRPCConnection(JSONRPCAutoDetect)
-        super().__init__(connection=connection)
-        self.logger = util.class_logger(__name__, self.__class__.__name__)
+        super().__init__(transport, connection=connection)
         self.session_mgr = session_mgr
         self.db = db
         self.mempool = mempool
@@ -808,6 +800,14 @@ class SessionBase(RPCSession):
         self.log_me = SessionBase.log_new
         self.session_id = None
         self.daemon_request = self.session_mgr.daemon_request
+        self.session_id = next(self.session_counter)
+        context = {'conn_id': f'{self.session_id}'}
+        logger = util.class_logger(__name__, self.__class__.__name__)
+        self.logger = util.ConnectionLogger(logger, context)
+        self.logger.info(f'{self.kind} {self.remote_address_string()}, '
+                         f'{self.session_mgr.session_count():,d} total')
+        self.recalc_concurrency()
+        self.session_mgr.add_session(self)
 
     async def notify(self, touched, height_changed):
         pass
@@ -829,27 +829,11 @@ class SessionBase(RPCSession):
         status += str(self._incoming_concurrency.max_concurrent)
         return status
 
-    def connection_made(self, transport):
-        '''Handle an incoming client connection.'''
-        super().connection_made(transport)
-        self.session_id = next(self.session_counter)
-        context = {'conn_id': f'{self.session_id}'}
-        self.logger = util.ConnectionLogger(self.logger, context)
-        self.session_mgr.add_session(self)
-        self.logger.info(f'{self.kind} {self.remote_address_string()}, '
-                         f'{self.session_mgr.session_count():,d} total')
-        self.recalc_concurrency()
-
-    def connection_lost(self, exc):
+    async def connection_lost(self):
         '''Handle client disconnection.'''
-        try:
-            self.session_mgr.remove_session(self)
-        except KeyError:
-            # uvloop has a bug where connection_lost() is called without a connection_made()
-            return
+        await super().connection_lost()
+        self.session_mgr.remove_session(self)
         msg = ''
-        if self.is_send_buffer_full():
-            msg += ' with full socket buffer'
         if self._incoming_concurrency.max_concurrent < self.initial_concurrent * 0.8:
             msg += ' whilst throttled'
         if self.send_size >= 1_000_000:
@@ -857,7 +841,6 @@ class SessionBase(RPCSession):
         if msg:
             msg = 'disconnected' + msg
             self.logger.info(msg)
-        super().connection_lost(exc)
 
     def sub_count(self):
         return 0
@@ -1419,6 +1402,8 @@ class DashElectrumX(ElectrumX):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mns = set()
+        self.mn_cache_height = 0
+        self.mn_cache = []
 
     def set_request_handlers(self, ptuple):
         super().set_request_handlers(ptuple)

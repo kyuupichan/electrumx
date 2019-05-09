@@ -17,7 +17,7 @@ import time
 from collections import defaultdict, Counter
 
 import aiohttp
-from aiorpcx import (Connector, RPCSession, SOCKSProxy, Notification, handler_invocation,
+from aiorpcx import (connect_rs, RPCSession, SOCKSProxy, Notification, handler_invocation,
                      SOCKSError, RPCError, TaskTimeout, TaskGroup, Event,
                      sleep, ignore_after)
 
@@ -271,7 +271,8 @@ class PeerManager:
 
             peer_text = f'[{peer}:{port} {kind}]'
             try:
-                async with Connector(PeerSession, peer.host, port, **kwargs) as session:
+                async with connect_rs(peer.host, port, session_factory=PeerSession,
+                                      **kwargs) as session:
                     session.sent_request_timeout = 120 if peer.is_tor else 30
                     await self._verify_peer(session, peer)
                 is_good = True

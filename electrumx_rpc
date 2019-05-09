@@ -13,9 +13,10 @@
 import argparse
 import asyncio
 import json
+import sys
 from os import environ
 
-from aiorpcx import timeout_after, Connector, RPCSession
+from aiorpcx import timeout_after, connect_rs
 import electrumx.lib.text as text
 
 
@@ -114,8 +115,8 @@ def main():
     async def send_request():
         try:
             async with timeout_after(30):
-                async with Connector(RPCSession, 'localhost', port) as session:
-                    session.framer.max_size = 0
+                async with connect_rs('localhost', port) as session:
+                    session.transport._framer.max_size = 0
                     result = await session.send_request(method, args)
                     if method in ('query', ):
                         for line in result:
@@ -126,14 +127,18 @@ def main():
                             print(line)
                     else:
                         print(json.dumps(result, indent=4, sort_keys=True))
+            return 0
         except OSError:
             print('cannot connect - is ElectrumX catching up, not running, or '
                   f'is {port} the wrong RPC port?')
+            return 1
         except Exception as e:
             print(f'error making request: {e}')
+            return 1
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(send_request())
+    code = loop.run_until_complete(send_request())
+    sys.exit(code)
 
 
 if __name__ == '__main__':
