@@ -586,6 +586,8 @@ class SessionManager:
             if self.env.drop_client is not None:
                 self.logger.info('drop clients matching: {}'
                                  .format(self.env.drop_client.pattern))
+            for service in self.env.report_services:
+                self.logger.info(f'advertising service {service}')
             # Start notifications; initialize hsub_results
             await notifications.start(self.db.db_height, self._notify_sessions)
             await self._start_external_servers()

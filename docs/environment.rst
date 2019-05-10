@@ -4,15 +4,14 @@
 Environment Variables
 =====================
 
-ElectrumX takes no command line arguments, instead its behaviour is
-controlled by environment variables.  Only a few are required to be
-given, the rest will have sensible defaults if not specified.  Many of
-the defaults around resource usage are conservative; I encourage you
-to review them.
+ElectrumX takes no command line arguments, instead its behaviour is controlled by
+environment variables.  Only a few are required to be given, the rest will have sensible
+defaults if not specified.  Many of the defaults around resource usage are conservative; I
+encourage you to review them.
 
-Note: by default the server will only serve to connections from the
-same machine.  To be accessible to other users across the internet you
-must set **HOST** appropriately; see below.
+.. note:: set :envvar:`SERVICES` appropriately to be able to connect to your server.  For
+  clients across the internet to know what services you offer you must advertize your
+  services with :envvar:`REPORT_SERVICES`.
 
 
 Required
@@ -104,7 +103,8 @@ Here are some examples of valid services::
 
 .. envvar:: SERVICES
 
-  A comma-separated list of services ElectrumX will accept incoming connections for.
+  A comma-separated list of services ElectrumX will accept incoming connections for.  If
+  unset or empty, ElectrumX will not listen for any incoming connections.
 
   This environment variable determines what interfaces and ports the server listens on, so
   must be set correctly for any connection to the server to succeed.
@@ -130,8 +130,9 @@ Here are some examples of valid services::
 
 .. envvar:: REPORT_SERVICES
 
-  A comma-separated list of services ElectrumX will advertise and other servers in the
-  server network (if peer discovery is enabled), and any successful connection.
+  A comma-separated list of services ElectrumX will advertize and other servers in the
+  server network (if peer discovery is enabled), and any successful connection.  If not
+  set, no services are advertized.
 
   This environment variable must be set correctly, taking account of your network,
   firewall and router setup, for clients and other servers to see how to connect to your
