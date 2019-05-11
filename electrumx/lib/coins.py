@@ -2852,7 +2852,6 @@ class Ravencoin(Coin):
         import x16r_hash
         return x16r_hash.getPoWHash(header)
 
-
 class RavencoinTestnet(Ravencoin):
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587CF")
@@ -2872,6 +2871,32 @@ class RavencoinTestnet(Ravencoin):
         'rvn.satoshi.org.uk s t'
     ]
 
+class Veil(Coin):
+    NAME = "Veil"
+    SHORTNAME = "VEIL"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("3C")
+    P2SH_VERBYTES = [bytes.fromhex("7A")]
+    GENESIS_HASH = ('051be91d426dfff0a2a3b8895a0726d9'
+                    '97c2749c501b581dd739687e706d7f0b')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 210000
+    TX_COUNT_HEIGHT = 181078
+    TX_PER_BLOCK = 10
+    RPC_PORT = 58811
+    REORG_LIMIT = 55
+    PEERS = [
+        'veilseed.presstab.pw s t',
+        'veil.seed.fuzzbawls.pw s t',
+        'veil.seed2.fuzzbawls.pw s t'
+    ]
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
 
 class Bolivarcoin(Coin):
     NAME = "Bolivarcoin"
@@ -2976,3 +3001,4 @@ class ECCoin(Coin):
         # you have to install scryp python module (pip install scrypt)
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
+
