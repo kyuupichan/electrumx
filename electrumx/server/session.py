@@ -175,7 +175,7 @@ class SessionManager:
             # FIXME: pass the service not the kind
             session_factory = partial(session_class, self, self.db, self.mempool,
                                       self.peer_mgr, kind)
-            host = None if service.host == 'all_interfaces' else service.host
+            host = None if service.host == 'all_interfaces' else str(service.host)
             try:
                 self.servers[service] = await serve(session_factory, host,
                                                     service.port, ssl=sslc)
