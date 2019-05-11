@@ -2882,11 +2882,10 @@ class Veil(Coin):
     GENESIS_HASH = ('051be91d426dfff0a2a3b8895a0726d9'
                     '97c2749c501b581dd739687e706d7f0b')
     DESERIALIZER = lib_tx.DeserializerSegWit
-    TX_COUNT = 210000
+    TX_COUNT = 410000
     TX_COUNT_HEIGHT = 181078
-    TX_PER_BLOCK = 10
+    TX_PER_BLOCK = 5
     RPC_PORT = 58811
-    REORG_LIMIT = 55
     PEERS = [
         'veilseed.presstab.pw s t',
         'veil.seed.fuzzbawls.pw s t',
@@ -2895,8 +2894,8 @@ class Veil(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import x16r_hash
-        return x16r_hash.getPoWHash(header)
+        import x16rt_hash
+        return x16rt_hash.getPoWHash(header)
 
 class Bolivarcoin(Coin):
     NAME = "Bolivarcoin"
