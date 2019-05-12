@@ -69,15 +69,17 @@ A **service** has the general form::
 
   protocol://host:port
 
-*protocol* is case-insensitive.  A protocol can be specified multiple times, with
-different hosts or ports.  This might be useful for multi-homed hosts, or if you offer
-both Tor and clearnet services.  The recognised protocols are::
+*protocol* is case-insensitive.  The recognised protocols are::
 
    tcp    Plaintext TCP sockets
    ssl    SSL-encrypted TCP sockets
    ws     Plaintext websockets
    wss    SSL-encrypted websockets
    rpc    Plaintext RPC
+
+In a services list, a protocol can be specified multiple times, with different hosts or
+ports.  This might be useful for multi-homed hosts, or if you offer both Tor and clearnet
+services.
 
 *host* can be a hostname, an IPv4 address, or an IPv6 address enclosed in square brackets.
 
@@ -103,11 +105,11 @@ Here are some examples of valid services::
 
 .. envvar:: SERVICES
 
-  A comma-separated list of services ElectrumX will accept incoming connections for.  If
-  unset or empty, ElectrumX will not listen for any incoming connections.
+  A comma-separated list of services ElectrumX will accept incoming connections for.
 
   This environment variable determines what interfaces and ports the server listens on, so
-  must be set correctly for any connection to the server to succeed.
+  must be set correctly for any connection to the server to succeed.  If unset or empty,
+  ElectrumX will not listen for any incoming connections.
 
   *protocol* can be any recognised protocol.
 
@@ -121,27 +123,27 @@ Here are some examples of valid services::
 
   Tor **onion** addresses are invalid in :envvar:`SERVICES`.
 
-  Here is an example value of this environment variable::
+  Here is an example value of the :envvar:`SERVICES` environment variable::
 
     tcp://:50001,ssl://:50002,wss://:50004,rpc://
 
   This serves **tcp**, **ssl**, **wss** on all interfaces on ports 50001, 50002 and 50004
-  respectively.  **rpc** is served on :const:`localhost` port :const:`8000`.
+  respectively.  **rpc** is served on its default host :const:`localhost` and default port
+  :const:`8000`.
 
 .. envvar:: REPORT_SERVICES
 
   A comma-separated list of services ElectrumX will advertize and other servers in the
-  server network (if peer discovery is enabled), and any successful connection.  If not
-  set, no services are advertized.
+  server network (if peer discovery is enabled), and any successful connection.
 
   This environment variable must be set correctly, taking account of your network,
   firewall and router setup, for clients and other servers to see how to connect to your
-  server.
+  server.  If not set or empty, no services are advertized.
 
   The **rpc** protocol, special IP addresses (inlcuding private ones if peer discovery is
   enabled), and :const:`localhost` are invalid in :envvar:`REPORT_SERVICES`.
 
-  Here is an example value of this environment variable::
+  Here is an example value of the :envvar:`REPORT_SERVICES` environment variable::
 
     tcp://sv.usebsv.com:50001,ssl://sv.usebsv.com:50002,wss://sv.usebsv.com:50004
 
