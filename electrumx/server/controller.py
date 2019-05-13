@@ -82,7 +82,7 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start serving external clients.
         '''
-        if not (0, 18, 0) <= aiorpcx_version < (0, 19):
+        if not (0, 18, 1) <= aiorpcx_version < (0, 19):
             raise RuntimeError('aiorpcX version 0.18.x is required')
 
         env = self.env

@@ -8,6 +8,16 @@
    should not occur with Python 3.7.
 
 
+Version 1.12.0 (13 May 2019)
+============================
+
+* require aiorpcX 0.18.1.  This introduces websocket support.  The environment variables
+  changed accordingly; see :envvar:`SERVICES` and :envvar:`REPORT_SERVICES`.
+* work around bug in recent versions of uvloop
+* aiorpcX upgrade fixes from Shane M
+* coin additions / updates: BitcoinSV, Bolivarcoin (Jose Luis Estevez), BTC Testnet (ghost43),
+  Odin (Pixxl)
+
 Version 1.11.0 (18 Apr 2019)
 ============================
 
