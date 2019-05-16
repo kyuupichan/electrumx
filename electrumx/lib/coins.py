@@ -622,6 +622,18 @@ class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
         'bitcoin.cluelessperson.com s t',
     ]
 
+class GleecBtc(Coin):
+    NAME = "GleecBTC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("23")
+    P2SH_VERBYTES = [bytes.fromhex("26")]
+    WIF_BYTE = bytes.fromhex("41")
+    GENESIS_HASH = ('000000000019d6689c085ae165831e93'
+                    '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    TX_COUNT = 1285611
+    TX_COUNT_HEIGHT = 1187137
+    TX_PER_BLOCK = 1
+
     @classmethod
     def warn_old_client_on_tx_broadcast(cls, client_ver):
         if client_ver < (3, 3, 3):
