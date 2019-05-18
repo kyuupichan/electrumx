@@ -1689,7 +1689,11 @@ class Bitzeny(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import zny_yespower_0_5
+        try:
+            import zny_yespower_0_5
+        except ImportError as e:
+            sys.exit("Please run 'sudo pip3 install zny-yespower-0-5'.")
+
         return zny_yespower_0_5.getPoWHash(header)
 
 
