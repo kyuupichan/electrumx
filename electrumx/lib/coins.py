@@ -2212,6 +2212,7 @@ class Zcoin(Coin):
     MTP_HEADER_DATA_END = MTP_HEADER_DATA_START + MTP_HEADER_DATA_SIZE
     STATIC_BLOCK_HEADERS = False
     DAEMON = daemon.ZcoinMtpDaemon
+    DESERIALIZER = lib_tx.DeserializerZcoin
     PEERS = [
         'electrum.polispay.com'
     ]
