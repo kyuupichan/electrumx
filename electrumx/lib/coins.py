@@ -3033,3 +3033,27 @@ class ECCoin(Coin):
         # you have to install scryp python module (pip install scrypt)
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
+
+class Bellcoin(Coin):
+    NAME = "Bellcoin"
+    SHORTNAME = "BELL"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('000008f3b6bd10c2d03b06674a006b8d'
+                    '9731f6cb58179ef1eee008cee2209603')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 264129
+    TX_COUNT_HEIGHT = 219574
+    TX_PER_BLOCK = 1
+    RPC_PORT = 25252
+    REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import bell_yespower
+        return bell_yespower.getPoWHash(header)
