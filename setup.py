@@ -18,6 +18,7 @@ setuptools.setup(
         'tribus-hash': ['tribus-hash>=1.0.2'],
         'xevan-hash': ['xeven-hash'],
         'x11-hash': ['x11-hash>=1.4'],
+        'zny-yespower-0-5':['zny-yespower-0-5'],
     },
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',
