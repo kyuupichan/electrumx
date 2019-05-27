@@ -228,12 +228,12 @@ class Daemon(object):
         '''Update our record of the daemon's mempool hashes.'''
         return await self._send_single('getrawmempool')
 
-    async def estimatefee(self, block_count):
+    async def estimatefee(self, block_count, estimate_mode):
         '''Return the fee estimate for the block count.  Units are whole
         currency units per KB, e.g. 0.00000995, or -1 if no estimate
         is available.
         '''
-        args = (block_count, )
+        args = (block_count, estimate_mode)
         if await self._is_rpc_available('estimatesmartfee'):
             estimate = await self._send_single('estimatesmartfee', args)
             return estimate.get('feerate', -1)

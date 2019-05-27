@@ -1220,15 +1220,16 @@ class ElectrumX(SessionBase):
         self.bump_cost(1.0)
         return await self.daemon_request('relayfee')
 
-    async def estimatefee(self, number):
+    async def estimatefee(self, number, mode="CONSERVATIVE"):
         '''The estimated transaction fee per kilobyte to be paid for a
         transaction to be included within a certain number of blocks.
 
         number: the number of blocks
+        mode: CONSERVATIVE (default) or ECONOMICAL estimation mode
         '''
         number = non_negative_integer(number)
         self.bump_cost(2.0)
-        return await self.daemon_request('estimatefee', number)
+        return await self.daemon_request('estimatefee', number, mode)
 
     async def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
