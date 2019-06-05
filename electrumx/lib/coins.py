@@ -522,7 +522,7 @@ class Emercoin(Coin):
     VALUE_PER_COIN = 1000000
     RPC_PORT = 6662
 
-    DESERIALIZER = lib_tx.DeserializerTxTimeAuxPow
+    DESERIALIZER = lib_tx.DeserializerEmercoin
 
     PEERS = []
 
