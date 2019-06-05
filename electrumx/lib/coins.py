@@ -339,6 +339,37 @@ class BitcoinMixin(object):
     RPC_PORT = 8332
 
 
+class NameMixin(object):
+
+    @staticmethod
+    def find_end_position_of_name(script, length):
+        """Find the end position of the name data"""
+        n = 0
+        for _i in range(length):
+            # Content of this loop is copied from Script.get_ops's loop
+            op = script[n]
+            n += 1
+
+            if op <= OpCodes.OP_PUSHDATA4:
+                # Raw bytes follow
+                if op < OpCodes.OP_PUSHDATA1:
+                    dlen = op
+                elif op == OpCodes.OP_PUSHDATA1:
+                    dlen = script[n]
+                    n += 1
+                elif op == OpCodes.OP_PUSHDATA2:
+                    dlen, = struct.unpack('<H', script[n: n + 2])
+                    n += 2
+                else:
+                    dlen, = struct.unpack('<I', script[n: n + 4])
+                    n += 4
+                if n + dlen > len(script):
+                    raise IndexError
+                n += dlen
+
+        return n
+
+
 class HOdlcoin(Coin):
     NAME = "HOdlcoin"
     SHORTNAME = "HODLC"
@@ -506,7 +537,7 @@ class BitcoinDiamond(BitcoinSegwit, Coin):
     DESERIALIZER = lib_tx.DeserializerBitcoinDiamondSegWit
 
 
-class Emercoin(Coin):
+class Emercoin(NameMixin, Coin):
     NAME = "Emercoin"
     SHORTNAME = "EMC"
     NET = "mainnet"
@@ -539,6 +570,55 @@ class Emercoin(Coin):
     def header_hash(cls, header):
         '''Given a header return hash'''
         return double_sha256(header[:cls.BASIC_HEADER_SIZE])
+
+    @classmethod
+    def hashX_from_script(cls, script):
+        address_script = cls.address_script_from_script(script)
+
+        return super().hashX_from_script(address_script)
+
+    @classmethod
+    def address_script_from_script(cls, script):
+        from electrumx.lib.script import _match_ops, Script, ScriptError
+
+        try:
+            ops = Script.get_ops(script)
+        except ScriptError:
+            return script
+
+        match = _match_ops
+
+        # Name opcodes
+        OP_NAME_NEW = OpCodes.OP_1
+        OP_NAME_UPDATE = OpCodes.OP_2
+        OP_NAME_DELETE = OpCodes.OP_3
+
+        # Opcode sequences for name operations
+        # Script structure: https://git.io/fjuRu
+        NAME_NEW_OPS = [OP_NAME_NEW, OpCodes.OP_DROP, -1, -1,
+                        OpCodes.OP_2DROP, -1, OpCodes.OP_DROP]
+        NAME_UPDATE_OPS = [OP_NAME_UPDATE, OpCodes.OP_DROP, -1, -1,
+                           OpCodes.OP_2DROP, -1, OpCodes.OP_DROP]
+        NAME_DELETE_OPS = [OP_NAME_DELETE, OpCodes.OP_DROP, -1,
+                           OpCodes.OP_DROP]
+
+        name_script_op_count = None
+
+        # Detect name operations; determine count of opcodes.
+        for name_ops in [NAME_NEW_OPS, NAME_UPDATE_OPS, NAME_DELETE_OPS]:
+            if match(ops[:len(name_ops)], name_ops):
+                name_script_op_count = len(name_ops)
+                break
+
+        if name_script_op_count is None:
+            return script
+
+        name_end_pos = cls.find_end_position_of_name(script, name_script_op_count)
+
+        # Strip the name data to yield the address script
+        address_script = script[name_end_pos:]
+
+        return address_script
 
 
 class BitcoinTestnetMixin(object):
@@ -834,7 +914,7 @@ class Unitus(Coin):
 
 
 # Source: namecoin.org
-class Namecoin(AuxPowMixin, Coin):
+class Namecoin(NameMixin, AuxPowMixin, Coin):
     NAME = "Namecoin"
     SHORTNAME = "NMC"
     NET = "mainnet"
@@ -897,32 +977,10 @@ class Namecoin(AuxPowMixin, Coin):
         if name_script_op_count is None:
             return None, script
 
-        # Find the end position of the name data
-        n = 0
-        for _i in range(name_script_op_count):
-            # Content of this loop is copied from Script.get_ops's loop
-            op = script[n]
-            n += 1
+        name_end_pos = cls.find_end_position_of_name(script, name_script_op_count)
 
-            if op <= OpCodes.OP_PUSHDATA4:
-                # Raw bytes follow
-                if op < OpCodes.OP_PUSHDATA1:
-                    dlen = op
-                elif op == OpCodes.OP_PUSHDATA1:
-                    dlen = script[n]
-                    n += 1
-                elif op == OpCodes.OP_PUSHDATA2:
-                    dlen, = struct.unpack('<H', script[n: n + 2])
-                    n += 2
-                else:
-                    dlen, = struct.unpack('<I', script[n: n + 4])
-                    n += 4
-                if n + dlen > len(script):
-                    raise IndexError
-                op = (op, script[n:n + dlen])
-                n += dlen
         # Strip the name data to yield the address script
-        address_script = script[n:]
+        address_script = script[name_end_pos:]
 
         if name_pushdata is None:
             return None, address_script
