@@ -339,6 +339,37 @@ class BitcoinMixin(object):
     RPC_PORT = 8332
 
 
+class NameMixin(object):
+
+    @staticmethod
+    def find_end_position_of_name(script, length):
+        """Find the end position of the name data"""
+        n = 0
+        for _i in range(length):
+            # Content of this loop is copied from Script.get_ops's loop
+            op = script[n]
+            n += 1
+
+            if op <= OpCodes.OP_PUSHDATA4:
+                # Raw bytes follow
+                if op < OpCodes.OP_PUSHDATA1:
+                    dlen = op
+                elif op == OpCodes.OP_PUSHDATA1:
+                    dlen = script[n]
+                    n += 1
+                elif op == OpCodes.OP_PUSHDATA2:
+                    dlen, = struct.unpack('<H', script[n: n + 2])
+                    n += 2
+                else:
+                    dlen, = struct.unpack('<I', script[n: n + 4])
+                    n += 4
+                if n + dlen > len(script):
+                    raise IndexError
+                n += dlen
+
+        return n
+
+
 class HOdlcoin(Coin):
     NAME = "HOdlcoin"
     SHORTNAME = "HODLC"
@@ -506,7 +537,7 @@ class BitcoinDiamond(BitcoinSegwit, Coin):
     DESERIALIZER = lib_tx.DeserializerBitcoinDiamondSegWit
 
 
-class Emercoin(Coin):
+class Emercoin(NameMixin, Coin):
     NAME = "Emercoin"
     SHORTNAME = "EMC"
     NET = "mainnet"
@@ -582,32 +613,10 @@ class Emercoin(Coin):
         if name_script_op_count is None:
             return script
 
-        # Find the end position of the name data
-        n = 0
-        for _i in range(name_script_op_count):
-            # Content of this loop is copied from Script.get_ops's loop
-            op = script[n]
-            n += 1
+        name_end_pos = cls.find_end_position_of_name(script, name_script_op_count)
 
-            if op <= OpCodes.OP_PUSHDATA4:
-                # Raw bytes follow
-                if op < OpCodes.OP_PUSHDATA1:
-                    dlen = op
-                elif op == OpCodes.OP_PUSHDATA1:
-                    dlen = script[n]
-                    n += 1
-                elif op == OpCodes.OP_PUSHDATA2:
-                    dlen, = struct.unpack('<H', script[n: n + 2])
-                    n += 2
-                else:
-                    dlen, = struct.unpack('<I', script[n: n + 4])
-                    n += 4
-                if n + dlen > len(script):
-                    raise IndexError
-                op = (op, script[n:n + dlen])
-                n += dlen
         # Strip the name data to yield the address script
-        address_script = script[n:]
+        address_script = script[name_end_pos:]
 
         return address_script
 
@@ -905,7 +914,7 @@ class Unitus(Coin):
 
 
 # Source: namecoin.org
-class Namecoin(AuxPowMixin, Coin):
+class Namecoin(NameMixin, AuxPowMixin, Coin):
     NAME = "Namecoin"
     SHORTNAME = "NMC"
     NET = "mainnet"
@@ -968,32 +977,10 @@ class Namecoin(AuxPowMixin, Coin):
         if name_script_op_count is None:
             return None, script
 
-        # Find the end position of the name data
-        n = 0
-        for _i in range(name_script_op_count):
-            # Content of this loop is copied from Script.get_ops's loop
-            op = script[n]
-            n += 1
+        name_end_pos = cls.find_end_position_of_name(script, name_script_op_count)
 
-            if op <= OpCodes.OP_PUSHDATA4:
-                # Raw bytes follow
-                if op < OpCodes.OP_PUSHDATA1:
-                    dlen = op
-                elif op == OpCodes.OP_PUSHDATA1:
-                    dlen = script[n]
-                    n += 1
-                elif op == OpCodes.OP_PUSHDATA2:
-                    dlen, = struct.unpack('<H', script[n: n + 2])
-                    n += 2
-                else:
-                    dlen, = struct.unpack('<I', script[n: n + 4])
-                    n += 4
-                if n + dlen > len(script):
-                    raise IndexError
-                op = (op, script[n:n + dlen])
-                n += dlen
         # Strip the name data to yield the address script
-        address_script = script[n:]
+        address_script = script[name_end_pos:]
 
         if name_pushdata is None:
             return None, address_script
