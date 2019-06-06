@@ -255,20 +255,19 @@ class PeerManager:
             if kind == 'SSL':
                 kwargs['ssl'] = ssl.SSLContext(ssl.PROTOCOL_TLS)
 
-            if self.env.report_services:
-                local_addr_host = self.env.report_services[0].host
-            else:
-                local_addr_host = None
-
             if self.env.force_proxy or peer.is_tor:
                 if not self.proxy:
                     return
                 kwargs['proxy'] = self.proxy
                 kwargs['resolve'] = not peer.is_tor
-            elif local_addr_host:
+            else:
                 # Use our listening Host/IP for outgoing non-proxy
                 # connections so our peers see the correct source.
-                kwargs['local_addr'] = (str(local_addr_host), None)
+                local_hosts = {service.host for service in self.env.services
+                               if isinstance(service.host, (IPv4Address, IPv6Address))
+                               and service.protocol != 'rpc'}
+                if local_hosts:
+                    kwargs['local_addr'] = (str(local_hosts.pop()), None)
 
             peer_text = f'[{peer}:{port} {kind}]'
             try:
