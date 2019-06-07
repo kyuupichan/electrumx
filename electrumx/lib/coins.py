@@ -650,7 +650,7 @@ class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
 class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     NET = "scalingtest"
     PEERS = [
-        '206.189.16.213 t51001 s51002',
+        'stn-server.electrumsv.io t51001 s51002',
     ]
     TX_COUNT = 2015
     TX_COUNT_HEIGHT = 5711
