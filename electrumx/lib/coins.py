@@ -3033,3 +3033,31 @@ class ECCoin(Coin):
         # you have to install scryp python module (pip install scrypt)
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
+
+# Source: https://github.com/projectzyrk/zyrk-core
+class Zyrk(Coin):
+    NAME = "Zyrk"
+    SHORTNAME = "ZYRK"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("4b")
+    P2SH_VERBYTES = [bytes.fromhex("50")]
+    GENESIS_HASH = ('00000d8a24f1303b9d29566987e31c6e'
+                    'c289caa102657dda3a0ce6c4e4993035')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 32656
+    TX_COUNT_HEIGHT = 25755
+    TX_PER_BLOCK = 2
+    RPC_PORT = 19656
+    REORG_LIMIT = 1000
+    PEERS = [
+        'seed.zyrk.io s t',
+        'peers.zyrk.io s t'
+    ]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
