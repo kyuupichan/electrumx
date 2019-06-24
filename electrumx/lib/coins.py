@@ -41,6 +41,7 @@ import electrumx.lib.util as util
 from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
 from electrumx.lib.script import ScriptPubKey, OpCodes
+from electrumx.lib.verus_hash import verus_hash
 import electrumx.lib.tx as lib_tx
 import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
@@ -1388,6 +1389,27 @@ class Monaize(KomodoMixin, EquihashMixin, Coin):
     RPC_PORT = 14337
     REORG_LIMIT = 800
     PEERS = []
+
+
+class Verus(KomodoMixin, EquihashMixin, Coin):
+    NAME = "Verus"
+    SHORTNAME = "VRSC"
+    NET = "mainnet"
+    TX_COUNT = 55000
+    TX_COUNT_HEIGHT = 42000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 27486
+    REORG_LIMIT = 800
+    PEERS = []
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        # if this may be the genesis block, use sha256, otherwise, VerusHash
+        if cls.header_prevhash(header) == bytes([0] * 32):
+            return double_sha256(header)
+        else:
+            return verus_hash(header)
 
 
 class Einsteinium(Coin):
