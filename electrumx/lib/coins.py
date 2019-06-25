@@ -3034,6 +3034,7 @@ class ECCoin(Coin):
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
 
+
 class Bellcoin(Coin):
     NAME = "Bellcoin"
     SHORTNAME = "BELL"
@@ -3048,9 +3049,13 @@ class Bellcoin(Coin):
     DESERIALIZER = lib_tx.DeserializerSegWit
     TX_COUNT = 264129
     TX_COUNT_HEIGHT = 219574
-    TX_PER_BLOCK = 1
+    TX_PER_BLOCK = 5
     RPC_PORT = 25252
     REORG_LIMIT = 1000
+    PEERS = [
+        'bell.electrumx.japanesecoin-pool.work s t',
+        'bell.streetcrypto7.com s t',
+    ]
 
     @classmethod
     def header_hash(cls, header):
