@@ -141,23 +141,23 @@ def subbytes(s):
 
 # AES ShiftRows
 def shiftrows(s):
-    return [s[0], s[5], s[10], s[15], 
-            s[4], s[9], s[14], s[3], 
-            s[8], s[13], s[2], s[7], 
+    return [s[0], s[5], s[10], s[15],
+            s[4], s[9], s[14], s[3],
+            s[8], s[13], s[2], s[7],
             s[12], s[1], s[6], s[11]]
 
 
 # AES MixColumns
-def mixcolumns(s):	
+def mixcolumns(s):
     return list(itertools.chain(*
         [[xtime(s[4*i]) ^ xtime(s[4*i+1]) ^ s[4*i+1] ^ s[4*i+2] ^ s[4*i+3],
         s[4*i] ^ xtime(s[4*i+1]) ^ xtime(s[4*i+2]) ^ s[4*i+2] ^ s[4*i+3],
         s[4*i] ^ s[4*i+1] ^ xtime(s[4*i+2]) ^ xtime(s[4*i+3]) ^ s[4*i+3],
-        xtime(s[4*i]) ^ s[4*i] ^ s[4*i+1] ^ s[4*i+2] ^ xtime(s[4*i+3])] 
+        xtime(s[4*i]) ^ s[4*i] ^ s[4*i+1] ^ s[4*i+2] ^ xtime(s[4*i+3])]
         for i in range(4)]))
-    
 
-# AES single regular round	
+
+# AES single regular round
 def aesenc(s, rk):
     s = subbytes(s)
     s = shiftrows(s)
@@ -176,14 +176,14 @@ def shift32(x):
 # linear mixing for Haraka-512/256
 def mix512(s):
     return [s[0][12:16] + s[2][12:16] + s[1][12:16] + s[3][12:16],
-             s[2][0:4]   + s[0][0:4]   + s[3][0:4]   + s[1][0:4]  ,
-             s[2][4:8]   + s[0][4:8]   + s[3][4:8]   + s[1][4:8]  ,
-             s[0][8:12]  + s[2][8:12]  + s[1][8:12]  + s[3][8:12]]
+             s[2][0:4] + s[0][0:4] + s[3][0:4] + s[1][0:4],
+             s[2][4:8] + s[0][4:8] + s[3][4:8] + s[1][4:8],
+             s[0][8:12] + s[2][8:12] + s[1][8:12] + s[3][8:12]]
 
 
 # linear mixing for Haraka-256/256
 def mix256(s):
-    return [s[0][0:4]  + s[1][0:4]  + s[0][4:8]   + s[1][4:8],
+    return [s[0][0:4] + s[1][0:4] + s[0][4:8] + s[1][4:8],
             s[0][8:12] + s[1][8:12] + s[0][12:16] + s[1][12:16]]
 
 
@@ -210,7 +210,7 @@ def haraka512256(msg):
 
     # apply feed-forward
     s = [xor(s[i], msg[16*i:16*(i+1)]) for i in range(4)]
-    
+
     # truncation
     return s[0][8:] + s[1][8:] + s[2][0:8] + s[3][0:8]
 
@@ -233,7 +233,7 @@ def haraka256256(msg):
 
     # apply feed-forward
     s = [xor(s[i], msg[16*i:16*(i+1)]) for i in range(2)]
-    
+
     # truncation
     return list(itertools.chain(*s))
 
