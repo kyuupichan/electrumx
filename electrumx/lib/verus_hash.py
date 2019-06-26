@@ -521,15 +521,13 @@ def __verusclmulwithoutreduction64alignedrepeat_port(randomsource, buf, keyMask)
             aesround = 0
 
             for j in range(rounds, -1, -1):
-                if (selector & ((0x10000000 << j) & 0xffffffff)
-                    if j != 3
-                        else selector & 0xffffffff80000000):
-                            onekey = randomsource[rc]
-                            rc += 1
-                            temp2 = buf[pbuf] if j & 1 else buf[buftmp]
-                            add1 = _mm_xor_si128_emu(onekey, temp2)
-                            clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
-                            acc = _mm_xor_si128_emu(clprod1, acc)
+                if (selector & ((0x10000000 << j) & 0xffffffff) if j != 3 else selector & 0xffffffff80000000):
+                    onekey = randomsource[rc]
+                    rc += 1
+                    temp2 = buf[pbuf] if j & 1 else buf[buftmp]
+                    add1 = _mm_xor_si128_emu(onekey, temp2)
+                    clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
+                    acc = _mm_xor_si128_emu(clprod1, acc)
                 else:
                     onekey = randomsource[rc]
                     rc += 1
@@ -537,7 +535,6 @@ def __verusclmulwithoutreduction64alignedrepeat_port(randomsource, buf, keyMask)
                     roundidx = aesround << 2
                     aesround += 1
                     onekey, temp2 = AES2_MIX2_EMU(onekey, temp2, rc + roundidx, randomsource)
-
                     acc = _mm_xor_si128_emu(onekey, acc)
                     acc = _mm_xor_si128_emu(temp2, acc)
 
