@@ -2881,6 +2881,7 @@ class Bitsend(Coin):
                             .format(header_hex_hash, cls.GENESIS_HASH))
         return header + bytes(1)
 
+
 class Ritocoin(Coin):
     NAME = "Ritocoin"
     SHORTNAME = "RITO"
@@ -2905,6 +2906,7 @@ class Ritocoin(Coin):
         '''Given a header return the hash.'''
         import x21s_hash
         return x21s_hash.getPoWHash(header)
+
 
 class Ravencoin(Coin):
     NAME = "Ravencoin"
