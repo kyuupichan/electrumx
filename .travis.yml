@@ -36,6 +36,7 @@ install:
   - pip install x16r_hash
   - pip install pycryptodomex
   - pip install git+https://github.com/Electra-project/nist5_hash
+  - pip install bell-yespower
 # command to run tests
 script:
   - pytest --cov=electrumx
