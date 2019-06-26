@@ -2882,6 +2882,32 @@ class Bitsend(Coin):
         return header + bytes(1)
 
 
+class Ritocoin(Coin):
+    NAME = "Ritocoin"
+    SHORTNAME = "RITO"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0534E7CA")
+    XPRV_VERBYTES = bytes.fromhex("05347EAC")
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("69")]
+    GENESIS_HASH = ('00000075e344bdf1c0e433f453764b18'
+                    '30a7aa19b2a5213e707502a22b779c1b')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 1188090
+    TX_COUNT_HEIGHT = 296030
+    TX_PER_BLOCK = 3
+    RPC_PORT = 8766
+    REORG_LIMIT = 55
+    PEERS = [
+        'electrum-rito.minermore.com s t'
+    ]
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x21s_hash
+        return x21s_hash.getPoWHash(header)
+
+
 class Ravencoin(Coin):
     NAME = "Ravencoin"
     SHORTNAME = "RVN"
