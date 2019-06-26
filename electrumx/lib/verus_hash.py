@@ -104,13 +104,13 @@ def ps(s):
 def printstate(s):
     for i in range(4):
         if len(s) == 4:
-            q = [s[0][i],s[0][i+4],s[0][i+8],s[0][i+12],
-                s[1][i],s[1][i+4],s[1][i+8],s[1][i+12],
-                s[2][i],s[2][i+4],s[2][i+8],s[2][i+12],
-                s[3][i],s[3][i+4],s[3][i+8],s[3][i+12]]
+            q = [s[0][i], s[0][i+4], s[0][i+8], s[0][i+12],
+                s[1][i], s[1][i+4], s[1][i+8], s[1][i+12],
+                s[2][i], s[2][i+4], s[2][i+8], s[2][i+12],
+                s[3][i], s[3][i+4], s[3][i+8], s[3][i+12]]
         else:
-            q = [s[0][i],s[0][i+4],s[0][i+8],s[0][i+12],
-                s[1][i],s[1][i+4],s[1][i+8],s[1][i+12]]
+            q = [s[0][i], s[0][i+4], s[0][i+8], s[0][i+12],
+                s[1][i], s[1][i+4], s[1][i+8], s[1][i+12]]
         print(" ".join([hexbyte(x) for x in q]))
         # print q
     print("")
@@ -125,7 +125,7 @@ def xtime(x):
 
 
 # xor two lists element-wise
-def xor(x,y):
+def xor(x, y):
     return [x[i] ^ y[i] for i in range(16)]
 
 
@@ -196,8 +196,8 @@ def convRC(rc):
 # Haraka-512/256
 def haraka512256(msg):
     # obtain state from msg input and set initial rcon
-    s = [msg[i:i+16] for i in [0,16,32,48]]
-    rcon = [0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1]
+    s = [msg[i:i+16] for i in [0, 16, 32, 48]]
+    rcon = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
 
     # apply round functions
     for t in range(ROUNDS):
@@ -218,8 +218,8 @@ def haraka512256(msg):
 # Haraka-256/256
 def haraka256256(msg):
     # obtain state from msg input and set initial rcon
-    s = [msg[i:i+16] for i in [0,16]]
-    rcon = [0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1]
+    s = [msg[i:i+16] for i in [0, 16]]
+    rcon = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]
 
     # apply round functions
     for t in range(ROUNDS):
