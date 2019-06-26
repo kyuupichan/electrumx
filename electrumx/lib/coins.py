@@ -2925,6 +2925,7 @@ class Ravencoin(Coin):
         'electrum-rvn.minermore.com s t',
         '153.126.197.243 s t'
     ]
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
