@@ -89,13 +89,16 @@ RC2 = [0x0684704ce620c00ab2c5fef075817b9d, 0x8b66b4e188f3a06b640f6ba42f08f717,
        0x4ce99a54b9f3026aa2ca9cf7839ec978, 0xae51a51a1bdff7be40c06e2822901235,
        0xa0c1613cba7ed22bc173bc0f48a659cf, 0x756acc03022882884ad6bdfde9c59da1]
 
+
 # get padded hex for single byte
 def hexbyte(x):
     return hex(x)[2:].zfill(2)
 
+
 # print list of bytes in hex
 def ps(s):
     return " ".join([hexbyte(x) for x in s])
+
 
 # print state
 def printstate(s):
@@ -112,6 +115,7 @@ def printstate(s):
         # print q
     print("")
 
+
 # multiply by 2 over GF(2^128)
 def xtime(x):
     if (x >> 7):
@@ -119,17 +123,21 @@ def xtime(x):
     else:
         return (x << 1) & 0xff
 
+
 # xor two lists element-wise
 def xor(x,y):
     return [x[i] ^ y[i] for i in range(16)]
+
 
 # apply a single S-box
 def sbox(x):
     return S[(x >> 4)][x & 0xF]
 
+
 # AES SubBytes
 def subbytes(s):
     return [sbox(x) for x in s]
+
 
 # AES ShiftRows
 def shiftrows(s):
@@ -137,6 +145,7 @@ def shiftrows(s):
             s[4], s[9], s[14], s[3], 
             s[8], s[13], s[2], s[7], 
             s[12], s[1], s[6], s[11]]
+
 
 # AES MixColumns
 def mixcolumns(s):	
@@ -147,6 +156,7 @@ def mixcolumns(s):
         xtime(s[4*i]) ^ s[4*i] ^ s[4*i+1] ^ s[4*i+2] ^ xtime(s[4*i+3])] 
         for i in range(4)]))
     
+
 # AES single regular round	
 def aesenc(s, rk):
     s = subbytes(s)
@@ -155,11 +165,13 @@ def aesenc(s, rk):
     s = xor(s, rk[::-1])
     return s
 
+
 # consider 4 consecutive entries as 32-bit values and shift each of them to the left
 def shift32(x):
     # make list of 32-bit elements
     w = [((x[i] << 24) ^ (x[i+1] << 16) ^ (x[i+2] << 8) ^ x[i+3]) << 1 for i in [0, 4, 8, 12]]
     return list(itertools.chain(*[[(q >> 24) & 0xFF, (q >> 16) & 0xFF, (q >> 8) & 0xFF, (q >> 0) & 0xFF] for q in w]))
+
 
 # linear mixing for Haraka-512/256
 def mix512(s):
@@ -168,15 +180,18 @@ def mix512(s):
              s[2][4:8]   + s[0][4:8]   + s[3][4:8]   + s[1][4:8]  ,
              s[0][8:12]  + s[2][8:12]  + s[1][8:12]  + s[3][8:12]]
 
+
 # linear mixing for Haraka-256/256
 def mix256(s):
     return [s[0][0:4]  + s[1][0:4]  + s[0][4:8]   + s[1][4:8],
             s[0][8:12] + s[1][8:12] + s[0][12:16] + s[1][12:16]]
 
+
 # convert RC to 16 words state
 def convRC(rc):
     rcstr = hex(rc)[2:-1].zfill(32)
     return [int(rcstr[i:i+2], 16) for i in range(0, 32, 2)]
+
 
 # Haraka-512/256
 def haraka512256(msg):
@@ -184,44 +199,27 @@ def haraka512256(msg):
     s = [msg[i:i+16] for i in [0,16,32,48]]
     rcon = [0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1]
 
-    #print("= input state =")
-    #printstate(s)
-
     # apply round functions
     for t in range(ROUNDS):
         # first we do AES_ROUNDS of AES rounds and update the round constant each time
         for m in range(AES_ROUNDS):
             s = [aesenc(s[i], convRC(RC[4*t*AES_ROUNDS + 4*m + i])) for i in range(4)]
 
-        #print("= round %d : after aes layer ="%(t))
-        #printstate(s)
-
         # now apply mixing
         s = mix512(s)
 
-        #print("= round %d : after mix layer ="%(t))
-        #printstate(s)
-
-    #print("= output from permutation =")
-    #printstate(s)
-    
     # apply feed-forward
     s = [xor(s[i], msg[16*i:16*(i+1)]) for i in range(4)]
     
-    #print("= after feed-forward =")
-    #printstate(s)
-
     # truncation
     return s[0][8:] + s[1][8:] + s[2][0:8] + s[3][0:8]
+
 
 # Haraka-256/256
 def haraka256256(msg):
     # obtain state from msg input and set initial rcon
     s = [msg[i:i+16] for i in [0,16]]
     rcon = [0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1]
-
-    #print("= input state =")
-    #printstate(s)
 
     # apply round functions
     for t in range(ROUNDS):
@@ -230,26 +228,15 @@ def haraka256256(msg):
             s = [aesenc(s[i], convRC(RC[2*t*AES_ROUNDS + 2*m + i])) for i in range(2)]
             rcon = shift32(rcon)
 
-        #print("= round %d : after aes layer ="%(t))
-        #printstate(s)
-
         # now apply mixing
         s = mix256(s)
 
-        #print("= round %d : after mix layer ="%(t))
-        #printstate(s)
-
-    #print("= output from permutation =")
-    #printstate(s)
-    
     # apply feed-forward
     s = [xor(s[i], msg[16*i:16*(i+1)]) for i in range(2)]
     
-    #print("= after feed-forward =")
-    #printstate(s)
-
     # truncation
     return list(itertools.chain(*s))
+
 
 # verus_hash
 def verus_hash(msg):
@@ -260,6 +247,7 @@ def verus_hash(msg):
         buf[32:64] = [b for b in msg[i:i + clen]] + [0] * (32 - clen)
         buf[0:32] = haraka512256(buf)
     return bytes(buf[0:32])
+
 
 '''
 # set some message bytes
