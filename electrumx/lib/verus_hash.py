@@ -105,12 +105,12 @@ def printstate(s):
     for i in range(4):
         if len(s) == 4:
             q = [s[0][i], s[0][i+4], s[0][i+8], s[0][i+12],
-                s[1][i], s[1][i+4], s[1][i+8], s[1][i+12],
-                s[2][i], s[2][i+4], s[2][i+8], s[2][i+12],
-                s[3][i], s[3][i+4], s[3][i+8], s[3][i+12]]
+                 s[1][i], s[1][i+4], s[1][i+8], s[1][i+12],
+                 s[2][i], s[2][i+4], s[2][i+8], s[2][i+12],
+                 s[3][i], s[3][i+4], s[3][i+8], s[3][i+12]]
         else:
             q = [s[0][i], s[0][i+4], s[0][i+8], s[0][i+12],
-                s[1][i], s[1][i+4], s[1][i+8], s[1][i+12]]
+                 s[1][i], s[1][i+4], s[1][i+8], s[1][i+12]]
         print(" ".join([hexbyte(x) for x in q]))
         # print q
     print("")
@@ -151,10 +151,10 @@ def shiftrows(s):
 def mixcolumns(s):
     return list(itertools.chain(*
         [[xtime(s[4*i]) ^ xtime(s[4*i+1]) ^ s[4*i+1] ^ s[4*i+2] ^ s[4*i+3],
-        s[4*i] ^ xtime(s[4*i+1]) ^ xtime(s[4*i+2]) ^ s[4*i+2] ^ s[4*i+3],
-        s[4*i] ^ s[4*i+1] ^ xtime(s[4*i+2]) ^ xtime(s[4*i+3]) ^ s[4*i+3],
-        xtime(s[4*i]) ^ s[4*i] ^ s[4*i+1] ^ s[4*i+2] ^ xtime(s[4*i+3])]
-        for i in range(4)]))
+         s[4*i] ^ xtime(s[4*i+1]) ^ xtime(s[4*i+2]) ^ s[4*i+2] ^ s[4*i+3],
+         s[4*i] ^ s[4*i+1] ^ xtime(s[4*i+2]) ^ xtime(s[4*i+3]) ^ s[4*i+3],
+         xtime(s[4*i]) ^ s[4*i] ^ s[4*i+1] ^ s[4*i+2] ^ xtime(s[4*i+3])]
+         for i in range(4)]))
 
 
 # AES single regular round
@@ -176,9 +176,9 @@ def shift32(x):
 # linear mixing for Haraka-512/256
 def mix512(s):
     return [s[0][12:16] + s[2][12:16] + s[1][12:16] + s[3][12:16],
-             s[2][0:4] + s[0][0:4] + s[3][0:4] + s[1][0:4],
-             s[2][4:8] + s[0][4:8] + s[3][4:8] + s[1][4:8],
-             s[0][8:12] + s[2][8:12] + s[1][8:12] + s[3][8:12]]
+            s[2][0:4] + s[0][0:4] + s[3][0:4] + s[1][0:4],
+            s[2][4:8] + s[0][4:8] + s[3][4:8] + s[1][4:8],
+            s[0][8:12] + s[2][8:12] + s[1][8:12] + s[3][8:12]]
 
 
 # linear mixing for Haraka-256/256
