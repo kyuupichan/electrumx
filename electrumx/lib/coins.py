@@ -41,7 +41,7 @@ import electrumx.lib.util as util
 from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
 from electrumx.lib.script import ScriptPubKey, OpCodes
-from electrumx.lib.verus_hash import verus_hash
+from electrumx.lib.verus_hash import verus_hash, verus_hash2b
 import electrumx.lib.tx as lib_tx
 import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
@@ -1409,7 +1409,10 @@ class Verus(KomodoMixin, EquihashMixin, Coin):
         if cls.header_prevhash(header) == bytes(32):
             return double_sha256(header)
         else:
-            return verus_hash(header)
+            if (header[0] == 4 and header[2] == 1):
+                return verus_hash2b(header)
+            else:
+                return verus_hash(header)
 
 
 class Einsteinium(Coin):
