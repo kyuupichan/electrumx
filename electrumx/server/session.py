@@ -1810,4 +1810,3 @@ class BitGreenElectrumX(ElectrumX):
             return [mn for mn in cache if mn['vin'] in vins]
         else:
             return cache
-
