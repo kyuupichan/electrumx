@@ -122,7 +122,7 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.DecredTestnet
     os.environ.pop('NET')
-    os.environ['COIN'] = ' BitcoinGreen '
+    os.environ['COIN'] = ' BitGreen '
     e = Env()
     assert e.coin == lib_coins.Bitg
     os.environ['NET'] = 'mainnet'
@@ -141,6 +141,7 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.TokenPay
 
+
 def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)
 
@@ -157,6 +158,7 @@ def test_SERVICES():
         Service('ws', NetAddress('1.2.3.4', 567)),
         Service('rpc', NetAddress('::1', 700)),
     ]
+
 
 def test_SERVICES_default_rpc():
     # This has a blank entry between commas
@@ -178,7 +180,7 @@ def test_bad_SERVICES():
     setup_base_env()
     os.environ['SERVICES'] = 'tcp:foo.bar:1234'
     with pytest.raises(ServiceError) as err:
-         Env()
+        Env()
     assert 'invalid service string' in str(err.value)
     os.environ['SERVICES'] = 'xxx://foo.com:50001'
     with pytest.raises(ServiceError) as err:

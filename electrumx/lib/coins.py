@@ -46,7 +46,7 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
+                                      BitGreenElectrumX, SmartCashElectrumX, AuxPoWElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -2598,7 +2598,7 @@ class PivxTestnet(Pivx):
 
 class Bitg(Coin):
 
-    NAME = "BitcoinGreen"
+    NAME = "BitGreen"
     SHORTNAME = "BITG"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
@@ -2608,14 +2608,14 @@ class Bitg(Coin):
     WIF_BYTE = bytes.fromhex("2e")
     GENESIS_HASH = (
         '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
-    DAEMON = daemon.DashDaemon
+    DAEMON = daemon.BitGreenDaemon
     TX_COUNT = 1000
     TX_COUNT_HEIGHT = 10000
     TX_PER_BLOCK = 1
     RPC_PORT = 9332
     REORG_LIMIT = 1000
-    SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
+    SESSIONCLS = BitGreenElectrumX
+    PEERS = []
 
     @classmethod
     def header_hash(cls, header):

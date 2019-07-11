@@ -1676,3 +1676,138 @@ class AuxPoWElectrumX(ElectrumX):
             height += 1
 
         return headers.hex()
+
+
+class BitGreenElectrumX(ElectrumX):
+    '''A TCP server that handles incoming Electrum Bitg connections.'''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mns = set()
+        self.mn_cache_height = 0
+        self.mn_cache = []
+
+    def set_request_handlers(self, ptuple):
+        super().set_request_handlers(ptuple)
+        self.request_handlers.update({
+            'masternode.announce.broadcast':
+            self.masternode_announce_broadcast,
+            'masternode.list': self.masternode_list,
+        })
+
+    async def notify(self, touched, height_changed):
+        '''Notify the client about changes in masternode list.'''
+        await super().notify(touched, height_changed)
+        for mn in self.mns.copy():
+            status = await self.daemon_request('masternode_list',
+                                               ['list', mn])
+            if mn in status:
+                await self.send_notification('masternode.subscribe',
+                                             [mn, status[mn]])
+
+    # Masternode command handlers
+    async def masternode_announce_broadcast(self, signmnb):
+        '''Pass through the masternode announce message to be broadcast
+        by the daemon.
+
+        signmnb: signed masternode broadcast message.'''
+        try:
+            return await self.daemon_request('masternode_broadcast',
+                                             ['relay', signmnb])
+        except DaemonError as e:
+            error, = e.args
+            message = error['message']
+            self.logger.info(f'masternode_broadcast: {message}')
+            raise RPCError(BAD_REQUEST, 'the masternode broadcast was '
+                           f'rejected.\n\n{message}\n[{signmnb}]')
+
+    async def masternode_list(self, vins):
+        '''
+        Returns the list of masternodes.
+
+        vin: a list of masternode VINs.
+        '''
+        if not isinstance(vins, list):
+            raise RPCError(BAD_REQUEST, 'expected a list of VINs')
+
+        def get_masternode_payment_queue(mns):
+            '''Returns the calculated position in the payment queue for all the
+            valid masterernodes in the given mns list.
+
+            mns: a list of masternodes information.
+            '''
+            now = int(datetime.datetime.utcnow().strftime("%s"))
+            mn_queue = []
+
+            # Only ENABLED masternodes are considered for the list.
+            for line in mns:
+                if line['status'] == 'ENABLED':
+                    # if last paid time == 0
+                    if int(line['lastpaid']) == 0:
+                        # use active seconds
+                        line['position'] = int(line['activetime'])
+                    else:
+                        # now minus last paid
+                        delta = now - int(line['activetime'])
+                        # if > active seconds, use active seconds
+                        if delta >= int(line['activetime']):
+                            line['position'] = int(line['activetime'])
+                        # use active seconds
+                        else:
+                            line['position'] = delta
+                    mn_queue.append(line)
+            mn_queue = sorted(
+                mn_queue, key=lambda x: x['position'], reverse=True)
+            return mn_queue
+
+        def get_payment_position(payment_queue, address):
+            '''
+            Returns the position of the payment list for the given address.
+
+            payment_queue: position in the payment queue for the masternode.
+            address: masternode payee address.
+            '''
+            position = -1
+            for pos, mn in enumerate(payment_queue, start=1):
+                if mn['addr'] == address:
+                    position = pos
+                    break
+            return position
+
+        # Accordingly with the masternode payment queue, a custom list
+        # with the masternode information including the payment
+        # position is returned.
+        cache = self.mn_cache
+        if not cache or self.mn_cache_height != self.db.db_height:
+            full_mn_list = await self.daemon_request('masternode_list',
+                                                     ['list'])
+            mn_payment_queue = get_masternode_payment_queue(full_mn_list)
+            mn_payment_count = len(mn_payment_queue)
+            mn_list = []
+
+            for mn_data in full_mn_list:
+                mn_info = {}
+                mn_info['vin'] = mn_data['txhash'] + \
+                    '-' + str(mn_data['outidx'])
+                mn_info['status'] = mn_data['status']
+                mn_info['version'] = mn_data['version']
+                mn_info['addr'] = mn_data['addr']
+                mn_info['lastseen'] = mn_data['lastseen']
+                mn_info['activetime'] = mn_data['activetime']
+                mn_info['lastpaid'] = mn_data['lastpaid']
+                mn_info['ip'] = ''
+                mn_info['paymentposition'] = get_payment_position(
+                    mn_payment_queue, mn_info['addr'])
+                mn_info['inselection'] = (
+                    mn_info['paymentposition'] < mn_payment_count // 10)
+                mn_list.append(mn_info)
+            cache.clear()
+            cache.extend(mn_list)
+            self.mn_cache_height = self.db.db_height
+
+        # If vins is an empty list the whole masternode list is returned
+        if vins:
+            return [mn for mn in cache if mn['vin'] in vins]
+        else:
+            return cache
+
