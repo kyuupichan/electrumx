@@ -3120,3 +3120,28 @@ class Bellcoin(Coin):
         '''Given a header return the hash.'''
         import bell_yespower
         return bell_yespower.getPoWHash(header)
+
+
+class CPUchain(Coin):
+    NAME = "CPUchain"
+    SHORTNAME = "CPU"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1C")
+    P2SH_VERBYTES = [bytes.fromhex("1E")]
+    GENESIS_HASH = ('000024d8766043ea0e1c9ad42e7ea4b5'
+                    'fdb459887bd80b8f9756f3d87e128f12')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 4471
+    TX_COUNT_HEIGHT = 3491
+    TX_PER_BLOCK = 2
+    RPC_PORT = 19707
+    REORG_LIMIT = 1000
+    PEERS = [
+        'electrumx.cpuchain.org s t',
+    ]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import cpupower
+        return cpupower.getPoWHash(header)
