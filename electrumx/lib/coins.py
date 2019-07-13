@@ -1062,6 +1062,23 @@ class DogecoinTestnet(Dogecoin):
                     '4d7049f45189db5664f3c4d07350559e')
 
 
+class Unobtanium(AuxPowMixin, Coin):
+    NAME = "Unobtanium"
+    SHORTNAME = "UNO"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("130")
+    P2SH_VERBYTES = [bytes.fromhex("30")]
+    WIF_BYTE = bytes.fromhex("E0")
+    GENESIS_HASH = ('000004c2fc5fffb810dccc197d603690'
+                    '099a68305232e552d96ccbe8e2c52b75')
+    TX_COUNT = 1554846
+    TX_COUNT_HEIGHT = 1320961
+    TX_PER_BLOCK = 20
+    REORG_LIMIT = 2000
+
+
 # Source: https://github.com/motioncrypto/motion
 class Motion(Coin):
     NAME = "Motion"
