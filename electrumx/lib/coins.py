@@ -1068,8 +1068,8 @@ class Unobtanium(AuxPowMixin, Coin):
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
-    P2PKH_VERBYTE = bytes.fromhex("130")
-    P2SH_VERBYTES = [bytes.fromhex("30")]
+    P2PKH_VERBYTE = bytes.fromhex("82")
+    P2SH_VERBYTES = [bytes.fromhex("1E")]
     WIF_BYTE = bytes.fromhex("E0")
     GENESIS_HASH = ('000004c2fc5fffb810dccc197d603690'
                     '099a68305232e552d96ccbe8e2c52b75')
