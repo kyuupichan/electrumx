@@ -1077,6 +1077,9 @@ class Unobtanium(AuxPowMixin, Coin):
     TX_COUNT_HEIGHT = 1320961
     TX_PER_BLOCK = 20
     REORG_LIMIT = 2000
+    DESERIALIZER = lib_tx.DeserializerAuxPow
+    RPC_PORT = 65535
+
 
 
 # Source: https://github.com/motioncrypto/motion
