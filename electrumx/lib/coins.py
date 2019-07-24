@@ -40,7 +40,8 @@ from functools import partial
 import electrumx.lib.util as util
 from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
-from electrumx.lib.script import ScriptPubKey, OpCodes
+from electrumx.lib.script import (_match_ops, Script, ScriptError,
+                                  ScriptPubKey, OpCodes)
 import electrumx.lib.tx as lib_tx
 import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
@@ -343,7 +344,10 @@ class NameMixin(object):
 
     @staticmethod
     def find_end_position_of_name(script, length):
-        """Find the end position of the name data"""
+        """Finds the end position of the name data
+
+        Given the number of opcodes in the name prefix (length), returns the
+        index into the byte array of where the name prefix ends."""
         n = 0
         for _i in range(length):
             # Content of this loop is copied from Script.get_ops's loop
@@ -368,6 +372,56 @@ class NameMixin(object):
                 n += dlen
 
         return n
+
+    @classmethod
+    def interpret_name_prefix(cls, script, possible_ops):
+        """Interprets a potential name prefix
+
+        Checks if the given script has a name prefix.  If it has, the
+        name prefix is split off the actual address script, and its parsed
+        fields (e.g. the name) returned.
+
+        possible_ops must be an array of arrays, defining the structures
+        of name prefixes to look out for.  Each array can consist of
+        actual opcodes, -1 for ignored data placeholders and strings for
+        named placeholders.  Whenever a data push matches a named placeholder,
+        the corresponding value is put into a dictionary the placeholder name
+        as key, and the dictionary of matches is returned."""
+
+        try:
+            ops = Script.get_ops(script)
+        except ScriptError:
+            return None, script
+
+        name_op_count = None
+        for pops in possible_ops:
+            n = len(pops)
+
+            # Start by translating named placeholders to -1 values, and
+            # keeping track of which op they corresponded to.
+            template = []
+            named_index = {}
+            for i in range(n):
+                if type(pops[i]) == str:
+                    template.append(-1)
+                    named_index[pops[i]] = i
+                else:
+                    template.append(pops[i])
+
+            if not _match_ops(ops[:n], template):
+                continue
+
+            name_op_count = n
+            named_values = {key: ops[named_index[key]] for key in named_index}
+            break
+
+        if name_op_count is None:
+            return None, script
+
+        name_end_pos = cls.find_end_position_of_name(script, name_op_count)
+
+        address_script = script[name_end_pos:]
+        return named_values, address_script
 
 
 class HOdlcoin(Coin):
@@ -585,15 +639,6 @@ class Emercoin(NameMixin, Coin):
 
     @classmethod
     def address_script_from_script(cls, script):
-        from electrumx.lib.script import _match_ops, Script, ScriptError
-
-        try:
-            ops = Script.get_ops(script)
-        except ScriptError:
-            return script
-
-        match = _match_ops
-
         # Name opcodes
         OP_NAME_NEW = OpCodes.OP_1
         OP_NAME_UPDATE = OpCodes.OP_2
@@ -608,22 +653,13 @@ class Emercoin(NameMixin, Coin):
         NAME_DELETE_OPS = [OP_NAME_DELETE, OpCodes.OP_DROP, -1,
                            OpCodes.OP_DROP]
 
-        name_script_op_count = None
+        ops = [
+            NAME_NEW_OPS,
+            NAME_UPDATE_OPS,
+            NAME_DELETE_OPS,
+        ]
 
-        # Detect name operations; determine count of opcodes.
-        for name_ops in [NAME_NEW_OPS, NAME_UPDATE_OPS, NAME_DELETE_OPS]:
-            if match(ops[:len(name_ops)], name_ops):
-                name_script_op_count = len(name_ops)
-                break
-
-        if name_script_op_count is None:
-            return script
-
-        name_end_pos = cls.find_end_position_of_name(script, name_script_op_count)
-
-        # Strip the name data to yield the address script
-        address_script = script[name_end_pos:]
-
+        _, address_script = cls.interpret_name_prefix(script, ops)
         return address_script
 
 
@@ -965,49 +1001,27 @@ class Namecoin(NameMixin, AuxPowMixin, Coin):
 
     @classmethod
     def split_name_script(cls, script):
-        from electrumx.lib.script import _match_ops, Script, ScriptError
-
-        try:
-            ops = Script.get_ops(script)
-        except ScriptError:
-            return None, script
-
-        match = _match_ops
+        from electrumx.lib.script import Script
 
         # Opcode sequences for name operations
         NAME_NEW_OPS = [cls.OP_NAME_NEW, -1, OpCodes.OP_2DROP]
-        NAME_FIRSTUPDATE_OPS = [cls.OP_NAME_FIRSTUPDATE, -1, -1, -1,
+        NAME_FIRSTUPDATE_OPS = [cls.OP_NAME_FIRSTUPDATE, "name", -1, -1,
                                 OpCodes.OP_2DROP, OpCodes.OP_2DROP]
-        NAME_UPDATE_OPS = [cls.OP_NAME_UPDATE, -1, -1, OpCodes.OP_2DROP,
+        NAME_UPDATE_OPS = [cls.OP_NAME_UPDATE, "name", -1, OpCodes.OP_2DROP,
                            OpCodes.OP_DROP]
 
-        name_script_op_count = None
-        name_pushdata = None
+        ops = [
+            NAME_NEW_OPS,
+            NAME_FIRSTUPDATE_OPS,
+            NAME_UPDATE_OPS,
+        ]
 
-        # Detect name operations; determine count of opcodes.
-        # Also extract the name field -- we might use that for something in a
-        # future version.
-        if match(ops[:len(NAME_NEW_OPS)], NAME_NEW_OPS):
-            name_script_op_count = len(NAME_NEW_OPS)
-        elif match(ops[:len(NAME_FIRSTUPDATE_OPS)], NAME_FIRSTUPDATE_OPS):
-            name_script_op_count = len(NAME_FIRSTUPDATE_OPS)
-            name_pushdata = ops[1]
-        elif match(ops[:len(NAME_UPDATE_OPS)], NAME_UPDATE_OPS):
-            name_script_op_count = len(NAME_UPDATE_OPS)
-            name_pushdata = ops[1]
+        named_values, address_script = cls.interpret_name_prefix(script, ops)
 
-        if name_script_op_count is None:
-            return None, script
-
-        name_end_pos = cls.find_end_position_of_name(script, name_script_op_count)
-
-        # Strip the name data to yield the address script
-        address_script = script[name_end_pos:]
-
-        if name_pushdata is None:
+        if named_values is None or "name" not in named_values:
             return None, address_script
 
-        normalized_name_op_script = cls.build_name_index_script(name_pushdata[1])
+        normalized_name_op_script = cls.build_name_index_script(named_values["name"][1])
         return bytes(normalized_name_op_script), address_script
 
     @classmethod
