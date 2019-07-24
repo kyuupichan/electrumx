@@ -275,28 +275,44 @@ class DeserializerSegWit(Deserializer):
 class DeserializerAuxPow(Deserializer):
     VERSION_AUXPOW = (1 << 8)
 
+    def read_auxpow(self):
+        '''Reads and returns the CAuxPow data'''
+
+        # We first calculate the size of the CAuxPow instance and then
+        # read it as bytes in the final step.
+        start = self.cursor
+
+        self.read_tx()  # AuxPow transaction
+        self.cursor += 32  # Parent block hash
+        merkle_size = self._read_varint()
+        self.cursor += 32 * merkle_size  # Merkle branch
+        self.cursor += 4  # Index
+        merkle_size = self._read_varint()
+        self.cursor += 32 * merkle_size  # Chain merkle branch
+        self.cursor += 4  # Chain index
+        self.cursor += 80  # Parent block header
+
+        end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(end - start)
+
     def read_header(self, static_header_size):
         '''Return the AuxPow block header bytes'''
+
+        # We are going to calculate the block size then read it as bytes
         start = self.cursor
+
         version = self._read_le_uint32()
         if version & self.VERSION_AUXPOW:
-            # We are going to calculate the block size then read it as bytes
             self.cursor = start
             self.cursor += static_header_size  # Block normal header
-            self.read_tx()  # AuxPow transaction
-            self.cursor += 32  # Parent block hash
-            merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size  # Merkle branch
-            self.cursor += 4  # Index
-            merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size  # Chain merkle branch
-            self.cursor += 4  # Chain index
-            self.cursor += 80  # Parent block header
+            self.read_auxpow()
             header_end = self.cursor
         else:
-            header_end = static_header_size
+            header_end = start + static_header_size
+
         self.cursor = start
-        return self._read_nbytes(header_end)
+        return self._read_nbytes(header_end - start)
 
 
 class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
