@@ -46,7 +46,8 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX,
+                                      AuxPoWDashElectrumX)
 
 
 Block = namedtuple("Block", "raw header transactions")
@@ -1140,6 +1141,51 @@ class DashTestnet(Dash):
     PEERS = [
         'electrum.dash.siampm.com s t',
         'dasht.random.re s54002 t54001',
+    ]
+
+
+# Source: https://github.com/terracoin/terracoin
+class Terracoin(AuxPowMixin, Coin):
+    NAME = "Terracoin"
+    SHORTNAME = "TRC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    GENESIS_HASH = ('00000000804bbc6a621a9dbb564ce469'
+                    'f492e1ccf2d70f8a6b241e26a277afa2')
+    P2PKH_VERBYTE = bytes.fromhex("00")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("80")
+    CHUNK_SIZE = 30
+    TX_COUNT = 2142980
+    TX_COUNT_HEIGHT = 1533195
+    TX_PER_BLOCK = 1
+    RPC_PORT = 13332
+    PEERS = [
+        'electrum.terracoin.io s t',
+        'electrum.southofheaven.ca s t',
+    ]
+    SESSIONCLS = AuxPoWDashElectrumX
+    DAEMON = daemon.DashDaemon
+
+
+class TerracoinTestnet(Terracoin):
+    SHORTNAME = "tTRC"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    GENESIS_HASH = ('00000000a48f093611895d7452e456b6'
+                    '46d213d238e86dc2c0db7d15fe6c555d')
+    P2PKH_VERBYTE = bytes.fromhex("6f")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("ef")
+    CHUNK_SIZE = 2016
+    TX_COUNT_HEIGHT = 1
+    TX_COUNT = 1
+    RPC_PORT = 18332
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
+    PEERS = [
+        'test-electrum.terracoin.io s t',
     ]
 
 
