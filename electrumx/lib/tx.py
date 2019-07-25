@@ -934,3 +934,37 @@ class DeserializerZcoin(Deserializer):
             )
 
         return tx_input
+
+
+class DeserializerXaya(DeserializerSegWit, DeserializerAuxPow):
+    """Deserializer class for the Xaya network
+
+    The main difference to other networks is the changed format of the
+    block header with "triple purpose mining", see
+    https://github.com/xaya/xaya/blob/master/doc/xaya/mining.md.
+
+    This builds upon classic auxpow, but has a modified serialisation format
+    that we have to implement here."""
+
+    MM_FLAG = 0x80
+
+    def read_header(self, static_header_size):
+        """Reads in the full block header (including PoW data)"""
+
+        # We first calculate the dynamic size of the block header, and then
+        # read in all the data in the final step.
+        start = self.cursor
+
+        self.cursor += static_header_size  # Normal block header
+
+        algo = self._read_byte()
+        self._read_le_uint32()  # nBits
+
+        if algo & self.MM_FLAG:
+            self.read_auxpow()
+        else:
+            self.cursor += static_header_size  # Fake header
+
+        end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(end - start)
