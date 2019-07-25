@@ -979,7 +979,7 @@ class Namecoin(NameMixin, AuxPowMixin, Coin):
         'luggscoqbymhvnkp.onion t82',
         'ulrichard.ch s50006 t50005',
     ]
-    BLOCK_PROCESSOR = block_proc.NamecoinBlockProcessor
+    BLOCK_PROCESSOR = block_proc.NameIndexBlockProcessor
 
     # Name opcodes
     OP_NAME_NEW = OpCodes.OP_1
