@@ -3183,7 +3183,7 @@ class CPUchain(Coin):
         return cpupower.getPoWHash(header)
 
 
-class Xaya(AuxPowMixin, Coin):
+class Xaya(NameIndexMixin, AuxPowMixin, Coin):
     NAME = "Xaya"
     SHORTNAME = "CHI"
     NET = "mainnet"
@@ -3203,6 +3203,20 @@ class Xaya(AuxPowMixin, Coin):
     PEERS = [
         'seeder.xaya.io s50002',
         'xaya.domob.eu s50002',
+    ]
+
+    # Op-codes for name operations
+    OP_NAME_REGISTER = OpCodes.OP_1
+    OP_NAME_UPDATE = OpCodes.OP_2
+
+    # Valid name prefixes.
+    NAME_REGISTER_OPS = [OP_NAME_REGISTER, "name", -1, OpCodes.OP_2DROP,
+                         OpCodes.OP_DROP]
+    NAME_UPDATE_OPS = [OP_NAME_UPDATE, "name", -1, OpCodes.OP_2DROP,
+                       OpCodes.OP_DROP]
+    NAME_OPERATIONS = [
+        NAME_REGISTER_OPS,
+        NAME_UPDATE_OPS,
     ]
 
     @classmethod
