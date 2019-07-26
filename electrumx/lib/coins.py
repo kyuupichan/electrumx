@@ -2976,3 +2976,40 @@ class ECCoin(Coin):
         # you have to install scryp python module (pip install scrypt)
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
+
+
+class Veil(Coin):
+    NAME = "Veil"
+    SHORTNAME = "Veil"
+    NET = "mainnet"
+    DESERIALIZER = lib_tx.DeserializerVeil
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("3A")
+    P2SH_VERBYTES = [bytes.fromhex("7A")]
+    GENESIS_HASH = ('051be91d426dfff0a2a3b8895a0726d997c2749c501b581dd739687e706d7f0b')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 289129
+    TX_PER_BLOCK = 4
+    RPC_PORT = 58812
+    PEERS = [
+        'veilseed.presstab.pw s t',
+        'veil.seed.fuzzbawls.pw s t',
+        'veil.seed2.fuzzbawls.pw s t'
+    ]
+
+    @classmethod
+    def is_mtp(cls, header):
+        from electrumx.lib.util import unpack_le_uint32_from, hex_to_bytes
+        if isinstance(header, str):
+            nVersion, = unpack_le_uint32_from(hex_to_bytes(header[0:4*2]))
+        elif isinstance(header, bytes):
+            nVersion, = unpack_le_uint32_from(header[0:4])
+        else:
+            raise "Cannot handle the passed type"
+        return nVersion & 0x1000
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        return double_sha256(header)
