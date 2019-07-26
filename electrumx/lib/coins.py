@@ -942,6 +942,27 @@ class Namecoin(NameMixin, AuxPowMixin, Coin):
     ]
     BLOCK_PROCESSOR = block_proc.NamecoinBlockProcessor
 
+    # Name opcodes
+    OP_NAME_NEW = OpCodes.OP_1
+    OP_NAME_FIRSTUPDATE = OpCodes.OP_2
+    OP_NAME_UPDATE = OpCodes.OP_3
+
+    @classmethod
+    def build_name_index_script(cls, name):
+        """Returns the normalised script by which names are indexed"""
+
+        from electrumx.lib.script import Script
+
+        normalized_name_op_script = bytearray()
+        normalized_name_op_script.append(cls.OP_NAME_UPDATE)
+        normalized_name_op_script.extend(Script.push_data(name))
+        normalized_name_op_script.extend(Script.push_data(bytes([])))
+        normalized_name_op_script.append(OpCodes.OP_2DROP)
+        normalized_name_op_script.append(OpCodes.OP_DROP)
+        normalized_name_op_script.append(OpCodes.OP_RETURN)
+
+        return bytes(normalized_name_op_script)
+
     @classmethod
     def split_name_script(cls, script):
         from electrumx.lib.script import _match_ops, Script, ScriptError
@@ -953,16 +974,11 @@ class Namecoin(NameMixin, AuxPowMixin, Coin):
 
         match = _match_ops
 
-        # Name opcodes
-        OP_NAME_NEW = OpCodes.OP_1
-        OP_NAME_FIRSTUPDATE = OpCodes.OP_2
-        OP_NAME_UPDATE = OpCodes.OP_3
-
         # Opcode sequences for name operations
-        NAME_NEW_OPS = [OP_NAME_NEW, -1, OpCodes.OP_2DROP]
-        NAME_FIRSTUPDATE_OPS = [OP_NAME_FIRSTUPDATE, -1, -1, -1,
+        NAME_NEW_OPS = [cls.OP_NAME_NEW, -1, OpCodes.OP_2DROP]
+        NAME_FIRSTUPDATE_OPS = [cls.OP_NAME_FIRSTUPDATE, -1, -1, -1,
                                 OpCodes.OP_2DROP, OpCodes.OP_2DROP]
-        NAME_UPDATE_OPS = [OP_NAME_UPDATE, -1, -1, OpCodes.OP_2DROP,
+        NAME_UPDATE_OPS = [cls.OP_NAME_UPDATE, -1, -1, OpCodes.OP_2DROP,
                            OpCodes.OP_DROP]
 
         name_script_op_count = None
@@ -991,14 +1007,7 @@ class Namecoin(NameMixin, AuxPowMixin, Coin):
         if name_pushdata is None:
             return None, address_script
 
-        normalized_name_op_script = bytearray()
-        normalized_name_op_script.append(OP_NAME_UPDATE)
-        normalized_name_op_script.extend(Script.push_data(name_pushdata[1]))
-        normalized_name_op_script.extend(Script.push_data(bytes([])))
-        normalized_name_op_script.append(OpCodes.OP_2DROP)
-        normalized_name_op_script.append(OpCodes.OP_DROP)
-        normalized_name_op_script.append(OpCodes.OP_RETURN)
-
+        normalized_name_op_script = cls.build_name_index_script(name_pushdata[1])
         return bytes(normalized_name_op_script), address_script
 
     @classmethod
