@@ -3197,6 +3197,10 @@ class Xaya(AuxPowMixin, Coin):
     DESERIALIZER = lib_tx.DeserializerXaya
     TRUNCATED_HEADER_SIZE = 80 + 5
     RPC_PORT = 8396
+    PEERS = [
+        'seeder.xaya.io s50002',
+        'xaya.domob.eu s50002',
+    ]
 
     @classmethod
     def genesis_block(cls, block):
@@ -3219,6 +3223,7 @@ class XayaTestnet(Xaya):
     TX_COUNT_HEIGHT = 49000
     TX_PER_BLOCK = 1
     RPC_PORT = 18396
+    PEERS = []
 
 
 class XayaRegtest(XayaTestnet):
