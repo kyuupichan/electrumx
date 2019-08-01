@@ -2588,7 +2588,6 @@ class Pivx(Coin):
         version, = struct.unpack('<I', header[:4])
         timestamp, bits, nonce = struct.unpack('<III', header[68:80])
 
-
         if (version >= cls.ZEROCOIN_BLOCK_VERSION):
             return {
                 'block_height': height,
