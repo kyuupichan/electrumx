@@ -2547,62 +2547,82 @@ class GroestlcoinTestnet(Groestlcoin):
 
 
 class Pivx(Coin):
-    NAME = "Pivx"
+    NAME = "PIVX"
     SHORTNAME = "PIVX"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("022D2533")
     XPRV_VERBYTES = bytes.fromhex("0221312B")
+    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
     P2PKH_VERBYTE = bytes.fromhex("1e")
-    P2SH_VERBYTES = [bytes.fromhex("0d")]
+    P2SH_VERBYTE = bytes.fromhex("0d")
     WIF_BYTE = bytes.fromhex("d4")
-    GENESIS_HASH = ('0000041e482b9b9691d98eefb4847340'
-                    '5c0b8ec31b76df3797c74a78680ef818')
-    BASIC_HEADER_SIZE = 80
-    HDR_V4_SIZE = 112
-    HDR_V4_HEIGHT = 863787
-    HDR_V4_START_OFFSET = HDR_V4_HEIGHT * BASIC_HEADER_SIZE
-    TX_COUNT = 2930206
-    TX_COUNT_HEIGHT = 1299212
-    TX_PER_BLOCK = 2
-    RPC_PORT = 51473
+    TX_COUNT_HEIGHT = 569399
+    TX_COUNT = 2157510
+    TX_PER_BLOCK = 1
+    STATIC_BLOCK_HEADERS = False
+    RPC_PORT = 51470
+    ZEROCOIN_HEADER = 112
+    ZEROCOIN_START_HEIGHT = 863787
+    ZEROCOIN_BLOCK_VERSION = 4
 
     @classmethod
-    def static_header_offset(cls, height):
-        assert cls.STATIC_BLOCK_HEADERS
-        if height >= cls.HDR_V4_HEIGHT:
-            relative_v4_offset = (height - cls.HDR_V4_HEIGHT) * cls.HDR_V4_SIZE
-            return cls.HDR_V4_START_OFFSET + relative_v4_offset
+    def static_header_len(cls, height):
+        '''Given a header height return its length.'''
+        if (height >= cls.ZEROCOIN_START_HEIGHT):
+            return cls.ZEROCOIN_HEADER
         else:
-            return height * cls.BASIC_HEADER_SIZE
+            return cls.BASIC_HEADER_SIZE
 
     @classmethod
     def header_hash(cls, header):
-        version, = util.unpack_le_uint32_from(header)
-        if version >= 4:
+        '''Given a header return the hash.'''
+        version, = struct.unpack('<I', header[:4])
+        if version >= cls.ZEROCOIN_BLOCK_VERSION:
             return super().header_hash(header)
         else:
             import quark_hash
             return quark_hash.getPoWHash(header)
 
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+
+
+        if (version >= cls.ZEROCOIN_BLOCK_VERSION):
+            return {
+                'block_height': height,
+                'version': version,
+                'prev_block_hash': hash_to_str(header[4:36]),
+                'merkle_root': hash_to_str(header[36:68]),
+                'timestamp': timestamp,
+                'bits': bits,
+                'nonce': nonce,
+                'acc_checkpoint': hash_to_str(header[80:112])
+            }
+        else:
+            return {
+                'block_height': height,
+                'version': version,
+                'prev_block_hash': hash_to_str(header[4:36]),
+                'merkle_root': hash_to_str(header[36:68]),
+                'timestamp': timestamp,
+                'bits': bits,
+                'nonce': nonce,
+            }
+
 
 class PivxTestnet(Pivx):
-    SHORTNAME = "tPIVX"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("3a8061a0")
     XPRV_VERBYTES = bytes.fromhex("3a805837")
+    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
     P2PKH_VERBYTE = bytes.fromhex("8B")
-    P2SH_VERBYTES = [bytes.fromhex("13")]
+    P2SH_VERBYTE = bytes.fromhex("13")
     WIF_BYTE = bytes.fromhex("EF")
-    GENESIS_HASH = (
-        '0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
-    BASIC_HEADER_SIZE = 80
-    HDR_V4_SIZE = 112
-    HDR_V4_HEIGHT = 863787
-    HDR_V4_START_OFFSET = HDR_V4_HEIGHT * BASIC_HEADER_SIZE
-    TX_COUNT = 2157510
-    TX_COUNT_HEIGHT = 569399
-    TX_PER_BLOCK = 2
+    TX_PER_BLOCK = 4
     RPC_PORT = 51472
+    ZEROCOIN_START_HEIGHT = 201564
 
 
 class Bitg(Coin):
