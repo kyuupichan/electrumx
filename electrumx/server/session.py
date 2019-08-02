@@ -1680,7 +1680,7 @@ class AuxPoWElectrumX(ElectrumX):
         headers = bytearray()
 
         while cursor < len(headers_full):
-            headers.extend(headers_full[cursor:cursor+self.coin.BASIC_HEADER_SIZE])
+            headers.extend(headers_full[cursor:cursor+self.coin.TRUNCATED_HEADER_SIZE])
             cursor += self.db.dynamic_header_len(height)
             height += 1
 

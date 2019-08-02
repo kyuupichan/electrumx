@@ -273,6 +273,7 @@ class AuxPowMixin(object):
     STATIC_BLOCK_HEADERS = False
     DESERIALIZER = lib_tx.DeserializerAuxPow
     SESSIONCLS = AuxPoWElectrumX
+    TRUNCATED_HEADER_SIZE = 80
     # AuxPoW headers are significantly larger, so the DEFAULT_MAX_SEND from
     # Bitcoin is insufficient.  In Namecoin mainnet, 5 MB wasn't enough to
     # sync, while 10 MB worked fine.
@@ -3194,6 +3195,7 @@ class Xaya(AuxPowMixin, Coin):
     TX_COUNT_HEIGHT = 1030000
     TX_PER_BLOCK = 2
     DESERIALIZER = lib_tx.DeserializerXaya
+    TRUNCATED_HEADER_SIZE = 80 + 5
     RPC_PORT = 8396
 
     @classmethod
