@@ -3033,3 +3033,25 @@ class ECCoin(Coin):
         # you have to install scryp python module (pip install scrypt)
         import scrypt
         return scrypt.hash(header, header, 1024, 1, 1, 32)
+
+
+class Veles(Coin):
+    NAME = "Veles"
+    SHORTNAME = "VLS"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("A40C86FA")
+    XPRV_VERBYTES = bytes.fromhex("A40B91BD")
+    GENESIS_HASH = ('d7d274ccc1d4f6ff6e5533442ff7d734'
+                    'a25357de4a5a4e4c01c39823cba68831')
+    P2PKH_VERBYTE = bytes.fromhex("46")
+    P2SH_VERBYTES = [bytes.fromhex("1e")]
+    WIF_BYTE = bytes.fromhex("D4")
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 560319
+    TX_COUNT_HEIGHT = 186773
+    TX_PER_BLOCK = 3
+    RPC_PORT = 5493
+    PEERS = [
+        'explorer.veles.network',
+        '80.211.97.48'
+    ]
