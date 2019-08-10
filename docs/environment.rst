@@ -130,6 +130,19 @@ Here are some examples of valid services::
   This serves **tcp**, **ssl**, **wss** on all interfaces on ports 50001, 50002 and 50004
   respectively.  **rpc** is served on its default host :const:`localhost` and default port
   :const:`8000`.
+  
+  To avoid any possible issues with local security settings, you should consider choosing
+  ports for services > 1024, otherwise the python3 electrumx_server executable will need 
+  special permissions to be able to bind to ports < 1024. 
+  
+  On Debian for example, this can be achieved by installinng libcap2-bin package:
+  
+  sudo apt-get update && sudo apt-get -y install libcap2-bin
+  sudo setcap cap_net_bind_service=+ep /usr/local/bin/electrumx_server
+  
+  Change the path to your electrumx_server executable if different.
+  After this, ElectrumX will be able to listen on any port < 1024, if free of course.
+  
 
 .. envvar:: REPORT_SERVICES
 
