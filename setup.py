@@ -19,6 +19,8 @@ setuptools.setup(
         'xevan-hash': ['xeven-hash'],
         'x11-hash': ['x11-hash>=1.4'],
         'zny-yespower-0-5': ['zny-yespower-0-5'],
+        'bell-yespower': ['bell-yespower'],
+        'cpupower': ['cpupower'],
     },
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',
