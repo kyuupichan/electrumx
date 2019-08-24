@@ -398,5 +398,5 @@ def test_axe_tx_serialize_wrong_tx_type():
     assert tx.tx_type == 4
     with pytest.raises(ValueError) as excinfo:
         ser = tx.serialize()
-    assert ('Axe tx_type does not conform'
+    assert ('Dash tx_type does not conform'
             ' with extra payload class' in str(excinfo.value))
