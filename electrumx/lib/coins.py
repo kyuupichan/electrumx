@@ -1673,7 +1673,7 @@ class MonacoinTestnet(Monacoin):
         'electrumx1.testnet.monacoin.nl s t',
     ]
 
-    
+
 class MonacoinRegtest(MonacoinTestnet):
     NET = "regtest"
     GENESIS_HASH = ('7543a69d7c2fcdb29a5ebec2fc064c07'
@@ -1682,7 +1682,7 @@ class MonacoinRegtest(MonacoinTestnet):
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
 
-    
+
 class Crown(AuxPowMixin, Coin):
     NAME = "Crown"
     SHORTNAME = "CRW"
