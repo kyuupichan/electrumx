@@ -1043,6 +1043,16 @@ class NamecoinTestnet(Namecoin):
                     'a4cccff2a4767a8eee39c11db367b008')
 
 
+class NamecoinRegtest(NamecoinTestnet):
+    NAME = "Namecoin"
+    NET = "regtest"
+    GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
+                    'bf5beb436012afca590b1a11466e2206')
+    PEERS = []
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+
+
 class Dogecoin(AuxPowMixin, Coin):
     NAME = "Dogecoin"
     SHORTNAME = "DOGE"
