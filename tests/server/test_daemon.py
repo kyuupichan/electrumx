@@ -34,6 +34,12 @@ def dash_daemon(request):
     return coin.DAEMON(coin, ','.join(urls))
 
 
+@pytest.fixture(params=[Axe])
+def dash_daemon(request):
+    coin = request.param
+    return coin.DAEMON(coin, ','.join(urls))
+
+
 class ResponseBase(object):
 
     def __init__(self, headers, status):
