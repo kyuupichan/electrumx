@@ -1,6 +1,6 @@
 import pytest
 
-import electrumx.lib.tx_dash as lib_tx_dash
+import electrumx.lib.tx_axe as lib_tx_axe
 
 
 bfh = bytes.fromhex
@@ -108,7 +108,7 @@ WRONG_SPEC_TX = (  # Tx version < 3
 
 def test_axe_v2_tx():
     test = bfh(V2_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 2
     assert tx.tx_type == 0
@@ -119,7 +119,7 @@ def test_axe_v2_tx():
 
 def test_axe_tx_cb_tx():
     test = bfh(CB_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 5
@@ -135,7 +135,7 @@ def test_axe_tx_cb_tx():
 
 def test_axe_tx_cb_tx_v2():
     test = bfh(CB_TX_V2)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 5
@@ -154,7 +154,7 @@ def test_axe_tx_cb_tx_v2():
 
 def test_axe_tx_pro_reg_tx():
     test = bfh(PRO_REG_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 1
@@ -192,7 +192,7 @@ def test_axe_tx_pro_reg_tx():
 
 def test_axe_tx_pro_up_serv_tx():
     test = bfh(PRO_UP_SERV_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 2
@@ -218,7 +218,7 @@ def test_axe_tx_pro_up_serv_tx():
 
 def test_axe_tx_pro_up_reg_tx():
     test = bfh(PRO_UP_REG_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 3
@@ -248,7 +248,7 @@ def test_axe_tx_pro_up_reg_tx():
 
 def test_axe_tx_pro_up_rev_tx():
     test = bfh(PRO_UP_REV_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 4
@@ -270,7 +270,7 @@ def test_axe_tx_pro_up_rev_tx():
 ''' No DIP0005 in Axe
 def test_axe_tx_sub_tx_register_tx():
     test = bfh(SUB_TX_REGISTER)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 8
@@ -292,7 +292,7 @@ def test_axe_tx_sub_tx_register_tx():
 
 def test_axe_tx_sub_tx_topup_tx():
     test = bfh(SUB_TX_TOPUP)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 9
@@ -307,7 +307,7 @@ def test_axe_tx_sub_tx_topup_tx():
 
 def test_axe_tx_sub_tx_reset_key_tx():
     test = bfh(SUB_TX_RESET_KEY)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 10
@@ -336,7 +336,7 @@ def test_axe_tx_sub_tx_reset_key_tx():
 
 def test_axe_tx_sub_tx_close_account_tx():
     test = bfh(SUB_TX_CLOSE_ACCOUNT)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 11
@@ -361,7 +361,7 @@ def test_axe_tx_sub_tx_close_account_tx():
 
 def test_axe_tx_unknown_spec_tx():
     test = bfh(UNKNOWN_SPEC_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 3
     assert tx.tx_type == 187
@@ -379,7 +379,7 @@ def test_axe_tx_unknown_spec_tx():
 
 def test_axe_tx_wrong_spec_tx():
     test = bfh(WRONG_SPEC_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.version == 12255234
     assert tx.tx_type == 0
@@ -391,12 +391,12 @@ def test_axe_tx_wrong_spec_tx():
 
 def test_axe_tx_serialize_wrong_tx_type():
     test = bfh(CB_TX)
-    deser = lib_tx_dash.DeserializerDash(test)
+    deser = lib_tx_axe.DeserializerAxe(test)
     tx = deser.read_tx()
     assert tx.tx_type == 5
     tx = tx._replace(tx_type=4)
     assert tx.tx_type == 4
     with pytest.raises(ValueError) as excinfo:
         ser = tx.serialize()
-    assert ('Dash tx_type does not conform'
+    assert ('Axe tx_type does not conform'
             ' with extra payload class' in str(excinfo.value))
