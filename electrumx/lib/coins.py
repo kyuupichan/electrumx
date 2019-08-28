@@ -1644,12 +1644,8 @@ class Monacoin(Coin):
     BLACKLIST_URL = 'https://electrum-mona.org/blacklist.json'
     PEERS = [
         'electrumx.tamami-foundation.org s t',
-        'electrumx2.tamami-foundation.org s t',
-        'electrumx3.tamami-foundation.org s t',
-        'electrumx2.monacoin.nl s t',
         'electrumx3.monacoin.nl s t',
         'electrumx1.monacoin.ninja s t',
-        'electrumx2.monacoin.ninja s t',
         'electrumx2.movsign.info s t',
         'electrum-mona.bitbank.cc s t',
         'ri7rzlmdaf4eqbza.onion s t',
@@ -1676,6 +1672,15 @@ class MonacoinTestnet(Monacoin):
         'electrumx1.testnet.monacoin.ninja s t',
         'electrumx1.testnet.monacoin.nl s t',
     ]
+
+
+class MonacoinRegtest(MonacoinTestnet):
+    NET = "regtest"
+    GENESIS_HASH = ('7543a69d7c2fcdb29a5ebec2fc064c07'
+                    '4a35253b6f3072c8a749473aa590a29c')
+    PEERS = []
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
 
 
 class Crown(AuxPowMixin, Coin):
