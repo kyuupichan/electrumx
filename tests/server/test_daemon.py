@@ -430,7 +430,7 @@ async def test_connection_error(daemon, caplog):
         with ClientSessionNoConnection(('getblockcount', [], height)):
             await daemon.height() == height
 
-    assert in_caplog(caplog, "connection problem - is your daemon running?")
+    assert in_caplog(caplog, "connection problem - check your daemon is running")
     assert in_caplog(caplog, "connection restored")
 
 

@@ -115,7 +115,7 @@ class Daemon(object):
             now = time.time()
             if now - last_error_log > 60:
                 last_error_log = now
-                self.logger.error(f'{error}  Retrying occasionally...')
+                self.logger.error(f'{error}.  Retrying occasionally...')
             if retry == self.max_retry and self.failover():
                 retry = 0
 
@@ -131,24 +131,24 @@ class Daemon(object):
                     self.logger.info(on_good_message)
                 return result
             except asyncio.TimeoutError:
-                log_error('timeout error.')
+                log_error('timeout error')
             except aiohttp.ServerDisconnectedError:
-                log_error('disconnected.')
+                log_error('disconnected')
                 on_good_message = 'connection restored'
             except ConnectionResetError:
                 log_error('connection reset')
                 on_good_message = 'connection restored'
             except aiohttp.ClientConnectionError:
-                log_error('connection problem - is your daemon running?')
+                log_error('connection problem - check your daemon is running')
                 on_good_message = 'connection restored'
             except aiohttp.ClientError as e:
                 log_error(f'daemon error: {e}')
                 on_good_message = 'running normally'
             except ServiceRefusedError as e:
-                log_error(f'daemon service refused: {e}.')
+                log_error(f'daemon service refused: {e}')
                 on_good_message = 'running normally'
             except WarmingUpError:
-                log_error('starting up checking blocks.')
+                log_error('starting up checking blocks')
                 on_good_message = 'running normally'
 
             await asyncio.sleep(retry)
