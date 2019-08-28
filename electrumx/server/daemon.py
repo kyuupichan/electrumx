@@ -32,8 +32,9 @@ class WarmingUpError(Exception):
     '''Internal - when the daemon is warming up.'''
 
 
-class WorkQueueFullError(Exception):
-    '''Internal - when the daemon's work queue is full.'''
+class ServiceRefusedError(Exception):
+    '''Internal - when the daemon doesn't provide a JSON response, only an HTTP error, for
+    some reason.'''
 
 
 class Daemon(object):
@@ -100,11 +101,8 @@ class Daemon(object):
                         return await resp.json()
                     # bitcoind's HTTP protocol "handling" is a bad joke
                     text = await resp.text()
-                    if 'Work queue depth exceeded' in text:
-                        raise WorkQueueFullError
                     text = text.strip() or resp.reason
-                    self.logger.error(text)
-                    raise DaemonError(text)
+                    raise ServiceRefusedError(text)
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -146,11 +144,11 @@ class Daemon(object):
             except aiohttp.ClientError as e:
                 log_error(f'daemon error: {e}')
                 on_good_message = 'running normally'
+            except ServiceRefusedError as e:
+                log_error(f'daemon service refused: {e}.')
+                on_good_message = 'running normally'
             except WarmingUpError:
                 log_error('starting up checking blocks.')
-                on_good_message = 'running normally'
-            except WorkQueueFullError:
-                log_error('work queue full.')
                 on_good_message = 'running normally'
 
             await asyncio.sleep(retry)

@@ -402,11 +402,11 @@ async def test_get_raw_transactions(daemon):
 
 @pytest.mark.asyncio
 async def test_bad_auth(daemon, caplog):
-    with pytest.raises(DaemonError) as e:
+    async with ignore_after(0.1):
         with ClientSessionBadAuth():
             await daemon.height()
 
-    assert "Unauthorized" in e.value.args[0]
+    assert in_caplog(caplog, "daemon service refused")
     assert in_caplog(caplog, "Unauthorized")
 
 
@@ -418,7 +418,7 @@ async def test_workqueue_depth(daemon, caplog):
         with ClientSessionWorkQueueFull(('getblockcount', [], height)):
             await daemon.height() == height
 
-    assert in_caplog(caplog, "work queue full")
+    assert in_caplog(caplog, "Work queue depth exceeded")
     assert in_caplog(caplog, "running normally")
 
 
