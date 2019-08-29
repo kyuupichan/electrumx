@@ -43,7 +43,7 @@ class Daemon(object):
     WARMING_UP = -28
     id_counter = itertools.count()
 
-    def __init__(self, coin, url, max_workqueue=10, init_retry=0.25, max_retry=4.0):
+    def __init__(self, coin, url, *, max_workqueue=10, init_retry=0.25, max_retry=4.0):
         self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.url_index = None
@@ -56,6 +56,18 @@ class Daemon(object):
         self.max_retry = max_retry
         self._height = None
         self.available_rpcs = {}
+        self.session = None
+
+    async def __aenter__(self):
+        self.session = aiohttp.ClientSession(connector=self.connector())
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.session.close()
+        self.session = None
+
+    def connector(self):
+        return None
 
     def set_url(self, url):
         '''Set the URLS to the given list, and switch to the first one.'''
@@ -88,21 +100,15 @@ class Daemon(object):
             return True
         return False
 
-    def client_session(self):
-        '''An aiohttp client session.'''
-        return aiohttp.ClientSession()
-
     async def _send_data(self, data):
         async with self.workqueue_semaphore:
-            async with self.client_session() as session:
-                async with session.post(self.current_url(), data=data) as resp:
-                    kind = resp.headers.get('Content-Type', None)
-                    if kind == 'application/json':
-                        return await resp.json()
-                    # bitcoind's HTTP protocol "handling" is a bad joke
-                    text = await resp.text()
-                    text = text.strip() or resp.reason
-                    raise ServiceRefusedError(text)
+            async with self.session.post(self.current_url(), data=data) as resp:
+                kind = resp.headers.get('Content-Type', None)
+                if kind == 'application/json':
+                    return await resp.json()
+                text = await resp.text()
+                text = text.strip() or resp.reason
+                raise ServiceRefusedError(text)
 
     async def _send(self, payload, processor):
         '''Send a payload to be converted to JSON.
@@ -446,10 +452,9 @@ class DecredDaemon(Daemon):
         mempool += tip.get('stx', [])
         return mempool
 
-    def client_session(self):
+    def connector(self):
         # FIXME allow self signed certificates
-        connector = aiohttp.TCPConnector(verify_ssl=False)
-        return aiohttp.ClientSession(connector=connector)
+        return aiohttp.TCPConnector(verify_ssl=False)
 
 
 class PreLegacyRPCDaemon(LegacyRPCDaemon):

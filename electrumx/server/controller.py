@@ -97,38 +97,38 @@ class Controller(ServerBase):
         Daemon = env.coin.DAEMON
         BlockProcessor = env.coin.BLOCK_PROCESSOR
 
-        daemon = Daemon(env.coin, env.daemon_url)
-        db = DB(env)
-        bp = BlockProcessor(env, db, daemon, notifications)
+        async with Daemon(env.coin, env.daemon_url) as daemon:
+            db = DB(env)
+            bp = BlockProcessor(env, db, daemon, notifications)
 
-        # Set notifications up to implement the MemPoolAPI
-        def get_db_height():
-            return db.db_height
-        notifications.height = daemon.height
-        notifications.db_height = get_db_height
-        notifications.cached_height = daemon.cached_height
-        notifications.mempool_hashes = daemon.mempool_hashes
-        notifications.raw_transactions = daemon.getrawtransactions
-        notifications.lookup_utxos = db.lookup_utxos
-        MemPoolAPI.register(Notifications)
-        mempool = MemPool(env.coin, notifications)
+            # Set notifications up to implement the MemPoolAPI
+            def get_db_height():
+                return db.db_height
+            notifications.height = daemon.height
+            notifications.db_height = get_db_height
+            notifications.cached_height = daemon.cached_height
+            notifications.mempool_hashes = daemon.mempool_hashes
+            notifications.raw_transactions = daemon.getrawtransactions
+            notifications.lookup_utxos = db.lookup_utxos
+            MemPoolAPI.register(Notifications)
+            mempool = MemPool(env.coin, notifications)
 
-        session_mgr = SessionManager(env, db, bp, daemon, mempool,
-                                     shutdown_event)
+            session_mgr = SessionManager(env, db, bp, daemon, mempool,
+                                         shutdown_event)
 
-        # Test daemon authentication, and also ensure it has a cached
-        # height.  Do this before entering the task group.
-        await daemon.height()
+            # Test daemon authentication, and also ensure it has a cached
+            # height.  Do this before entering the task group.
+            await daemon.height()
 
-        caught_up_event = Event()
-        mempool_event = Event()
+            caught_up_event = Event()
+            mempool_event = Event()
 
-        async def wait_for_catchup():
-            await caught_up_event.wait()
-            await group.spawn(db.populate_header_merkle_cache())
-            await group.spawn(mempool.keep_synchronized(mempool_event))
+            async def wait_for_catchup():
+                await caught_up_event.wait()
+                await group.spawn(db.populate_header_merkle_cache())
+                await group.spawn(mempool.keep_synchronized(mempool_event))
 
-        async with TaskGroup() as group:
-            await group.spawn(session_mgr.serve(notifications, mempool_event))
-            await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
-            await group.spawn(wait_for_catchup())
+            async with TaskGroup() as group:
+                await group.spawn(session_mgr.serve(notifications, mempool_event))
+                await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
+                await group.spawn(wait_for_catchup())
