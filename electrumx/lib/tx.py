@@ -275,28 +275,44 @@ class DeserializerSegWit(Deserializer):
 class DeserializerAuxPow(Deserializer):
     VERSION_AUXPOW = (1 << 8)
 
+    def read_auxpow(self):
+        '''Reads and returns the CAuxPow data'''
+
+        # We first calculate the size of the CAuxPow instance and then
+        # read it as bytes in the final step.
+        start = self.cursor
+
+        self.read_tx()  # AuxPow transaction
+        self.cursor += 32  # Parent block hash
+        merkle_size = self._read_varint()
+        self.cursor += 32 * merkle_size  # Merkle branch
+        self.cursor += 4  # Index
+        merkle_size = self._read_varint()
+        self.cursor += 32 * merkle_size  # Chain merkle branch
+        self.cursor += 4  # Chain index
+        self.cursor += 80  # Parent block header
+
+        end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(end - start)
+
     def read_header(self, static_header_size):
         '''Return the AuxPow block header bytes'''
+
+        # We are going to calculate the block size then read it as bytes
         start = self.cursor
+
         version = self._read_le_uint32()
         if version & self.VERSION_AUXPOW:
-            # We are going to calculate the block size then read it as bytes
             self.cursor = start
             self.cursor += static_header_size  # Block normal header
-            self.read_tx()  # AuxPow transaction
-            self.cursor += 32  # Parent block hash
-            merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size  # Merkle branch
-            self.cursor += 4  # Index
-            merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size  # Chain merkle branch
-            self.cursor += 4  # Chain index
-            self.cursor += 80  # Parent block header
+            self.read_auxpow()
             header_end = self.cursor
         else:
-            header_end = static_header_size
+            header_end = start + static_header_size
+
         self.cursor = start
-        return self._read_nbytes(header_end)
+        return self._read_nbytes(header_end - start)
 
 
 class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
@@ -918,3 +934,37 @@ class DeserializerZcoin(Deserializer):
             )
 
         return tx_input
+
+
+class DeserializerXaya(DeserializerSegWit, DeserializerAuxPow):
+    """Deserializer class for the Xaya network
+
+    The main difference to other networks is the changed format of the
+    block header with "triple purpose mining", see
+    https://github.com/xaya/xaya/blob/master/doc/xaya/mining.md.
+
+    This builds upon classic auxpow, but has a modified serialisation format
+    that we have to implement here."""
+
+    MM_FLAG = 0x80
+
+    def read_header(self, static_header_size):
+        """Reads in the full block header (including PoW data)"""
+
+        # We first calculate the dynamic size of the block header, and then
+        # read in all the data in the final step.
+        start = self.cursor
+
+        self.cursor += static_header_size  # Normal block header
+
+        algo = self._read_byte()
+        self._read_le_uint32()  # nBits
+
+        if algo & self.MM_FLAG:
+            self.read_auxpow()
+        else:
+            self.cursor += static_header_size  # Fake header
+
+        end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(end - start)

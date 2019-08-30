@@ -273,6 +273,7 @@ class AuxPowMixin(object):
     STATIC_BLOCK_HEADERS = False
     DESERIALIZER = lib_tx.DeserializerAuxPow
     SESSIONCLS = AuxPoWElectrumX
+    TRUNCATED_HEADER_SIZE = 80
     # AuxPoW headers are significantly larger, so the DEFAULT_MAX_SEND from
     # Bitcoin is insufficient.  In Namecoin mainnet, 5 MB wasn't enough to
     # sync, while 10 MB worked fine.
@@ -3177,3 +3178,56 @@ class CPUchain(Coin):
         '''Given a header return the hash.'''
         import cpupower
         return cpupower.getPoWHash(header)
+
+
+class Xaya(AuxPowMixin, Coin):
+    NAME = "Xaya"
+    SHORTNAME = "CHI"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("1c")
+    P2SH_VERBYTES = [bytes.fromhex("1e")]
+    WIF_BYTE = bytes.fromhex("82")
+    GENESIS_HASH = ('e5062d76e5f50c42f493826ac9920b63'
+                    'a8def2626fd70a5cec707ec47a4c4651')
+    TX_COUNT = 1147749
+    TX_COUNT_HEIGHT = 1030000
+    TX_PER_BLOCK = 2
+    DESERIALIZER = lib_tx.DeserializerXaya
+    TRUNCATED_HEADER_SIZE = 80 + 5
+    RPC_PORT = 8396
+    PEERS = [
+        'seeder.xaya.io s50002',
+        'xaya.domob.eu s50002',
+    ]
+
+    @classmethod
+    def genesis_block(cls, block):
+        super().genesis_block(block)
+
+        # In Xaya, the genesis block's coinbase is spendable.  Thus unlike
+        # the generic genesis_block() method, we return the full block here.
+        return block
+
+
+class XayaTestnet(Xaya):
+    SHORTNAME = "XCH"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("58")
+    P2SH_VERBYTES = [bytes.fromhex("5a")]
+    WIF_BYTE = bytes.fromhex("e6")
+    GENESIS_HASH = ('5195fc01d0e23d70d1f929f21ec55f47'
+                    'e1c6ea1e66fae98ee44cbbc994509bba')
+    TX_COUNT = 51557
+    TX_COUNT_HEIGHT = 49000
+    TX_PER_BLOCK = 1
+    RPC_PORT = 18396
+    PEERS = []
+
+
+class XayaRegtest(XayaTestnet):
+    NET = "regtest"
+    GENESIS_HASH = ('6f750b36d22f1dc3d0a6e483af453010'
+                    '22646dfc3b3ba2187865f5a7d6d83ab1')
+    RPC_PORT = 18493
