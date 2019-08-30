@@ -52,7 +52,6 @@ from electrumx.server.session import (ElectrumX, DashElectrumX,
 
 
 Block = namedtuple("Block", "raw header transactions")
-OP_RETURN = OpCodes.OP_RETURN
 
 
 class CoinError(Exception):
@@ -144,7 +143,9 @@ class Coin(object):
         '''Returns a hashX from a script, or None if the script is provably
         unspendable so the output can be dropped.
         '''
-        if script and script[0] == OP_RETURN:
+        prefix = script[:2]
+        # Match a prefix of OP_RETURN or (OP_FALSE, OP_RETURN)
+        if prefix == b'\x00\x6a' or (prefix and prefix[0] == 0x6a):
             return None
         return sha256(script).digest()[:HASHX_LEN]
 
