@@ -427,6 +427,58 @@ class NameMixin(object):
         return named_values, address_script
 
 
+class NameIndexMixin(NameMixin):
+    """Shared definitions for coins that have a name index
+
+    This class defines common functions and logic for coins that have
+    a name index in addition to the index by address / script."""
+
+    BLOCK_PROCESSOR = block_proc.NameIndexBlockProcessor
+
+    @classmethod
+    def build_name_index_script(cls, name):
+        """Returns the script by which names are indexed"""
+
+        from electrumx.lib.script import Script
+
+        res = bytearray()
+        res.append(cls.OP_NAME_UPDATE)
+        res.extend(Script.push_data(name))
+        res.extend(Script.push_data(bytes([])))
+        res.append(OpCodes.OP_2DROP)
+        res.append(OpCodes.OP_DROP)
+        res.append(OpCodes.OP_RETURN)
+
+        return bytes(res)
+
+    @classmethod
+    def split_name_script(cls, script):
+        named_values, address_script = cls.interpret_name_prefix(script, cls.NAME_OPERATIONS)
+        if named_values is None or "name" not in named_values:
+            return None, address_script
+
+        name_index_script = cls.build_name_index_script(named_values["name"][1])
+        return name_index_script, address_script
+
+    @classmethod
+    def hashX_from_script(cls, script):
+        _, address_script = cls.split_name_script(script)
+        return super().hashX_from_script(address_script)
+
+    @classmethod
+    def address_from_script(cls, script):
+        _, address_script = cls.split_name_script(script)
+        return super().address_from_script(address_script)
+
+    @classmethod
+    def name_hashX_from_script(cls, script):
+        name_index_script, _ = cls.split_name_script(script)
+        if name_index_script is None:
+            return None
+
+        return super().hashX_from_script(name_index_script)
+
+
 class HOdlcoin(Coin):
     NAME = "HOdlcoin"
     SHORTNAME = "HODLC"
@@ -959,7 +1011,7 @@ class Unitus(Coin):
 
 
 # Source: namecoin.org
-class Namecoin(NameMixin, AuxPowMixin, Coin):
+class Namecoin(NameIndexMixin, AuxPowMixin, Coin):
     NAME = "Namecoin"
     SHORTNAME = "NMC"
     NET = "mainnet"
@@ -979,74 +1031,24 @@ class Namecoin(NameMixin, AuxPowMixin, Coin):
         'luggscoqbymhvnkp.onion t82',
         'ulrichard.ch s50006 t50005',
     ]
-    BLOCK_PROCESSOR = block_proc.NamecoinBlockProcessor
+    BLOCK_PROCESSOR = block_proc.NameIndexBlockProcessor
 
     # Name opcodes
     OP_NAME_NEW = OpCodes.OP_1
     OP_NAME_FIRSTUPDATE = OpCodes.OP_2
     OP_NAME_UPDATE = OpCodes.OP_3
 
-    @classmethod
-    def build_name_index_script(cls, name):
-        """Returns the normalised script by which names are indexed"""
-
-        from electrumx.lib.script import Script
-
-        normalized_name_op_script = bytearray()
-        normalized_name_op_script.append(cls.OP_NAME_UPDATE)
-        normalized_name_op_script.extend(Script.push_data(name))
-        normalized_name_op_script.extend(Script.push_data(bytes([])))
-        normalized_name_op_script.append(OpCodes.OP_2DROP)
-        normalized_name_op_script.append(OpCodes.OP_DROP)
-        normalized_name_op_script.append(OpCodes.OP_RETURN)
-
-        return bytes(normalized_name_op_script)
-
-    @classmethod
-    def split_name_script(cls, script):
-        from electrumx.lib.script import Script
-
-        # Opcode sequences for name operations
-        NAME_NEW_OPS = [cls.OP_NAME_NEW, -1, OpCodes.OP_2DROP]
-        NAME_FIRSTUPDATE_OPS = [cls.OP_NAME_FIRSTUPDATE, "name", -1, -1,
-                                OpCodes.OP_2DROP, OpCodes.OP_2DROP]
-        NAME_UPDATE_OPS = [cls.OP_NAME_UPDATE, "name", -1, OpCodes.OP_2DROP,
-                           OpCodes.OP_DROP]
-
-        ops = [
-            NAME_NEW_OPS,
-            NAME_FIRSTUPDATE_OPS,
-            NAME_UPDATE_OPS,
-        ]
-
-        named_values, address_script = cls.interpret_name_prefix(script, ops)
-
-        if named_values is None or "name" not in named_values:
-            return None, address_script
-
-        normalized_name_op_script = cls.build_name_index_script(named_values["name"][1])
-        return bytes(normalized_name_op_script), address_script
-
-    @classmethod
-    def hashX_from_script(cls, script):
-        _name_op_script, address_script = cls.split_name_script(script)
-
-        return super().hashX_from_script(address_script)
-
-    @classmethod
-    def address_from_script(cls, script):
-        _name_op_script, address_script = cls.split_name_script(script)
-
-        return super().address_from_script(address_script)
-
-    @classmethod
-    def name_hashX_from_script(cls, script):
-        name_op_script, _address_script = cls.split_name_script(script)
-
-        if name_op_script is None:
-            return None
-
-        return super().hashX_from_script(name_op_script)
+    # Valid name prefixes.
+    NAME_NEW_OPS = [OP_NAME_NEW, -1, OpCodes.OP_2DROP]
+    NAME_FIRSTUPDATE_OPS = [OP_NAME_FIRSTUPDATE, "name", -1, -1,
+                            OpCodes.OP_2DROP, OpCodes.OP_2DROP]
+    NAME_UPDATE_OPS = [OP_NAME_UPDATE, "name", -1, OpCodes.OP_2DROP,
+                       OpCodes.OP_DROP]
+    NAME_OPERATIONS = [
+        NAME_NEW_OPS,
+        NAME_FIRSTUPDATE_OPS,
+        NAME_UPDATE_OPS,
+    ]
 
 
 class NamecoinTestnet(Namecoin):
@@ -3181,7 +3183,7 @@ class CPUchain(Coin):
         return cpupower.getPoWHash(header)
 
 
-class Xaya(AuxPowMixin, Coin):
+class Xaya(NameIndexMixin, AuxPowMixin, Coin):
     NAME = "Xaya"
     SHORTNAME = "CHI"
     NET = "mainnet"
@@ -3201,6 +3203,20 @@ class Xaya(AuxPowMixin, Coin):
     PEERS = [
         'seeder.xaya.io s50002',
         'xaya.domob.eu s50002',
+    ]
+
+    # Op-codes for name operations
+    OP_NAME_REGISTER = OpCodes.OP_1
+    OP_NAME_UPDATE = OpCodes.OP_2
+
+    # Valid name prefixes.
+    NAME_REGISTER_OPS = [OP_NAME_REGISTER, "name", -1, OpCodes.OP_2DROP,
+                         OpCodes.OP_DROP]
+    NAME_UPDATE_OPS = [OP_NAME_UPDATE, "name", -1, OpCodes.OP_2DROP,
+                       OpCodes.OP_DROP]
+    NAME_OPERATIONS = [
+        NAME_REGISTER_OPS,
+        NAME_UPDATE_OPS,
     ]
 
     @classmethod
