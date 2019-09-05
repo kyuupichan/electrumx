@@ -916,6 +916,19 @@ class GravityCoin(Coin):
     REORG_LIMIT = 5000
     PEERS = []
 
+class GravityZeroCoin(ScryptMixin, Coin):
+    NAME = "GravityZeroCoin"
+    SHORTNAME = "GZRO"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    WIF_BYTE = bytes.fromhex("26")
+    GENESIS_HASH = ('0000028bfbf9ccaed8f28b3ca6b3ffe6b65e29490ab0e4430679bf41cc7c164f')
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 100
+    TX_COUNT_HEIGHT = 747635
+    TX_PER_BLOCK = 2
+    RPC_PORT = 36442
+
 
 # Source: https://github.com/BitcoinZeroOfficial/bitcoinzero
 class Bitcoinzero(Coin):
