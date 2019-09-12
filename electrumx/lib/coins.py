@@ -923,11 +923,13 @@ class GravityZeroCoin(ScryptMixin, Coin):
     P2PKH_VERBYTE = bytes.fromhex("26")
     WIF_BYTE = bytes.fromhex("26")
     GENESIS_HASH = ('0000028bfbf9ccaed8f28b3ca6b3ffe6b65e29490ab0e4430679bf41cc7c164f')
-    DAEMON = daemon.LegacyRPCDaemon
+    DAEMON = daemon.FakeEstimateLegacyRPCDaemon
     TX_COUNT = 100
     TX_COUNT_HEIGHT = 747635
     TX_PER_BLOCK = 2
     RPC_PORT = 36442
+    ESTIMATE_FEE = 0.01
+    RELAY_FEE = 0.01
 
 
 # Source: https://github.com/BitcoinZeroOfficial/bitcoinzero
