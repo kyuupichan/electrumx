@@ -213,8 +213,6 @@ Version 1.8  (06 Aug 2018)
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
-1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
-
 .. _#521: https://github.com/kyuupichan/electrumx/issues/521
 .. _#552: https://github.com/kyuupichan/electrumx/issues/552
 .. _#554: https://github.com/kyuupichan/electrumx/issues/554

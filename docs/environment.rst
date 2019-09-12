@@ -118,6 +118,13 @@ Here are some examples of valid services::
 
   *port* can only be defaulted for **rpc** where the default is :const:`8000`.
 
+  On most Unix systems ports below 1024 require elevated priveleges so choosing a higher
+  port is advisable.  On Debian for example, this can be achieved by installinng
+  libcap2-bin package::
+
+    sudo apt-get update && sudo apt-get -y install libcap2-bin
+    sudo setcap cap_net_bind_service=+ep /path/to/electrumx_server
+
   If any listed service has protocol **ssl** or **wss** then :envvar:`SSL_CERTFILE` and
   :envvar:`SSL_KEYFILE` must be defined.
 

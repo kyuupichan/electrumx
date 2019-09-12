@@ -490,7 +490,7 @@ class SessionManager:
         return self.peer_mgr.rpc_data()
 
     async def rpc_query(self, items, limit):
-        '''Return a list of data about server peers.'''
+        '''Returns data about a script, address or name.'''
         coin = self.env.coin
         db = self.db
         lines = []
@@ -505,11 +505,20 @@ class SessionManager:
 
             try:
                 hashX = coin.address_to_hashX(arg)
-            except Base58Error as e:
-                lines.append(e.args[0])
-                return None
-            lines.append(f'Address: {arg}')
-            return hashX
+                lines.append(f'Address: {arg}')
+                return hashX
+            except Base58Error:
+                pass
+
+            try:
+                script = coin.build_name_index_script(arg.encode("ascii"))
+                hashX = coin.name_hashX_from_script(script)
+                lines.append(f'Name: {arg}')
+                return hashX
+            except (AttributeError, UnicodeEncodeError):
+                pass
+
+            return None
 
         for arg in items:
             hashX = arg_to_hashX(arg)
@@ -1671,7 +1680,7 @@ class AuxPoWElectrumX(ElectrumX):
         headers = bytearray()
 
         while cursor < len(headers_full):
-            headers.extend(headers_full[cursor:cursor+self.coin.BASIC_HEADER_SIZE])
+            headers.extend(headers_full[cursor:cursor+self.coin.TRUNCATED_HEADER_SIZE])
             cursor += self.db.dynamic_header_len(height)
             height += 1
 

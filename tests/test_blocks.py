@@ -66,5 +66,6 @@ def test_block(block_details):
         block.header) == hex_str_to_hash(block_info['hash'])
     assert (coin.header_prevhash(block.header)
             == hex_str_to_hash(block_info['previousblockhash']))
+    assert len(block_info['tx']) == len(block.transactions)
     for n, (tx, txid) in enumerate(block.transactions):
         assert txid == hex_str_to_hash(block_info['tx'][n])
