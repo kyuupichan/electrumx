@@ -917,22 +917,6 @@ class GravityCoin(Coin):
     PEERS = []
 
 
-class GravityZeroCoin(ScryptMixin, Coin):
-    NAME = "GravityZeroCoin"
-    SHORTNAME = "GZRO"
-    NET = "mainnet"
-    P2PKH_VERBYTE = bytes.fromhex("26")
-    WIF_BYTE = bytes.fromhex("26")
-    GENESIS_HASH = ('0000028bfbf9ccaed8f28b3ca6b3ffe6b65e29490ab0e4430679bf41cc7c164f')
-    DAEMON = daemon.FakeEstimateLegacyRPCDaemon
-    TX_COUNT = 100
-    TX_COUNT_HEIGHT = 747635
-    TX_PER_BLOCK = 2
-    RPC_PORT = 36442
-    ESTIMATE_FEE = 0.01
-    RELAY_FEE = 0.01
-
-
 # Source: https://github.com/BitcoinZeroOfficial/bitcoinzero
 class Bitcoinzero(Coin):
     NAME = "Bitcoinzero"
@@ -3248,3 +3232,21 @@ class XayaRegtest(XayaTestnet):
     GENESIS_HASH = ('6f750b36d22f1dc3d0a6e483af453010'
                     '22646dfc3b3ba2187865f5a7d6d83ab1')
     RPC_PORT = 18493
+
+# Source: https://github.com/GZR0/GRZ0
+
+
+class GravityZeroCoin(ScryptMixin, Coin):
+    NAME = "GravityZeroCoin"
+    SHORTNAME = "GZRO"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    WIF_BYTE = bytes.fromhex("26")
+    GENESIS_HASH = ('0000028bfbf9ccaed8f28b3ca6b3ffe6b65e29490ab0e4430679bf41cc7c164f')
+    DAEMON = daemon.FakeEstimateLegacyRPCDaemon
+    TX_COUNT = 100
+    TX_COUNT_HEIGHT = 747635
+    TX_PER_BLOCK = 2
+    RPC_PORT = 36442
+    ESTIMATE_FEE = 0.01
+    RELAY_FEE = 0.01
