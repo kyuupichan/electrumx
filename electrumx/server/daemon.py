@@ -373,8 +373,10 @@ class LegacyRPCDaemon(Daemon):
             return t
         return timegm(time.strptime(t, "%Y-%m-%d %H:%M:%S %Z"))
 
+
 class FakeEstimateLegacyRPCDaemon(LegacyRPCDaemon, FakeEstimateFeeDaemon):
     pass
+
 
 class DecredDaemon(Daemon):
     async def raw_blocks(self, hex_hashes):

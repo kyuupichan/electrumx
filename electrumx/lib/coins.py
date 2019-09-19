@@ -916,6 +916,7 @@ class GravityCoin(Coin):
     REORG_LIMIT = 5000
     PEERS = []
 
+
 class GravityZeroCoin(ScryptMixin, Coin):
     NAME = "GravityZeroCoin"
     SHORTNAME = "GZRO"
