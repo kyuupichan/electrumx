@@ -3268,6 +3268,7 @@ class GravityZeroCoin(ScryptMixin, Coin):
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
 
+
 # Source: https://github.com/hatchpay/hatch
 class Hatch(Coin):
     NAME = "Hatch"
