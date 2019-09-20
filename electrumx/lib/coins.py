@@ -45,6 +45,7 @@ from electrumx.lib.script import (_match_ops, Script, ScriptError,
 import electrumx.lib.tx as lib_tx
 import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.lib.tx_axe as lib_tx_axe
+import electrumx.lib.tx_hatch as lib_tx_hatch
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
@@ -3266,3 +3267,52 @@ class GravityZeroCoin(ScryptMixin, Coin):
     RPC_PORT = 36442
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
+
+# Source: https://github.com/hatchpay/hatch
+class Hatch(Coin):
+    NAME = "Hatch"
+    SHORTNAME = "HATCH"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("02fe52cc")
+    XPRV_VERBYTES = bytes.fromhex("02fe52f8")
+    GENESIS_HASH = ('000000fa6116f5d6c6ce9b60bd431469'
+                    'e40b4fe55feeeda59e33cd2f0b863196')
+    P2PKH_VERBYTE = bytes.fromhex("4c")
+    P2SH_VERBYTES = [bytes.fromhex("10")]
+    WIF_BYTE = bytes.fromhex("cc")
+    TX_COUNT_HEIGHT = 163659
+    TX_COUNT = 179781
+    TX_PER_BLOCK = 1
+    RPC_PORT = 8884
+    PEERS = []
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx_hatch.DeserializerHatch
+
+    @classmethod
+    def header_hash(cls, header):
+        ''''
+        Given a header return the hash for HATCH.
+        Need to download `hatch_hash` module
+        Source code: https://github.com/hatchpay/hatch_hash
+        '''
+        import x11_hash
+        return x11_hash.getPoWHash(header)
+
+
+class HatchTestnet(Hatch):
+    SHORTNAME = "tHATCH"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("3a805837")
+    XPRV_VERBYTES = bytes.fromhex("3a8061a0")
+    GENESIS_HASH = ('00000bf8b02180fa3860e3f4fbfaab76'
+                    'db14fbfd1323d1d3ad06d83b828b6644')
+    P2PKH_VERBYTE = bytes.fromhex("8c")
+    P2SH_VERBYTES = [bytes.fromhex("13")]
+    WIF_BYTE = bytes.fromhex("ef")
+    TX_COUNT_HEIGHT = 261
+    TX_COUNT = 264
+    TX_PER_BLOCK = 1
+    RPC_PORT = 18884
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
+    PEERS = []
