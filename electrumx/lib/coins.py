@@ -3292,7 +3292,7 @@ class Hatch(Coin):
 
     @classmethod
     def header_hash(cls, header):
-        ''''
+        '''
         Given a header return the hash for HATCH.
         Need to download `hatch_hash` module
         Source code: https://github.com/hatchpay/hatch_hash
