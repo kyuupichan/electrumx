@@ -2969,6 +2969,7 @@ class Ritocoin(Coin):
     PEERS = [
         'electrum-rito.minermore.com s t'
     ]
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
@@ -2987,21 +2988,25 @@ class Ravencoin(Coin):
     GENESIS_HASH = ('0000006b444bc2f2ffe627be9d9e7e7a'
                     '0730000870ef6eb6da46c8eae389df90')
     DESERIALIZER = lib_tx.DeserializerSegWit
-    TX_COUNT = 3911020
-    TX_COUNT_HEIGHT = 602000
-    TX_PER_BLOCK = 4
+    X16RV2_ACTIVATION_TIME = 1569945600  # algo switch to x16rv2 at this timestamp
+    TX_COUNT = 5626682
+    TX_COUNT_HEIGHT = 887000
+    TX_PER_BLOCK = 6
     RPC_PORT = 8766
     REORG_LIMIT = 55
     PEERS = [
-        'rvn.satoshi.org.uk s t',
-        'electrum-rvn.minermore.com s t',
-        '153.126.197.243 s t'
     ]
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import x16r_hash
-        return x16r_hash.getPoWHash(header)
+        timestamp = util.unpack_le_uint32_from(header, 68)[0]
+        if timestamp >= cls.X16RV2_ACTIVATION_TIME:
+            import x16rv2_hash
+            return x16rv2_hash.getPoWHash(header)
+        else:
+            import x16r_hash
+            return x16r_hash.getPoWHash(header)
 
 
 class RavencoinTestnet(Ravencoin):
@@ -3013,14 +3018,14 @@ class RavencoinTestnet(Ravencoin):
     WIF_BYTE = bytes.fromhex("EF")
     GENESIS_HASH = ('000000ecfc5e6324a079542221d00e10'
                     '362bdc894d56500c414060eea8a3ad5a')
-    TX_COUNT = 108085
-    TX_COUNT_HEIGHT = 60590
-    TX_PER_BLOCK = 4
+    X16RV2_ACTIVATION_TIME = 1567533600
+    TX_COUNT = 496158
+    TX_COUNT_HEIGHT = 420500
+    TX_PER_BLOCK = 1
     RPC_PORT = 18766
     PEER_DEFAULT_PORTS = {'t': '50003', 's': '50004'}
     REORG_LIMIT = 55
     PEERS = [
-        'rvn.satoshi.org.uk s t'
     ]
 
 
