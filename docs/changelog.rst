@@ -7,6 +7,19 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.13.0 (26 Sep 2019)
+============================
+
+* daemon: use a single connection for all requests rather than a connection per request.
+  Distinguish handling of JSON and HTTP errors
+* recognise OP_FALSE OP_RETURN scripts as unspendable
+* peers - attempt to bind to correct local IP address
+* improve name support (domob1812)
+* coin additions / updates: BitZeny (y-chan), ZCoin (a-bezrukov), Emercoin (yakimka),
+  BSV (Roger Taylor), Bellcoin (streetcrypto7), Ritocoin (traysi), BTC (Sombernight),
+  PIVX (mrcarlanthony), Monacoin (wakiyamap)), NamecoinRegtest (JeremyRand), Axe (ddude1),
+  Xaya (domob1812), GZRO (MrNaif2018), Ravencoin (standard-error)
+* other: gits7r
 
 Version 1.12.0 (13 May 2019)
 ============================
