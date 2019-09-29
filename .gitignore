@@ -10,4 +10,5 @@ docs/_build
 /dist
 /electrumx.egg-info
 .vscode/
+.mypy_cache/
 .idea/

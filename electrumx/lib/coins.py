@@ -345,6 +345,92 @@ class BitcoinMixin(object):
 
 
 class NameMixin(object):
+    DATA_PUSH_MULTIPLE = -2
+
+    @classmethod
+    def interpret_name_prefix(cls, script, possible_ops):
+        """Interprets a potential name prefix
+
+        Checks if the given script has a name prefix.  If it has, the
+        name prefix is split off the actual address script, and its parsed
+        fields (e.g. the name) returned.
+
+        possible_ops must be an array of arrays, defining the structures
+        of name prefixes to look out for.  Each array can consist of
+        actual opcodes, -1 for ignored data placeholders, -2 for
+        multiple ignored data placeholders and strings for named placeholders.
+        Whenever a data push matches a named placeholder,
+        the corresponding value is put into a dictionary the placeholder name
+        as key, and the dictionary of matches is returned."""
+
+        try:
+            ops = Script.get_ops(script)
+        except ScriptError:
+            return None, script
+
+        name_op_count = None
+        for pops in possible_ops:
+            # Start by translating named placeholders to -1 values, and
+            # keeping track of which op they corresponded to.
+            template = []
+            named_index = {}
+
+            n = len(pops)
+            offset = 0
+            for i, op in enumerate(pops):
+                if op == cls.DATA_PUSH_MULTIPLE:
+                    # Emercoin stores value in multiple placeholders
+                    # Script structure: https://git.io/fjuRu
+                    added, template = cls._add_data_placeholders_to_template(ops[i:], template)
+                    offset += added - 1  # subtract the "DATA_PUSH_MULTIPLE" opcode
+                elif type(op) == str:
+                    template.append(-1)
+                    named_index[op] = i + offset
+                else:
+                    template.append(op)
+            n += offset
+
+            if not _match_ops(ops[:n], template):
+                continue
+
+            name_op_count = n
+            named_values = {key: ops[named_index[key]] for key in named_index}
+            break
+
+        if name_op_count is None:
+            return None, script
+
+        name_end_pos = cls.find_end_position_of_name(script, name_op_count)
+
+        address_script = script[name_end_pos:]
+        return named_values, address_script
+
+    @classmethod
+    def _add_data_placeholders_to_template(cls, opcodes, template):
+        num_dp = cls._read_data_placeholders_count(opcodes)
+        num_2drop = num_dp // 2
+        num_drop = num_dp % 2
+
+        two_drops = [OpCodes.OP_2DROP for _ in range(num_2drop)]
+        one_drops = [OpCodes.OP_DROP for _ in range(num_drop)]
+
+        elements_added = num_dp + num_2drop + num_drop
+        placeholders = [-1 for _ in range(num_dp)]
+        drops = two_drops + one_drops
+
+        return elements_added, template + placeholders + drops
+
+    @classmethod
+    def _read_data_placeholders_count(cls, opcodes):
+        data_placeholders = 0
+
+        for opcode in opcodes:
+            if type(opcode) == tuple:
+                data_placeholders += 1
+            else:
+                break
+
+        return data_placeholders
 
     @staticmethod
     def find_end_position_of_name(script, length):
@@ -376,56 +462,6 @@ class NameMixin(object):
                 n += dlen
 
         return n
-
-    @classmethod
-    def interpret_name_prefix(cls, script, possible_ops):
-        """Interprets a potential name prefix
-
-        Checks if the given script has a name prefix.  If it has, the
-        name prefix is split off the actual address script, and its parsed
-        fields (e.g. the name) returned.
-
-        possible_ops must be an array of arrays, defining the structures
-        of name prefixes to look out for.  Each array can consist of
-        actual opcodes, -1 for ignored data placeholders and strings for
-        named placeholders.  Whenever a data push matches a named placeholder,
-        the corresponding value is put into a dictionary the placeholder name
-        as key, and the dictionary of matches is returned."""
-
-        try:
-            ops = Script.get_ops(script)
-        except ScriptError:
-            return None, script
-
-        name_op_count = None
-        for pops in possible_ops:
-            n = len(pops)
-
-            # Start by translating named placeholders to -1 values, and
-            # keeping track of which op they corresponded to.
-            template = []
-            named_index = {}
-            for i in range(n):
-                if type(pops[i]) == str:
-                    template.append(-1)
-                    named_index[pops[i]] = i
-                else:
-                    template.append(pops[i])
-
-            if not _match_ops(ops[:n], template):
-                continue
-
-            name_op_count = n
-            named_values = {key: ops[named_index[key]] for key in named_index}
-            break
-
-        if name_op_count is None:
-            return None, script
-
-        name_end_pos = cls.find_end_position_of_name(script, name_op_count)
-
-        address_script = script[name_end_pos:]
-        return named_values, address_script
 
 
 class NameIndexMixin(NameMixin):
@@ -673,6 +709,24 @@ class Emercoin(NameMixin, Coin):
 
     PEERS = []
 
+    # Name opcodes
+    OP_NAME_NEW = OpCodes.OP_1
+    OP_NAME_UPDATE = OpCodes.OP_2
+    OP_NAME_DELETE = OpCodes.OP_3
+
+    # Valid name prefixes.
+    NAME_NEW_OPS = [OP_NAME_NEW, OpCodes.OP_DROP, "name", "days",
+                    OpCodes.OP_2DROP, NameMixin.DATA_PUSH_MULTIPLE]
+    NAME_UPDATE_OPS = [OP_NAME_UPDATE, OpCodes.OP_DROP, "name", "days",
+                       OpCodes.OP_2DROP, NameMixin.DATA_PUSH_MULTIPLE]
+    NAME_DELETE_OPS = [OP_NAME_DELETE, OpCodes.OP_DROP, "name",
+                       OpCodes.OP_DROP]
+    NAME_OPERATIONS = [
+        NAME_NEW_OPS,
+        NAME_UPDATE_OPS,
+        NAME_DELETE_OPS,
+    ]
+
     @classmethod
     def block_header(cls, block, height):
         '''Returns the block header given a block and its height.'''
@@ -689,34 +743,9 @@ class Emercoin(NameMixin, Coin):
 
     @classmethod
     def hashX_from_script(cls, script):
-        address_script = cls.address_script_from_script(script)
+        _, address_script = cls.interpret_name_prefix(script, cls.NAME_OPERATIONS)
 
         return super().hashX_from_script(address_script)
-
-    @classmethod
-    def address_script_from_script(cls, script):
-        # Name opcodes
-        OP_NAME_NEW = OpCodes.OP_1
-        OP_NAME_UPDATE = OpCodes.OP_2
-        OP_NAME_DELETE = OpCodes.OP_3
-
-        # Opcode sequences for name operations
-        # Script structure: https://git.io/fjuRu
-        NAME_NEW_OPS = [OP_NAME_NEW, OpCodes.OP_DROP, -1, -1,
-                        OpCodes.OP_2DROP, -1, OpCodes.OP_DROP]
-        NAME_UPDATE_OPS = [OP_NAME_UPDATE, OpCodes.OP_DROP, -1, -1,
-                           OpCodes.OP_2DROP, -1, OpCodes.OP_DROP]
-        NAME_DELETE_OPS = [OP_NAME_DELETE, OpCodes.OP_DROP, -1,
-                           OpCodes.OP_DROP]
-
-        ops = [
-            NAME_NEW_OPS,
-            NAME_UPDATE_OPS,
-            NAME_DELETE_OPS,
-        ]
-
-        _, address_script = cls.interpret_name_prefix(script, ops)
-        return address_script
 
 
 class BitcoinTestnetMixin(object):
@@ -2994,6 +3023,7 @@ class Ritocoin(Coin):
     PEERS = [
         'electrum-rito.minermore.com s t'
     ]
+
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
@@ -3012,22 +3042,25 @@ class Ravencoin(Coin):
     GENESIS_HASH = ('0000006b444bc2f2ffe627be9d9e7e7a'
                     '0730000870ef6eb6da46c8eae389df90')
     DESERIALIZER = lib_tx.DeserializerSegWit
-    TX_COUNT = 3911020
-    TX_COUNT_HEIGHT = 602000
-    TX_PER_BLOCK = 4
+    X16RV2_ACTIVATION_TIME = 1569945600  # algo switch to x16rv2 at this timestamp
+    TX_COUNT = 5626682
+    TX_COUNT_HEIGHT = 887000
+    TX_PER_BLOCK = 6
     RPC_PORT = 8766
     REORG_LIMIT = 55
     PEERS = [
-        'rvn.satoshi.org.uk s t',
-        'electrum-rvn.minermore.com s t',
-        '153.126.197.243 s t'
     ]
 
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import x16r_hash
-        return x16r_hash.getPoWHash(header)
+        timestamp = util.unpack_le_uint32_from(header, 68)[0]
+        if timestamp >= cls.X16RV2_ACTIVATION_TIME:
+            import x16rv2_hash
+            return x16rv2_hash.getPoWHash(header)
+        else:
+            import x16r_hash
+            return x16r_hash.getPoWHash(header)
 
 
 class RavencoinTestnet(Ravencoin):
@@ -3039,14 +3072,14 @@ class RavencoinTestnet(Ravencoin):
     WIF_BYTE = bytes.fromhex("EF")
     GENESIS_HASH = ('000000ecfc5e6324a079542221d00e10'
                     '362bdc894d56500c414060eea8a3ad5a')
-    TX_COUNT = 108085
-    TX_COUNT_HEIGHT = 60590
-    TX_PER_BLOCK = 4
+    X16RV2_ACTIVATION_TIME = 1567533600
+    TX_COUNT = 496158
+    TX_COUNT_HEIGHT = 420500
+    TX_PER_BLOCK = 1
     RPC_PORT = 18766
     PEER_DEFAULT_PORTS = {'t': '50003', 's': '50004'}
     REORG_LIMIT = 55
     PEERS = [
-        'rvn.satoshi.org.uk s t'
     ]
 
 
@@ -3274,3 +3307,21 @@ class XayaRegtest(XayaTestnet):
     GENESIS_HASH = ('6f750b36d22f1dc3d0a6e483af453010'
                     '22646dfc3b3ba2187865f5a7d6d83ab1')
     RPC_PORT = 18493
+
+# Source: https://github.com/GZR0/GRZ0
+
+
+class GravityZeroCoin(ScryptMixin, Coin):
+    NAME = "GravityZeroCoin"
+    SHORTNAME = "GZRO"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    WIF_BYTE = bytes.fromhex("26")
+    GENESIS_HASH = ('0000028bfbf9ccaed8f28b3ca6b3ffe6b65e29490ab0e4430679bf41cc7c164f')
+    DAEMON = daemon.FakeEstimateLegacyRPCDaemon
+    TX_COUNT = 100
+    TX_COUNT_HEIGHT = 747635
+    TX_PER_BLOCK = 2
+    RPC_PORT = 36442
+    ESTIMATE_FEE = 0.01
+    RELAY_FEE = 0.01
