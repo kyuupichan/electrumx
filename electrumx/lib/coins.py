@@ -3035,8 +3035,8 @@ class Ravencoin(Coin):
             import x16rv2_hash
             return x16rv2_hash.getPoWHash(header)
         else:
-        import x16r_hash
-        return x16r_hash.getPoWHash(header)
+            import x16r_hash
+            return x16r_hash.getPoWHash(header)
 
 
 class RavencoinTestnet(Ravencoin):
