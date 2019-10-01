@@ -2345,6 +2345,7 @@ class Zcoin(Coin):
     MTP_HEADER_DATA_START = Coin.BASIC_HEADER_SIZE + MTP_HEADER_EXTRA_SIZE
     MTP_HEADER_DATA_END = MTP_HEADER_DATA_START + MTP_HEADER_DATA_SIZE
     STATIC_BLOCK_HEADERS = False
+    SESSIONCLS = DashElectrumX
     DAEMON = daemon.ZcoinMtpDaemon
     DESERIALIZER = lib_tx.DeserializerZcoin
     PEERS = [
@@ -3034,8 +3035,8 @@ class Ravencoin(Coin):
             import x16rv2_hash
             return x16rv2_hash.getPoWHash(header)
         else:
-            import x16r_hash
-            return x16r_hash.getPoWHash(header)
+        import x16r_hash
+        return x16r_hash.getPoWHash(header)
 
 
 class RavencoinTestnet(Ravencoin):
