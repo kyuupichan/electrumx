@@ -841,6 +841,15 @@ class DeserializerECCoin(Deserializer):
 class TxInputVeil(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
     '''Class representing a Veil transaction input.'''
 
+    OP_ANON_MARKER = 0xb9
+    # 2byte marker (cpubkey + sigc + sigr)
+    MIN_ANON_IN_SIZE = 2 + (33 + 32 + 32)
+
+    def _is_anon_input(self):
+        return (len(self.script) >= self.MIN_ANON_IN_SIZE and
+                self.script[0] == OpCodes.OP_RETURN and
+                self.script[1] == self.OP_ANON_MARKER)
+                
     def __str__(self):
         prev_hash = hash_to_hex_str(self.prev_hash)
         return ("Input({}, {:d}, tree={}, sequence={:d})"
@@ -848,6 +857,8 @@ class TxInputVeil(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
 
     def is_generation(self):
         '''Test if an input is generation/coinbase like'''
+        if self._is_anon_input():
+            return True
         return self.prev_idx == MINUS_1 and self.prev_hash == ZERO
 
 
