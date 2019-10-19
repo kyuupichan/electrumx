@@ -507,7 +507,6 @@ class DeserializerGroestlcoin(DeserializerSegWit):
 
 class TxInputTokenPay(TxInput):
     '''Class representing a TokenPay transaction input.'''
-
     OP_ANON_MARKER = 0xb9
     # 2byte marker (cpubkey + sigc + sigr)
     MIN_ANON_IN_SIZE = 2 + (33 + 32 + 32)
@@ -838,10 +837,10 @@ class DeserializerECCoin(Deserializer):
         return tx
 
 
-class TxInputVeil(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
+class TxInputVeil(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
     '''Class representing a Veil transaction input.'''
 
-    OP_ANON_MARKER = 0xb9
+    OP_ANON_MARKER = 0xffffffa0
     # 2byte marker (cpubkey + sigc + sigr)
     MIN_ANON_IN_SIZE = 2 + (33 + 32 + 32)
 
@@ -859,7 +858,29 @@ class TxInputVeil(namedtuple("TxInput", "prev_hash prev_idx tree sequence")):
         '''Test if an input is generation/coinbase like'''
         if self._is_anon_input():
             return True
-        return self.prev_idx == MINUS_1 and self.prev_hash == ZERO
+        return super(TxInputVeil, self).is_generation()
+
+
+class TxInputVeilStealth(
+        namedtuple("TxInput", "keyimage ringsize script sequence")):
+    '''Class representing a Veil stealth transaction input.'''
+
+    def __str__(self):
+        script = self.script.hex()
+        keyimage = bytes(self.keyimage).hex()
+        return ("Input({}, {:d}, script={}, sequence={:d})"
+                .format(keyimage, self.ringsize[1], script, self.sequence))
+
+    def is_generation(self):
+        return True
+
+    def serialize(self):
+        return b''.join((
+            self.keyimage,
+            self.ringsize,
+            pack_varbytes(self.script),
+            pack_le_uint32(self.sequence),
+        ))
 
 
 class TxOutputVeil(namedtuple("TxOutput", "value version pk_script")):
@@ -870,7 +891,7 @@ class TxVeil(namedtuple("Tx", "version inputs outputs locktime")):
     '''Class representing a Veil  transaction.'''
 
 
-class DeserializerVeil(Deserializer):
+class DeserializerVeil(DeserializerTxTime):
     def read_tx(self):
         return self._read_tx_parts(produce_hash=False)[0]
 
@@ -894,12 +915,26 @@ class DeserializerVeil(Deserializer):
         return [read_tx() for _ in range(self._read_varint())]
 
     def _read_input(self):
-        return TxInputVeil(
+        txin = TxInputVeil(
             self._read_nbytes(32),   # prev_hash
             self._read_le_uint32(),  # prev_idx
-            self._read_byte(),       # tree
+            self._read_varbytes(),   # script
             self._read_le_uint32(),  # sequence
         )
+        if txin._is_anon_input():
+            # Not sure if this is actually needed, and seems
+            # extra work for no immediate benefit, but it at
+            # least correctly represents a stealth input
+            raw = txin.serialize()
+            deserializer = Deserializer(raw)
+            txin = TxInputVeilStealth(
+                deserializer._read_nbytes(33),  # keyimage
+                deserializer._read_nbytes(3),   # ringsize
+                deserializer._read_varbytes(),  # script
+                deserializer._read_le_uint32()  # sequence
+            )
+        return txin
+        
 
     def _read_output(self):
         return TxOutputVeil(

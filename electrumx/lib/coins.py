@@ -2988,10 +2988,12 @@ class Veil(Coin):
     P2PKH_VERBYTE = bytes.fromhex("3A")
     P2SH_VERBYTES = [bytes.fromhex("7A")]
     GENESIS_HASH = ('051be91d426dfff0a2a3b8895a0726d997c2749c501b581dd739687e706d7f0b')
+    BLOCK_PROCESSOR = block_proc.VeilBlockProcessor
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 289129
     TX_PER_BLOCK = 4
     RPC_PORT = 58812
+    HEADER_UNPACK = struct.Struct('< i 32s 32s 32s H 6s H B B I I Q I I I I 32s I').unpack_from
     PEERS = [
         'veilseed.presstab.pw s t',
         'veil.seed.fuzzbawls.pw s t',
@@ -3013,3 +3015,11 @@ class Veil(Coin):
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         return double_sha256(header)
+    
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        if height > 0:
+            return super().block(raw_block, height)
+        else:
+            return Block(raw_block, cls.block_header(raw_block, height), [])
