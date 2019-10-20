@@ -80,7 +80,7 @@ other_commands = {
 def main():
     '''Send the RPC command to the server and print the result.'''
     main_parser = argparse.ArgumentParser(
-        'elextrumx_rpc',
+        'electrumx_rpc',
         description='Send electrumx an RPC command'
     )
     main_parser.add_argument('-p', '--port', metavar='port_num', type=int,
