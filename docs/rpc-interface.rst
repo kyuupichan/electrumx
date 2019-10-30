@@ -45,18 +45,21 @@ have that effect.
 disconnect
 ----------
 
-Disconnect the given session IDs.  Session IDs can be seen in the logs
-or with the `sessions`_ RPC command::
+Disonnect the given session IDs or group names.
 
-  $ electrumx_rpc disconnect 2 3
+Session IDs can be obtained in the logs or with the `sessions`_ RPC command.  Group
+names can be optained with the `groups`_ RPC command.
+
+The special string :const:`all` disconnects all sessions.
+
+Example::
+
+  $ electrumx_rpc disconnect 209.59.102 34 2
   [
-      "disconnected 2",
-      "disconnected 3"
+      "disconnecting session 34",
+      "disconnecting group 209.59.102"
+      "unknown: 2",
   ]
-
-ElectrumX initiates the socket close process for the passed sessions.
-Whilst most connections close quickly, it can take several minutes for
-Python to shut some SSL connections down.
 
 getinfo
 -------
@@ -66,53 +69,77 @@ A typical result is as follows (with annotated comments)::
 
   $ electrumx_rpc getinfo
   {
-    "closing": 1,                  # The number of sessions being closed down
-    "daemon": "192.168.0.2:8332/", # The daemon URL without auth info
-    "daemon_height": 520527,       # The daemon's height when last queried
-    "db_height": 520527,           # The height to which the DB is flushed
-    "errors": 0,                   # Errors across current sessions
-    "groups": 7,                   # The number of session groups
-    "logged": 0,                   # The number of sessions being logged
-    "paused": 0,                   # The number of paused sessions
-    "peers": {                     # Various categories of server peers
-        "bad": 0,                  # Not responding or invalid height etc.
-        "good": 28,                # Responding with good data
-        "never": 0,                # Never managed to connect
-        "stale": 0,                # Was "good" but not recently connected
-        "total": 28                # Sum of the above
-    },
-    "pid": 85861,                  # Server's process ID
-    "requests": 0,                 # Unprocessed requests across all sessions
-    "sessions": 43,                # Total number of sessions
-    "subs": 84,                    # Script hash subscriptions across all sessions
-    "txs_sent": 4,                 # Transactions sent since server started
-    "uptime": "06h 48m 00s"        # Time since server started
+      "coin": "BitcoinSegwit",
+      "daemon": "127.0.0.1:9334/",
+      "daemon height": 572154,         # The daemon's height when last queried
+      "db height": 572154,             # The height to which the DB is flushed
+      "groups": 586,                   # The number of session groups
+      "history cache": "185,014 lookups 9,756 hits 1,000 entries",
+      "merkle cache": "280 lookups 54 hits 213 entries",
+      "peers": {                       # Peer information
+          "bad": 1,
+          "good": 51,
+          "never": 2,
+          "stale": 0,
+          "total": 54
+      },
+      "pid": 11804,                    # Process ID
+      "request counts": {              # Count of RPC requests by method name
+          "blockchain.block.header": 245,
+          "blockchain.block.headers": 70,
+          "blockchain.estimatefee": 12776,
+          "blockchain.headers.subscribe": 2825,
+          "blockchain.relayfee": 740,
+          "blockchain.scripthash.get_history": 196,
+          "blockchain.scripthash.subscribe": 184626,
+          "blockchain.transaction.broadcast": 19,
+          "blockchain.transaction.get": 213,
+          "blockchain.transaction.get_merkle": 289,
+          "getinfo": 3,
+          "groups": 1,
+          "mempool.get_fee_histogram": 3194,
+          "server.add_peer": 9,
+          "server.banner": 740,
+          "server.donation_address": 754,
+          "server.features": 50,
+          "server.peers.subscribe": 792,
+          "server.ping": 6412,
+          "server.version": 2866
+      },
+      "request total": 216820,         # Total requests served
+      "sessions": {                    # Live session stats
+          "count": 670,
+          "count with subs": 45,
+          "errors": 0,
+          "logged": 0,
+          "paused": 0,
+          "pending requests": 79,      # Number of requests currently being processed
+          "subs": 36292                # Total subscriptions
+      },
+      "tx hashes cache": "289 lookups 38 hits 213 entries",
+      "txs sent": 19,                  # Transactions broadcast
+      "uptime": "01h 39m 04s",
+      "version": "ElectrumX 1.10.1"
   }
 
 Each ill-formed request, or one that does not follow the Electrum
-protocol, increments the error count of the session that sent it.  If
-the error count reaches a certain level (currently ``10``) that client
-is disconnected.
+protocol, increments the error count of the session that sent it.
 
 :ref:`logging <session logging>` of sessions can be enabled by RPC.
 
 For more information on peers see :ref:`here <peers>`.
 
-Clients that are slow to consume data sent to them are :dfn:`paused`
-until their socket buffer drains sufficiently, at which point
-processing of requests resumes.
+Clients that are slow to consume data sent to them are :dfn:`paused` until their socket
+buffer drains sufficiently, at which point processing of requests resumes.
 
-Apart from very short intervals, typically after a new block or when
-a client has just connected, the number of unprocessed requests
-should normally be zero.
+Apart from very short intervals, typically after a new block or when a client has just
+connected, the number of unprocessed requests should be low, say 250 or fewer.  If it is
+over 1,000 the server is overloaded.
 
-Sessions are put into groups, primarily as an anti-DoS measure.
-Initially all connections made within a period of time are put in the
-same group.  High bandwidth usage by a member of a group deprioritizes
-that session, and all members of its group to a lesser extent.
-Low-priority sessions have their requests served after higher priority
-sessions.  ElectrumX will start delaying responses to a session if it
-becomes sufficiently deprioritized.
+Sessions are put into groups, primarily as an anti-DoS measure.  Currently each session
+goes into two groups: one for an IP subnet, and one based on the timeslice it connected
+in.  Each member of a group incurs a fraction of the costs of the other group members.
+This appears in the `sessions_` list under the column XCost.
 
 groups
 ------
@@ -124,23 +151,33 @@ The output is quite similar to the `sessions`_ command.
 log
 ---
 
-Toggle logging of the given session IDs.  All incoming requests for a
-logged session are written to the server log.  Session IDs can be seen
-in the logs or with the `sessions`_ RPC command::
+Toggle logging of the given session IDs or group names.  All incoming requests for a
+logged session are written to the server log.  The arguments are case-insensitive.
 
-  $ electrumx_rpc log 0 1 2 3 4 5
+When a group is specified, logging is toggled for its current members only; there is no
+effect on future group members.
+
+Session IDs can be obtained in the logs or with the `sessions`_ RPC command.  Group
+names can be optained with the `groups`_ RPC command.
+
+The special string :const:`all` turns on logging of all current and future sessions,
+:const:`none` turns off logging of all current and future sessions, and :const:`new`
+toggles logging of future sessions.
+
+Example::
+
+  $ electrumx_rpc log new 6 t0 z
   [
-      "log 0: False",
-      "log 1: False",
-      "log 2: False",
-      "log 3: True",
-      "log 4: True",
-      "unknown session: 5"
+    "logging new sessions",
+    "logging session 6",
+    "logging session 3",
+    "logging session 57",
+    "logging session 12"
+    "unknown: z",
   ]
 
-The return value shows this command turned off logging for sesssions
-0, 1 and 2.  It was turned on for sessions 3 and 4, and there was no
-session 5.
+In the above command sessions 3, 12 and 57 were in group `t0` (in fact, session 6 was
+too).
 
 .. _peers:
 
@@ -167,7 +204,8 @@ query
 -----
 
 Run a query of the UTXO and history databases against one or more
-addresses or hex scripts.  `--limit <N>` or `-l <N>` limits the output
+addresses, hex scripts or ASCII names (for coins that have an index
+on names like Namecoin).  `--limit <N>` or `-l <N>` limits the output
 for each kind to that many entries.  History is printed in blockchain
 order; UTXOs in an arbitrary order.
 
@@ -205,22 +243,19 @@ sessions
 
 Return a list of all current sessions.  Takes no arguments::
 
-  ID     Flags            Client Proto  Reqs   Txs    Subs    Recv Recv KB    Sent Sent KB      Time                Peer
-  110    S1                2.9.4  0.10     0     0       0     403      28     442      37 06h41m41s  xxx.xxx.xxx.xxx:xx
-  282    S1                3.1.5   1.1     0     0       0     380      25     417      40 06h21m38s  xxx.xxx.xxx.xxx:xx
-  300    S1                2.9.4  0.10     0     0       0     381      25     418      34 06h19m35s  xxx.xxx.xxx.xxx:xx
-  [...]
-  3313   S1                2.9.3  0.10     0     0       0      22       1      22       6       07s  xxx.xxx.xxx.xxx:xx
-  4      R0                  RPC   RPC     0     0       0       1       0       0       0       00s         [::1]:62479
+  ID     Flags            Client Proto    Cost   XCost  Reqs   Txs    Subs    Recv Recv KB    Sent Sent KB      Time                  Peer
+  1      S6                1.1.1   1.4       0      16     0     0       0       3       0       3       0    05m42s 165.255.191.213:22349
+  2      S6       all_seeing_eye   1.4       0      16     0     0       0       2       0       2       0    05m40s   67.170.52.226:24995
+  4      S6                3.3.2   1.4       0      16     0     0      34      45       5      45       3    05m40s 185.220.100.252:40463
+  3      S6                1.1.2   1.4       0      16     0     0       0       3       0       3       0    05m40s    89.17.142.28:59241
 
-The columns show information by session: the session ID, flags (see
-below), how the client identifies itself - typically the Electrum
-client version, the protocol version negotiated, the number of
-unprocessed requests, the number of transactions sent, the number of
-address subscriptions, the number of requests received and their total
-size, the number of messages sent and their size, how long the client
-has been connected, and the client's IP address (if anonymous logging
-is disabled).
+The columns show information by session: the session ID, flags (see below), how the client
+identifies itself - typically the Electrum client version, the protocol version
+negotiated, the session cost, the additional session cost accrued from its groups, the
+number of unprocessed requests, the number of transactions sent, the number of address
+subscriptions, the number of requests received and their total size, the number of
+messages sent and their size, how long the client has been connected, and the client's IP
+address (if anonymous logging is disabled).
 
 The flags are:
 

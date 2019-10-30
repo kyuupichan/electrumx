@@ -211,23 +211,30 @@ class DashProUpRevTx(namedtuple("DashProUpRevTx",
         )
 
 
-class DashCbTx(namedtuple("DashCbTx", "version height merkleRootMNList")):
+class DashCbTx(namedtuple("DashCbTx", "version height merkleRootMNList "
+                                      "merkleRootQuorums")):
     '''Class representing DIP4 coinbase special tx'''
     def serialize(self):
         assert len(self.merkleRootMNList) == 32
-        return (
+        res = (
             pack_le_uint16(self.version) +              # version
             pack_le_uint32(self.height) +               # height
             self.merkleRootMNList                       # merkleRootMNList
         )
+        if self.version > 1:
+            assert len(self.merkleRootQuorums) == 32
+            res += self.merkleRootQuorums               # merkleRootQuorums
+        return res
 
     @classmethod
     def read_tx_extra(cls, deser):
-        return DashCbTx(
-            deser._read_le_uint16(),                    # version
-            deser._read_le_uint32(),                    # height
-            deser._read_nbytes(32)                      # merkleRootMNList
-        )
+        version = deser._read_le_uint16()
+        height = deser._read_le_uint32()
+        merkleRootMNList = deser._read_nbytes(32)
+        merkleRootQuorums = b''
+        if version > 1:
+            merkleRootQuorums = deser._read_nbytes(32)
+        return DashCbTx(version, height, merkleRootMNList, merkleRootQuorums)
 
 
 class DashSubTxRegister(namedtuple("DashSubTxRegister",

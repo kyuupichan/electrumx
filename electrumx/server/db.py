@@ -22,7 +22,7 @@ import attr
 from aiorpcx import run_in_thread, sleep
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import formatted_time
 from electrumx.server.storage import db_class
@@ -76,8 +76,18 @@ class DB(object):
         self.db_class = db_class(self.env.db_engine)
         self.history = History()
         self.utxo_db = None
+        self.utxo_flush_count = 0
+        self.fs_height = -1
+        self.fs_tx_count = 0
+        self.db_height = -1
+        self.db_tx_count = 0
+        self.db_tip = None
         self.tx_counts = None
         self.last_flush = time.time()
+        self.last_flush_tx_count = 0
+        self.wall_time = 0
+        self.first_sync = True
+        self.db_version = -1
 
         self.logger.info(f'using {self.env.db_engine} for DB backend')
 
@@ -402,7 +412,7 @@ class DB(object):
         return await run_in_thread(read_headers)
 
     def fs_tx_hash(self, tx_num):
-        '''Return a par (tx_hash, tx_height) for the given tx number.
+        '''Return a pair (tx_hash, tx_height) for the given tx number.
 
         If the tx_height is not on disk, returns (None, tx_height).'''
         tx_height = bisect_right(self.tx_counts, tx_num)
@@ -411,6 +421,25 @@ class DB(object):
         else:
             tx_hash = self.hashes_file.read(tx_num * 32, 32)
         return tx_hash, tx_height
+
+    def fs_tx_hashes_at_blockheight(self, block_height):
+        '''Return a list of tx_hashes at given block height,
+        in the same order as in the block.
+        '''
+        if block_height > self.db_height:
+            raise self.DBError(f'block {block_height:,d} not on disk (>{self.db_height:,d})')
+        assert block_height >= 0
+        if block_height > 0:
+            first_tx_num = self.tx_counts[block_height - 1]
+        else:
+            first_tx_num = 0
+        num_txs_in_block = self.tx_counts[block_height] - first_tx_num
+        tx_hashes = self.hashes_file.read(first_tx_num * 32, num_txs_in_block * 32)
+        assert num_txs_in_block == len(tx_hashes) // 32
+        return [tx_hashes[idx * 32: (idx+1) * 32] for idx in range(num_txs_in_block)]
+
+    async def tx_hashes_at_blockheight(self, block_height):
+        return await run_in_thread(self.fs_tx_hashes_at_blockheight, block_height)
 
     async def fs_block_hashes(self, height, count):
         headers_concat, headers_count = await self.read_headers(height, count)
@@ -493,7 +522,7 @@ class DB(object):
         prefix = b'U'
         min_height = self.min_undo_height(self.db_height)
         keys = []
-        for key, hist in self.utxo_db.iterator(prefix=prefix):
+        for key, _hist in self.utxo_db.iterator(prefix=prefix):
             height, = unpack('>I', key[-4:])
             if height >= min_height:
                 break
@@ -636,7 +665,7 @@ class DB(object):
                 for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
                     tx_num_packed = db_key[-4:]
                     tx_num, = unpack('<I', tx_num_packed)
-                    hash, height = self.fs_tx_hash(tx_num)
+                    hash, _height = self.fs_tx_hash(tx_num)
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed
                 return None, None

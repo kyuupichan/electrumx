@@ -4,8 +4,8 @@ Protocol Basics
 Message Stream
 --------------
 
-Clients and servers communicate using **JSON RPC** over an unspecified
-underlying stream transport protocol, typically TCP or SSL.
+Clients and servers communicate using **JSON RPC** over an unspecified underlying stream
+transport.  Examples include TCP, SSL, WS and WSS.
 
 Two standards `JSON RPC 1.0
 <http://www.jsonrpc.org/specification_v1>`_ and `JSON RPC 2.0
@@ -25,11 +25,12 @@ Clients making batch requests should limit their size depending on the
 nature of their query, because servers will limit response size as an
 anti-DoS mechanism.
 
-Each RPC call, and each response, is separated by a single newline in
-their respective streams.  The JSON specification does not permit
-control characters within strings, so no confusion is possible there.
-However it does permit newlines as extraneous whitespace between
-elements; client and server MUST NOT use newlines in such a way.
+Over TCP and SSL raw sockets each RPC call, and each response, MUST be terminated by a
+single newline to delimit messages.  Websocket messages are already framed so they MUST
+NOT be newline terminated.  The JSON specification does not permit control characters
+within strings, so no confusion is possible there.  However it does permit newlines as
+extraneous whitespace between elements; client and server MUST NOT use newlines in such a
+way.
 
 If using JSON RPC 2.0's feature of parameter passing by name, the
 names shown in the description of the method or notification in

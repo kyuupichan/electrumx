@@ -7,6 +7,73 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.13.0 (26 Sep 2019)
+============================
+
+* daemon: use a single connection for all requests rather than a connection per request.
+  Distinguish handling of JSON and HTTP errors
+* recognise OP_FALSE OP_RETURN scripts as unspendable
+* peers - attempt to bind to correct local IP address
+* improve name support (domob1812)
+* coin additions / updates: BitZeny (y-chan), ZCoin (a-bezrukov), Emercoin (yakimka),
+  BSV (Roger Taylor), Bellcoin (streetcrypto7), Ritocoin (traysi), BTC (Sombernight),
+  PIVX (mrcarlanthony), Monacoin (wakiyamap)), NamecoinRegtest (JeremyRand), Axe (ddude1),
+  Xaya (domob1812), GZRO (MrNaif2018), Ravencoin (standard-error)
+* other: gits7r
+
+Version 1.12.0 (13 May 2019)
+============================
+
+* require aiorpcX 0.18.1.  This introduces websocket support.  The environment variables
+  changed accordingly; see :envvar:`SERVICES` and :envvar:`REPORT_SERVICES`.
+* work around bug in recent versions of uvloop
+* aiorpcX upgrade fixes from Shane M
+* coin additions / updates: BitcoinSV, Bolivarcoin (Jose Luis Estevez), BTC Testnet (ghost43),
+  Odin (Pixxl)
+
+Version 1.11.0 (18 Apr 2019)
+============================
+
+* require aiorpcX 0.15.x
+* require aiohttp 3.3 or higher; earlier versions had a problematic bug
+* add :envvar:`REQUEST_TIMEOUT` and :envvar:`LOG_LEVEL` environment variables
+* mark 4 old environment variables obsolete.  ElectrumX won't start until they are removed
+* getinfo local RPC cleaned up and shows more stats
+* miscellaneous fixes and improvements
+* more efficient handling of some RPC methods, particularly
+  :func:`blockchain.transaction.get_merkle`
+* coin additions / updates: BitcoinSV scaling testnet (Roger Taylor), Dash (zebra lucky),
+* issues resolved: `#566`_, `#731`_, `#795`_
+
+Version 1.10.1 (13 Apr 2019)
+============================
+
+* introduce per-request costing.  See environment variables documentation for new
+  variables :envvar:`COST_SOFT_LIMIT`, :envvar:`COST_HARD_LIMIT`, :envvar:`REQUEST_SLEEP`,
+  :envvar:`INITIAL_CONCURRENT`, :envvar:`BANDWIDTH_UNIT_COST`.  Sessions are placed in groups
+  with which they share some of their costs.  Prior cost is remembered across reconnects.
+* require aiorpcX 0.13.5 for better concurrency handling
+* require clients use protocol 1.4 or higher
+* handle transaction.get_merkle requests more efficiently (ghost43)
+* Windows support (sancoder)
+* peers improvements (ghost43)
+* report mempool and block sizes in logs
+* electrumx_rpc: timeout raised to 30s, fix session request counts
+* other tweaks and improvements by Bjorge Dijkstra, ghost43, peleion,
+* coin additions / updates: ECA (Jenova7), ECCoin (smogm), GXX (DEVCØN), BZX (2INFINITY),
+  DeepOnion (Liam Alford), CivX / EXOS (turcol)
+
+Version 1.10.0 (15 Mar 2019)
+============================
+
+* extra countermeasures to limit BTC phishing effectiveness (ghost43)
+* peers: mark blacklisted peers bad; force retry blacklisted peers (ghost43)
+* coin additions / updates: Monacoin (wakiyamap), Sparks (Mircea Rila), ColossusXT,
+  Polis, MNPCoin, Zcoin, GINCoin (cronos), Grosetlcoin (gruve-p), Dash (konez2k),
+  Bitsend (David), Ravencoin (standard-error), Onixcoin (Jose Estevez), SnowGem
+* coin removals: Gobyte, Moneci (cronos)
+* minor tweaks by d42
+* issues fixed `#660`_ - unclean shutdowns during initial sync
 
 Version 1.9.5 (08 Feb 2019)
 ===========================
@@ -159,8 +226,6 @@ Version 1.8  (06 Aug 2018)
 
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
-1BWwXJH3q6PRsizBkSGm2Uw4Sz1urZ5sCj
-
 .. _#521: https://github.com/kyuupichan/electrumx/issues/521
 .. _#552: https://github.com/kyuupichan/electrumx/issues/552
 .. _#554: https://github.com/kyuupichan/electrumx/issues/554
@@ -168,6 +233,7 @@ Version 1.8  (06 Aug 2018)
 .. _#559: https://github.com/kyuupichan/electrumx/issues/559
 .. _#564: https://github.com/kyuupichan/electrumx/issues/564
 .. _#565: https://github.com/kyuupichan/electrumx/issues/565
+.. _#566: https://github.com/kyuupichan/electrumx/issues/566
 .. _#567: https://github.com/kyuupichan/electrumx/issues/567
 .. _#570: https://github.com/kyuupichan/electrumx/issues/570
 .. _#577: https://github.com/kyuupichan/electrumx/issues/577
@@ -177,6 +243,9 @@ Version 1.8  (06 Aug 2018)
 .. _#632: https://github.com/kyuupichan/electrumx/issues/630
 .. _#653: https://github.com/kyuupichan/electrumx/issues/653
 .. _#655: https://github.com/kyuupichan/electrumx/issues/655
+.. _#660: https://github.com/kyuupichan/electrumx/issues/660
 .. _#684: https://github.com/kyuupichan/electrumx/issues/684
 .. _#713: https://github.com/kyuupichan/electrumx/issues/713
 .. _#727: https://github.com/kyuupichan/electrumx/issues/727
+.. _#731: https://github.com/kyuupichan/electrumx/issues/731
+.. _#795: https://github.com/kyuupichan/electrumx/issues/795

@@ -30,6 +30,10 @@ class History(object):
         self.max_hist_row_entries = 12500
         self.unflushed = defaultdict(partial(array.array, 'I'))
         self.unflushed_count = 0
+        self.flush_count = 0
+        self.comp_flush_count = -1
+        self.comp_cursor = -1
+        self.db_version = max(self.DB_VERSIONS)
         self.db = None
 
     def open_db(self, db_class, for_sync, utxo_flush_count, compacting):
@@ -80,7 +84,7 @@ class History(object):
                          'excess history flushes...')
 
         keys = []
-        for key, hist in self.db.iterator(prefix=b''):
+        for key, _hist in self.db.iterator(prefix=b''):
             flush_id, = unpack_be_uint16_from(key[-2:])
             if flush_id > utxo_flush_count:
                 keys.append(key)
@@ -179,7 +183,7 @@ class History(object):
         transactions.  By default yields at most 1000 entries.  Set
         limit to None to get them all.  '''
         limit = util.resolve_limit(limit)
-        for key, hist in self.db.iterator(prefix=hashX):
+        for _key, hist in self.db.iterator(prefix=hashX):
             a = array.array('I')
             a.frombytes(hist)
             for tx_num in a:

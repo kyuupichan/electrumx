@@ -25,11 +25,11 @@
 
 '''Representation of a peer server.'''
 
-from ipaddress import ip_address, IPv4Address, IPv6Address
+from ipaddress import ip_address, IPv4Address, IPv6Address, IPv4Network, IPv6Network
 from socket import AF_INET, AF_INET6
 
-from electrumx.lib.util import cachedproperty
-import electrumx.lib.util as util
+from aiorpcx import is_valid_hostname
+from electrumx.lib.util import cachedproperty, protocol_tuple, version_string
 
 
 class Peer(object):
@@ -102,7 +102,7 @@ class Peer(object):
         '''Update features in-place.'''
         try:
             tmp = Peer(self.host, features)
-        except Exception:
+        except AssertionError:
             pass
         else:
             self.update_features_from_peer(tmp)
@@ -156,7 +156,7 @@ class Peer(object):
         if ip:
             return ((ip.is_global or ip.is_private)
                     and not (ip.is_multicast or ip.is_unspecified))
-        return util.is_valid_hostname(self.host)
+        return is_valid_hostname(self.host)
 
     @cachedproperty
     def is_public(self):
@@ -174,12 +174,38 @@ class Peer(object):
         except ValueError:
             return None
 
-    def bucket(self):
+    def bucket_for_internal_purposes(self):
+        '''Used for keeping the internal peer list manageable in size.
+        Restrictions are loose.
+        '''
         if self.is_tor:
             return 'onion'
         if not self.ip_addr:
             return ''
-        return tuple(self.ip_addr.split('.')[:2])
+        ip_addr = ip_address(self.ip_addr)
+        if ip_addr.version == 4:
+            return str(ip_addr)
+        elif ip_addr.version == 6:
+            slash64 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128-64)
+            return str(slash64)
+        return ''
+
+    def bucket_for_external_interface(self):
+        '''Used when responding to RPC queries to return a distributed list
+        of peers. Restrictions are stricter than internal bucketing.
+        '''
+        if self.is_tor:
+            return 'onion'
+        if not self.ip_addr:
+            return ''
+        ip_addr = ip_address(self.ip_addr)
+        if ip_addr.version == 4:
+            slash16 = IPv4Network(self.ip_addr).supernet(prefixlen_diff=32-16)
+            return str(slash16)
+        elif ip_addr.version == 6:
+            slash56 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128-56)
+            return str(slash56)
+        return ''
 
     def serialize(self):
         '''Serialize to a dictionary.'''
@@ -210,7 +236,7 @@ class Peer(object):
 
     @cachedproperty
     def genesis_hash(self):
-        '''Returns None if no SSL port, otherwise the port as an integer.'''
+        '''Returns the network genesis block hash as a string if known, otherwise None.'''
         return self._string('genesis_hash')
 
     @cachedproperty
@@ -239,8 +265,8 @@ class Peer(object):
 
     def _protocol_version_string(self, key):
         version_str = self.features.get(key)
-        ptuple = util.protocol_tuple(version_str)
-        return util.version_string(ptuple)
+        ptuple = protocol_tuple(version_str)
+        return version_string(ptuple)
 
     @cachedproperty
     def protocol_min(self):

@@ -123,7 +123,8 @@ class MemPool(object):
         elapsed = time.time() - start
         self.logger.info(f'synced in {elapsed:.2f}s')
         while True:
-            self.logger.info(f'{len(self.txs):,d} txs '
+            mempool_size = sum(tx.size for tx in self.txs.values()) / 1_000_000
+            self.logger.info(f'{len(self.txs):,d} txs {mempool_size:.2f} MB '
                              f'touching {len(self.hashXs):,d} addresses')
             await sleep(self.log_status_secs)
             await synchronized_event.wait()
@@ -201,7 +202,7 @@ class MemPool(object):
                              sum(v for _, v in tx.out_pairs)))
             txs[hash] = tx
 
-            for hashX, value in itertools.chain(tx.in_pairs, tx.out_pairs):
+            for hashX, _value in itertools.chain(tx.in_pairs, tx.out_pairs):
                 touched.add(hashX)
                 hashXs[hashX].add(hash)
 

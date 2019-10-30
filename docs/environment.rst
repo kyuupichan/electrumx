@@ -4,15 +4,14 @@
 Environment Variables
 =====================
 
-ElectrumX takes no command line arguments, instead its behaviour is
-controlled by environment variables.  Only a few are required to be
-given, the rest will have sensible defaults if not specified.  Many of
-the defaults around resource usage are conservative; I encourage you
-to review them.
+ElectrumX takes no command line arguments, instead its behaviour is controlled by
+environment variables.  Only a few are required to be given, the rest will have sensible
+defaults if not specified.  Many of the defaults around resource usage are conservative; I
+encourage you to review them.
 
-Note: by default the server will only serve to connections from the
-same machine.  To be accessible to other users across the internet you
-must set **HOST** appropriately; see below.
+.. note:: set :envvar:`SERVICES` appropriately to be able to connect to your server.  For
+  clients across the internet to know what services you offer you must advertize your
+  services with :envvar:`REPORT_SERVICES`.
 
 
 Required
@@ -61,6 +60,119 @@ The following are required if you use the ``run`` script:
   The username the server will run as.
 
 
+Services
+========
+
+These two environment variables are comma-separated lists of individual *services*.
+
+A **service** has the general form::
+
+  protocol://host:port
+
+*protocol* is case-insensitive.  The recognised protocols are::
+
+   tcp    Plaintext TCP sockets
+   ssl    SSL-encrypted TCP sockets
+   ws     Plaintext websockets
+   wss    SSL-encrypted websockets
+   rpc    Plaintext RPC
+
+In a services list, a protocol can be specified multiple times, with different hosts or
+ports.  This might be useful for multi-homed hosts, or if you offer both Tor and clearnet
+services.
+
+*host* can be a hostname, an IPv4 address, or an IPv6 address enclosed in square brackets.
+
+*port* is an integer from :const:`1` to :const:`65535` inclusive.
+
+Where documented, one or more of *protocol*, *host* and *port* can be omitted, in which
+case a default value will be assumed.
+
+Here are some examples of valid services::
+
+  tcp://host.domain.tld:50001           # Hostname, lowercase protocol, port
+  SSL://23.45.67.78:50002               # An IPv4 address, upper-case protocol, port
+  rpC://localhost                       # Host as a string, mixed-case protocol, default port
+  ws://[1234:5678:abcd::5601]:8000      # Host as an IPv6 address
+  wss://h3ubaasdlkheryasd.onion:50001   # Host as a Tor ".onion" address
+  rpc://:8000                           # Default host, port given
+  host.domain.tld:5151                  # Default protocol, hostname, port
+  rpc://                                # RPC protocol, default host and port
+
+.. note:: ElectrumX will not serve any incoming connections until it has fully caught up
+          with your bitcoin daemon.  The only exception is local **RPC** connections,
+          which are served at any time after the server has initialized.
+
+.. envvar:: SERVICES
+
+  A comma-separated list of services ElectrumX will accept incoming connections for.
+
+  This environment variable determines what interfaces and ports the server listens on, so
+  must be set correctly for any connection to the server to succeed.  If unset or empty,
+  ElectrumX will not listen for any incoming connections.
+
+  *protocol* can be any recognised protocol.
+
+  *host* defaults to all of the machine's interfaces, except if the protocol is **rpc**,
+  when it defaults to :const:`localhost`.
+
+  *port* can only be defaulted for **rpc** where the default is :const:`8000`.
+
+  On most Unix systems ports below 1024 require elevated priveleges so choosing a higher
+  port is advisable.  On Debian for example, this can be achieved by installinng
+  libcap2-bin package::
+
+    sudo apt-get update && sudo apt-get -y install libcap2-bin
+    sudo setcap cap_net_bind_service=+ep /path/to/electrumx_server
+
+  If any listed service has protocol **ssl** or **wss** then :envvar:`SSL_CERTFILE` and
+  :envvar:`SSL_KEYFILE` must be defined.
+
+  Tor **onion** addresses are invalid in :envvar:`SERVICES`.
+
+  Here is an example value of the :envvar:`SERVICES` environment variable::
+
+    tcp://:50001,ssl://:50002,wss://:50004,rpc://
+
+  This serves **tcp**, **ssl**, **wss** on all interfaces on ports 50001, 50002 and 50004
+  respectively.  **rpc** is served on its default host :const:`localhost` and default port
+  :const:`8000`.
+
+.. envvar:: REPORT_SERVICES
+
+  A comma-separated list of services ElectrumX will advertize and other servers in the
+  server network (if peer discovery is enabled), and any successful connection.
+
+  This environment variable must be set correctly, taking account of your network,
+  firewall and router setup, for clients and other servers to see how to connect to your
+  server.  If not set or empty, no services are advertized.
+
+  The **rpc** protocol, special IP addresses (inlcuding private ones if peer discovery is
+  enabled), and :const:`localhost` are invalid in :envvar:`REPORT_SERVICES`.
+
+  Here is an example value of the :envvar:`REPORT_SERVICES` environment variable::
+
+    tcp://sv.usebsv.com:50001,ssl://sv.usebsv.com:50002,wss://sv.usebsv.com:50004
+
+  This advertizes **tcp**, **ssl**, **wss** services at :const:`sv.usebsv.com` on ports
+  50001, 50002 and 50004 respectively.
+
+.. note:: Certificate Authority-signed certificates don't work over Tor, so you should
+          only have Tor services` in :envvar:`REPORT_SERVICES` if yours is self-signed.
+
+.. envvar:: SSL_CERTFILE
+
+  The filesystem path to your SSL certificate file.
+
+  :ref:`SSL certificates`
+
+.. envvar:: SSL_KEYFILE
+
+  The filesystem path to your SSL key file.
+
+  :ref:`SSL certificates`
+
+
 Miscellaneous
 =============
 
@@ -71,6 +183,11 @@ These environment variables are optional:
   The Python logging `format string
   <https://docs.python.org/3/library/logging.html#logrecord-attributes>`_
   to use.  Defaults to ``%(levelname)s:%(name)s:%(message)s``.
+
+.. envvar:: LOG_LEVEL
+
+  The default Python logging level, a case-insensitive string.  Useful values
+  are 'debug', 'info', 'warning' and 'error'.
 
 .. envvar:: ALLOW_ROOT
 
@@ -88,54 +205,6 @@ These environment variables are optional:
   ``leveldb``.  The other alternative is ``rocksdb``.  You will need
   to install the appropriate python package for your engine.  The
   value is not case sensitive.
-
-.. envvar:: HOST
-
-  The host or IP address that the TCP and SSL servers will use when
-  binding listening sockets.  Defaults to ``localhost``.  To listen on
-  multiple specific addresses specify a comma-separated list.  Set to
-  an empty string to listen on all available interfaces (likely both
-  IPv4 and IPv6).
-
-.. envvar:: TCP_PORT
-
-  If set ElectrumX will serve TCP clients on
-  :envvar:`HOST`\::envvar:`TCP_PORT`.
-
-  .. note:: ElectrumX will not serve TCP connections until it has
-            fully caught up with your daemon.
-
-.. envvar:: SSL_PORT
-
-  If set ElectrumX will serve SSL clients on
-  :envvar:`HOST`\::envvar:`SSL_PORT`.  If set then
-  :envvar:`SSL_CERTFILE` and :envvar:`SSL_KEYFILE` must be defined
-  environment variables with values the filesystem paths to those SSL
-  files.
-
-  .. note:: ElectrumX will not serve SSL connections until it has
-            fully caught up with your daemon.
-
-.. envvar:: RPC_HOST
-
-  The host or IP address that the RPC server will listen on and
-  defaults to ``localhost``.  To listen on multiple specific addresses
-  specify a comma-separated list.  Servers with unusual networking
-  setups might want to specify e.g. ``::1`` or ``127.0.0.1``
-  explicitly rather than defaulting to ``localhost``.
-
-  An empty string (normally indicating all interfaces) is interpreted
-  as ``localhost``, because allowing access to the server's RPC
-  interface to arbitrary connections across the internet is not a good
-  idea.
-
-.. envvar:: RPC_PORT
-
-  ElectrumX will listen on this port for local RPC connections.
-  ElectrumX listens for RPC connections unless this is explicitly set
-  to blank.  The default depends on :envvar:`COIN` and :envvar:`NET`
-  (e.g., 8000 for Bitcoin mainnet) if not set, as indicated in
-  `lib/coins.py`_.
 
 .. envvar:: DONATION_ADDRESS
 
@@ -246,40 +315,69 @@ raise them.
   hexadecimal ASCII characters on the wire.  Very few transactions on
   Bitcoin mainnet are over 500KB in size.
 
-.. envvar:: MAX_SUBS
+.. envvar:: COST_SOFT_LIMIT
+.. envvar:: COST_HARD_LIMIT
+.. envvar:: REQUEST_SLEEP
+.. envvar:: INITIAL_CONCURRENT
 
-  The maximum number of address subscriptions across all sessions.
-  Defaults to 250,000.
+  All values are integers. :envvar:`COST_SOFT_LIMIT` defaults to :const:`1,000`,
+  :envvar:`COST_HARD_LIMIT` to :const:`10,000`, :envvar:`REQUEST_SLEEP` to :const:`2,500`
+  milliseconds, and :envvar:`INITIAL_CONCURRENT` to :const:`10` concurrent requests.
 
-.. envvar:: MAX_SESSION_SUBS
+  The server prices each request made to it based upon an estimate of the resources needed
+  to process it.  Factors include whether the request uses bitcoind, how much bandwidth
+  it uses, and how hard it hits the databases.
 
-  The maximum number of address subscriptions permitted to a single
-  session.  Defaults to 50,000.
+  To set a base for the units, a :func:`blockchain.scripthash.subscribe` subscription to
+  an address with a history of 2 or fewer transactions is costed at :const:`1.0` before
+  considering the bandwidth consumed.  :func:`server.ping` is costed at :const:`0.1`.
 
-.. envvar:: BANDWIDTH_LIMIT
+  As the total cost of a session goes over the soft limit, its requests start to be
+  throttled in two ways.  First, the number of requests for that session that the server
+  will process concurrently is reduced.  Second, each request starts to sleep a little
+  before being handled.
 
-  Per-session periodic bandwidth usage limit in bytes.  This is a soft,
-  not hard, limit.  Currently the period is hard-coded to be one hour.
-  The default limit value is 2 million bytes.
+  Before throttling starts, the server will process up to :envvar:`INITIAL_CONCURRENT`
+  requests concurrently without sleeping.  As the session cost ranges from
+  :envvar:`COST_SOFT_LIMIT` to :envvar:`COST_HARD_LIMIT`, concurrency drops linearly to
+  zero and each request's sleep time increases linearly up to :envvar:`REQUEST_SLEEP`
+  milliseconds.  Once the hard limit is reached, the session is disconnected.
 
-  Bandwidth usage over each period is totalled, and when this limit is
-  exceeded each subsequent request is stalled by sleeping before
-  handling it, effectively giving higher processing priority to other
-  sessions.
+  In order that non-abusive sessions can continue to be served, a session's cost gradually
+  decays over time.  Subscriptions have an ongoing servicing cost, so the decay is slower
+  as the number of subscriptions increases.
 
-  The more bandwidth usage exceeds this soft limit the longer the next
-  request will sleep.  Sleep times are a round number of seconds with
-  a minimum of 1.  Each time the delay changes the event is logged.
+  If a session disconnects, ElectrumX continues to associate its cost with its IP address,
+  so if it immediately reconnects it will re-acquire its previous cost allocation.
 
-  Bandwidth usage is gradually reduced over time by "refunding" a
-  proportional part of the limit every now and then.
+  A server operator should experiment with different values according to server loads.  It
+  is not necessarily true that e.g. having a low soft limit, decreasing concurrency and
+  increasing sleep will help handling heavy loads, as it will also increase the backlog of
+  requests the server has to manage in memory.  It will also give a much worse experience
+  for genuine connections.
+
+.. envvar:: BANDWIDTH_UNIT_COST
+
+  The number of bytes, sent and received, by a session that is deemed to cost :const:`1.0`.
+
+  The default value :const:`5,000` bytes, meaning the bandwidth cost assigned to a response
+  of 100KB is 20.  If your bandwidth is cheap you should probably raise this.
+
+.. envvar:: REQUEST_TIMEOUT
+
+  An integer number of seconds defaulting to :const:`30`.  If a request takes longer than
+  this to respond to, either because of request limiting or because the request is
+  expensive, the server rejects it and returns a timeout error to the client indicating
+  that the server is busy.
+
+  This can help prevent large backlogs of unprocessed requests building up under heavy load.
 
 .. envvar:: SESSION_TIMEOUT
 
-  An integer number of seconds defaulting to 600.  Sessions with no
-  activity for longer than this are disconnected.  Properly
-  functioning Electrum clients by default will send pings roughly
-  every 60 seconds.
+  An integer number of seconds defaulting to :const:`600`.  Sessions that have not sent a
+  request for longer than this are disconnected.  Properly functioning clients should send
+  a :func:`server.ping` request once roughly 450 seconds have passed since the previous
+  request, in order to avoid disconnection.
 
 
 Peer Discovery
@@ -349,52 +447,6 @@ some of this.
 
   URL to retrieve a list of blacklisted peers.  If not set, a coin-
   specific default is used.
-
-
-
-Server Advertising
-==================
-
-These environment variables affect how your server is advertised
-by peer discovery (if enabled).
-
-.. envvar:: REPORT_HOST
-
-  The clearnet host to advertise.  If not set, no clearnet host is
-  advertised.
-
-.. envvar:: REPORT_TCP_PORT
-
-  The clearnet TCP port to advertise if :envvar:`REPORT_HOST` is set.
-  Defaults to :envvar:`TCP_PORT`.  ``0`` disables publishing a TCP
-  port.
-
-.. envvar:: REPORT_SSL_PORT
-
-  The clearnet SSL port to advertise if :envvar:`REPORT_HOST` is set.
-  Defaults to :envvar:`SSL_PORT`.  ``0`` disables publishing an SSL
-  port.
-
-.. envvar:: REPORT_HOST_TOR
-
-  If you wish run a Tor service, this is the Tor host name to
-  advertise and must end with ``.onion``.
-
-.. envvar:: REPORT_TCP_PORT_TOR
-
-  The Tor TCP port to advertise.  The default is the clearnet
-  :envvar:`REPORT_TCP_PORT`, unless disabled or it is ``0``, otherwise
-  :envvar:`TCP_PORT`.  ``0`` disables publishing a Tor TCP port.
-
-.. envvar:: REPORT_SSL_PORT_TOR
-
-  The Tor SSL port to advertise.  The default is the clearnet
-  :envvar:`REPORT_SSL_PORT`, unless disabled or it is ``0``, otherwise
-  :envvar:`SSL_PORT`.  ``0`` disables publishing a Tor SSL port.
-
-  .. note:: Certificate-Authority signed certificates don't work over
-            Tor, so you should set :envvar:`REPORT_SSL_PORT_TOR` to
-            ``0`` if yours is not self-signed.
 
 
 Cache
