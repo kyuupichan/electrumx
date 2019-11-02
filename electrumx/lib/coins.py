@@ -1950,7 +1950,9 @@ class Feathercoin(Coin):
     RPC_PORT = 9337
     REORG_LIMIT = 2000
     PEERS = [
-        'electrumx-ch-1.feathercoin.ch s t',
+        'electrumx-gb-1.feathercoin.network s t',
+        'electrumx-gb-2.feathercoin.network s t',
+        'electrumx-de-1.feathercoin.network s t',
     ]
 
 
