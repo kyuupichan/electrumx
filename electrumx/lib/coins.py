@@ -1951,8 +1951,8 @@ class Feathercoin(Coin):
     REORG_LIMIT = 2000
     PEERS = [
         'electrumx-gb-1.feathercoin.network s t',
+        'electrumx-gb-2.feathercoin.network s t',
         'electrumx-de-1.feathercoin.network s t',
-      
     ]
 
 
