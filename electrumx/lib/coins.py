@@ -580,6 +580,8 @@ class BitcoinSegwit(BitcoinMixin, Coin):
     CRASH_CLIENT_VER = (3, 2, 3)
     BLACKLIST_URL = 'https://electrum.org/blacklist.json'
     PEERS = [
+        'bitcoin.lukechilds.co s t',
+        'lukebtc46ko5kgsp.onion s',
         'E-X.not.fyi s t',
         'electrum.vom-stausee.de s t',
         'electrum.hsmiths.com s t',
