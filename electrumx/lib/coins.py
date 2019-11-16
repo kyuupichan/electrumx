@@ -3305,3 +3305,69 @@ class GravityZeroCoin(ScryptMixin, Coin):
     RPC_PORT = 36442
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
+
+
+class Vitae(Coin):
+    NAME = "Vitae"
+    SHORTNAME = "VITAE"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("022D2533")
+    XPRV_VERBYTES = bytes.fromhex("0221312B")
+    GENESIS_HASH = ('0000041e482b9b9691d98eefb48473405c0b8ec31b76df3797c74a78680ef818')
+    P2PKH_VERBYTE = bytes.fromhex("47")
+    P2SH_VERBYTE = bytes.fromhex("0d")
+    WIF_BYTE = bytes.fromhex("d4")
+    TX_COUNT_HEIGHT = 1020593
+    BASIC_HEADER_SIZE = 80
+    TX_COUNT = 2414971
+    TX_PER_BLOCK = 1
+    STATIC_BLOCK_HEADERS = False
+    RPC_PORT = 51473
+    ZEROCOIN_HEADER = 112
+    ZEROCOIN_START_HEIGHT = 209467
+    ZEROCOIN_BLOCK_VERSION = 5
+    HEADER_HEADERCHECKPOINTV = 3
+    @classmethod
+    def static_header_len(cls, height):
+        '''Given a header height return its length.'''
+        if (height > 0):
+            return cls.ZEROCOIN_HEADER
+        else:
+            return cls.BASIC_HEADER_SIZE
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        version, = struct.unpack('<I', header[:4])
+        if version < 4:
+            import pivx_quark_hash as quark_hashx
+            return quark_hashx.getPoWHash(header)
+        else:
+            return super().header_hash(header)
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
+
+        if (version > cls.HEADER_HEADERCHECKPOINTV):
+            return {
+                'block_height': height,
+                'version': version,
+                'prev_block_hash': hash_to_str(header[4:36]),
+                'merkle_root': hash_to_str(header[36:68]),
+                'timestamp': timestamp,
+                'bits': bits,
+                'nonce': nonce,
+                'acc_checkpoint': hash_to_str(header[80:112])
+            }
+        else:
+            return {
+                'block_height': height,
+                'version': version,
+                'prev_block_hash': hash_to_str(header[4:36]),
+                'merkle_root': hash_to_str(header[36:68]),
+                'timestamp': timestamp,
+                'bits': bits,
+                'nonce': nonce,
+            }

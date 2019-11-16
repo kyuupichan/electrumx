@@ -135,6 +135,13 @@ def test_COIN_NET():
     os.environ['NET'] = 'testnet'
     e = Env()
     assert e.coin == lib_coins.PivxTestnet
+    os.environ['NET'] = 'mainnet'
+    e = Env()
+    os.environ.pop('NET')
+    os.environ['COIN'] = ' Vitae'
+    os.environ['NET'] = 'mainnet'
+    e = Env()
+    assert e.coin == lib_coins.Vitae
     os.environ.pop('NET')
     os.environ['NET'] = 'mainnet'
     os.environ['COIN'] = ' TokenPay '
