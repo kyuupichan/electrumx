@@ -3302,3 +3302,19 @@ class GravityZeroCoin(ScryptMixin, Coin):
     RPC_PORT = 36442
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
+
+# Source:https://github.com/bitcoinroyale/bitcoinroyale
+class BitcoinRoyale(Coin):
+    NAME = "BitcoinRoyale"
+    SHORTNAME = "BTCR"
+    NET = "mainnet"
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    P2PKH_VERBYTE = bytes.fromhex("4E")
+    P2SH_VERBYTE = [bytes.fromhex("3C")]
+    GENESIS_HASH = ('0000000028ce26975b32feda3d75ac3fe10372f75062366cfba4e934dcc6a48b')
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    RPC_PORT = 8332
+    TX_COUNT = 3300
+    TX_COUNT_HEIGHT = 3300
+    TX_PER_BLOCK = 2000
