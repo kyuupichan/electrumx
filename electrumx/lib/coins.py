@@ -3302,3 +3302,35 @@ class GravityZeroCoin(ScryptMixin, Coin):
     RPC_PORT = 36442
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
+
+class Navcoin(Coin):
+    NAME = "Navcoin"
+    SHORTNAME = "NAV"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("35")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("96")
+    GENESIS_HASH = ('00006a4e3e18c71c6d48ad6c261e2254'
+                    'fa764cf29607a4357c99b712dfbb8e6a')
+    DESERIALIZER = lib_tx.DeserializerTxTimeSegWitNavCoin
+    TX_COUNT = 137641
+    TX_COUNT_HEIGHT = 3649662
+    TX_PER_BLOCK = 2
+    RPC_PORT = 44444
+    REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        if int.from_bytes(header[:1], "big") > 6:
+            return double_sha256(header)
+        else:
+            import x13_hash
+            return x13_hash.getPoWHash(header)
+
+    @classmethod
+    def block(cls, raw_block, height):
+        header = cls.block_header(raw_block, height)
+        txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
+        return Block(raw_block, header, txs)
