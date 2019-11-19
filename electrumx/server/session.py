@@ -288,6 +288,7 @@ class SessionManager:
             'daemon': self.daemon.logged_url(),
             'daemon height': self.daemon.cached_height(),
             'db height': self.db.db_height,
+            'db_flush_count': self.db.history.flush_count,
             'groups': len(self.session_groups),
             'history cache': cache_fmt.format(
                 self._history_lookups, self._history_hits, len(self._history_cache)),
