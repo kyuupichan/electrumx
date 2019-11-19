@@ -412,12 +412,10 @@ class BlockProcessor(object):
         update_touched = self.touched.update
         hashXs_by_tx = []
         append_hashXs = hashXs_by_tx.append
-
         for tx, tx_hash in txs:
             hashXs = []
             append_hashX = hashXs.append
             tx_numb = s_pack('<I', tx_num)
-
             # Spend the inputs
             for txin in tx.inputs:
                 if txin.is_generation():

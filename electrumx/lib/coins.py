@@ -3328,9 +3328,3 @@ class Navcoin(Coin):
         else:
             import x13_hash
             return x13_hash.getPoWHash(header)
-
-    @classmethod
-    def block(cls, raw_block, height):
-        header = cls.block_header(raw_block, height)
-        txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
-        return Block(raw_block, header, txs)

@@ -406,7 +406,6 @@ class TxTimeSegWit(namedtuple(
         "Tx", "version time marker flag inputs outputs witness locktime")):
     '''Class representing a SegWit transaction with time.'''
 
-
 class DeserializerTxTimeSegWit(DeserializerTxTime):
     def _read_witness(self, fields):
         read_witness_field = self._read_witness_field
@@ -469,12 +468,29 @@ class DeserializerTxTimeSegWitNavCoin(DeserializerTxTime):
         read_varbytes = self._read_varbytes
         return [read_varbytes() for _ in range(self._read_varint())]
 
+    def read_tx_no_segwit(self):
+        version = self._read_le_int32()
+        time = self._read_le_uint32()
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        strDZeel = ""
+        if version >= 2:
+            strDZeel = self._read_varbytes()
+        return TxTime(
+            version,
+            time,
+            inputs,
+            outputs,
+            locktime
+        )
+
     def _read_tx_parts(self):
         '''Return a (deserialized TX, tx_hash, vsize) tuple.'''
         start = self.cursor
         marker = self.binary[self.cursor + 8]
         if marker:
-            tx = super().read_tx()
+            tx = self.read_tx_no_segwit()
             tx_hash = self.TX_HASH_FN(self.binary[start:self.cursor])
             return tx, tx_hash, self.binary_length
 
@@ -495,11 +511,12 @@ class DeserializerTxTimeSegWitNavCoin(DeserializerTxTime):
 
         start = self.cursor
         locktime = self._read_le_uint32()
-        vsize = (3 * base_size + self.binary_length) // 4
+        strDZeel = ""
 
         if version >= 2:
             strDZeel = self._read_varbytes()
 
+        vsize = (3 * base_size + self.binary_length) // 4
         orig_ser += self.binary[start:self.cursor]
 
         return TxTimeSegWit(
