@@ -406,6 +406,7 @@ class TxTimeSegWit(namedtuple(
         "Tx", "version time marker flag inputs outputs witness locktime")):
     '''Class representing a SegWit transaction with time.'''
 
+
 class DeserializerTxTimeSegWit(DeserializerTxTime):
     def _read_witness(self, fields):
         read_witness_field = self._read_witness_field
@@ -458,6 +459,7 @@ class DeserializerTxTimeSegWit(DeserializerTxTime):
     def read_tx_and_vsize(self):
         tx, tx_hash, vsize = self._read_tx_parts()
         return tx, vsize
+
 
 class DeserializerTxTimeSegWitNavCoin(DeserializerTxTime):
     def _read_witness(self, fields):
@@ -533,6 +535,7 @@ class DeserializerTxTimeSegWitNavCoin(DeserializerTxTime):
     def read_tx_and_vsize(self):
         tx, tx_hash, vsize = self._read_tx_parts()
         return tx, vsize
+
 
 class TxTrezarcoin(
         namedtuple("Tx", "version time inputs outputs locktime txcomment")):

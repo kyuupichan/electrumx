@@ -3303,6 +3303,7 @@ class GravityZeroCoin(ScryptMixin, Coin):
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
 
+
 class Navcoin(Coin):
     NAME = "Navcoin"
     SHORTNAME = "NAV"
