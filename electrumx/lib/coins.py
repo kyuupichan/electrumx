@@ -1051,13 +1051,16 @@ class Namecoin(NameIndexMixin, AuxPowMixin, Coin):
     WIF_BYTE = bytes.fromhex("e4")
     GENESIS_HASH = ('000000000062b72c5e2ceb45fbc8587e'
                     '807c155b0da735e6483dfba2f0a9c770')
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
     TX_COUNT = 4415768
     TX_COUNT_HEIGHT = 329065
     TX_PER_BLOCK = 10
     RPC_PORT = 8336
     PEERS = [
+        'electrum-nmc.le-space.de s50002',
         'ex.lug.gs s446',
         'luggscoqbymhvnkp.onion t82',
+        'nmc.bitcoins.sk s50002',
         'ulrichard.ch s50006 t50005',
     ]
     BLOCK_PROCESSOR = block_proc.NameIndexBlockProcessor
