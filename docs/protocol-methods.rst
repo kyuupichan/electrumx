@@ -541,7 +541,7 @@ Return a raw transaction.
 
 **Signature**
 
-  .. function:: blockchain.transaction.get(tx_hash, verbose=false, merkle=false)
+  .. function:: blockchain.transaction.get(tx_hash, verbose=false)
   .. versionchanged:: 1.1
      ignored argument *height* removed
   .. versionchanged:: 1.2

@@ -1052,13 +1052,16 @@ class Namecoin(NameIndexMixin, AuxPowMixin, Coin):
     WIF_BYTE = bytes.fromhex("e4")
     GENESIS_HASH = ('000000000062b72c5e2ceb45fbc8587e'
                     '807c155b0da735e6483dfba2f0a9c770')
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
     TX_COUNT = 4415768
     TX_COUNT_HEIGHT = 329065
     TX_PER_BLOCK = 10
     RPC_PORT = 8336
     PEERS = [
+        'electrum-nmc.le-space.de s50002',
         'ex.lug.gs s446',
         'luggscoqbymhvnkp.onion t82',
+        'nmc.bitcoins.sk s50002',
         'ulrichard.ch s50006 t50005',
     ]
     BLOCK_PROCESSOR = block_proc.NameIndexBlockProcessor
@@ -1577,12 +1580,12 @@ class Peercoin(Coin):
     WIF_BYTE = bytes.fromhex("b7")
     GENESIS_HASH = ('0000000032fe677166d54963b62a4677'
                     'd8957e87c508eaa4fd7eb1c880cd27e3')
-    DESERIALIZER = lib_tx.DeserializerTxTime
+    DESERIALIZER = lib_tx.DeserializerTxTimeSegWit
     DAEMON = daemon.FakeEstimateFeeDaemon
-    ESTIMATE_FEE = 0.01
+    ESTIMATE_FEE = 0.001
     RELAY_FEE = 0.01
-    TX_COUNT = 1207356
-    TX_COUNT_HEIGHT = 306425
+    TX_COUNT = 1691771
+    TX_COUNT_HEIGHT = 455409
     TX_PER_BLOCK = 4
     RPC_PORT = 9902
     REORG_LIMIT = 5000
@@ -1975,7 +1978,9 @@ class Feathercoin(Coin):
     RPC_PORT = 9337
     REORG_LIMIT = 2000
     PEERS = [
-        'electrumx-ch-1.feathercoin.ch s t',
+        'electrumx-gb-1.feathercoin.network s t',
+        'electrumx-gb-2.feathercoin.network s t',
+        'electrumx-de-1.feathercoin.network s t',
     ]
 
 
