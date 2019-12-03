@@ -3324,7 +3324,7 @@ class Navcoin(Coin):
 
     @classmethod
     def header_hash(cls, header):
-        if int.from_bytes(header[:1], "big") > 6:
+        if int.from_bytes(header, "big") > 6:
             return double_sha256(header)
         else:
             import x13_hash
