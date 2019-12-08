@@ -633,6 +633,9 @@ class DB(object):
                 tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
                 value, = unpack('<Q', db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
+                if tx_pos == 0:
+                    assert value == 0
+                    self.logger.warning(f'not implemented: returning incorrect zero value for coinbase output in {tx_hash.hex()}')
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
             return utxos
 
