@@ -1659,7 +1659,7 @@ class Trezarcoin(Coin):
             return double_sha256(header)
         else:
             if (header[0] == 4 and header[2] >= 1):
-                if (header[143] < 3):
+                if (len(header) < 144 or header[143] < 3):
                     return verus_hash2b(header)
                 else:
                     return verus_hash2_1(header)
