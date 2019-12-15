@@ -40,7 +40,7 @@ from functools import partial
 import electrumx.lib.util as util
 from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
-from electrumx.lib.verus_hash import verus_hash, verus_hash2b
+from electrumx.lib.verus_hash import verus_hash, verus_hash2b, verus_hash2_1
 from electrumx.lib.script import (_match_ops, Script, ScriptError,
                                   ScriptPubKey, OpCodes)
 import electrumx.lib.tx as lib_tx
@@ -1649,8 +1649,91 @@ class Trezarcoin(Coin):
 
     @classmethod
     def header_hash(cls, header):
+<<<<<<< HEAD
         '''Given a header return the hash.'''
         return cls.HEADER_HASH(header)
+=======
+        '''Given a header return hash'''
+        # if this may be the genesis block, use sha256, otherwise, VerusHash
+        if cls.header_prevhash(header) == bytes([0] * 32):
+            return double_sha256(header)
+        else:
+            if (header[0] == 4 and header[2] >= 1):
+                if (header[2] < 3):
+                    return verus_hash2b(header)
+                else:
+                    return verus_hash2_1(header)
+            else:
+                return verus_hash(header)
+
+
+class Einsteinium(Coin):
+    NAME = "Einsteinium"
+    SHORTNAME = "EMC2"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("21")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("b0")
+    GENESIS_HASH = ('4e56204bb7b8ac06f860ff1c845f03f9'
+                    '84303b5b97eb7b42868f714611aed94b')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    TX_COUNT = 2087559
+    TX_COUNT_HEIGHT = 1358517
+    TX_PER_BLOCK = 2
+    RPC_PORT = 41879
+    REORG_LIMIT = 2000
+
+
+class Blackcoin(ScryptMixin, Coin):
+    NAME = "Blackcoin"
+    SHORTNAME = "BLK"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('000001faef25dec4fbcf906e6242621d'
+                    'f2c183bf232f263d0ba5b101911e4563')
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 4594999
+    TX_COUNT_HEIGHT = 1667070
+    TX_PER_BLOCK = 3
+    RPC_PORT = 15715
+    REORG_LIMIT = 5000
+
+
+class Bitbay(ScryptMixin, Coin):
+    NAME = "Bitbay"
+    SHORTNAME = "BAY"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('0000075685d3be1f253ce777174b1594'
+                    '354e79954d2a32a6f77fe9cba00e6467')
+    TX_COUNT = 4594999
+    TX_COUNT_HEIGHT = 1667070
+    TX_PER_BLOCK = 3
+    RPC_PORT = 19914
+    REORG_LIMIT = 5000
+
+
+class Peercoin(Coin):
+    NAME = "Peercoin"
+    SHORTNAME = "PPC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("75")]
+    WIF_BYTE = bytes.fromhex("b7")
+    GENESIS_HASH = ('0000000032fe677166d54963b62a4677'
+                    'd8957e87c508eaa4fd7eb1c880cd27e3')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1207356
+    TX_COUNT_HEIGHT = 306425
+    TX_PER_BLOCK = 4
+    RPC_PORT = 9902
+    REORG_LIMIT = 5000
+>>>>>>> 7e0b7b1... VerusHash 2.1 update
 
 
 class Reddcoin(Coin):

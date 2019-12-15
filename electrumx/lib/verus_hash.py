@@ -582,6 +582,273 @@ def __verusclmulwithoutreduction64alignedrepeat_port(randomsource, buf, keyMask)
     return acc
 
 
+# must be 64 bit integers, not larger
+def x64modulo(dividend, divisor):
+    modadd = 0
+    modmul = 1
+    if (dividend & 0x8000000000000000):
+        dividend = -(dividend - 0x10000000000000000)
+        modadd = 0x100000000
+        modmul = -1
+
+    # should not be zero here or NaN
+    if (divisor & 0x80000000):
+        divisor = -(divisor - 0x100000000)
+
+    return (dividend % divisor - modadd) * modmul
+
+
+# verus intermediate hash extra
+def __verusclmulwithoutreduction64alignedrepeat_v2_1(randomsource, _buf, keyMask):
+    # divide key mask by 16 from bytes to __m128i
+    keyMask >>= 4
+
+    acc = randomsource[keyMask + 2]
+    buf = [_buf[0] ^ _buf[2], _buf[1] ^ _buf[3], _buf[2], _buf[3]]
+
+    #print("key start", hex(randomsource[0]), hex(randomsource[1]))
+
+    for i in range(32):
+        selector = _mm_cvtsi128_si64_emu(acc)
+
+        #print("LOOP ", i, "acc: ", hex(acc))
+
+        # get two random locations in the key, which will be mutated and swapped
+        prand = ((selector >> 5) & keyMask)
+        prandex = ((selector >> 32) & keyMask)
+
+        # select random start and order of pbuf processing
+        pbuf = (selector & 3)
+
+        path = selector & 0x1c
+
+        if (path == 0):
+            temp1 = randomsource[prandex]
+            temp2 = buf[pbuf - (((pbuf & 1) << 1) - 1)]
+            add1 = _mm_xor_si128_emu(temp1, temp2)
+            clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
+            acc = _mm_xor_si128_emu(clprod1, acc)
+
+            #print("temp1: ", hex(temp1))
+            #print("temp2: ", hex(temp2))
+            #print("add1: ", hex(add1))
+            #print("clprod1: ", hex(clprod1))
+            #print("acc: ", hex(acc))
+
+            tempa1 = _mm_mulhrs_epi16_emu(acc, temp1)
+            tempa2 = _mm_xor_si128_emu(tempa1, temp1)
+
+            temp12 = randomsource[prand]
+            randomsource[prand] = tempa2
+
+            temp22 = buf[pbuf]
+            add12 = _mm_xor_si128_emu(temp12, temp22)
+            clprod12 = _mm_clmulepi64_si128_emu_0x10(add12, add12)
+            acc = _mm_xor_si128_emu(clprod12, acc)
+
+            tempb1 = _mm_mulhrs_epi16_emu(acc, temp12)
+            tempb2 = _mm_xor_si128_emu(tempb1, temp12)
+            randomsource[prandex] = tempb2
+
+        elif (path == 4):
+            temp1 = randomsource[prand]
+            temp2 = buf[pbuf]
+            add1 = _mm_xor_si128_emu(temp1, temp2)
+            clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
+            acc = _mm_xor_si128_emu(clprod1, acc)
+            clprod2 = _mm_clmulepi64_si128_emu_0x10(temp2, temp2)
+            acc = _mm_xor_si128_emu(clprod2, acc)
+
+            tempa1 = _mm_mulhrs_epi16_emu(acc, temp1)
+            tempa2 = _mm_xor_si128_emu(tempa1, temp1)
+
+            temp12 = randomsource[prandex]
+            randomsource[prandex] = tempa2
+
+            temp22 = buf[pbuf - (((pbuf & 1) << 1) - 1)]
+            add12 = _mm_xor_si128_emu(temp12, temp22)
+            acc = _mm_xor_si128_emu(add12, acc)
+
+            tempb1 = _mm_mulhrs_epi16_emu(acc, temp12)
+            tempb2 = _mm_xor_si128_emu(tempb1, temp12)
+            randomsource[prand] = tempb2
+
+        elif (path == 8):
+            temp1 = randomsource[prandex]
+            temp2 = buf[pbuf]
+            add1 = _mm_xor_si128_emu(temp1, temp2)
+            acc = _mm_xor_si128_emu(add1, acc)
+
+            tempa1 = _mm_mulhrs_epi16_emu(acc, temp1)
+            tempa2 = _mm_xor_si128_emu(tempa1, temp1)
+
+            temp12 = randomsource[prand]
+            randomsource[prand] = tempa2
+
+            temp22 = buf[pbuf - (((pbuf & 1) << 1) - 1)]
+            add12 = _mm_xor_si128_emu(temp12, temp22)
+            clprod12 = _mm_clmulepi64_si128_emu_0x10(add12, add12)
+            acc = _mm_xor_si128_emu(clprod12, acc)
+            clprod22 = _mm_clmulepi64_si128_emu_0x10(temp22, temp22)
+            acc = _mm_xor_si128_emu(clprod22, acc)
+
+            tempb1 = _mm_mulhrs_epi16_emu(acc, temp12)
+            tempb2 = _mm_xor_si128_emu(tempb1, temp12)
+            randomsource[prandex] = tempb2
+
+        elif (path == 0xc):
+            temp1 = randomsource[prand]
+            temp2 = buf[pbuf - (((pbuf & 1) << 1) - 1)]
+            add1 = _mm_xor_si128_emu(temp1, temp2)
+
+            acc = _mm_xor_si128_emu(add1, acc)
+
+            dividend = _mm_cvtsi128_si64_emu(acc)
+            # cannot be zero here
+            divisor = selector & 0xffffffff
+            modulo = x64modulo(dividend, divisor)
+            acc = _mm_xor_si128_emu(modulo, acc)
+
+            tempa1 = _mm_mulhrs_epi16_emu(acc, temp1)
+            tempa2 = _mm_xor_si128_emu(tempa1, temp1)
+
+            if (dividend & 1):
+                temp12 = randomsource[prandex]
+                randomsource[prandex] = tempa2
+
+                temp22 = buf[pbuf]
+                add12 = _mm_xor_si128_emu(temp12, temp22)
+                clprod12 = _mm_clmulepi64_si128_emu_0x10(add12, add12)
+                acc = _mm_xor_si128_emu(clprod12, acc)
+                clprod22 = _mm_clmulepi64_si128_emu_0x10(temp22, temp22)
+                acc = _mm_xor_si128_emu(clprod22, acc)
+
+                tempb1 = _mm_mulhrs_epi16_emu(acc, temp12)
+                tempb2 = _mm_xor_si128_emu(tempb1, temp12)
+                randomsource[prand] = tempb2
+            else:
+                tempb3 = randomsource[prandex]
+                randomsource[prandex] = tempa2
+                randomsource[prand] = tempb3
+
+        elif (path == 0x10):
+            # a few AES operations
+            temp1 = buf[pbuf - (((pbuf & 1) << 1) - 1)]
+            temp2 = buf[pbuf]
+
+            temp1, temp2 = AES2_MIX2_EMU(temp1, temp2, prand, randomsource)
+            temp1, temp2 = AES2_MIX2_EMU(temp1, temp2, prand + 4, randomsource)
+            temp1, temp2 = AES2_MIX2_EMU(temp1, temp2, prand + 8, randomsource)
+
+            acc = _mm_xor_si128_emu(temp1, acc)
+            acc = _mm_xor_si128_emu(temp2, acc)
+
+            tempa1 = randomsource[prand]
+            tempa2 = _mm_mulhrs_epi16_emu(acc, tempa1)
+            tempa3 = _mm_xor_si128_emu(tempa1, tempa2)
+
+            tempa4 = randomsource[prandex]
+            randomsource[prandex] = tempa3
+            randomsource[prand] = tempa4
+
+        elif (path == 0x14):
+            # we'll just call this one the monkins loop, inspired by Chris
+            buftmp = pbuf - (((pbuf & 1) << 1) - 1)
+
+            rounds = (selector >> 61) & 7    # loop randomly between 1 and 8 times
+            rc = prand
+            aesround = 0
+
+            for j in range(rounds, -1, -1):
+                #print("acc: ", hex(acc))
+
+                if (selector & (0x10000000 << j)):
+                    onekey = randomsource[rc]
+                    rc += 1
+                    temp2 = buf[pbuf] if j & 1 else buf[buftmp]
+                    add1 = _mm_xor_si128_emu(onekey, temp2)
+                    clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
+                    acc = _mm_xor_si128_emu(clprod1, acc)
+                else:
+                    onekey = randomsource[rc]
+                    rc += 1
+                    temp2 = buf[buftmp] if j & 1 else buf[pbuf]
+                    roundidx = aesround << 2
+                    aesround += 1
+                    onekey, temp2 = AES2_MIX2_EMU(onekey, temp2, rc + roundidx, randomsource)
+
+                    #print("onekey: ", hex(onekey))
+                    #print("temp2: ", hex(temp2))
+
+                    acc = _mm_xor_si128_emu(onekey, acc)
+                    acc = _mm_xor_si128_emu(temp2, acc)
+
+            tempa1 = randomsource[prand]
+            tempa2 = _mm_mulhrs_epi16_emu(acc, tempa1)
+            tempa3 = _mm_xor_si128_emu(tempa1, tempa2)
+
+            tempa4 = randomsource[prandex]
+            randomsource[prandex] = tempa3
+            randomsource[prand] = tempa4
+
+        elif (path == 0x18):
+            # we'll just call this one the monkins loop, inspired by Chris
+            buftmp = pbuf - (((pbuf & 1) << 1) - 1)
+
+            rounds = (selector >> 61) & 7    # loop randomly between 1 and 8 times
+            rc = prand
+            onekey = 0
+
+            for j in range(rounds, -1, -1):
+                #print("acc: ", hex(acc))
+
+                if (selector & (0x10000000 << j)):
+                    onekey = randomsource[rc]
+                    rc += 1
+                    temp2 = buf[pbuf] if j & 1 else buf[buftmp]
+                    add1 = _mm_xor_si128_emu(onekey, temp2)
+                    dividend = _mm_cvtsi128_si64_emu(add1)
+                    divisor = selector & 0xffffffff
+                    modulo = x64modulo(dividend, divisor)
+                    acc = _mm_xor_si128_emu(modulo, acc)
+
+                else:
+                    onekey = randomsource[rc]
+                    rc += 1
+                    temp2 = buf[buftmp] if j & 1 else buf[pbuf]
+                    add1 = _mm_xor_si128_emu(onekey, temp2)
+                    clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
+                    clprod2 = _mm_mulhrs_epi16_emu(acc, clprod1)
+                    acc = _mm_xor_si128_emu(clprod2, acc)
+
+            tempa3 = randomsource[prandex]
+            tempa4 = _mm_xor_si128_emu(tempa3, acc)
+
+            randomsource[prandex] = tempa4
+            randomsource[prand] = onekey
+
+        else:
+            temp1 = buf[pbuf]
+            temp2 = randomsource[prandex]
+            add1 = _mm_xor_si128_emu(temp1, temp2)
+            clprod1 = _mm_clmulepi64_si128_emu_0x10(add1, add1)
+            acc = _mm_xor_si128_emu(clprod1, acc)
+
+            tempa1 = _mm_mulhrs_epi16_emu(acc, temp2)
+            tempa2 = _mm_xor_si128_emu(tempa1, temp2)
+
+            tempa3 = randomsource[prand]
+            randomsource[prand] = tempa2
+
+            acc = _mm_xor_si128_emu(tempa3, acc)
+
+            tempb1 = _mm_mulhrs_epi16_emu(acc, tempa3)
+            tempb2 = _mm_xor_si128_emu(tempb1, tempa3)
+            randomsource[prandex] = tempb2
+
+    return acc
+
+
 def lazyLengthHash_port(keylength, length):
     lengthvector = _mm_set_epi64x_emu(keylength, length)
     clprod1 = _mm_clmulepi64_si128_emu_0x10(lengthvector, lengthvector)
@@ -613,6 +880,14 @@ def verus_clhash(key, msg):
     acc = _mm_xor_si128_emu(acc, lazyLengthHash_port(1024, 64))
     return precompReduction64_port(acc)
 
+# intermediate hash in verush_hash2b
+def verus_clhash_2_1(key, msg):
+    # convert msg into an array of 4 128 bit entries composed of the first 64 bytes
+    acc = __verusclmulwithoutreduction64alignedrepeat_v2_1(key,
+                [_mm_setr_epi8_emu(msg[0:16]), _mm_setr_epi8_emu(msg[16:32]), _mm_setr_epi8_emu(msg[32:48]), _mm_setr_epi8_emu(msg[48:64])],
+                8191)
+    acc = _mm_xor_si128_emu(acc, lazyLengthHash_port(1024, 64))
+    return precompReduction64_port(acc)
 
 # finalize the 2b hash
 def finalizehash2b(key, buf):
@@ -629,6 +904,26 @@ def finalizehash2b(key, buf):
     buf[0:32] = haraka512256(buf, rc=key[idx:idx+40])
     return buf[0:32]
 
+# finalize the 2b hash
+def finalizehash2_1(key, buf):
+    #print("= verus_hash pre-buffer = ")
+    #print(ps(buf) + "\n")
+
+    intermediate = verus_clhash_2_1(key, buf)
+    intlist = [(intermediate >> (j << 3) & 0xff) for j in range(8)]
+
+    #print("= verus_hash intermediate = ")
+    #print(hex(intermediate) + "\n")
+
+    buf[47:55] = intlist[0:8]
+    buf[55:63] = intlist[0:8]
+    buf[63] = intlist[0]
+
+    # run the intermediate clhash
+    # run the final hash with the key determined by the intermediate
+    idx = intermediate & 0x1ff
+    buf[0:32] = haraka512256(buf, rc=key[idx:idx+40])
+    return buf[0:32]
 
 # verus_hash 2b
 def verus_hash2b(msg):
@@ -653,6 +948,53 @@ def verus_hash2b(msg):
 
             intermediate = verus_clhash(key, buf)
             intlist = [(intermediate >> (j << 3) & 0xff) for j in range(8)]
+
+            buf[47:55] = intlist[0:8]
+            buf[55:63] = intlist[0:8]
+            buf[63] = intlist[0]
+
+            # run the intermediate clhash
+            # run the final hash with the key determined by the intermediate
+            idx = intermediate & 0x1ff
+            buf[0:32] = haraka512256(buf, rc=key[idx:idx+40])
+        else:
+            # buf[0:32] = haraka512256(buf, rc=RC2)
+            buf[0:32] = haraka512256(buf, rc=RC2)
+    return bytes(buf[0:32])
+
+
+# verus_hash 2b
+def verus_hash2_1(msg):
+    #print("= going to hash = ")
+    #print(ps(msg) + "\n")
+
+    buf = [0] * 64
+    key = [0 for i in range(552)]
+    length = len(msg)
+    for i in range(0, length, 32):
+        clen = min(32, length - i)
+        buf[32:64] = [b for b in msg[i:i + clen]] + [0] * (32 - clen)
+        # when at the end, finalize with 2b
+        if (clen < 32):
+            # get large key of 128 bit entries from haraka256 chained inputs
+            nextKey = buf[0:32]
+            for i in range(0, 552, 2):
+                nextKey = haraka256256(nextKey, rc=RC2)
+                key[i] = _mm_setr_epi8_emu(nextKey[0:16])
+                key[i + 1] = _mm_setr_epi8_emu(nextKey[16:32])
+
+            # prepare buffer for intermediate hash
+            buf[47:63] = buf[0:16]
+            buf[63] = buf[0]
+
+            #print("= verus_hash pre-buffer = ")
+            #print(ps(buf) + "\n")
+
+            intermediate = verus_clhash_2_1(key, buf)
+            intlist = [(intermediate >> (j << 3) & 0xff) for j in range(8)]
+
+            #print("= verus_hash intermediate = ")
+            #print(ps(intlist) + "\n")
 
             buf[47:55] = intlist[0:8]
             buf[55:63] = intlist[0:8]

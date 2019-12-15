@@ -169,7 +169,7 @@ class DB(object):
     # Header merkle cache
 
     async def populate_header_merkle_cache(self):
-        self.logger.info('populating header merkle cache...')
+        self.logger.info(f'populating header merkle cache... at {time.time():.1f}s')
         length = max(1, self.db_height - self.env.reorg_limit)
         start = time.time()
         await self.header_mc.initialize(length)
