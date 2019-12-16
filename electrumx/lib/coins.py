@@ -3360,3 +3360,31 @@ class Myce(Coin):
             return scrypt.hash(header, header, 1024, 1, 1, 32)
         else:
             return double_sha256(header)
+
+
+class Navcoin(Coin):
+    NAME = "Navcoin"
+    SHORTNAME = "NAV"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("35")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("96")
+    GENESIS_HASH = ('00006a4e3e18c71c6d48ad6c261e2254'
+                    'fa764cf29607a4357c99b712dfbb8e6a')
+    DESERIALIZER = lib_tx.DeserializerTxTimeSegWitNavCoin
+    TX_COUNT = 137641
+    TX_COUNT_HEIGHT = 3649662
+    TX_PER_BLOCK = 2
+    RPC_PORT = 44444
+    REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        if int.from_bytes(header[:4], "little") > 6:
+            return double_sha256(header)
+        else:
+            import x13_hash
+            return x13_hash.getPoWHash(header)
+
