@@ -125,6 +125,12 @@ class Coin(object):
         return url + '/'
 
     @classmethod
+    def max_fetch_blocks(cls, height):
+        if height < 130000:
+            return 1000
+        return 100
+
+    @classmethod
     def genesis_block(cls, block):
         '''Check the Genesis block is the right one for this coin.
 
@@ -781,6 +787,12 @@ class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     TX_COUNT = 2015
     TX_COUNT_HEIGHT = 5711
     TX_PER_BLOCK = 5000
+
+    @classmethod
+    def max_fetch_blocks(cls, height):
+        if height <= 10:
+            return 100
+        return 3
 
 
 class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
