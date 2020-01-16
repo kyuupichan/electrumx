@@ -3306,3 +3306,61 @@ class GravityZeroCoin(ScryptMixin, Coin):
     RPC_PORT = 36442
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
+
+
+class Simplicity(Coin):
+    NAME = "Simplicity"
+    SHORTNAME = "SPL"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0444d5bc")
+    XPRV_VERBYTES = bytes.fromhex("0444f0a3")
+    P2PKH_VERBYTE = bytes.fromhex("12")
+    P2SH_VERBYTE = bytes.fromhex("3b")
+    WIF_BYTE = bytes.fromhex("5d")
+    GENESIS_HASH = ('f4bbfc518aa3622dbeb8d2818a606b82c2b8b1ac2f28553ebdb6fc04d7abaccf')
+    RPC_PORT = 11958
+    TX_COUNT = 1726548
+    TX_COUNT_HEIGHT = 1040000
+    TX_PER_BLOCK = 5
+    REORG_LIMIT = 100
+    DESERIALIZER = lib_tx.DeserializerSimplicity
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        version, = util.unpack_le_uint32_from(header)
+
+        if version < 2:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
+        else:
+            return double_sha256(header)
+
+
+class Myce(Coin):
+    NAME = "Myce"
+    SHORTNAME = "YCE"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTE = bytes.fromhex("55")
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('0000c74cc66c72cb1a327c5c1d4893ae5276aa50be49fb23cec21df1a2f20d87')
+    RPC_PORT = 23512
+    TX_COUNT = 1568977
+    TX_COUNT_HEIGHT = 774450
+    TX_PER_BLOCK = 3
+    REORG_LIMIT = 100
+    DESERIALIZER = lib_tx.DeserializerSimplicity
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        version, = util.unpack_le_uint32_from(header)
+
+        if version < 7:
+            import scrypt
+            return scrypt.hash(header, header, 1024, 1, 1, 32)
+        else:
+            return double_sha256(header)
