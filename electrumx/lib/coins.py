@@ -2652,33 +2652,6 @@ class Pivx(Coin):
             import quark_hash
             return quark_hash.getPoWHash(header)
 
-    @classmethod
-    def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
-
-        if (version >= cls.ZEROCOIN_BLOCK_VERSION):
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-                'acc_checkpoint': hash_to_str(header[80:112])
-            }
-        else:
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-            }
-
 
 class PivxTestnet(Pivx):
     NET = "testnet"
