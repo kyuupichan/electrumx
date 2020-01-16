@@ -16,7 +16,7 @@ import time
 from bisect import bisect_right
 from collections import namedtuple
 from glob import glob
-from struct import pack, unpack
+from struct import Struct
 
 import attr
 from aiorpcx import run_in_thread, sleep
@@ -24,7 +24,10 @@ from aiorpcx import run_in_thread, sleep
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
-from electrumx.lib.util import formatted_time, pack_be_uint16
+from electrumx.lib.util import (
+    formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint64, pack_le_uint32,
+    unpack_le_uint32, unpack_be_uint32, unpack_le_uint64
+)
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -358,7 +361,7 @@ class DB(object):
         offsets = []
         for h in headers:
             offset += len(h)
-            offsets.append(pack("<Q", offset))
+            offsets.append(pack_le_uint64(offset))
         # For each header we get the offset of the next header, hence we
         # start writing from the next height
         pos = (height_start + 1) * 8
@@ -366,7 +369,7 @@ class DB(object):
 
     def dynamic_header_offset(self, height):
         assert not self.coin.STATIC_BLOCK_HEADERS
-        offset, = unpack('<Q', self.headers_offsets_file.read(height * 8, 8))
+        offset, = unpack_le_uint64(self.headers_offsets_file.read(height * 8, 8))
         return offset
 
     def dynamic_header_len(self, height):
@@ -483,7 +486,7 @@ class DB(object):
 
     def undo_key(self, height):
         '''DB key for undo information at the given height.'''
-        return b'U' + pack('>I', height)
+        return b'U' + pack_be_uint32(height)
 
     def read_undo_info(self, height):
         '''Read undo information from a file for the current height.'''
@@ -523,7 +526,7 @@ class DB(object):
         min_height = self.min_undo_height(self.db_height)
         keys = []
         for key, _hist in self.utxo_db.iterator(prefix=prefix):
-            height, = unpack('>I', key[-4:])
+            height, = unpack_be_uint32(key[-4:])
             if height >= min_height:
                 break
             keys.append(key)
@@ -689,13 +692,13 @@ class DB(object):
         def read_utxos():
             utxos = []
             utxos_append = utxos.append
-            s_unpack = unpack
+            unpack_2_le_uint32 = Struct('<II').unpack
             # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                tx_pos, tx_num = s_unpack('<II', db_key[-8:])
-                value, = unpack('<Q', db_value)
+                tx_pos, tx_num = unpack_2_le_uint32(db_key[-8:])
+                value, = unpack_le_uint64(db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
             return utxos
@@ -719,7 +722,7 @@ class DB(object):
             for each prevout.
             '''
             def lookup_hashX(tx_hash, tx_idx):
-                idx_packed = pack('<I', tx_idx)
+                idx_packed = pack_le_uint32(tx_idx)
 
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
                 # Value: hashX
@@ -728,7 +731,7 @@ class DB(object):
                 # Find which entry, if any, the TX_HASH matches.
                 for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
                     tx_num_packed = db_key[-4:]
-                    tx_num, = unpack('<I', tx_num_packed)
+                    tx_num, = unpack_le_uint32(tx_num_packed)
                     hash, _height = self.fs_tx_hash(tx_num)
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed
@@ -750,7 +753,7 @@ class DB(object):
                     # This can happen if the DB was updated between
                     # getting the hashXs and getting the UTXOs
                     return None
-                value, = unpack('<Q', db_value)
+                value, = unpack_le_uint64(db_value)
                 return hashX, value
             return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 

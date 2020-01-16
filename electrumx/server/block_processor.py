@@ -10,7 +10,6 @@
 
 
 import asyncio
-from struct import pack, unpack
 import time
 
 from aiorpcx import TaskGroup, run_in_thread
@@ -18,7 +17,9 @@ from aiorpcx import TaskGroup, run_in_thread
 import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
-from electrumx.lib.util import chunks, class_logger
+from electrumx.lib.util import (
+    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint32
+)
 from electrumx.server.db import FlushData
 
 
@@ -405,18 +406,19 @@ class BlockProcessor(object):
         undo_info = []
         tx_num = self.tx_count
         script_hashX = self.coin.hashX_from_script
-        s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
         undo_info_append = undo_info.append
         update_touched = self.touched.update
         hashXs_by_tx = []
         append_hashXs = hashXs_by_tx.append
+        to_le_uint32 = pack_le_uint32
+        to_le_uint64 = pack_le_uint64
 
         for tx, tx_hash in txs:
             hashXs = []
             append_hashX = hashXs.append
-            tx_numb = s_pack('<I', tx_num)
+            tx_numb = to_le_uint32(tx_num)
 
             # Spend the inputs
             for txin in tx.inputs:
@@ -432,8 +434,8 @@ class BlockProcessor(object):
                 hashX = script_hashX(txout.pk_script)
                 if hashX:
                     append_hashX(hashX)
-                    put_utxo(tx_hash + s_pack('<I', idx),
-                             hashX + tx_numb + s_pack('<Q', txout.value))
+                    put_utxo(tx_hash + to_le_uint32(idx),
+                             hashX + tx_numb + to_le_uint64(txout.value))
 
             append_hashXs(hashXs)
             update_touched(hashXs)
@@ -482,7 +484,6 @@ class BlockProcessor(object):
         n = len(undo_info)
 
         # Use local vars for speed in the loops
-        s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
@@ -504,8 +505,7 @@ class BlockProcessor(object):
                     continue
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + s_pack('<I', txin.prev_idx),
-                         undo_item)
+                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
                 touched.add(undo_item[:-12])
 
         assert n == 0
@@ -573,7 +573,7 @@ class BlockProcessor(object):
         corruption.
         '''
         # Fast track is it being in the cache
-        idx_packed = pack('<I', tx_idx)
+        idx_packed = pack_le_uint32(tx_idx)
         cache_value = self.utxo_cache.pop(tx_hash + idx_packed, None)
         if cache_value:
             return cache_value
@@ -590,7 +590,7 @@ class BlockProcessor(object):
             tx_num_packed = hdb_key[-4:]
 
             if len(candidates) > 1:
-                tx_num, = unpack('<I', tx_num_packed)
+                tx_num, = unpack_le_uint32(tx_num_packed)
                 hash, height = self.db.fs_tx_hash(tx_num)
                 if hash != tx_hash:
                     assert hash is not None  # Should always be found
@@ -730,26 +730,27 @@ class LTORBlockProcessor(BlockProcessor):
         undo_info = []
         tx_num = self.tx_count
         script_hashX = self.coin.hashX_from_script
-        s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
         undo_info_append = undo_info.append
         update_touched = self.touched.update
+        to_le_uint32 = pack_le_uint32
+        to_le_uint64 = pack_le_uint64
 
         hashXs_by_tx = [set() for _ in txs]
 
         # Add the new UTXOs
         for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
             add_hashXs = hashXs.add
-            tx_numb = s_pack('<I', tx_num)
+            tx_numb = to_le_uint32(tx_num)
 
             for idx, txout in enumerate(tx.outputs):
                 # Get the hashX. Ignore unspendable outputs.
                 hashX = script_hashX(txout.pk_script)
                 if hashX:
                     add_hashXs(hashX)
-                    put_utxo(tx_hash + s_pack('<I', idx),
-                             hashX + tx_numb + s_pack('<Q', txout.value))
+                    put_utxo(tx_hash + to_le_uint32(idx),
+                             hashX + tx_numb + to_le_uint64(txout.value))
             tx_num += 1
 
         # Spend the inputs
@@ -781,7 +782,6 @@ class LTORBlockProcessor(BlockProcessor):
                              .format(self.height))
 
         # Use local vars for speed in the loops
-        s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
@@ -796,8 +796,7 @@ class LTORBlockProcessor(BlockProcessor):
                 if txin.is_generation():
                     continue
                 undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + s_pack('<I', txin.prev_idx),
-                         undo_item)
+                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
                 add_touched(undo_item[:-12])
                 n += undo_entry_len
 
