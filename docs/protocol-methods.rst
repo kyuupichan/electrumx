@@ -889,7 +889,7 @@ Return a list of features and services supported by the server.
   * *server_version*
 
     A string that identifies the server software.  Should be the same
-    as the result to the :func:`server.version` RPC call.
+    as the first element of the result to the :func:`server.version` RPC call.
 
   * *protocol_max*
   * *protocol_min*
