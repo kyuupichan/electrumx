@@ -298,7 +298,7 @@ class DB(object):
         for key, value in flush_data.adds.items():
             # suffix = tx_idx + tx_num
             hashX = value[:-12]
-            suffix = key[-2:] + value[-12:-8]
+            suffix = key[-4:] + value[-12:-8]
             batch_put(b'h' + key[:4] + suffix, hashX)
             batch_put(b'u' + hashX + suffix, value[-8:])
         flush_data.adds.clear()
@@ -630,7 +630,7 @@ class DB(object):
             # Value: the UTXO value as a 64-bit unsigned integer
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
+                tx_pos, tx_num = s_unpack('<II', db_key[-8:])
                 value, = unpack('<Q', db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
@@ -655,7 +655,7 @@ class DB(object):
             for each prevout.
             '''
             def lookup_hashX(tx_hash, tx_idx):
-                idx_packed = pack('<H', tx_idx)
+                idx_packed = pack('<I', tx_idx)
 
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
                 # Value: hashX

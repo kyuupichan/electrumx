@@ -432,7 +432,7 @@ class BlockProcessor(object):
                 hashX = script_hashX(txout.pk_script)
                 if hashX:
                     append_hashX(hashX)
-                    put_utxo(tx_hash + s_pack('<H', idx),
+                    put_utxo(tx_hash + s_pack('<I', idx),
                              hashX + tx_numb + s_pack('<Q', txout.value))
 
             append_hashXs(hashXs)
@@ -504,7 +504,7 @@ class BlockProcessor(object):
                     continue
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                put_utxo(txin.prev_hash + s_pack('<I', txin.prev_idx),
                          undo_item)
                 touched.add(undo_item[:-12])
 
@@ -521,10 +521,10 @@ class BlockProcessor(object):
     TX not per UTXO).  So store them in a Python dictionary with
     binary keys and values.
 
-      Key:    TX_HASH + TX_IDX           (32 + 2 = 34 bytes)
+      Key:    TX_HASH + TX_IDX           (32 + 4 = 36 bytes)
       Value:  HASHX + TX_NUM + VALUE     (11 + 4 + 8 = 23 bytes)
 
-    That's 57 bytes of raw data in-memory.  Python dictionary overhead
+    That's 59 bytes of raw data in-memory.  Python dictionary overhead
     means each entry actually uses about 205 bytes of memory.  So
     almost 5 million UTXOs can fit in 1GB of RAM.  There are
     approximately 42 million UTXOs on bitcoin mainnet at height
@@ -573,7 +573,7 @@ class BlockProcessor(object):
         corruption.
         '''
         # Fast track is it being in the cache
-        idx_packed = pack('<H', tx_idx)
+        idx_packed = pack('<I', tx_idx)
         cache_value = self.utxo_cache.pop(tx_hash + idx_packed, None)
         if cache_value:
             return cache_value
@@ -598,7 +598,7 @@ class BlockProcessor(object):
 
             # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
-            udb_key = b'u' + hashX + hdb_key[-6:]
+            udb_key = b'u' + hashX + hdb_key[-8:]
             utxo_value_packed = self.db.utxo_db.get(udb_key)
             if utxo_value_packed:
                 # Remove both entries for this UTXO
@@ -748,7 +748,7 @@ class LTORBlockProcessor(BlockProcessor):
                 hashX = script_hashX(txout.pk_script)
                 if hashX:
                     add_hashXs(hashX)
-                    put_utxo(tx_hash + s_pack('<H', idx),
+                    put_utxo(tx_hash + s_pack('<I', idx),
                              hashX + tx_numb + s_pack('<Q', txout.value))
             tx_num += 1
 
@@ -796,7 +796,7 @@ class LTORBlockProcessor(BlockProcessor):
                 if txin.is_generation():
                     continue
                 undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                put_utxo(txin.prev_hash + s_pack('<I', txin.prev_idx),
                          undo_item)
                 add_touched(undo_item[:-12])
                 n += undo_entry_len
