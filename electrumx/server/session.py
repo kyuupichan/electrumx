@@ -7,7 +7,6 @@
 
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
-import asyncio
 import codecs
 import datetime
 import itertools
