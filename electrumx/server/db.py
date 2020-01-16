@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2020, Neil Booth
 # Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
@@ -24,7 +24,7 @@ from aiorpcx import run_in_thread, sleep
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
-from electrumx.lib.util import formatted_time
+from electrumx.lib.util import formatted_time, pack_be_uint16
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -52,7 +52,7 @@ class DB(object):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [6]
+    DB_VERSIONS = [6, 7]
 
     class DBError(Exception):
         '''Raised on general DB errors generally indicating corruption.'''
@@ -588,6 +588,10 @@ class DB(object):
         self.fs_tx_count = self.db_tx_count
         self.last_flush_tx_count = self.fs_tx_count
 
+        # Upgrade DB
+        if self.db_version != max(self.DB_VERSIONS):
+            self.upgrade_db()
+
         # Log some stats
         self.logger.info('DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
@@ -600,6 +604,66 @@ class DB(object):
         if self.first_sync:
             self.logger.info('sync time so far: {}'
                              .format(util.formatted_time(self.wall_time)))
+
+    def upgrade_db(self):
+        self.logger.info('DB version: {:d}'.format(self.db_version))
+        self.logger.info('Upgrading your DB; this can take some time...')
+
+        def upgrade_u_prefix(prefix):
+            count = 0
+            with self.utxo_db.write_batch() as batch:
+                batch_delete = batch.delete
+                batch_put = batch.put
+                # Key: b'u' + address_hashX + tx_idx + tx_num
+                for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                    if len(db_key) != 18:
+                        break
+                    count += 1
+                    batch_delete(db_key)
+                    batch_put(db_key[:14] + b'\0\0' + db_key[14:], db_value)
+            return count
+
+        last = time.time()
+        count = 0
+        for cursor in range(65536):
+            prefix = b'u' + pack_be_uint16(cursor)
+            count += upgrade_u_prefix(prefix)
+            now = time.time()
+            if now > last + 10:
+                last = now
+                self.logger.info(f'DB 1 of 2: {count:,d} entries updated, '
+                                 f'{cursor * 100 / 65536:.1f}% complete')
+        self.logger.info('DB 1 of 2 upgraded successfully')
+
+        def upgrade_h_prefix(prefix):
+            count = 0
+            with self.utxo_db.write_batch() as batch:
+                batch_delete = batch.delete
+                batch_put = batch.put
+                # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
+                for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                    if len(db_key) != 11:
+                        break
+                    count += 1
+                    batch_delete(db_key)
+                    batch_put(db_key[:7] + b'\0\0' + db_key[7:], db_value)
+            return count
+
+        last = time.time()
+        count = 0
+        for cursor in range(65536):
+            prefix = b'h' + pack_be_uint16(cursor)
+            count += upgrade_h_prefix(prefix)
+            now = time.time()
+            if now > last + 10:
+                last = now
+                self.logger.info(f'DB 2 of 2: {count:,d} entries updated, '
+                                 f'{cursor * 100 / 65536:.1f}% complete')
+
+        self.db_version = max(self.DB_VERSIONS)
+        with self.utxo_db.write_batch() as batch:
+            self.write_utxo_state(batch)
+        self.logger.info('DB 2 of 2 upgraded successfully')
 
     def write_utxo_state(self, batch):
         '''Write (UTXO) state to the batch.'''
