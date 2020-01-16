@@ -51,11 +51,11 @@ used to either.
 When building the database from the genesis block, ElectrumX has to
 flush large quantities of data to disk and its DB.  You will have a
 better experience if the database directory is on an SSD than on an
-HDD.  Currently to around height 447,100 of the Bitcoin blockchain the
+HDD.  Currently to around height 611,600 of the Bitcoin blockchain the
 final size of the leveldb database, and other ElectrumX file metadata
-comes to just over 18.7GB (17.5 GiB).  LevelDB needs a bit more for
+comes to just over 46.9GB (43.7 GiB).  LevelDB needs a bit more for
 brief periods, and the block chain is only getting longer, so I would
-recommend having at least 30-40GB of free space before starting.
+recommend having at least 70-80GB of free space before starting.
 
 Database Engine
 ===============
