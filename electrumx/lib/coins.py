@@ -2273,6 +2273,7 @@ class Odin(Coin):
 
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx.DeserializerSegWit
 
     @classmethod
     def static_header_offset(cls, height):
