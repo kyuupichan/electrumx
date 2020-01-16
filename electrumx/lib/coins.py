@@ -1919,6 +1919,17 @@ class Sibcoin(Dash):
         return x11_gost_hash.getPoWHash(header)
 
 
+class SibcoinTestnet(Sibcoin):
+    SHORTNAME = "tSIB"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    GENESIS_HASH = ('00000617791d0e19f524387f67e558b2'
+                    'a928b670b9a3b387ae003ad7f9093017')
+
+    RPC_PORT = 11944
+
+
 class Chips(Coin):
     NAME = "Chips"
     SHORTNAME = "CHIPS"
