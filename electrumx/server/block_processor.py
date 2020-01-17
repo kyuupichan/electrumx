@@ -17,6 +17,7 @@ from aiorpcx import TaskGroup, run_in_thread
 import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
 from electrumx.lib.util import (
     chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint32
 )
@@ -385,10 +386,13 @@ class BlockProcessor(object):
         '''
         min_height = self.db.min_undo_height(self.daemon.cached_height())
         height = self.height
+        genesis_activation = self.coin.GENESIS_ACTIVATION
 
         for block in blocks:
             height += 1
-            undo_info = self.advance_txs(block.transactions)
+            is_unspendable = (is_unspendable_genesis if height >= genesis_activation
+                              else is_unspendable_legacy)
+            undo_info = self.advance_txs(block.transactions, is_unspendable)
             if height >= min_height:
                 self.undo_infos.append((undo_info, height))
                 self.db.write_raw_block(block.raw, height)
@@ -398,7 +402,7 @@ class BlockProcessor(object):
         self.headers.extend(headers)
         self.tip = self.coin.header_hash(headers[-1])
 
-    def advance_txs(self, txs):
+    def advance_txs(self, txs, is_unspendable):
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
 
         # Use local vars for speed in the loops
@@ -429,12 +433,15 @@ class BlockProcessor(object):
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
-                # Get the hashX.  Ignore unspendable outputs
+                # Ignore unspendable outputs
+                if is_unspendable(txout.pk_script):
+                    continue
+
+                # Get the hashX
                 hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    append_hashX(hashX)
-                    put_utxo(tx_hash + to_le_uint32(idx),
-                             hashX + tx_numb + to_le_uint64(txout.value))
+                append_hashX(hashX)
+                put_utxo(tx_hash + to_le_uint32(idx),
+                         hashX + tx_numb + to_le_uint64(txout.value))
 
             append_hashXs(hashXs)
             update_touched(hashXs)
@@ -455,6 +462,7 @@ class BlockProcessor(object):
         '''
         self.db.assert_flushed(self.flush_data())
         assert self.height >= len(raw_blocks)
+        genesis_activation = self.coin.GENESIS_ACTIVATION
 
         coin = self.coin
         for raw_block in raw_blocks:
@@ -467,13 +475,15 @@ class BlockProcessor(object):
                                          hash_to_hex_str(self.tip),
                                          self.height))
             self.tip = coin.header_prevhash(block.header)
-            self.backup_txs(block.transactions)
+            is_unspendable = (is_unspendable_genesis if self.height >= genesis_activation
+                              else is_unspendable_legacy)
+            self.backup_txs(block.transactions, is_unspendable)
             self.height -= 1
             self.db.tx_counts.pop()
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
-    def backup_txs(self, txs):
+    def backup_txs(self, txs, is_unspendable):
         # Prevout values, in order down the block (coinbase first if present)
         # undo_info is in reverse block order
         undo_info = self.db.read_undo_info(self.height)
@@ -493,10 +503,13 @@ class BlockProcessor(object):
             for idx, txout in enumerate(tx.outputs):
                 # Spend the TX outputs.  Be careful with unspendable
                 # outputs - we didn't save those in the first place.
+                if is_unspendable(txout.pk_script):
+                    continue
+
+                # Get the hashX
                 hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    cache_value = spend_utxo(tx_hash, idx)
-                    touched.add(cache_value[:-12])
+                cache_value = spend_utxo(tx_hash, idx)
+                touched.add(cache_value[:-12])
 
             # Restore the inputs
             for txin in reversed(tx.inputs):
@@ -590,7 +603,7 @@ class BlockProcessor(object):
 
             if len(candidates) > 1:
                 tx_num, = unpack_le_uint32(tx_num_packed)
-                hash, height = self.db.fs_tx_hash(tx_num)
+                hash, _height = self.db.fs_tx_hash(tx_num)
                 if hash != tx_hash:
                     assert hash is not None  # Should always be found
                     continue
@@ -691,8 +704,8 @@ class DecredBlockProcessor(BlockProcessor):
 
 class NameIndexBlockProcessor(BlockProcessor):
 
-    def advance_txs(self, txs):
-        result = super().advance_txs(txs)
+    def advance_txs(self, txs, is_unspendable):
+        result = super().advance_txs(txs, is_unspendable)
 
         tx_num = self.tx_count - len(txs)
         script_name_hashX = self.coin.name_hashX_from_script
@@ -722,7 +735,7 @@ class NameIndexBlockProcessor(BlockProcessor):
 
 class LTORBlockProcessor(BlockProcessor):
 
-    def advance_txs(self, txs):
+    def advance_txs(self, txs, is_unspendable):
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
 
         # Use local vars for speed in the loops
@@ -744,12 +757,15 @@ class LTORBlockProcessor(BlockProcessor):
             tx_numb = to_le_uint32(tx_num)
 
             for idx, txout in enumerate(tx.outputs):
-                # Get the hashX. Ignore unspendable outputs.
+                # Ignore unspendable outputs
+                if is_unspendable(txout.pk_script):
+                    continue
+
+                # Get the hashX
                 hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    add_hashXs(hashX)
-                    put_utxo(tx_hash + to_le_uint32(idx),
-                             hashX + tx_numb + to_le_uint64(txout.value))
+                add_hashXs(hashX)
+                put_utxo(tx_hash + to_le_uint32(idx),
+                         hashX + tx_numb + to_le_uint64(txout.value))
             tx_num += 1
 
         # Spend the inputs
@@ -774,7 +790,7 @@ class LTORBlockProcessor(BlockProcessor):
 
         return undo_info
 
-    def backup_txs(self, txs):
+    def backup_txs(self, txs, is_unspendable):
         undo_info = self.db.read_undo_info(self.height)
         if undo_info is None:
             raise ChainError('no undo information found for height {:,d}'
@@ -804,11 +820,14 @@ class LTORBlockProcessor(BlockProcessor):
         # Remove tx outputs made in this block, by spending them.
         for tx, tx_hash in txs:
             for idx, txout in enumerate(tx.outputs):
-                hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    # Be careful with unspendable outputs- we didn't save those
-                    # in the first place.
-                    cache_value = spend_utxo(tx_hash, idx)
-                    add_touched(cache_value[:-12])
+                # Spend the TX outputs.  Be careful with unspendable
+                # outputs - we didn't save those in the first place.
+                if is_unspendable(txout.pk_script):
+                    continue
+
+                # Get the hashX
+                hashX = script_hashX(txout.script)
+                cache_value = spend_utxo(tx_hash, idx)
+                add_touched(cache_value[:-12])
 
         self.tx_count -= len(txs)

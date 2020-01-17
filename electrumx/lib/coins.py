@@ -86,6 +86,7 @@ class Coin(object):
     DECODE_CHECK = Base58.decode_check
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_ACTIVATION = 100_000_000
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -146,13 +147,7 @@ class Coin(object):
 
     @classmethod
     def hashX_from_script(cls, script):
-        '''Returns a hashX from a script, or None if the script is provably
-        unspendable so the output can be dropped.
-        '''
-        prefix = script[:2]
-        # Match a prefix of OP_RETURN or (OP_FALSE, OP_RETURN)
-        if prefix == b'\x00\x6a' or (prefix and prefix[0] == 0x6a):
-            return None
+        '''Returns a hashX from a script.'''
         return sha256(script).digest()[:HASHX_LEN]
 
     @staticmethod
@@ -549,6 +544,7 @@ class BitcoinSV(BitcoinMixin, Coin):
         'sv.jochen-hoenicke.de s t',
         'sv.satoshi.io s t',
     ]
+    GENESIS_ACTIVATION = 620_538
 
 
 class BitcoinCash(BitcoinMixin, Coin):
@@ -777,6 +773,7 @@ class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
     PEERS = [
         'electrontest.cascharia.com t51001 s51002',
     ]
+    GENESIS_ACTIVATION = 1_344_302
 
 
 class BitcoinSVScalingTestnet(BitcoinSVTestnet):
@@ -787,6 +784,7 @@ class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     TX_COUNT = 2015
     TX_COUNT_HEIGHT = 5711
     TX_PER_BLOCK = 5000
+    GENESIS_ACTIVATION = 14_896
 
     @classmethod
     def max_fetch_blocks(cls, height):
@@ -824,6 +822,7 @@ class BitcoinSVRegtest(BitcoinSVTestnet):
     PEERS = []
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
+    GENESIS_ACTIVATION = 10_000
 
 
 class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
