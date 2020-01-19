@@ -1,5 +1,5 @@
 import setuptools
-version = '1.13.0'
+version = '1.14.0'
 
 setuptools.setup(
     name='electrumX',
@@ -10,7 +10,7 @@ setuptools.setup(
                       'plyvel', 'pylru', 'aiohttp>=3.3'],
     extras_require={
         'rocksdb': ['python-rocksdb>=0.6.9'],
-        'uvloop': ['uvloop>=0.12.2'],   # Bump when the uvloop connection_lost bug is fixed
+        'uvloop': ['uvloop>=0.14'],
         # For various coins
         'blake256': ['blake256>=0.1.1'],
         'crypto': ['pycryptodomex>=3.8.1'],
