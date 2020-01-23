@@ -874,6 +874,7 @@ class BitcoinNolnet(BitcoinCash):
     RPC_PORT = 28332
     PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
 
+	
 class Sumcoin(Coin):
 	NAME = "Sumcoin"
 	SHORTNAME = "SUM"
@@ -891,8 +892,10 @@ class Sumcoin(Coin):
 	TX_PER_BLOCK = 2
 	RPC_PORT = 3332
 	REORG_LIMIT = 800
+	PEER_DEFAULT_PORTS = {'t': '53332', 's': '53333'}
 	PEERS = []
 
+	
 class Litecoin(Coin):
     NAME = "Litecoin"
     SHORTNAME = "LTC"
