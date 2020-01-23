@@ -874,7 +874,8 @@ class BitcoinNolnet(BitcoinCash):
     RPC_PORT = 28332
     PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
 
-	
+
+# Source: https://github.com/sumcoinlabs/sumcoin/	
 class Sumcoin(Coin):
     NAME = "Sumcoin"
     SHORTNAME = "SUM"
@@ -885,7 +886,7 @@ class Sumcoin(Coin):
     P2SH_VERBYTES = [bytes.fromhex("C8"), bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("bf")
     GENESIS_HASH = ('37d4696c5072cd012f3b7c651e5ce56a'
-		    '1383577e4edacc2d289ec9b25eebfd5e')
+                    '1383577e4edacc2d289ec9b25eebfd5e')
     DESERIALIZER = lib_tx.DeserializerSegWit
     TX_COUNT = 976394
     TX_COUNT_HEIGHT = 659520
