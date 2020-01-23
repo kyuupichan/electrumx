@@ -895,7 +895,7 @@ class Sumcoin(Coin):
     PEER_DEFAULT_PORTS = {'t': '53332', 's': '53333'}
     PEERS = []
 
-	
+
 class Litecoin(Coin):
     NAME = "Litecoin"
     SHORTNAME = "LTC"
