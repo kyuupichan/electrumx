@@ -7,8 +7,6 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -yq libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev liblz4-dev librocksdb-dev libleveldb-dev
 python:
-  - "3.6"
-  - "3.6-dev"
   - "3.7-dev"
   - "nightly"
 # command to install dependencies
@@ -47,7 +45,7 @@ script:
   - sh -c "cd docs && make html"
 # Dont report coverage from nightly
 after_success:
-  - if [[ $(python3 -V 2>&1) == *"Python 3.6"* ]]; then
+  - if [[ $(python3 -V 2>&1) == *"Python 3.7"* ]]; then
       pip install python-coveralls;
       coveralls;
     fi

@@ -45,6 +45,11 @@ These environment variables are always required:
   port for :envvar:`COIN` and :envvar:`NET` if omitted.
 
 
+.. note:: With the above set your server will run and index the chain.  To enable incoming
+   connections you must set :envvar:`SERVICES`, and for others to be aware of your server
+   set :envvar:`REPORT_SERVICES`.
+
+
 For the ``run`` script
 ======================
 

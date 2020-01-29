@@ -7,6 +7,21 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 1.14.0 (19 Jan 2020)
+============================
+
+* require Python 3.7
+* support for Bitcoin SV Genesis activation
+* DB upgrade to allow for larger transactions.  Your DB will automatically upgrade when
+  starting, the upgrade should take approximately 15 mintues.
+* fix server shutdown process
+* fix cache race condition (issue `#909`_)
+* faster initial sync
+* coin additions / updates: Emercoin (yakimka), Feathercoin (wellenreiter01),
+  Peercoin (peerchemist), Namecoin (JeremyRand), Zcoin (a-bezrukov), Simplicity,
+  Mice (ComputerCraftr), Sibcoin testnet (TriKriSta), Odin (Manbearpixel),
+* other: h2o10, osagga, Sombernight, breign, pedr0-fr, wingsuit
+
 Version 1.13.0 (26 Sep 2019)
 ============================
 
@@ -124,123 +139,10 @@ Version 1.9.0 (10 Jan 2019)
 * other minor tweaks (Michael Schmoock, Michael Taborsky)
 
 
-Version 1.8.12 (10 Nov 2018)
-============================
-
-* bug fix
-
-Version 1.8.11 (07 Nov 2018)
-============================
-
-* require aiorpcX 0.10.1
-
-Version 1.8.10 (05 Nov 2018)
-============================
-
-* require aiorpcX 0.10.0
-* fix `#632`_
-* coin additions / updates: ZelCash (TheTrunk)
-
-Version 1.8.9 (02 Nov 2018)
-===========================
-
-* fix `#630`_
-
-Version 1.8.8 (01 Nov 2018)
-===========================
-
-* require aiorpcX 0.9.0
-* coin additions / updates: decred (dajohi, bolapara), zcash (erasmospunk),
-  namecoin (JeremyRand),CivX (turcol), NewYorkCoin (erasmospunk)
-* fix `#603`_, `#608`_
-* other minor fixes and changes: FMCorz
-
-Version 1.8.7 (13 Sep 2018)
-===========================
-
-* require aiorpcX 0.8.1
-* fix reorg bug loading blocks from disk (erasmospunk)
-
-Version 1.8.6 (12 Sep 2018)
-===========================
-
-* require aiorpcX 0.8.0
-* suppress socket.send() errors
-* new coin TokenPay (samfiragabriel)
-* minor fix: wakiyamap
-
-Version 1.8.5 (18 Aug 2018)
-===========================
-
-* require aiorpcX 0.7.3 which contains a couple of bugfixes
-* fix `#552`_, `#577`_
-* fixed a session limiting bug reported by ghost43
-* coin additions / updates: PIVX and Decred Testnets, BitcoinGreen (cunhasb)
-  Monacoin (wakayamap)
-* proper generation input handling for various altcoins (erasmospunk) fixing
-  `#570`_
-
-Version 1.8.4 (14 Aug 2018)
-===========================
-
-* improved notification handling and efficiency
-* improved daemon handling with minor fixes; full tests for Daemon class
-* remove chain_state class
-* various internal cleanups and improvements (erasmospunk)
-* add PIVX support (erasmospunk) - mempool handling WIP
-* fix protocol 1.3 handling of blockchain.block.header RPC (ghost43)
-
-Version 1.8.3 (11 Aug 2018)
-===========================
-
-* separate the DB and the BlockProcessor objects
-* comprehensive mempool tests
-* fix `#521`_, `#565`_, `#567`_
-
-Version 1.8.2 (09 Aug 2018)
-===========================
-
-* require aiorpcX 0.7.1 which along with an ElectrumX change restores clean
-  shutdown and flush functionality, particularly during initial sync
-* fix `#564`_
-
-Version 1.8.1 (08 Aug 2018)
-===========================
-
-* require aiorpcX 0.7.0 which fixes a bug causing silent shutdown of ElectrumX
-* fix `#557`_, `#559`_
-* tweaks related to log spew (I think mostly occurring with old versions
-  of Python)
-
-Version 1.8  (06 Aug 2018)
-==========================
-
-* require aiorpcX 0.6.2
-* fix query.py; move to contrib.  Add :ref:`query <query>` function to RPC
-* rewrite :command:`electrumx_rpc` so that proper command-line help is provided
-* per-coin tx hash functions (erasmospunk)
-* coin additions / updates: Groestlcoin (Kefkius, erasmospunk),
-  Decred (erasmonpsunk)
-* other minor (smmalis37)
-
-
 **Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
 
-.. _#521: https://github.com/kyuupichan/electrumx/issues/521
-.. _#552: https://github.com/kyuupichan/electrumx/issues/552
 .. _#554: https://github.com/kyuupichan/electrumx/issues/554
-.. _#557: https://github.com/kyuupichan/electrumx/issues/557
-.. _#559: https://github.com/kyuupichan/electrumx/issues/559
-.. _#564: https://github.com/kyuupichan/electrumx/issues/564
-.. _#565: https://github.com/kyuupichan/electrumx/issues/565
 .. _#566: https://github.com/kyuupichan/electrumx/issues/566
-.. _#567: https://github.com/kyuupichan/electrumx/issues/567
-.. _#570: https://github.com/kyuupichan/electrumx/issues/570
-.. _#577: https://github.com/kyuupichan/electrumx/issues/577
-.. _#603: https://github.com/kyuupichan/electrumx/issues/603
-.. _#608: https://github.com/kyuupichan/electrumx/issues/608
-.. _#630: https://github.com/kyuupichan/electrumx/issues/630
-.. _#632: https://github.com/kyuupichan/electrumx/issues/630
 .. _#653: https://github.com/kyuupichan/electrumx/issues/653
 .. _#655: https://github.com/kyuupichan/electrumx/issues/655
 .. _#660: https://github.com/kyuupichan/electrumx/issues/660
@@ -249,3 +151,4 @@ Version 1.8  (06 Aug 2018)
 .. _#727: https://github.com/kyuupichan/electrumx/issues/727
 .. _#731: https://github.com/kyuupichan/electrumx/issues/731
 .. _#795: https://github.com/kyuupichan/electrumx/issues/795
+.. _#909: https://github.com/kyuupichan/electrumx/issues/909

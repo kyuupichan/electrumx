@@ -15,7 +15,7 @@ small - pull requests are welcome.
 ================ ========================
 Package          Notes
 ================ ========================
-Python3          ElectrumX uses asyncio.  Python version >= 3.6 is
+Python3          ElectrumX uses asyncio.  Python version >= 3.7 is
                  **required**.
 `aiohttp`_       Python library for asynchronous HTTP.  Version >=
                  2.0 required.
@@ -51,11 +51,11 @@ used to either.
 When building the database from the genesis block, ElectrumX has to
 flush large quantities of data to disk and its DB.  You will have a
 better experience if the database directory is on an SSD than on an
-HDD.  Currently to around height 447,100 of the Bitcoin blockchain the
+HDD.  Currently to around height 611,600 of the Bitcoin blockchain the
 final size of the leveldb database, and other ElectrumX file metadata
-comes to just over 18.7GB (17.5 GiB).  LevelDB needs a bit more for
+comes to just over 46.9GB (43.7 GiB).  LevelDB needs a bit more for
 brief periods, and the block chain is only getting longer, so I would
-recommend having at least 30-40GB of free space before starting.
+recommend having at least 70-80GB of free space before starting.
 
 Database Engine
 ===============
@@ -206,14 +206,6 @@ Once configured you may want to start ElectrumX at boot::
    minutes to flush cached data to disk during initial sync.  You
    should set TimeoutStopSec to *at least* 10 mins in your
    :file:`.service` file.
-
-
-Installing Python 3.6 under Ubuntu
-----------------------------------
-
-Many Ubuntu distributions have an incompatible Python version baked
-in.  Because of this, it is easier to install Python 3.6.  See
-`contrib/python3.6/python-3.6.sh`_.
 
 
 Installing on Raspberry Pi 3
@@ -435,6 +427,5 @@ You can then set the port as follows and advertise the service externally on the
 .. _`aiohttp`: https://pypi.python.org/pypi/aiohttp
 .. _`pylru`: https://pypi.python.org/pypi/pylru
 .. _`x11_hash`: https://pypi.python.org/pypi/x11_hash
-.. _`contrib/python3.6/python-3.6.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/python3.6/python-3.6.sh
 .. _`contrib/raspberrypi3/install_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/raspberrypi3/install_electrumx.sh
 .. _`contrib/raspberrypi3/run_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/raspberrypi3/run_electrumx.sh

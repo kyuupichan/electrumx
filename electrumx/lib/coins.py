@@ -87,6 +87,7 @@ class Coin(object):
     DECODE_CHECK = Base58.decode_check
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
+    GENESIS_ACTIVATION = 100_000_000
     # Peer discovery
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     PEERS = []
@@ -126,6 +127,12 @@ class Coin(object):
         return url + '/'
 
     @classmethod
+    def max_fetch_blocks(cls, height):
+        if height < 130000:
+            return 1000
+        return 100
+
+    @classmethod
     def genesis_block(cls, block):
         '''Check the Genesis block is the right one for this coin.
 
@@ -141,13 +148,7 @@ class Coin(object):
 
     @classmethod
     def hashX_from_script(cls, script):
-        '''Returns a hashX from a script, or None if the script is provably
-        unspendable so the output can be dropped.
-        '''
-        prefix = script[:2]
-        # Match a prefix of OP_RETURN or (OP_FALSE, OP_RETURN)
-        if prefix == b'\x00\x6a' or (prefix and prefix[0] == 0x6a):
-            return None
+        '''Returns a hashX from a script.'''
         return sha256(script).digest()[:HASHX_LEN]
 
     @staticmethod
@@ -544,6 +545,7 @@ class BitcoinSV(BitcoinMixin, Coin):
         'sv.jochen-hoenicke.de s t',
         'sv.satoshi.io s t',
     ]
+    GENESIS_ACTIVATION = 620_538
 
 
 class BitcoinCash(BitcoinMixin, Coin):
@@ -772,6 +774,7 @@ class BitcoinSVTestnet(BitcoinTestnetMixin, Coin):
     PEERS = [
         'electrontest.cascharia.com t51001 s51002',
     ]
+    GENESIS_ACTIVATION = 1_344_302
 
 
 class BitcoinSVScalingTestnet(BitcoinSVTestnet):
@@ -782,6 +785,13 @@ class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     TX_COUNT = 2015
     TX_COUNT_HEIGHT = 5711
     TX_PER_BLOCK = 5000
+    GENESIS_ACTIVATION = 14_896
+
+    @classmethod
+    def max_fetch_blocks(cls, height):
+        if height <= 10:
+            return 100
+        return 3
 
 
 class BitcoinCashTestnet(BitcoinTestnetMixin, Coin):
@@ -813,6 +823,7 @@ class BitcoinSVRegtest(BitcoinSVTestnet):
     PEERS = []
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
+    GENESIS_ACTIVATION = 10_000
 
 
 class BitcoinSegwitTestnet(BitcoinTestnetMixin, Coin):
@@ -1947,6 +1958,17 @@ class Sibcoin(Dash):
         return x11_gost_hash.getPoWHash(header)
 
 
+class SibcoinTestnet(Sibcoin):
+    SHORTNAME = "tSIB"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("043587cf")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    GENESIS_HASH = ('00000617791d0e19f524387f67e558b2'
+                    'a928b670b9a3b387ae003ad7f9093017')
+
+    RPC_PORT = 11944
+
+
 class Chips(Coin):
     NAME = "Chips"
     SHORTNAME = "CHIPS"
@@ -2290,6 +2312,7 @@ class Odin(Coin):
 
     SESSIONCLS = DashElectrumX
     DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx.DeserializerSegWit
 
     @classmethod
     def static_header_offset(cls, height):
@@ -2378,6 +2401,7 @@ class Zcoin(Coin):
     MTP_HEADER_DATA_START = Coin.BASIC_HEADER_SIZE + MTP_HEADER_EXTRA_SIZE
     MTP_HEADER_DATA_END = MTP_HEADER_DATA_START + MTP_HEADER_DATA_SIZE
     STATIC_BLOCK_HEADERS = False
+    SESSIONCLS = DashElectrumX
     DAEMON = daemon.ZcoinMtpDaemon
     DESERIALIZER = lib_tx.DeserializerZcoin
     PEERS = [
@@ -2678,33 +2702,6 @@ class Pivx(Coin):
         else:
             import quark_hash
             return quark_hash.getPoWHash(header)
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits, nonce = struct.unpack('<III', header[68:80])
-
-        if (version >= cls.ZEROCOIN_BLOCK_VERSION):
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-                'acc_checkpoint': hash_to_str(header[80:112])
-            }
-        else:
-            return {
-                'block_height': height,
-                'version': version,
-                'prev_block_hash': hash_to_str(header[4:36]),
-                'merkle_root': hash_to_str(header[36:68]),
-                'timestamp': timestamp,
-                'bits': bits,
-                'nonce': nonce,
-            }
 
 
 class PivxTestnet(Pivx):
@@ -3333,3 +3330,88 @@ class GravityZeroCoin(ScryptMixin, Coin):
     RPC_PORT = 36442
     ESTIMATE_FEE = 0.01
     RELAY_FEE = 0.01
+
+
+class Simplicity(Coin):
+    NAME = "Simplicity"
+    SHORTNAME = "SPL"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0444d5bc")
+    XPRV_VERBYTES = bytes.fromhex("0444f0a3")
+    P2PKH_VERBYTE = bytes.fromhex("12")
+    P2SH_VERBYTE = bytes.fromhex("3b")
+    WIF_BYTE = bytes.fromhex("5d")
+    GENESIS_HASH = ('f4bbfc518aa3622dbeb8d2818a606b82c2b8b1ac2f28553ebdb6fc04d7abaccf')
+    RPC_PORT = 11958
+    TX_COUNT = 1726548
+    TX_COUNT_HEIGHT = 1040000
+    TX_PER_BLOCK = 5
+    REORG_LIMIT = 100
+    DESERIALIZER = lib_tx.DeserializerSimplicity
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        version, = util.unpack_le_uint32_from(header)
+
+        if version < 2:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
+        else:
+            return double_sha256(header)
+
+
+class Myce(Coin):
+    NAME = "Myce"
+    SHORTNAME = "YCE"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("32")
+    P2SH_VERBYTE = bytes.fromhex("55")
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('0000c74cc66c72cb1a327c5c1d4893ae5276aa50be49fb23cec21df1a2f20d87')
+    RPC_PORT = 23512
+    TX_COUNT = 1568977
+    TX_COUNT_HEIGHT = 774450
+    TX_PER_BLOCK = 3
+    REORG_LIMIT = 100
+    DESERIALIZER = lib_tx.DeserializerSimplicity
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        version, = util.unpack_le_uint32_from(header)
+
+        if version < 7:
+            import scrypt
+            return scrypt.hash(header, header, 1024, 1, 1, 32)
+        else:
+            return double_sha256(header)
+
+
+class Navcoin(Coin):
+    NAME = "Navcoin"
+    SHORTNAME = "NAV"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("35")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("96")
+    GENESIS_HASH = ('00006a4e3e18c71c6d48ad6c261e2254'
+                    'fa764cf29607a4357c99b712dfbb8e6a')
+    DESERIALIZER = lib_tx.DeserializerTxTimeSegWitNavCoin
+    TX_COUNT = 137641
+    TX_COUNT_HEIGHT = 3649662
+    TX_PER_BLOCK = 2
+    RPC_PORT = 44444
+    REORG_LIMIT = 1000
+
+    @classmethod
+    def header_hash(cls, header):
+        if int.from_bytes(header[:4], "little") > 6:
+            return double_sha256(header)
+        else:
+            import x13_hash
+            return x13_hash.getPoWHash(header)
