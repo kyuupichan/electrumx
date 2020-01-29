@@ -87,7 +87,7 @@ class Coin(object):
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
     # Peer discovery
-    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '443'}
     PEERS = []
     CRASH_CLIENT_VER = None
     BLACKLIST_URL = None
@@ -3318,3 +3318,5 @@ class BitcoinRoyale(Coin):
     TX_COUNT = 3300
     TX_COUNT_HEIGHT = 3300
     TX_PER_BLOCK = 2000
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '443'}
+    PEERS = ['157.245.20.66 s t', '188.166.204.85 s t']
