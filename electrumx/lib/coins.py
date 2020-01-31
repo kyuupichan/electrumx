@@ -875,7 +875,7 @@ class BitcoinNolnet(BitcoinCash):
     PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
 
 
-# Source: https://github.com/sumcoinlabs/sumcoin/	
+# Source: https://github.com/sumcoinlabs/sumcoin/
 class Sumcoin(Coin):
     NAME = "Sumcoin"
     SHORTNAME = "SUM"
