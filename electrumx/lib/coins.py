@@ -875,15 +875,15 @@ class BitcoinNolnet(BitcoinCash):
     PEER_DEFAULT_PORTS = {'t': '52001', 's': '52002'}
 
 
-# Source: https://github.com/sumcoinlabs/sumcoin/
+# Source: https://github.com/sumcoinlabs/sumcoin
 class Sumcoin(Coin):
     NAME = "Sumcoin"
     SHORTNAME = "SUM"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b41c")
     XPRV_VERBYTES = bytes.fromhex("0488abe6")
-    P2PKH_VERBYTE = bytes.fromhex("3F")
-    P2SH_VERBYTES = [bytes.fromhex("C8"), bytes.fromhex("05")]
+    P2PKH_VERBYTE = bytes.fromhex("3f")
+    P2SH_VERBYTES = [bytes.fromhex("c8"), bytes.fromhex("05")]
     WIF_BYTE = bytes.fromhex("bf")
     GENESIS_HASH = ('37d4696c5072cd012f3b7c651e5ce56a'
                     '1383577e4edacc2d289ec9b25eebfd5e')
@@ -891,8 +891,8 @@ class Sumcoin(Coin):
     TX_COUNT = 976394
     TX_COUNT_HEIGHT = 659520
     TX_PER_BLOCK = 2
-    RPC_PORT = 3332
     REORG_LIMIT = 800
+    RPC_PORT = 3332
     PEER_DEFAULT_PORTS = {'t': '53332', 's': '53333'}
     PEERS = []
 
