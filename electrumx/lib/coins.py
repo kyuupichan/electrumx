@@ -40,7 +40,6 @@ from functools import partial
 import electrumx.lib.util as util
 from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash
-from electrumx.lib.verus_hash import verus_hash, verus_hash2b, verus_hash2_1
 from electrumx.lib.script import (_match_ops, Script, ScriptError,
                                   ScriptPubKey, OpCodes)
 import electrumx.lib.tx as lib_tx
@@ -1492,17 +1491,18 @@ class Verus(KomodoMixin, EquihashMixin, Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return hash'''
+        import verushash
         # if this may be the genesis block, use sha256, otherwise, VerusHash
         if cls.header_prevhash(header) == bytes([0] * 32):
             return double_sha256(header)
         else:
             if (header[0] == 4 and header[2] >= 1):
                 if (len(header) < 144 or header[143] < 3):
-                    return verus_hash2b(header)
+                    return verushash.verushash_v2b(header)
                 else:
-                    return verus_hash2_1(header)
+                    return verushash.verushash_v2b1(header)
             else:
-                return verus_hash(header)
+                return verushash.verushash(header)
 
 
 class Einsteinium(Coin):
