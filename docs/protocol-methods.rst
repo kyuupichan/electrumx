@@ -211,7 +211,7 @@ Subscribe to receive block headers when a new block is found.
 
 **Notifications**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when a new block is found.  The notification's signature is:
 
     .. function:: blockchain.headers.subscribe(header)
@@ -494,7 +494,7 @@ Unsubscribe from a script hash, preventing future notifications if its :ref:`sta
 
   Returns :const:`True` if the scripthash was subscribed to, otherwise :const:`False`.
   Note that :const:`False` might be returned even for something subscribed to earlier,
-  becuase the server can drop subscriptions in rare circumstances.
+  because the server can drop subscriptions in rare circumstances.
 
 blockchain.transaction.broadcast
 ================================
@@ -774,7 +774,7 @@ server.add_peer
 ===============
 
 A newly-started server uses this call to get itself into other servers'
-peers lists.  It sould not be used by wallet clients.
+peers lists.  It should not be used by wallet clients.
 
 **Signature**
 
@@ -1036,7 +1036,7 @@ validate messages from it.
 
 **Result**
 
-  :const:`true` if the message was broadcasted succesfully otherwise
+  :const:`true` if the message was broadcasted successfully otherwise
   :const:`false`.
 
 **Example**::
@@ -1068,7 +1068,7 @@ Returns the status of masternode.
 
 **Result**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when the masternode status changes.
 
   The status depends on the server the masternode is hosted, the

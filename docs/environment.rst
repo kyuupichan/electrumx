@@ -123,8 +123,8 @@ Here are some examples of valid services::
 
   *port* can only be defaulted for **rpc** where the default is :const:`8000`.
 
-  On most Unix systems ports below 1024 require elevated priveleges so choosing a higher
-  port is advisable.  On Debian for example, this can be achieved by installinng
+  On most Unix systems ports below 1024 require elevated privileges so choosing a higher
+  port is advisable.  On Debian for example, this can be achieved by installing
   libcap2-bin package::
 
     sudo apt-get update && sudo apt-get -y install libcap2-bin
@@ -152,7 +152,7 @@ Here are some examples of valid services::
   firewall and router setup, for clients and other servers to see how to connect to your
   server.  If not set or empty, no services are advertized.
 
-  The **rpc** protocol, special IP addresses (inlcuding private ones if peer discovery is
+  The **rpc** protocol, special IP addresses (including private ones if peer discovery is
   enabled), and :const:`localhost` are invalid in :envvar:`REPORT_SERVICES`.
 
   Here is an example value of the :envvar:`REPORT_SERVICES` environment variable::
