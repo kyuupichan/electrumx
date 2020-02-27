@@ -29,7 +29,7 @@ Implementation
 
 ElectrumX does not do any pruning or throwing away of history.  I want
 to retain this property for as long as it is feasible, and it appears
-efficiently achievable for the forseeable future with plain Python.
+efficiently achievable for the foreseeable future with plain Python.
 
 The following all play a part in making it efficient as a Python
 blockchain indexer:

@@ -19,7 +19,7 @@ The following commands are available:
 add_peer
 --------
 
-Add a peer to the peers list.  ElectrumX will schdule an immediate
+Add a peer to the peers list.  ElectrumX will schedule an immediate
 connection attempt.  This command takes a single argument: the peer's
 "real name" as it used to advertise itself on IRC::
 
@@ -35,7 +35,7 @@ omitted, the default argument value is the process's existing
 :envvar:`DAEMON_URL` environment variable.
 
 This command replaces the daemon's URL at run-time, and also
-forecefully rotates to the first URL in the list.
+forcefully rotates to the first URL in the list.
 
 For example, in case ElectrumX has previously failed over to a
 secondary daemon and you want to revert to the primary having resolved
@@ -45,10 +45,10 @@ have that effect.
 disconnect
 ----------
 
-Disonnect the given session IDs or group names.
+Disconnect the given session IDs or group names.
 
 Session IDs can be obtained in the logs or with the `sessions`_ RPC command.  Group
-names can be optained with the `groups`_ RPC command.
+names can be obtained with the `groups`_ RPC command.
 
 The special string :const:`all` disconnects all sessions.
 
@@ -158,7 +158,7 @@ When a group is specified, logging is toggled for its current members only; ther
 effect on future group members.
 
 Session IDs can be obtained in the logs or with the `sessions`_ RPC command.  Group
-names can be optained with the `groups`_ RPC command.
+names can be obtained with the `groups`_ RPC command.
 
 The special string :const:`all` turns on logging of all current and future sessions,
 :const:`none` turns off logging of all current and future sessions, and :const:`new`
