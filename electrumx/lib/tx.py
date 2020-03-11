@@ -387,6 +387,126 @@ class DeserializerZcash(DeserializerEquihash):
         return base_tx
 
 
+class TxZelNodeStart(namedtuple("Tx", "version inputs outputs locktime type collateral_out_hash collateral_out_index collateral_public_key public_key sig_time sig")):
+    '''Class representing a ZelNode start transaction.'''
+
+
+class TxZelNodeConfirm(namedtuple("Tx", "version inputs outputs locktime type collateral_out_hash collateral_out_index sig_time benchmark_tier benchmark_sig_time update_type ip sig benchmark_sig")):
+    '''Class representing a ZelNode confirm transaction.'''
+
+
+class DeserializerZelCash(DeserializerEquihash):
+    def read_tx(self):
+        header = self._read_le_uint32()
+        overwintered = ((header >> 31) == 1)
+        if overwintered:
+            version = header & 0x7fffffff
+            self.cursor += 4  # versionGroupId
+        else:
+            version = header
+
+        is_overwinter_v3 = version == 3
+        is_sapling_v4 = version == 4
+        is_zelnode_v5 = version == 5
+
+        ZELNODE_START_TX_TYPE = 2;
+        ZELNODE_CONFIRM_TX_TYPE = 4;
+
+        if is_zelnode_v5:
+            type = self._read_varint()
+            inputs = []
+            outputs = []
+            locktime = 0
+
+            if type == ZELNODE_START_TX_TYPE:
+                collateral_out_hash = self._read_nbytes(32) # collateralOutHash
+                collateral_out_index = self._read_le_uint32() # collateralOutIndex readUInt32LE
+                collateral_public_key = self._read_varbytes() # collateralPublicKey
+                public_key = self._read_varbytes() # publicKey
+                sig_time = self._read_le_uint32()# sigTime
+                sig = self._read_varbytes() # sig
+
+                zelnode_tx_start = TxZelNodeStart(
+                    version,
+                    inputs,
+                    outputs,
+                    locktime,
+                    type,
+                    collateral_out_hash,
+                    collateral_out_index,
+                    collateral_public_key,
+                    public_key,
+                    sig_time,
+                    sig
+                )
+
+                return zelnode_tx_start
+
+            if type == ZELNODE_CONFIRM_TX_TYPE:
+                collateral_out_hash = self._read_nbytes(32) # collateralOutHash
+                collateral_out_index = self._read_le_uint32()  # collateralOutIndex readUInt32LE
+                sig_time = self._read_le_uint32() # sigTime
+                benchmark_tier = self._read_varint() # benchmarkTier
+                benchmark_sig_time = self._read_le_uint32() # benchmarkSigTime
+                update_type = self._read_varint() # nUpdateType
+                ip = self._read_varbytes() # IP
+                sig = self._read_varbytes() # sig
+                benchmark_sig = self._read_varbytes() # benchmarkSig
+
+                zelnode_tx_confirm = TxZelNodeConfirm(
+                    version,
+                    inputs,
+                    outputs,
+                    locktime,
+                    type,
+                    collateral_out_hash,
+                    collateral_out_index,
+                    sig_time,
+                    benchmark_tier,
+                    benchmark_sig_time,
+                    update_type,
+                    ip,
+                    sig,
+                    benchmark_sig
+                )
+
+                return zelnode_tx_confirm
+
+        else:
+            base_tx = TxJoinSplit(
+                version,
+                self._read_inputs(),    # inputs
+                self._read_outputs(),   # outputs
+                self._read_le_uint32()  # locktime
+            )
+
+            if is_overwinter_v3 or is_sapling_v4:
+                self.cursor += 4  # expiryHeight
+
+            has_shielded = False
+            if is_sapling_v4:
+                self.cursor += 8  # valueBalance
+                shielded_spend_size = self._read_varint()
+                self.cursor += shielded_spend_size * 384  # vShieldedSpend
+                shielded_output_size = self._read_varint()
+                self.cursor += shielded_output_size * 948  # vShieldedOutput
+                has_shielded = shielded_spend_size > 0 or shielded_output_size > 0
+
+            if base_tx.version >= 2:
+                joinsplit_size = self._read_varint()
+                if joinsplit_size > 0:
+                    joinsplit_desc_len = 1506 + (192 if is_sapling_v4 else 296)
+                    # JSDescription
+                    self.cursor += joinsplit_size * joinsplit_desc_len
+                    self.cursor += 32  # joinSplitPubKey
+                    self.cursor += 64  # joinSplitSig
+
+            if is_sapling_v4 and has_shielded:
+                self.cursor += 64  # bindingSig
+
+            return base_tx
+
+
 class TxTime(namedtuple("Tx", "version time inputs outputs locktime")):
     '''Class representing transaction that has a time field.'''
 
