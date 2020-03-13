@@ -300,8 +300,8 @@ class DB(object):
         batch_put = batch.put
         for key, value in flush_data.adds.items():
             # suffix = tx_idx + tx_num
-            hashX = value[:-12]
-            suffix = key[-4:] + value[-12:-8]
+            hashX = value[:-13]
+            suffix = key[-4:] + value[-13:-8]
             batch_put(b'h' + key[:4] + suffix, hashX)
             batch_put(b'u' + hashX + suffix, value[-8:])
         flush_data.adds.clear()
@@ -692,12 +692,12 @@ class DB(object):
         def read_utxos():
             utxos = []
             utxos_append = utxos.append
-            unpack_2_le_uint32 = Struct('<II').unpack
             # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                tx_pos, tx_num = unpack_2_le_uint32(db_key[-8:])
+                tx_pos, = unpack_le_uint32(db_key[-9:-5])
+                tx_num, = unpack_le_uint64(db_key[-5:] + bytes(3))
                 value, = unpack_le_uint64(db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
@@ -730,8 +730,8 @@ class DB(object):
 
                 # Find which entry, if any, the TX_HASH matches.
                 for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
-                    tx_num_packed = db_key[-4:]
-                    tx_num, = unpack_le_uint32(tx_num_packed)
+                    tx_num_packed = db_key[-5:]
+                    tx_num, = unpack_le_uint64(tx_num_packed + bytes(3))
                     hash, _height = self.fs_tx_hash(tx_num)
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed

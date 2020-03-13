@@ -19,7 +19,7 @@ from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
 from electrumx.lib.util import (
-    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint32
+    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64
 )
 from electrumx.server.db import FlushData
 
@@ -421,7 +421,7 @@ class BlockProcessor(object):
         for tx, tx_hash in txs:
             hashXs = []
             append_hashX = hashXs.append
-            tx_numb = to_le_uint32(tx_num)
+            tx_numb = to_le_uint64(tx_num)[:5]
 
             # Spend the inputs
             for txin in tx.inputs:
@@ -429,7 +429,7 @@ class BlockProcessor(object):
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
-                append_hashX(cache_value[:-12])
+                append_hashX(cache_value[:-13])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
@@ -497,7 +497,7 @@ class BlockProcessor(object):
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
         touched = self.touched
-        undo_entry_len = 12 + HASHX_LEN
+        undo_entry_len = 13 + HASHX_LEN
 
         for tx, tx_hash in reversed(txs):
             for idx, txout in enumerate(tx.outputs):
@@ -509,7 +509,7 @@ class BlockProcessor(object):
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
                 cache_value = spend_utxo(tx_hash, idx)
-                touched.add(cache_value[:-12])
+                touched.add(cache_value[:-13])
 
             # Restore the inputs
             for txin in reversed(tx.inputs):
@@ -518,7 +518,7 @@ class BlockProcessor(object):
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
                 put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
-                touched.add(undo_item[:-12])
+                touched.add(undo_item[:-13])
 
         assert n == 0
         self.tx_count -= len(txs)
@@ -534,9 +534,9 @@ class BlockProcessor(object):
     binary keys and values.
 
       Key:    TX_HASH + TX_IDX           (32 + 4 = 36 bytes)
-      Value:  HASHX + TX_NUM + VALUE     (11 + 4 + 8 = 23 bytes)
+      Value:  HASHX + TX_NUM + VALUE     (11 + 5 + 8 = 24 bytes)
 
-    That's 59 bytes of raw data in-memory.  Python dictionary overhead
+    That's 60 bytes of raw data in-memory.  Python dictionary overhead
     means each entry actually uses about 205 bytes of memory.  So
     almost 5 million UTXOs can fit in 1GB of RAM.  There are
     approximately 42 million UTXOs on bitcoin mainnet at height
@@ -599,10 +599,10 @@ class BlockProcessor(object):
                       in self.db.utxo_db.iterator(prefix=prefix)}
 
         for hdb_key, hashX in candidates.items():
-            tx_num_packed = hdb_key[-4:]
+            tx_num_packed = hdb_key[-5:]
 
             if len(candidates) > 1:
-                tx_num, = unpack_le_uint32(tx_num_packed)
+                tx_num, = unpack_le_uint64(tx_num_packed + bytes(3))
                 hash, _height = self.db.fs_tx_hash(tx_num)
                 if hash != tx_hash:
                     assert hash is not None  # Should always be found
@@ -610,7 +610,7 @@ class BlockProcessor(object):
 
             # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
-            udb_key = b'u' + hashX + hdb_key[-8:]
+            udb_key = b'u' + hashX + hdb_key[-9:]
             utxo_value_packed = self.db.utxo_db.get(udb_key)
             if utxo_value_packed:
                 # Remove both entries for this UTXO
@@ -754,7 +754,7 @@ class LTORBlockProcessor(BlockProcessor):
         # Add the new UTXOs
         for (tx, tx_hash), hashXs in zip(txs, hashXs_by_tx):
             add_hashXs = hashXs.add
-            tx_numb = to_le_uint32(tx_num)
+            tx_numb = to_le_uint64(tx_num)[:5]
 
             for idx, txout in enumerate(tx.outputs):
                 # Ignore unspendable outputs
@@ -777,7 +777,7 @@ class LTORBlockProcessor(BlockProcessor):
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
-                add_hashXs(cache_value[:-12])
+                add_hashXs(cache_value[:-13])
 
         # Update touched set for notifications
         for hashXs in hashXs_by_tx:
@@ -801,7 +801,7 @@ class LTORBlockProcessor(BlockProcessor):
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
         add_touched = self.touched.add
-        undo_entry_len = 12 + HASHX_LEN
+        undo_entry_len = 13 + HASHX_LEN
 
         # Restore coins that had been spent
         # (may include coins made then spent in this block)
@@ -812,7 +812,7 @@ class LTORBlockProcessor(BlockProcessor):
                     continue
                 undo_item = undo_info[n:n + undo_entry_len]
                 put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
-                add_touched(undo_item[:-12])
+                add_touched(undo_item[:-13])
                 n += undo_entry_len
 
         assert n == len(undo_info)
@@ -828,6 +828,6 @@ class LTORBlockProcessor(BlockProcessor):
                 # Get the hashX
                 hashX = script_hashX(txout.script)
                 cache_value = spend_utxo(tx_hash, idx)
-                add_touched(cache_value[:-12])
+                add_touched(cache_value[:-13])
 
         self.tx_count -= len(txs)

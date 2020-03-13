@@ -16,7 +16,9 @@ from collections import defaultdict
 from functools import partial
 
 import electrumx.lib.util as util
-from electrumx.lib.util import pack_be_uint16, unpack_be_uint16_from
+from electrumx.lib.util import (
+    pack_be_uint16, pack_le_uint64, unpack_be_uint16_from, unpack_le_uint64,
+)
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 
 
@@ -28,7 +30,7 @@ class History(object):
         self.logger = util.class_logger(__name__, self.__class__.__name__)
         # For history compaction
         self.max_hist_row_entries = 12500
-        self.unflushed = defaultdict(partial(array.array, 'I'))
+        self.unflushed = defaultdict(bytearray)
         self.unflushed_count = 0
         self.flush_count = 0
         self.comp_flush_count = -1
@@ -115,14 +117,15 @@ class History(object):
         unflushed = self.unflushed
         count = 0
         for tx_num, hashXs in enumerate(hashXs_by_tx, start=first_tx_num):
+            tx_numb = pack_le_uint64(tx_num)[:5]
             hashXs = set(hashXs)
             for hashX in hashXs:
-                unflushed[hashX].append(tx_num)
+                unflushed[hashX].extend(tx_numb)
             count += len(hashXs)
         self.unflushed_count += count
 
     def unflushed_memsize(self):
-        return len(self.unflushed) * 180 + self.unflushed_count * 4
+        return len(self.unflushed) * 180 + self.unflushed_count * 5
 
     def assert_flushed(self):
         assert not self.unflushed
@@ -136,7 +139,7 @@ class History(object):
         with self.db.write_batch() as batch:
             for hashX in sorted(unflushed):
                 key = hashX + flush_id
-                batch.put(key, unflushed[hashX].tobytes())
+                batch.put(key, bytes(unflushed[hashX]))
             self.write_state(batch)
 
         count = len(unflushed)
@@ -153,19 +156,20 @@ class History(object):
         self.flush_count += 1
         nremoves = 0
         bisect_left = bisect.bisect_left
+        chunks = util.chunks
 
         with self.db.write_batch() as batch:
             for hashX in sorted(hashXs):
                 deletes = []
                 puts = {}
                 for key, hist in self.db.iterator(prefix=hashX, reverse=True):
-                    a = array.array('I')
-                    a.frombytes(hist)
+                    a = array.array('Q')
+                    a.frombytes(b''.join(item + bytes(3) for item in chunks(hist, 5)))
                     # Remove all history entries >= tx_count
                     idx = bisect_left(a, tx_count)
                     nremoves += len(a) - idx
                     if idx > 0:
-                        puts[key] = a[:idx].tobytes()
+                        puts[key] = hist[:5 * idx]
                         break
                     deletes.append(key)
 
@@ -183,12 +187,12 @@ class History(object):
         transactions.  By default yields at most 1000 entries.  Set
         limit to None to get them all.  '''
         limit = util.resolve_limit(limit)
+        chunks = util.chunks
         for _key, hist in self.db.iterator(prefix=hashX):
-            a = array.array('I')
-            a.frombytes(hist)
-            for tx_num in a:
+            for tx_numb in chunks(hist, 5):
                 if limit == 0:
                     return
+                tx_num, = unpack_le_uint64(tx_numb + bytes(3))
                 yield tx_num
                 limit -= 1
 
@@ -238,14 +242,14 @@ class History(object):
         # over rows of up to 50KB in size.  A fixed row size means
         # future compactions will not need to update the first N - 1
         # rows.
-        max_row_size = self.max_hist_row_entries * 4
+        max_row_size = self.max_hist_row_entries * 5
         full_hist = b''.join(hist_list)
         nrows = (len(full_hist) + max_row_size - 1) // max_row_size
         if nrows > 4:
             self.logger.info('hashX {} is large: {:,d} entries across '
                              '{:,d} rows'
                              .format(hash_to_hex_str(hashX),
-                                     len(full_hist) // 4, nrows))
+                                     len(full_hist) // 5, nrows))
 
         # Find what history needs to be written, and what keys need to
         # be deleted.  Start by assuming all keys are to be deleted,
