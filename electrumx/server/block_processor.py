@@ -675,10 +675,11 @@ class BlockProcessor(object):
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_prefetched_blocks())
-        except Exception:
+        except Exception as e:
             # If there is an error in the prefetcher chances are the flush can error too, hiding
             # this error.
-            self.logger.exception('error in prefetcher')
+            if not isinstance(e, asyncio.CancelledError):
+                self.logger.exception('error in prefetcher')
             raise
         finally:
             # Shut down block processing
