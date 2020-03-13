@@ -679,6 +679,7 @@ class BlockProcessor(object):
             # If there is an error in the prefetcher chances are the flush can error too, hiding
             # this error.
             self.logger.exception('error in prefetcher')
+            raise
         finally:
             # Shut down block processing
             self.logger.info('flushing to DB for a clean shutdown...')
