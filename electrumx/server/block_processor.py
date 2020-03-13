@@ -675,6 +675,10 @@ class BlockProcessor(object):
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_prefetched_blocks())
+        except Exception:
+            # If there is an error in the prefetcher chances are the flush can error too, hiding
+            # this error.
+            self.logger.exception('error in prefetcher')
         finally:
             # Shut down block processing
             self.logger.info('flushing to DB for a clean shutdown...')
