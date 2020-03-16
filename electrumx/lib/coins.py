@@ -1246,6 +1246,15 @@ class DashTestnet(Dash):
     ]
 
 
+class DashRegtest(DashTestnet):
+    NET = "regtest"
+    GENESIS_HASH = ('000008ca1832a4baf228eb1553c03d3a'
+                    '2c8e02399550dd6ea8d65cec3ef23d2e')
+    PEERS = []
+    TX_COUNT_HEIGHT = 1
+    TX_COUNT = 1
+
+
 class Argentum(AuxPowMixin, Coin):
     NAME = "Argentum"
     SHORTNAME = "ARG"
