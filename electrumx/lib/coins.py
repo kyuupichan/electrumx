@@ -3318,3 +3318,6 @@ class BitcoinRoyale(Coin):
     TX_COUNT = 3300
     TX_COUNT_HEIGHT = 3300
     TX_PER_BLOCK = 2000
+    ESTIMATE_FEE = 0.00001
+    RELAY_FEE = 0.00001
+    DAEMON = daemon.FakeEstimateFeeDaemon
