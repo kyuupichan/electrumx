@@ -22,7 +22,7 @@ install:
   - pip install pytest-cov
   - pip install Sphinx
 # hashes
-  - pip install tribus-hash
+  - pip install git+https://github.com/carsenk/tribus-hash
   - pip install blake256
   - pip install scrypt
   - pip install x11_hash
