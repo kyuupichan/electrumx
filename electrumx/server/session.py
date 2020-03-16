@@ -40,6 +40,8 @@ from electrumx.server.peers import PeerManager
 BAD_REQUEST = 1
 DAEMON_ERROR = 2
 
+STATIC_FEE = 0.00001000 # 1 sat/b
+
 
 def scripthash_to_hashX(scripthash):
     try:
@@ -1237,7 +1239,11 @@ class ElectrumX(SessionBase):
         '''
         number = non_negative_integer(number)
         self.bump_cost(2.0)
-        return await self.daemon_request('estimatefee', number)
+
+        # Suspend dynamic fee estimation until more transactions are present in the blockchain
+        # return await self.daemon_request('estimatefee', number)
+        return STATIC_FEE
+
 
     async def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
