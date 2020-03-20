@@ -153,9 +153,9 @@ def chunks(items, size):
 
 
 def resolve_limit(limit):
-    if limit is None:
+    if limit is None or limit < 0:
         return -1
-    assert isinstance(limit, int) and limit >= 0
+    assert isinstance(limit, int)
     return limit
 
 
