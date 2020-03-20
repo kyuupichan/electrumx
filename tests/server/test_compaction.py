@@ -6,7 +6,7 @@ from os import environ, urandom
 import random
 
 from electrumx.lib.hash import HASHX_LEN
-from electrumx.lib.util import pack_be_uint16
+from electrumx.lib.util import pack_be_uint16, pack_le_uint64
 from electrumx.server.env import Env
 from electrumx.server.db import DB
 
@@ -15,16 +15,17 @@ def create_histories(history, hashX_count=100):
     '''Creates a bunch of random transaction histories, and write them
     to disk in a series of small flushes.'''
     hashXs = [urandom(HASHX_LEN) for n in range(hashX_count)]
-    mk_array = lambda : array.array('I')
+    mk_array = lambda : array.array('Q')
     histories = {hashX : mk_array() for hashX in hashXs}
     unflushed = history.unflushed
     tx_num = 0
     while hashXs:
+        tx_numb = pack_le_uint64(tx_num)[:5]
         hash_indexes = set(random.randrange(len(hashXs))
                            for n in range(1 + random.randrange(4)))
         for index in hash_indexes:
             histories[hashXs[index]].append(tx_num)
-            unflushed[hashXs[index]].append(tx_num)
+            unflushed[hashXs[index]].extend(tx_numb)
 
         tx_num += 1
         # Occasionally flush and drop a random hashX if non-empty
@@ -39,8 +40,8 @@ def create_histories(history, hashX_count=100):
 
 def check_hashX_compaction(history):
     history.max_hist_row_entries = 40
-    row_size = history.max_hist_row_entries * 4
-    full_hist = array.array('I', range(100)).tobytes()
+    row_size = history.max_hist_row_entries * 5
+    full_hist = b''.join(pack_le_uint64(tx_num)[:5] for tx_num in range(100))
     hashX = urandom(HASHX_LEN)
     pairs = ((1, 20), (26, 50), (56, 30))
 
@@ -49,7 +50,7 @@ def check_hashX_compaction(history):
     hist_map = {}
     for flush_count, count in pairs:
         key = hashX + pack_be_uint16(flush_count)
-        hist = full_hist[cum * 4: (cum+count) * 4]
+        hist = full_hist[cum * 5: (cum+count) * 5]
         hist_map[key] = hist
         hist_list.append(hist)
         cum += count
