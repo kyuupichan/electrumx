@@ -24,7 +24,7 @@ from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 
 class History(object):
 
-    DB_VERSIONS = [0]
+    DB_VERSIONS = [0, 1]
 
     def __init__(self):
         self.logger = util.class_logger(__name__, self.__class__.__name__)
@@ -36,6 +36,7 @@ class History(object):
         self.comp_flush_count = -1
         self.comp_cursor = -1
         self.db_version = max(self.DB_VERSIONS)
+        self.upgrade_cursor = -1
         self.db = None
 
     def open_db(self, db_class, for_sync, utxo_flush_count, compacting):
@@ -63,17 +64,22 @@ class History(object):
             self.comp_flush_count = state.get('comp_flush_count', -1)
             self.comp_cursor = state.get('comp_cursor', -1)
             self.db_version = state.get('db_version', 0)
+            self.upgrade_cursor = state.get('upgrade_cursor', -1)
         else:
             self.flush_count = 0
             self.comp_flush_count = -1
             self.comp_cursor = -1
             self.db_version = max(self.DB_VERSIONS)
+            self.upgrade_cursor = -1
 
-        self.logger.info(f'history DB version: {self.db_version}')
         if self.db_version not in self.DB_VERSIONS:
-            msg = f'this software only handles DB versions {self.DB_VERSIONS}'
+            msg = (f'your history DB version is {self.db_version} but '
+                   f'this software only handles DB versions {self.DB_VERSIONS}')
             self.logger.error(msg)
             raise RuntimeError(msg)
+        if self.db_version != max(self.DB_VERSIONS):
+            self.upgrade_db()
+        self.logger.info(f'history DB version: {self.db_version}')
         self.logger.info(f'flush count: {self.flush_count:,d}')
 
     def clear_excess(self, utxo_flush_count):
@@ -108,6 +114,7 @@ class History(object):
             'comp_flush_count': self.comp_flush_count,
             'comp_cursor': self.comp_cursor,
             'db_version': self.db_version,
+            'upgrade_cursor': self.upgrade_cursor,
         }
         # History entries are not prefixed; the suffix \0\0 ensures we
         # look similar to other entries and aren't interfered with
@@ -330,3 +337,46 @@ class History(object):
             self.logger.warning('cancelling in-progress history compaction')
             self.comp_flush_count = -1
             self.comp_cursor = -1
+
+    #
+    # DB upgrade
+    #
+
+    def upgrade_db(self):
+        self.logger.info(f'history DB version: {self.db_version}')
+        self.logger.info('Upgrading your history DB; this can take some time...')
+
+        def upgrade_cursor(cursor):
+            count = 0
+            prefix = pack_be_uint16(cursor)
+            key_len = HASHX_LEN + 2
+            chunks = util.chunks
+            with self.db.write_batch() as batch:
+                batch_put = batch.put
+                for key, hist in self.db.iterator(prefix=prefix):
+                    # Ignore non-history entries
+                    if len(key) != key_len:
+                        continue
+                    count += 1
+                    hist = b''.join(item + b'\0' for item in chunks(hist, 4))
+                    batch_put(key, hist)
+                self.upgrade_cursor = cursor
+                self.write_state(batch)
+            return count
+
+        last = time.time()
+        count = 0
+
+        for cursor in range(self.upgrade_cursor + 1, 65536):
+            count += upgrade_cursor(cursor)
+            now = time.time()
+            if now > last + 10:
+                last = now
+                self.logger.info(f'DB 3 of 3: {count:,d} entries updated, '
+                                 f'{cursor * 100 / 65536:.1f}% complete')
+
+        self.db_version = max(self.DB_VERSIONS)
+        self.upgrade_cursor = -1
+        with self.db.write_batch() as batch:
+            self.write_state(batch)
+        self.logger.info('DB 3 of 3 upgraded successfully')

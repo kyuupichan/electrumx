@@ -55,7 +55,7 @@ class DB(object):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [6, 7]
+    DB_VERSIONS = [6, 7, 8]
 
     class DBError(Exception):
         '''Raised on general DB errors generally indicating corruption.'''
@@ -110,10 +110,10 @@ class DB(object):
             return
         # tx_counts[N] has the cumulative number of txs at the end of
         # height N.  So tx_counts[0] is 1 - the genesis coinbase
-        size = (self.db_height + 1) * 4
+        size = (self.db_height + 1) * 8
         tx_counts = self.tx_counts_file.read(0, size)
         assert len(tx_counts) == size
-        self.tx_counts = array.array('I', tx_counts)
+        self.tx_counts = array.array('Q', tx_counts)
         if self.tx_counts:
             assert self.db_tx_count == self.tx_counts[-1]
         else:
@@ -596,7 +596,7 @@ class DB(object):
             self.upgrade_db()
 
         # Log some stats
-        self.logger.info('DB version: {:d}'.format(self.db_version))
+        self.logger.info('UTXO DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
         self.logger.info('network: {}'.format(self.coin.NET))
         self.logger.info('height: {:,d}'.format(self.db_height))
@@ -609,7 +609,7 @@ class DB(object):
                              .format(util.formatted_time(self.wall_time)))
 
     def upgrade_db(self):
-        self.logger.info('DB version: {:d}'.format(self.db_version))
+        self.logger.info(f'UTXO DB version: {self.db_version}')
         self.logger.info('Upgrading your DB; this can take some time...')
 
         def upgrade_u_prefix(prefix):
@@ -619,11 +619,19 @@ class DB(object):
                 batch_put = batch.put
                 # Key: b'u' + address_hashX + tx_idx + tx_num
                 for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                    if len(db_key) != 18:
-                        break
-                    count += 1
-                    batch_delete(db_key)
-                    batch_put(db_key[:14] + b'\0\0' + db_key[14:], db_value)
+                    if len(db_key) == 21:
+                        return
+                    break
+                if self.db_version == 6:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key[:14] + b'\0\0' + db_key[14:] + b'\0', db_value)
+                else:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key + b'\0', db_value)
             return count
 
         last = time.time()
@@ -634,9 +642,9 @@ class DB(object):
             now = time.time()
             if now > last + 10:
                 last = now
-                self.logger.info(f'DB 1 of 2: {count:,d} entries updated, '
+                self.logger.info(f'DB 1 of 3: {count:,d} entries updated, '
                                  f'{cursor * 100 / 65536:.1f}% complete')
-        self.logger.info('DB 1 of 2 upgraded successfully')
+        self.logger.info('DB 1 of 3 upgraded successfully')
 
         def upgrade_h_prefix(prefix):
             count = 0
@@ -645,11 +653,19 @@ class DB(object):
                 batch_put = batch.put
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
                 for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                    if len(db_key) != 11:
-                        break
-                    count += 1
-                    batch_delete(db_key)
-                    batch_put(db_key[:7] + b'\0\0' + db_key[7:], db_value)
+                    if len(db_key) == 14:
+                        return
+                    break
+                if self.db_version == 6:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key[:7] + b'\0\0' + db_key[7:] + b'\0', db_value)
+                else:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key + b'\0', db_value)
             return count
 
         last = time.time()
@@ -660,13 +676,21 @@ class DB(object):
             now = time.time()
             if now > last + 10:
                 last = now
-                self.logger.info(f'DB 2 of 2: {count:,d} entries updated, '
+                self.logger.info(f'DB 2 of 3: {count:,d} entries updated, '
                                  f'{cursor * 100 / 65536:.1f}% complete')
+
+        # Upgrade tx_counts file
+        size = (self.db_height + 1) * 8
+        tx_counts = self.tx_counts_file.read(0, size)
+        if len(tx_counts) == (self.db_height + 1) * 4:
+            tx_counts = array.array('I', tx_counts)
+            tx_counts = array.array('Q', tx_counts)
+            self.tx_counts_file.write(0, tx_counts.tobytes())
 
         self.db_version = max(self.DB_VERSIONS)
         with self.utxo_db.write_batch() as batch:
             self.write_utxo_state(batch)
-        self.logger.info('DB 2 of 2 upgraded successfully')
+        self.logger.info('DB 2 of 3 upgraded successfully')
 
     def write_utxo_state(self, batch):
         '''Write (UTXO) state to the batch.'''
