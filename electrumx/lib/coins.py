@@ -3409,3 +3409,34 @@ class Navcoin(Coin):
         else:
             import x13_hash
             return x13_hash.getPoWHash(header)
+
+
+class Primecoin(Coin):
+    NAME = "Primecoin"
+    SHORTNAME = "XPM"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("17")
+    P2SH_VERBYTES = [bytes.fromhex("53")]
+    WIF_BYTE = bytes.fromhex("97")
+    GENESIS_HASH = ('963d17ba4dc753138078a2f56afb3af9'
+                    '674e2546822badff26837db9a0152106')
+    DAEMON = daemon.FakeEstimateFeeDaemon
+    ESTIMATE_FEE = 1.024
+    TX_COUNT = 7000000
+    TX_COUNT_HEIGHT = 3600000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 9912
+    REORG_LIMIT = 5000
+
+
+class PrimecoinTestnet(Primecoin):
+    NAME = "PrimecoinTestnet"
+    SHORTNAME = "tXPM"
+    NET = "testnet"
+    P2PKH_VERBYTE = bytes.fromhex("6f")
+    P2SH_VERBYTES = [bytes.fromhex("c4")]
+    WIF_BYTE = bytes.fromhex("ef")
+    GENESIS_HASH = ('221156cf301bc3585e72de34fe1efdb6'
+                    'fbd703bc27cfc468faa1cdd889d0efa0')
+    ESTIMATE_FEE = 1.024
+    RPC_PORT = 9914
