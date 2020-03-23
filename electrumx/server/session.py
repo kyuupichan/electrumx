@@ -494,19 +494,19 @@ class SessionManager:
         '''Returns data about a script, address or name.'''
         coin = self.env.coin
         db = self.db
-        lines = []
+        lines = defaultdict(list)
 
         def arg_to_hashX(arg):
             try:
                 script = bytes.fromhex(arg)
-                lines.append(f'Script: {arg}')
+                lines['script'] = arg
                 return coin.hashX_from_script(script)
             except ValueError:
                 pass
 
             try:
                 hashX = coin.address_to_hashX(arg)
-                lines.append(f'Address: {arg}')
+                lines['address'] = arg
                 return hashX
             except Base58Error:
                 pass
@@ -514,7 +514,7 @@ class SessionManager:
             try:
                 script = coin.build_name_index_script(arg.encode("ascii"))
                 hashX = coin.name_hashX_from_script(script)
-                lines.append(f'Name: {arg}')
+                lines['name'] = arg
                 return hashX
             except (AttributeError, UnicodeEncodeError):
                 pass
@@ -528,25 +528,28 @@ class SessionManager:
             n = None
             history = await db.limited_history(hashX, limit=limit)
             for n, (tx_hash, height) in enumerate(history):
-                lines.append(f'History #{n:,d}: height {height:,d} '
-                             f'tx_hash {hash_to_hex_str(tx_hash)}')
+                lines['history'].append({
+                    'height': height,
+                    'tx_hash': hash_to_hex_str(tx_hash)
+                })
             if n is None:
-                lines.append('No history found')
+                lines['history'] = []
             n = None
             utxos = await db.all_utxos(hashX)
             for n, utxo in enumerate(utxos, start=1):
-                lines.append(f'UTXO #{n:,d}: tx_hash '
-                             f'{hash_to_hex_str(utxo.tx_hash)} '
-                             f'tx_pos {utxo.tx_pos:,d} height '
-                             f'{utxo.height:,d} value {utxo.value:,d}')
+                lines['utxos'].append({
+                    'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                    'tx_pos': utxo.tx_pos,
+                    'height': utxo.height,
+                    'value': utxo.value
+                })
                 if n == limit:
                     break
             if n is None:
-                lines.append('No UTXOs found')
+                lines['utxos'] = []
 
             balance = sum(utxo.value for utxo in utxos)
-            lines.append(f'Balance: {coin.decimal_value(balance):,f} '
-                         f'{coin.SHORTNAME}')
+            lines['balance'] = f'{coin.decimal_value(balance):,f} {coin.SHORTNAME}'
 
         return lines
 
