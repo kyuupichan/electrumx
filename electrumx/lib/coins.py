@@ -516,6 +516,17 @@ class NameIndexMixin(NameMixin):
         return super().hashX_from_script(name_index_script)
 
 
+class PrimeChainPowMixin(object):
+    STATIC_BLOCK_HEADERS = False
+    DESERIALIZER = lib_tx.DeserializerPrimecoin
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Return the block header bytes'''
+        deserializer = cls.DESERIALIZER(block)
+        return deserializer.read_header(cls.BASIC_HEADER_SIZE)
+
+
 class HOdlcoin(Coin):
     NAME = "HOdlcoin"
     SHORTNAME = "HODLC"
@@ -3411,7 +3422,7 @@ class Navcoin(Coin):
             return x13_hash.getPoWHash(header)
 
 
-class Primecoin(Coin):
+class Primecoin(PrimeChainPowMixin, Coin):
     NAME = "Primecoin"
     SHORTNAME = "XPM"
     NET = "mainnet"
@@ -3438,5 +3449,4 @@ class PrimecoinTestnet(Primecoin):
     WIF_BYTE = bytes.fromhex("ef")
     GENESIS_HASH = ('221156cf301bc3585e72de34fe1efdb6'
                     'fbd703bc27cfc468faa1cdd889d0efa0')
-    ESTIMATE_FEE = 1.024
     RPC_PORT = 9914
