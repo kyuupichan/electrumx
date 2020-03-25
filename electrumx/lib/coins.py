@@ -517,7 +517,6 @@ class NameIndexMixin(NameMixin):
 
 
 class PrimeChainPowMixin(object):
-    STATIC_BLOCK_HEADERS = False
     DESERIALIZER = lib_tx.DeserializerPrimecoin
 
     @classmethod
