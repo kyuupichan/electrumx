@@ -3409,3 +3409,60 @@ class Navcoin(Coin):
         else:
             import x13_hash
             return x13_hash.getPoWHash(header)
+
+# Source: https://github.com/syscoin/syscoin
+
+class Syscoin(AuxPowMixin, Coin):
+    NAME = "Syscoin"
+    SHORTNAME = "SYS"
+    NET = "mainnet"
+    
+    P2PKH_VERBYTE = bytes.fromhex("3f")
+    P2SH_VERBYTES = bytes.fromhex("05")
+    WIF_BYTE = bytes.fromhex("80")
+    
+    GENESIS_HASH = '0000022642db0346b6e01c2a397471f4f12e65d4f4251ec96c1f85367a61a7ab'
+    TX_COUNT = 17036
+    TX_COUNT_HEIGHT = 16485
+    TX_PER_BLOCK = 5
+    RPC_PORT = 8368
+    REORG_LIMIT = 2000
+    
+    CHUNK_SIZE = 360
+    DEFAULT_MAX_SEND = 10000000
+
+    PEER_DEFAULT_PORTS = {'t': '58881', 's': '58882'}
+    PEERS = []
+
+    PEER_DEFAULT_PORTS = {'s': '58882'}
+    PEERS = [
+        'electrumx1.syscoin.org s',
+        'electrumx2.syscoin.org s',
+        'electrumx3.syscoin.org s',
+    ]
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
+
+
+class SyscoinTestnetMixin(object):
+    P2PKH_VERBYTE = bytes.fromhex("41")
+    P2SH_VERBYTES = bytes.fromhex("c4")
+    WIF_BYTE = bytes.fromhex("ef")
+    PEER_DEFAULT_PORTS = {'t': '59991', 's': '59992'}
+
+
+class SyscoinTestnet(Syscoin, SyscoinTestnetMixin):
+    NAME = "Syscoin"
+    SHORTNAME = "TSYS"
+    NET = "testnet"
+    GENESIS_HASH = '0000064430008f1fe74ba0bf54080f1cf6e73da3372df7617e33648529940fc3'
+    PEERS = [
+             '104.248.3.80 s t',
+             ]
+
+
+class SyscoinRegtest(Syscoin, SyscoinTestnetMixin):
+    NAME = "Syscoin"
+    SHORTNAME = "RSYS"
+    NET = "regtest"
+    GENESIS_HASH = '28a2c2d251f46fac05ade79085cbcb2ae4ec67ea24f1f1c7b40a348c00521194'
+    PEERS = []
