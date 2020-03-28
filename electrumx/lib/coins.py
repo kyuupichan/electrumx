@@ -2275,6 +2275,7 @@ class Axe(Dash):
         import x11_hash
         return x11_hash.getPoWHash(header)
 
+
 class AxeTestnet(Axe):
     SHORTNAME = "tAxe"
     NET = "testnet"
@@ -2301,6 +2302,7 @@ class AxeRegtest(AxeTestnet):
     TX_COUNT_HEIGHT = 1
     RPC_PORT = 19869
     TX_COUNT = 1
+
 
 class Xuez(Coin):
     NAME = "Xuez"
