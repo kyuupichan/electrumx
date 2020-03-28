@@ -2275,6 +2275,32 @@ class Axe(Dash):
         import x11_hash
         return x11_hash.getPoWHash(header)
 
+class AxeTestnet(Axe):
+    SHORTNAME = "tAxe"
+    NET = "testnet"
+    XPUB_VERBYTES = bytes.fromhex("3a805837")
+    XPRV_VERBYTES = bytes.fromhex("3a8061a0")
+    GENESIS_HASH = ('000005b709662e7bc5e89c71d3aba6c9'
+                    'd4623b4bbf44ac205caec55f4cefb483')
+    P2PKH_VERBYTE = bytes.fromhex("8c")
+    P2SH_VERBYTES = [bytes.fromhex("13")]
+    WIF_BYTE = bytes.fromhex("ef")
+    TX_COUNT_HEIGHT = 101619
+    TX_COUNT = 132681
+    TX_PER_BLOCK = 1
+    RPC_PORT = 19937
+    PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
+    PEERS = []
+
+
+class AxeRegtest(AxeTestnet):
+    NET = "regtest"
+    GENESIS_HASH = ('2026b8850f3774a0536152ba868c4dcb'
+                    'de9aef5ffc28a5d23f76f80e9b46e565')
+    PEERS = []
+    TX_COUNT_HEIGHT = 1
+    RPC_PORT = 19869
+    TX_COUNT = 1
 
 class Xuez(Coin):
     NAME = "Xuez"
