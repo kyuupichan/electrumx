@@ -252,6 +252,14 @@ class SessionManager:
             await self._disconnect_sessions(stale_sessions, 'closing stale')
             del stale_sessions
 
+    async def _handle_chain_reorgs(self):
+        '''Clear caches on chain reorgs.'''
+        while True:
+            await self.bp.backed_up_event.wait()
+            self.logger.info(f'reorg signalled; clearing tx_hashes and merkle caches')
+            self._tx_hashes_cache.clear()
+            self._merkle_cache.clear()
+
     async def _recalc_concurrency(self):
         '''Periodically recalculate session concurrency.'''
         session_class = self.env.coin.SESSIONCLS
@@ -608,6 +616,7 @@ class SessionManager:
             async with self._task_group as group:
                 await group.spawn(self.peer_mgr.discover_peers())
                 await group.spawn(self._clear_stale_sessions())
+                await group.spawn(self._handle_chain_reorgs())
                 await group.spawn(self._recalc_concurrency())
                 await group.spawn(self._log_sessions())
                 await group.spawn(self._manage_servers())
@@ -743,12 +752,6 @@ class SessionManager:
 
     async def _notify_sessions(self, height, touched):
         '''Notify sessions about height changes and touched addresses.'''
-        # Invalidate our height-based caches in case of a reorg
-        for cache in (self._tx_hashes_cache, self._merkle_cache):
-            for key in range(height, self.db.db_height + 1):
-                if key in cache:
-                    del cache[key]
-
         height_changed = height != self.notified_height
         if height_changed:
             await self._refresh_hsub_results(height)
