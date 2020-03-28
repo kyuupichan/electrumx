@@ -1494,6 +1494,34 @@ class Monaize(KomodoMixin, EquihashMixin, Coin):
     PEERS = []
 
 
+class Verus(KomodoMixin, EquihashMixin, Coin):
+    NAME = "Verus"
+    SHORTNAME = "VRSC"
+    NET = "mainnet"
+    TX_COUNT = 55000
+    TX_COUNT_HEIGHT = 42000
+    TX_PER_BLOCK = 2
+    RPC_PORT = 27486
+    REORG_LIMIT = 800
+    PEERS = []
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        import verushash
+        # if this may be the genesis block, use sha256, otherwise, VerusHash
+        if cls.header_prevhash(header) == bytes([0] * 32):
+            return double_sha256(header)
+        else:
+            if (header[0] == 4 and header[2] >= 1):
+                if (len(header) < 144 or header[143] < 3):
+                    return verushash.verushash_v2b(header)
+                else:
+                    return verushash.verushash_v2b1(header)
+            else:
+                return verushash.verushash(header)
+
+
 class Einsteinium(Coin):
     NAME = "Einsteinium"
     SHORTNAME = "EMC2"
