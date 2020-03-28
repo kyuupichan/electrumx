@@ -45,6 +45,11 @@ These environment variables are always required:
   port for :envvar:`COIN` and :envvar:`NET` if omitted.
 
 
+.. note:: With the above set your server will run and index the chain.  To enable incoming
+   connections you must set :envvar:`SERVICES`, and for others to be aware of your server
+   set :envvar:`REPORT_SERVICES`.
+
+
 For the ``run`` script
 ======================
 
@@ -118,6 +123,13 @@ Here are some examples of valid services::
 
   *port* can only be defaulted for **rpc** where the default is :const:`8000`.
 
+  On most Unix systems ports below 1024 require elevated privileges so choosing a higher
+  port is advisable.  On Debian for example, this can be achieved by installing
+  libcap2-bin package::
+
+    sudo apt-get update && sudo apt-get -y install libcap2-bin
+    sudo setcap cap_net_bind_service=+ep /path/to/electrumx_server
+
   If any listed service has protocol **ssl** or **wss** then :envvar:`SSL_CERTFILE` and
   :envvar:`SSL_KEYFILE` must be defined.
 
@@ -140,7 +152,7 @@ Here are some examples of valid services::
   firewall and router setup, for clients and other servers to see how to connect to your
   server.  If not set or empty, no services are advertized.
 
-  The **rpc** protocol, special IP addresses (inlcuding private ones if peer discovery is
+  The **rpc** protocol, special IP addresses (including private ones if peer discovery is
   enabled), and :const:`localhost` are invalid in :envvar:`REPORT_SERVICES`.
 
   Here is an example value of the :envvar:`REPORT_SERVICES` environment variable::

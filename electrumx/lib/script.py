@@ -76,6 +76,16 @@ assert OpCodes.OP_CHECKSIG == 0xac
 assert OpCodes.OP_CHECKMULTISIG == 0xae
 
 
+def is_unspendable_legacy(script):
+    # OP_FALSE OP_RETURN or OP_RETURN
+    return script[:2] == b'\x00\x6a' or (script and script[0] == 0x6a)
+
+
+def is_unspendable_genesis(script):
+    # OP_FALSE OP_RETURN
+    return script[:2] == b'\x00\x6a'
+
+
 def _match_ops(ops, pattern):
     if len(ops) != len(pattern):
         return False

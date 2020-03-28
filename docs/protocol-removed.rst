@@ -124,7 +124,7 @@ Subscribe to a bitcoin address.
 
 **Notifications**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when the :ref:`status <status>` of the address changes.  Its
   signature is
 
@@ -141,7 +141,7 @@ Subscribe to receive block headers when a new block is found.
   .. versionchanged:: 1.2
      Optional *raw* parameter added, defaulting to :const:`false`.
   .. versionchanged:: 1.3
-     *raw* parameter deafults to :const:`true`.
+     *raw* parameter defaults to :const:`true`.
   .. versionchanged:: 1.4
      *raw* parameter removed; responses and notifications pass raw
      headers.
@@ -191,7 +191,7 @@ Subscribe to receive block headers when a new block is found.
 
 **Notifications**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when a new block is found.  The notification's signature is:
 
     .. blockchain.headers.subscribe(header)
@@ -227,7 +227,7 @@ Subscribe to receive the block height when a new block is found.
 
 **Notifications**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when a new block is found.  The notification's signature is:
 
     .. function:: blockchain.numblocks.subscribe(height)

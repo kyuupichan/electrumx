@@ -15,7 +15,7 @@ small - pull requests are welcome.
 ================ ========================
 Package          Notes
 ================ ========================
-Python3          ElectrumX uses asyncio.  Python version >= 3.6 is
+Python3          ElectrumX uses asyncio.  Python version >= 3.7 is
                  **required**.
 `aiohttp`_       Python library for asynchronous HTTP.  Version >=
                  2.0 required.
@@ -51,11 +51,11 @@ used to either.
 When building the database from the genesis block, ElectrumX has to
 flush large quantities of data to disk and its DB.  You will have a
 better experience if the database directory is on an SSD than on an
-HDD.  Currently to around height 447,100 of the Bitcoin blockchain the
+HDD.  Currently to around height 611,600 of the Bitcoin blockchain the
 final size of the leveldb database, and other ElectrumX file metadata
-comes to just over 18.7GB (17.5 GiB).  LevelDB needs a bit more for
+comes to just over 46.9GB (43.7 GiB).  LevelDB needs a bit more for
 brief periods, and the block chain is only getting longer, so I would
-recommend having at least 30-40GB of free space before starting.
+recommend having at least 70-80GB of free space before starting.
 
 Database Engine
 ===============
@@ -208,14 +208,6 @@ Once configured you may want to start ElectrumX at boot::
    :file:`.service` file.
 
 
-Installing Python 3.6 under Ubuntu
-----------------------------------
-
-Many Ubuntu distributions have an incompatible Python version baked
-in.  Because of this, it is easier to install Python 3.6.  See
-`contrib/python3.6/python-3.6.sh`_.
-
-
 Installing on Raspberry Pi 3
 ----------------------------
 
@@ -258,7 +250,7 @@ from heights 363,000 to 378,000 is the most sluggish::
   447,168       2d 13h 20m      9h 47m
 
 *Machine A*: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU,
-8GB RAM and a DragonFlyBSD UFS fileystem on an SSD.  It requests
+8GB RAM and a DragonFlyBSD UFS filesystem on an SSD.  It requests
 blocks over the LAN from a bitcoind on machine B.  :envvar:`DB_CACHE`
 the default of 1,200.  LevelDB.
 
@@ -266,7 +258,7 @@ the default of 1,200.  LevelDB.
 Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on the same
 machine.  :envvar:`DB_CACHE` set to 1,800.  LevelDB.
 
-For chains other than bitcoin-mainnet sychronization should be much
+For chains other than bitcoin-mainnet synchronization should be much
 faster.
 
 .. note:: ElectrumX will not serve normal client connections until it
@@ -435,6 +427,5 @@ You can then set the port as follows and advertise the service externally on the
 .. _`aiohttp`: https://pypi.python.org/pypi/aiohttp
 .. _`pylru`: https://pypi.python.org/pypi/pylru
 .. _`x11_hash`: https://pypi.python.org/pypi/x11_hash
-.. _`contrib/python3.6/python-3.6.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/python3.6/python-3.6.sh
 .. _`contrib/raspberrypi3/install_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/raspberrypi3/install_electrumx.sh
 .. _`contrib/raspberrypi3/run_electrumx.sh`: https://github.com/kyuupichan/electrumx/blob/master/contrib/raspberrypi3/run_electrumx.sh

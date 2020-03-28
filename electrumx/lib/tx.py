@@ -275,28 +275,44 @@ class DeserializerSegWit(Deserializer):
 class DeserializerAuxPow(Deserializer):
     VERSION_AUXPOW = (1 << 8)
 
+    def read_auxpow(self):
+        '''Reads and returns the CAuxPow data'''
+
+        # We first calculate the size of the CAuxPow instance and then
+        # read it as bytes in the final step.
+        start = self.cursor
+
+        self.read_tx()  # AuxPow transaction
+        self.cursor += 32  # Parent block hash
+        merkle_size = self._read_varint()
+        self.cursor += 32 * merkle_size  # Merkle branch
+        self.cursor += 4  # Index
+        merkle_size = self._read_varint()
+        self.cursor += 32 * merkle_size  # Chain merkle branch
+        self.cursor += 4  # Chain index
+        self.cursor += 80  # Parent block header
+
+        end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(end - start)
+
     def read_header(self, static_header_size):
         '''Return the AuxPow block header bytes'''
+
+        # We are going to calculate the block size then read it as bytes
         start = self.cursor
+
         version = self._read_le_uint32()
         if version & self.VERSION_AUXPOW:
-            # We are going to calculate the block size then read it as bytes
             self.cursor = start
             self.cursor += static_header_size  # Block normal header
-            self.read_tx()  # AuxPow transaction
-            self.cursor += 32  # Parent block hash
-            merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size  # Merkle branch
-            self.cursor += 4  # Index
-            merkle_size = self._read_varint()
-            self.cursor += 32 * merkle_size  # Chain merkle branch
-            self.cursor += 4  # Chain index
-            self.cursor += 80  # Parent block header
+            self.read_auxpow()
             header_end = self.cursor
         else:
-            header_end = static_header_size
+            header_end = start + static_header_size
+
         self.cursor = start
-        return self._read_nbytes(header_end)
+        return self._read_nbytes(header_end - start)
 
 
 class DeserializerAuxPowSegWit(DeserializerSegWit, DeserializerAuxPow):
@@ -428,6 +444,82 @@ class DeserializerTxTimeSegWit(DeserializerTxTime):
         locktime = self._read_le_uint32()
         orig_ser += self.binary[start:self.cursor]
         vsize = (3 * base_size + self.binary_length) // 4
+
+        return TxTimeSegWit(
+            version, time, marker, flag, inputs, outputs, witness, locktime),\
+            self.TX_HASH_FN(orig_ser), vsize
+
+    def read_tx(self):
+        return self._read_tx_parts()[0]
+
+    def read_tx_and_hash(self):
+        tx, tx_hash, vsize = self._read_tx_parts()
+        return tx, tx_hash
+
+    def read_tx_and_vsize(self):
+        tx, tx_hash, vsize = self._read_tx_parts()
+        return tx, vsize
+
+
+class DeserializerTxTimeSegWitNavCoin(DeserializerTxTime):
+    def _read_witness(self, fields):
+        read_witness_field = self._read_witness_field
+        return [read_witness_field() for _ in range(fields)]
+
+    def _read_witness_field(self):
+        read_varbytes = self._read_varbytes
+        return [read_varbytes() for _ in range(self._read_varint())]
+
+    def read_tx_no_segwit(self):
+        version = self._read_le_int32()
+        time = self._read_le_uint32()
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        strDZeel = ""
+        if version >= 2:
+            strDZeel = self._read_varbytes()
+        return TxTime(
+            version,
+            time,
+            inputs,
+            outputs,
+            locktime
+        )
+
+    def _read_tx_parts(self):
+        '''Return a (deserialized TX, tx_hash, vsize) tuple.'''
+        start = self.cursor
+        marker = self.binary[self.cursor + 8]
+        if marker:
+            tx = self.read_tx_no_segwit()
+            tx_hash = self.TX_HASH_FN(self.binary[start:self.cursor])
+            return tx, tx_hash, self.binary_length
+
+        version = self._read_le_int32()
+        time = self._read_le_uint32()
+        orig_ser = self.binary[start:self.cursor]
+
+        marker = self._read_byte()
+        flag = self._read_byte()
+
+        start = self.cursor
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        orig_ser += self.binary[start:self.cursor]
+
+        base_size = self.cursor - start
+        witness = self._read_witness(len(inputs))
+
+        start = self.cursor
+        locktime = self._read_le_uint32()
+        strDZeel = ""
+
+        if version >= 2:
+            strDZeel = self._read_varbytes()
+
+        vsize = (3 * base_size + self.binary_length) // 4
+        orig_ser += self.binary[start:self.cursor]
 
         return TxTimeSegWit(
             version, time, marker, flag, inputs, outputs, witness, locktime),\
@@ -918,3 +1010,63 @@ class DeserializerZcoin(Deserializer):
             )
 
         return tx_input
+
+
+class DeserializerXaya(DeserializerSegWit, DeserializerAuxPow):
+    """Deserializer class for the Xaya network
+
+    The main difference to other networks is the changed format of the
+    block header with "triple purpose mining", see
+    https://github.com/xaya/xaya/blob/master/doc/xaya/mining.md.
+
+    This builds upon classic auxpow, but has a modified serialisation format
+    that we have to implement here."""
+
+    MM_FLAG = 0x80
+
+    def read_header(self, static_header_size):
+        """Reads in the full block header (including PoW data)"""
+
+        # We first calculate the dynamic size of the block header, and then
+        # read in all the data in the final step.
+        start = self.cursor
+
+        self.cursor += static_header_size  # Normal block header
+
+        algo = self._read_byte()
+        self._read_le_uint32()  # nBits
+
+        if algo & self.MM_FLAG:
+            self.read_auxpow()
+        else:
+            self.cursor += static_header_size  # Fake header
+
+        end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(end - start)
+
+
+class DeserializerSimplicity(Deserializer):
+    SIMPLICITY_TX_VERSION = 3
+
+    def _get_version(self):
+        result, = unpack_le_int32_from(self.binary, self.cursor)
+        return result
+
+    def read_tx(self):
+        version = self._get_version()
+        if version < self.SIMPLICITY_TX_VERSION:
+            return TxTime(
+                self._read_le_int32(),   # version
+                self._read_le_uint32(),  # time
+                self._read_inputs(),     # inputs
+                self._read_outputs(),    # outputs
+                self._read_le_uint32(),  # locktime
+            )
+        else:
+            return Tx(
+                self._read_le_int32(),  # version
+                self._read_inputs(),    # inputs
+                self._read_outputs(),   # outputs
+                self._read_le_uint32()  # locktime
+            )

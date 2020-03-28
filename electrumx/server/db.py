@@ -1,4 +1,4 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2020, Neil Booth
 # Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
@@ -16,7 +16,7 @@ import time
 from bisect import bisect_right
 from collections import namedtuple
 from glob import glob
-from struct import pack, unpack
+from struct import Struct
 
 import attr
 from aiorpcx import run_in_thread, sleep
@@ -24,7 +24,10 @@ from aiorpcx import run_in_thread, sleep
 import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
-from electrumx.lib.util import formatted_time
+from electrumx.lib.util import (
+    formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint64, pack_le_uint32,
+    unpack_le_uint32, unpack_be_uint32, unpack_le_uint64
+)
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
@@ -52,7 +55,7 @@ class DB(object):
     it was shutdown uncleanly.
     '''
 
-    DB_VERSIONS = [6]
+    DB_VERSIONS = [6, 7, 8]
 
     class DBError(Exception):
         '''Raised on general DB errors generally indicating corruption.'''
@@ -107,10 +110,10 @@ class DB(object):
             return
         # tx_counts[N] has the cumulative number of txs at the end of
         # height N.  So tx_counts[0] is 1 - the genesis coinbase
-        size = (self.db_height + 1) * 4
+        size = (self.db_height + 1) * 8
         tx_counts = self.tx_counts_file.read(0, size)
         assert len(tx_counts) == size
-        self.tx_counts = array.array('I', tx_counts)
+        self.tx_counts = array.array('Q', tx_counts)
         if self.tx_counts:
             assert self.db_tx_count == self.tx_counts[-1]
         else:
@@ -297,8 +300,8 @@ class DB(object):
         batch_put = batch.put
         for key, value in flush_data.adds.items():
             # suffix = tx_idx + tx_num
-            hashX = value[:-12]
-            suffix = key[-2:] + value[-12:-8]
+            hashX = value[:-13]
+            suffix = key[-4:] + value[-13:-8]
             batch_put(b'h' + key[:4] + suffix, hashX)
             batch_put(b'u' + hashX + suffix, value[-8:])
         flush_data.adds.clear()
@@ -358,7 +361,7 @@ class DB(object):
         offsets = []
         for h in headers:
             offset += len(h)
-            offsets.append(pack("<Q", offset))
+            offsets.append(pack_le_uint64(offset))
         # For each header we get the offset of the next header, hence we
         # start writing from the next height
         pos = (height_start + 1) * 8
@@ -366,7 +369,7 @@ class DB(object):
 
     def dynamic_header_offset(self, height):
         assert not self.coin.STATIC_BLOCK_HEADERS
-        offset, = unpack('<Q', self.headers_offsets_file.read(height * 8, 8))
+        offset, = unpack_le_uint64(self.headers_offsets_file.read(height * 8, 8))
         return offset
 
     def dynamic_header_len(self, height):
@@ -483,7 +486,7 @@ class DB(object):
 
     def undo_key(self, height):
         '''DB key for undo information at the given height.'''
-        return b'U' + pack('>I', height)
+        return b'U' + pack_be_uint32(height)
 
     def read_undo_info(self, height):
         '''Read undo information from a file for the current height.'''
@@ -523,7 +526,7 @@ class DB(object):
         min_height = self.min_undo_height(self.db_height)
         keys = []
         for key, _hist in self.utxo_db.iterator(prefix=prefix):
-            height, = unpack('>I', key[-4:])
+            height, = unpack_be_uint32(key[-4:])
             if height >= min_height:
                 break
             keys.append(key)
@@ -588,8 +591,12 @@ class DB(object):
         self.fs_tx_count = self.db_tx_count
         self.last_flush_tx_count = self.fs_tx_count
 
+        # Upgrade DB
+        if self.db_version != max(self.DB_VERSIONS):
+            self.upgrade_db()
+
         # Log some stats
-        self.logger.info('DB version: {:d}'.format(self.db_version))
+        self.logger.info('UTXO DB version: {:d}'.format(self.db_version))
         self.logger.info('coin: {}'.format(self.coin.NAME))
         self.logger.info('network: {}'.format(self.coin.NET))
         self.logger.info('height: {:,d}'.format(self.db_height))
@@ -600,6 +607,90 @@ class DB(object):
         if self.first_sync:
             self.logger.info('sync time so far: {}'
                              .format(util.formatted_time(self.wall_time)))
+
+    def upgrade_db(self):
+        self.logger.info(f'UTXO DB version: {self.db_version}')
+        self.logger.info('Upgrading your DB; this can take some time...')
+
+        def upgrade_u_prefix(prefix):
+            count = 0
+            with self.utxo_db.write_batch() as batch:
+                batch_delete = batch.delete
+                batch_put = batch.put
+                # Key: b'u' + address_hashX + tx_idx + tx_num
+                for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                    if len(db_key) == 21:
+                        return
+                    break
+                if self.db_version == 6:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key[:14] + b'\0\0' + db_key[14:] + b'\0', db_value)
+                else:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key + b'\0', db_value)
+            return count
+
+        last = time.time()
+        count = 0
+        for cursor in range(65536):
+            prefix = b'u' + pack_be_uint16(cursor)
+            count += upgrade_u_prefix(prefix)
+            now = time.time()
+            if now > last + 10:
+                last = now
+                self.logger.info(f'DB 1 of 3: {count:,d} entries updated, '
+                                 f'{cursor * 100 / 65536:.1f}% complete')
+        self.logger.info('DB 1 of 3 upgraded successfully')
+
+        def upgrade_h_prefix(prefix):
+            count = 0
+            with self.utxo_db.write_batch() as batch:
+                batch_delete = batch.delete
+                batch_put = batch.put
+                # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
+                for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                    if len(db_key) == 14:
+                        return
+                    break
+                if self.db_version == 6:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key[:7] + b'\0\0' + db_key[7:] + b'\0', db_value)
+                else:
+                    for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                        count += 1
+                        batch_delete(db_key)
+                        batch_put(db_key + b'\0', db_value)
+            return count
+
+        last = time.time()
+        count = 0
+        for cursor in range(65536):
+            prefix = b'h' + pack_be_uint16(cursor)
+            count += upgrade_h_prefix(prefix)
+            now = time.time()
+            if now > last + 10:
+                last = now
+                self.logger.info(f'DB 2 of 3: {count:,d} entries updated, '
+                                 f'{cursor * 100 / 65536:.1f}% complete')
+
+        # Upgrade tx_counts file
+        size = (self.db_height + 1) * 8
+        tx_counts = self.tx_counts_file.read(0, size)
+        if len(tx_counts) == (self.db_height + 1) * 4:
+            tx_counts = array.array('I', tx_counts)
+            tx_counts = array.array('Q', tx_counts)
+            self.tx_counts_file.write(0, tx_counts.tobytes())
+
+        self.db_version = max(self.DB_VERSIONS)
+        with self.utxo_db.write_batch() as batch:
+            self.write_utxo_state(batch)
+        self.logger.info('DB 2 of 3 upgraded successfully')
 
     def write_utxo_state(self, batch):
         '''Write (UTXO) state to the batch.'''
@@ -625,13 +716,13 @@ class DB(object):
         def read_utxos():
             utxos = []
             utxos_append = utxos.append
-            s_unpack = unpack
             # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
-                tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
-                value, = unpack('<Q', db_value)
+                tx_pos, = unpack_le_uint32(db_key[-9:-5])
+                tx_num, = unpack_le_uint64(db_key[-5:] + bytes(3))
+                value, = unpack_le_uint64(db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
             return utxos
@@ -655,7 +746,7 @@ class DB(object):
             for each prevout.
             '''
             def lookup_hashX(tx_hash, tx_idx):
-                idx_packed = pack('<H', tx_idx)
+                idx_packed = pack_le_uint32(tx_idx)
 
                 # Key: b'h' + compressed_tx_hash + tx_idx + tx_num
                 # Value: hashX
@@ -663,8 +754,8 @@ class DB(object):
 
                 # Find which entry, if any, the TX_HASH matches.
                 for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
-                    tx_num_packed = db_key[-4:]
-                    tx_num, = unpack('<I', tx_num_packed)
+                    tx_num_packed = db_key[-5:]
+                    tx_num, = unpack_le_uint64(tx_num_packed + bytes(3))
                     hash, _height = self.fs_tx_hash(tx_num)
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed
@@ -686,7 +777,7 @@ class DB(object):
                     # This can happen if the DB was updated between
                     # getting the hashXs and getting the UTXOs
                     return None
-                value, = unpack('<Q', db_value)
+                value, = unpack_le_uint64(db_value)
                 return hashX, value
             return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 

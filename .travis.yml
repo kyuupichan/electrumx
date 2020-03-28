@@ -7,8 +7,6 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -yq libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev liblz4-dev librocksdb-dev libleveldb-dev
 python:
-  - "3.6"
-  - "3.6-dev"
   - "3.7-dev"
   - "nightly"
 # command to install dependencies
@@ -24,7 +22,7 @@ install:
   - pip install pytest-cov
   - pip install Sphinx
 # hashes
-  - pip install tribus-hash
+  - pip install git+https://github.com/carsenk/tribus-hash
   - pip install blake256
   - pip install scrypt
   - pip install x11_hash
@@ -37,6 +35,8 @@ install:
   - pip install pycryptodomex
   - pip install git+https://github.com/Electra-project/nist5_hash
   - pip install git+https://github.com/RitoProject/x21s_hash
+  - pip install git+https://github.com/traysi/x16rv2_hash
+  - pip install git+https://github.com/VerusCoin/verushashpy
   - pip install bell-yespower
   - pip install cpupower
 # command to run tests
@@ -46,7 +46,7 @@ script:
   - sh -c "cd docs && make html"
 # Dont report coverage from nightly
 after_success:
-  - if [[ $(python3 -V 2>&1) == *"Python 3.6"* ]]; then
+  - if [[ $(python3 -V 2>&1) == *"Python 3.7"* ]]; then
       pip install python-coveralls;
       coveralls;
     fi

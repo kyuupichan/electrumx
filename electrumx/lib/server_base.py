@@ -71,7 +71,6 @@ class ServerBase:
 
         Setting the event also shuts down the server.
         '''
-        shutdown_event.set()
 
     def on_exception(self, loop, context):
         '''Suppress spurious messages it appears we cannot control.'''
@@ -82,7 +81,7 @@ class ServerBase:
             return
         loop.default_exception_handler(context)
 
-    async def _main(self, loop):
+    async def run(self):
         '''Run the server application:
 
         - record start time
@@ -94,7 +93,16 @@ class ServerBase:
             shutdown_event.set()
             self.logger.warning(f'received {signame} signal, initiating shutdown')
 
+        async def serve():
+            try:
+                await self.serve(shutdown_event)
+            finally:
+                shutdown_event.set()
+
         self.start_time = time.time()
+        loop = asyncio.get_event_loop()
+        shutdown_event = asyncio.Event()
+
         if platform.system() != 'Windows':
             # No signals on Windows
             for signame in ('SIGINT', 'SIGTERM'):
@@ -102,26 +110,18 @@ class ServerBase:
                                         partial(on_signal, signame))
         loop.set_exception_handler(self.on_exception)
 
-        shutdown_event = asyncio.Event()
-        server_task = await spawn(self.serve(shutdown_event))
-
-        # Wait for shutdown, log on receipt of the event
+        # Start serving and wait for shutdown, log receipt of the event
+        server_task = await spawn(serve, report_crash=False)
         try:
             await shutdown_event.wait()
         except KeyboardInterrupt:
-            self.logger.warning(f'received keyboard interrupt, initiating shutdown')
-        finally:
-            self.logger.info('shutting down')
+            self.logger.warning('received keyboard interrupt, initiating shutdown')
 
-            server_task.cancel()
-            with suppress(Exception):
-                await server_task
-            self.logger.info('shutdown complete')
+        self.logger.info('shutting down')
 
-    def run(self):
-        '''Start the event loop.'''
-        loop = asyncio.get_event_loop()
+        server_task.cancel()
         try:
-            loop.run_until_complete(self._main(loop))
+            with suppress(asyncio.CancelledError):
+                await server_task
         finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
+            self.logger.info('shutdown complete')

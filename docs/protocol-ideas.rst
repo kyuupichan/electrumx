@@ -106,7 +106,7 @@ hashes>`.
 
   * *history*
 
-    A list ot transactions.  Each transaction is itself a list of
+    A list of transactions.  Each transaction is itself a list of
     two elements:
 
       1. The block height
