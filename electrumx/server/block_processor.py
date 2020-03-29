@@ -12,7 +12,7 @@
 import asyncio
 import time
 
-from aiorpcx import TaskGroup, run_in_thread
+from aiorpcx import TaskGroup, run_in_thread, CancelledError
 
 import electrumx
 from electrumx.server.daemon import DaemonError
@@ -680,8 +680,9 @@ class BlockProcessor(object):
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_prefetched_blocks())
-        finally:
-            # Shut down block processing
+        # Don't flush for arbitrary exceptions as they might be a cause or consequence of
+        # corrupted data
+        except CancelledError:
             self.logger.info('flushing to DB for a clean shutdown...')
             await self.flush(True)
 
