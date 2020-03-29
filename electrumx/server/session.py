@@ -126,6 +126,7 @@ class SessionManager:
         self.txs_sent = 0
         self.start_time = time.time()
         self._method_counts = defaultdict(int)
+        self._reorg_count = 0
         self._history_cache = pylru.lrucache(1000)
         self._history_lookups = 0
         self._history_hits = 0
@@ -257,6 +258,7 @@ class SessionManager:
         while True:
             await self.bp.backed_up_event.wait()
             self.logger.info(f'reorg signalled; clearing tx_hashes and merkle caches')
+            self._reorg_count += 1
             self._tx_hashes_cache.clear()
             self._merkle_cache.clear()
 
@@ -694,10 +696,15 @@ class SessionManager:
             self._tx_hashes_hits += 1
             return tx_hashes, 0.1
 
-        try:
-            tx_hashes = await self.db.tx_hashes_at_blockheight(height)
-        except self.db.DBError as e:
-            raise RPCError(BAD_REQUEST, f'db error: {e!r}')
+        # Ensure the tx_hashes are fresh before placing in the cache
+        while True:
+            reorg_count = self._reorg_count
+            try:
+                tx_hashes = await self.db.tx_hashes_at_blockheight(height)
+            except self.db.DBError as e:
+                raise RPCError(BAD_REQUEST, f'db error: {e!r}')
+            if reorg_count == self._reorg_count:
+                break
 
         self._tx_hashes_cache[height] = tx_hashes
 
