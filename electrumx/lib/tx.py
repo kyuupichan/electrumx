@@ -1070,3 +1070,228 @@ class DeserializerSimplicity(Deserializer):
                 self._read_outputs(),   # outputs
                 self._read_le_uint32()  # locktime
             )
+
+
+class DeserializerAccumulatorCheckpoint(Deserializer):
+    def read_header(self, height, static_header_size):
+        '''Return the block header bytes'''
+        start = self.cursor
+        version = self._read_le_uint32()
+        # We are going to calculate the block size then read it as bytes
+        header_end = start + static_header_size
+        if version >= 4:
+            header_end += 32  # AccumulatorCheckpoint
+        self.cursor = start
+        return self._read_nbytes(header_end)
+
+
+class DeserializerGridcoin(Deserializer):
+    def read_tx(self):
+        version = self._read_le_int32()
+        time = self._read_le_uint32()
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        # Skip some extra tx data that we don't need for indexing
+        boinc_size = self._read_varint()
+        self.cursor += boinc_size
+
+        return TxTime(
+            version,
+            time,
+            inputs,
+            outputs,
+            locktime
+        )
+
+
+class TxZeroVin(namedtuple("Tx", "version inputs outputs locktime")):
+    '''Class representing a generic transaction that could have 0 inputs'''
+
+
+class DeserializerGeneric(Deserializer):
+    def read_tx(self):
+        version = self._read_le_int32()
+        self.parse_post_version(version)
+        inputs = self._read_inputs()
+        outputs = self._read_outputs()
+        locktime = self._read_le_uint32()
+        self.parse_post_locktime(version)
+
+        return TxZeroVin(
+            version,
+            inputs,
+            outputs,
+            locktime
+        )
+
+    def parse_post_version(self, version):
+        pass
+
+    def parse_post_locktime(self, version):
+        pass
+
+
+class DeserializerGenericSegWit(DeserializerSegWit):
+    TX_CLASS = Tx
+
+    def _read_tx_parts(self):
+        start = self.cursor
+        version = self._read_le_int32()
+        self.parse_post_version(version)
+        orig_ser = self.binary[start:self.cursor]
+
+        start = self.cursor
+        inputs = self._read_inputs()
+        flags = 0
+        if len(inputs) == 0:
+            flags = self._read_byte()
+            assert flags != 0
+            start = self.cursor
+            inputs = self._read_inputs()
+            outputs = self._read_outputs()
+        else:
+            outputs = self._read_outputs()
+        orig_ser += self.binary[start:self.cursor]
+
+        if flags & 1 != 0:
+            flags ^= 1
+            # Witness is not needed for indexing
+            self._read_witness(len(inputs))
+        assert flags == 0
+
+        start = self.cursor
+        locktime = self._read_le_uint32()
+        self.parse_post_locktime(version)
+        orig_ser += self.binary[start:self.cursor]
+        vsize = (3 * len(orig_ser) + self.binary_length) // 4
+
+        return type(self).TX_CLASS(
+            version,
+            inputs,
+            outputs,
+            locktime
+        ), self.TX_HASH_FN(orig_ser), vsize
+
+    def parse_post_version(self, version):
+        pass
+
+    def parse_post_locktime(self, version):
+        pass
+
+
+class DeserializerNavcoin(DeserializerGenericSegWit):
+    def parse_post_version(self, version):
+        self.cursor += 4  # time
+
+    def parse_post_locktime(self, version):
+        if version >= 2:
+            extra_data = self._read_varint()
+            self.cursor += extra_data
+
+
+class DeserializerAccumulatorCheckpoint(DeserializerGenericSegWit):
+    def parse_post_locktime(self, version):
+        if version > 3:
+            self.cursor += 4
+
+
+class DeserializerPotcoin(DeserializerGenericSegWit):
+    def parse_post_locktime(self, version):
+        if version > 3:
+            self.cursor += 4
+
+
+class DeserializerClams(DeserializerGenericSegWit):
+    def parse_post_version(self, version):
+        self.cursor += 4  # time
+
+    def parse_post_locktime(self, version):
+        if version > 1:
+            extra_data = self._read_varint()  # CLAMSpeech
+            self.cursor += extra_data
+
+
+class DeserializerSolarcoin(DeserializerGenericSegWit):
+    def parse_post_version(self, version):
+        if version >= 4:
+            self.cursor += 4  # time
+
+    def parse_post_locktime(self, version):
+        if version > 1:
+            extra_data = self._read_varint()  # TxComment
+            self.cursor += extra_data
+
+
+class DeserializerVpn(DeserializerGeneric):
+    def parse_post_version(self, version):
+        self.cursor += 4  # time
+
+    def parse_post_locktime(self, version):
+        extra_data = self._read_varint()  # vpndata
+        self.cursor += extra_data
+
+
+class DeserializerSyscoin(DeserializerAuxPow, DeserializerSegWit):
+    pass
+
+
+class DeserializerHorizen(DeserializerEquihash):
+    OP_CHECKBLOCKATHEIGHT = OpCodes.OP_NOP5
+
+    def _read_output(self):
+        value = self._read_le_int64()
+        script = self.remove_replay_protection(self._read_varbytes())
+
+        return TxOutput(
+            value,
+            script
+        )
+
+    def remove_replay_protection(self, script):
+        try:
+            ops = Script.get_ops(script)
+            if ops[-1] == self.OP_CHECKBLOCKATHEIGHT:
+                blk = ops[-3]  # block hash
+                if isinstance(blk, tuple) and blk[0] == 32:
+                    rp_idx = script.index(blk[1]) - 1  # include the push op
+                    return script[:rp_idx]  # strip replay protection data
+        except Exception:
+            pass
+        return script
+
+    def read_tx(self):
+        version = self._read_le_int32()  # can be negative for Groth txs
+        base_tx = TxJoinSplit(
+            version,
+            self._read_inputs(),    # inputs
+            self._read_outputs(),   # outputs
+            self._read_le_uint32()  # locktime
+        )
+        if version >= 2 or version == -3:
+            joinsplit_size = self._read_varint()
+            if joinsplit_size > 0:
+                is_groth = version == -3
+                joinsplit_desc_len = 1506 + (192 if is_groth else 296)
+                # JSDescription
+                self.cursor += joinsplit_size * joinsplit_desc_len
+                self.cursor += 32  # joinSplitPubKey
+                self.cursor += 64  # joinSplitSig
+
+        return base_tx
+
+
+class TxNubits(namedtuple("Tx", "version time inputs outputs locktime type")):
+    '''Class representing a NuBits transaction.'''
+
+
+class DeserializerNubits(Deserializer):
+    def read_tx(self):
+        return TxNubits(
+            self._read_le_int32(),   # version
+            self._read_le_uint32(),  # time
+            self._read_inputs(),     # inputs
+            self._read_outputs(),    # outputs
+            self._read_le_uint32(),  # locktime
+            self._read_byte()        # type
+        )
