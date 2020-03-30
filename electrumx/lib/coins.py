@@ -3793,3 +3793,787 @@ class Quebecoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 20
     REORG_LIMIT = 2000
     RPC_PORT = 10890
+
+
+class GoByte(Coin):
+    NAME = "GoByte"
+    SHORTNAME = "GBX"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    GENESIS_HASH = ('0000033b01055cf8df90b01a14734cae'
+                    '92f7039b9b0e48887b4e33a469d7bc07')
+    P2PKH_VERBYTE = bytes.fromhex("26")
+    P2SH_VERBYTES = [bytes.fromhex("0A")]
+    WIF_BYTE = bytes.fromhex("C6")
+    TX_COUNT_HEIGHT = 115890
+    TX_COUNT = 245030
+    TX_PER_BLOCK = 4
+    RPC_PORT = 12454
+    PEERS = [
+        'electrum1-gbx.polispay.org',
+        'electrum2-gbx.polispay.org'
+    ]
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
+
+
+class Verge(Coin):
+    NAME = "Verge"
+    SHORTNAME = "XVG"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1E")
+    P2SH_VERBYTES = [bytes.fromhex("21")]
+    WIF_BYTE = bytes.fromhex("9E")
+    GENESIS_HASH = ('00000fc63692467faeb20cdb3b53200d'
+                    'c601d75bdfa1001463304cc790d77278')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+
+    TX_COUNT = 1788355
+    TX_COUNT_HEIGHT = 1253018
+    TX_PER_BLOCK = 2
+    RPC_PORT = 20102
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+        return cls.HEADER_HASH(header)
+
+
+class Gridcoin(Coin):
+    NAME = "Gridcoin"
+    SHORTNAME = "GRC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3E")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("BE")
+    GENESIS_HASH = ('000005a247b397eadfefa58e872bc967'
+                    'c2614797bdc8d4d0e6b09fea5c191599')
+    DESERIALIZER = lib_tx.DeserializerGridcoin
+    DAEMON = daemon.LegacyRPCDaemon
+    ALLOW_ADVANCING_ERRORS = True
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 15715
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Lbry(Coin):
+    NAME = "LBRY"
+    SHORTNAME = "LBC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("019C354f")
+    XPRV_VERBYTES = bytes.fromhex("019C3118")
+    P2PKH_VERBYTE = bytes.fromhex("55")
+    P2SH_VERBYTES = [bytes.fromhex("7a")]
+    WIF_BYTE = bytes.fromhex("1c")
+    GENESIS_HASH = ('9c89283ba0f3227f6c03b70216b9f665'
+                    'f0118d5e0fa729cedf4fb34d6a34f463')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    BASIC_HEADER_SIZE = 112
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9245
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def genesis_block(cls, block):
+        header = cls.block_header(block, 0)
+        header_hex_hash = hash_to_hex_str(cls.header_hash(header))
+        if header_hex_hash != cls.GENESIS_HASH:
+            raise CoinError('genesis block has hash {} expected {}'
+                            .format(header_hex_hash, cls.GENESIS_HASH))
+
+        return block
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[100:112])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce,
+        }
+
+
+class Lbry(Coin):
+    NAME = "LBRY"
+    SHORTNAME = "LBC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("019C354f")
+    XPRV_VERBYTES = bytes.fromhex("019C3118")
+    P2PKH_VERBYTE = bytes.fromhex("55")
+    P2SH_VERBYTES = [bytes.fromhex("7a")]
+    WIF_BYTE = bytes.fromhex("1c")
+    GENESIS_HASH = ('9c89283ba0f3227f6c03b70216b9f665'
+                    'f0118d5e0fa729cedf4fb34d6a34f463')
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    BASIC_HEADER_SIZE = 112
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9245
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def genesis_block(cls, block):
+        header = cls.block_header(block, 0)
+        header_hex_hash = hash_to_hex_str(cls.header_hash(header))
+        if header_hex_hash != cls.GENESIS_HASH:
+            raise CoinError('genesis block has hash {} expected {}'
+                            .format(header_hex_hash, cls.GENESIS_HASH))
+
+        return block
+
+    @classmethod
+    def electrum_header(cls, header, height):
+        version, = struct.unpack('<I', header[:4])
+        timestamp, bits, nonce = struct.unpack('<III', header[100:112])
+
+        return {
+            'block_height': height,
+            'version': version,
+            'prev_block_hash': hash_to_hex_str(header[4:36]),
+            'merkle_root': hash_to_hex_str(header[36:68]),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce,
+        }
+
+
+class Insane(Coin):
+    NAME = "Insane"
+    SHORTNAME = "INSN"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("66")
+    P2SH_VERBYTES = [bytes.fromhex("39")]
+    WIF_BYTE = bytes.fromhex("37")
+    GENESIS_HASH = ('00001f66cb3ba8f5776cb750d621cb33'
+                    '90200580cc39f076b3f61efcf191fba0')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 10257
+    REORG_LIMIT = 5000
+
+    HEADER_HASH_X11 = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH_X11 is None:
+            import x11_hash
+            cls.HEADER_HASH_X11 = x11_hash.getPoWHash
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH_X11(header)
+
+
+class Ultimatesecurecash(Coin):
+    NAME = "UltimateSecureCash"
+    SHORTNAME = "UCS"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("EE80286A")
+    XPRV_VERBYTES = bytes.fromhex("EE8031E8")
+    P2PKH_VERBYTE = bytes.fromhex("44")
+    P2SH_VERBYTES = [bytes.fromhex("7D")]
+    WIF_BYTE = bytes.fromhex("bf")
+    GENESIS_HASH = ('00000438d60fb1a01a92a141f86d3675'
+                    '89fd6190727d246ad24ac4119d3e6691')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9278
+    REORG_LIMIT = 5000
+    DAEMON = daemon.LegacyRPCDaemon
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Pinkcoin(Coin):
+    NAME = "Pinkcoin"
+    SHORTNAME = "PINK"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("03")
+    P2SH_VERBYTES = [bytes.fromhex("1c")]
+    WIF_BYTE = bytes.fromhex("83")
+    GENESIS_HASH = ('00000f79b700e6444665c4d090c9b883'
+                    '3664c4e2597c7087a6ba6391b956cc89')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9384
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+        return cls.HEADER_HASH(header)
+
+
+class Putincoin(Coin):
+    NAME = "Putincoin"
+    SHORTNAME = "PUT"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("14")]
+    WIF_BYTE = bytes.fromhex("b7")
+    GENESIS_HASH = ('000002533dfcd597bfb748a6e87f2e6a'
+                    '0b3e50b662e2301e9d338f5d24520829')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9389
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+        return cls.HEADER_HASH(header)
+
+
+class Britcoin(Coin):
+    NAME = "Britcoin"
+    SHORTNAME = "BRIT"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('00000c2cafe160374ffe5b516a2d2c83'
+                    'd7d13cf4e910dee00dd4fc2f7fa9c7cf')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9198
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        import x13_hash
+        return x13_hash.getPoWHash(header)
+
+
+class Potcoin(Coin):
+    NAME = "Potcoin"
+    SHORTNAME = "POT"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("b7")
+    GENESIS_HASH = ('de36b0cb2a9c7d1d7ac0174d0a89918f'
+                    '874fabcf5f9741dd52cd6d04ee1335ec')
+    DESERIALIZER = lib_tx.DeserializerPotcoin
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 42000
+    REORG_LIMIT = 5000
+
+
+class Okcash(Coin):
+    NAME = "OKCash"
+    SHORTNAME = "OK"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("37")
+    P2SH_VERBYTES = [bytes.fromhex("1c")]
+    GENESIS_HASH = ('0000046309984501e5e724498cddb4af'
+                    'f41a126927355f64b44f1b8bba4f447e')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    ALLOW_ADVANCING_ERRORS = True
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9401
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Rubycoin(Coin):
+    NAME = "rubycoin"
+    SHORTNAME = "RBY"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3c")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("bc")
+    GENESIS_HASH = ('00000760e24f1ad47f7a6e912bc9ed2b'
+                    '9ce013fc85ba217da8b079762f6b0058')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9407
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Novacoin(Coin):
+    NAME = "novacoin"
+    SHORTNAME = "NVC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("08")
+    P2SH_VERBYTES = [bytes.fromhex("14")]
+    WIF_BYTE = bytes.fromhex("88")
+    GENESIS_HASH = ('00000a060336cbb72fe969666d337b87'
+                    '198b1add2abaa59cca226820b32933a4')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9409
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+        return cls.HEADER_HASH(header)
+
+
+class Clubcoin(Coin):
+    NAME = "clubcoin"
+    SHORTNAME = "CLUB"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1c")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('000001768b08da66b92dede0ea8e7dcb'
+                    '97424f93d7ac2ac59e7a6cf98f20615a')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9411
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Clams(Coin):
+    NAME = "clams"
+    SHORTNAME = "CLAM"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("89")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("bd")
+    GENESIS_HASH = ('00000c3ce6b3d823a35224a39798eca9'
+                    'ad889966aeb5a9da7b960ffb9869db35')
+    DESERIALIZER = lib_tx.DeserializerClams
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 1234
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Vpncoin(Coin):
+    NAME = "vpncoin"
+    SHORTNAME = "VASH"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("47")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("C7")
+    GENESIS_HASH = ('00000ac7d764e7119da60d3c832b1d44'
+                    '58da9bc9ef9d5dd0d91a15f690a46d99')
+    DESERIALIZER = lib_tx.DeserializerVpn
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 1234
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+
+        version, = struct.unpack('<I', header[:4])
+        if version > 6:
+            return super().header_hash(header)
+        else:
+            return cls.HEADER_HASH(header)
+
+
+class Diamond(Coin):
+    NAME = "Diamond"
+    SHORTNAME = "DMD"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("5a")
+    P2SH_VERBYTES = [bytes.fromhex("08")]
+    WIF_BYTE = bytes.fromhex("da")
+    GENESIS_HASH = ('0000029b550c0095513d9bb9dd14f884'
+                    '42573baca94d70e49018a510979c0f9b')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9499
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+
+    @classmethod
+    def header_hash(cls, header):
+        import quark_hash
+        return quark_hash.getPoWHash(header)
+
+
+class Toacoin(Coin):
+    NAME = "Toacoin"
+    SHORTNAME = "TOA"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("41")
+    P2SH_VERBYTES = [bytes.fromhex("17")]
+    WIF_BYTE = bytes.fromhex("c1")
+    GENESIS_HASH = ('000006cb2d081254e84a103ab457c64f'
+                    '8d8bf01c52fa00e5a3cefc5986bb167b')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    ALLOW_ADVANCING_ERRORS = True
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 42000
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        if cls.HEADER_HASH is None:
+            import scrypt
+            cls.HEADER_HASH = lambda x: scrypt.hash(x, x, 1024, 1, 1, 32)
+        return cls.HEADER_HASH(header)
+
+
+class Nushares(Coin):
+    NAME = "Nushares"
+    SHORTNAME = "NSR"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("3f")
+    P2SH_VERBYTES = [bytes.fromhex("40")]
+    WIF_BYTE = bytes.fromhex("95")
+    GENESIS_HASH = ('000003cc2da5a0a289ad0a590c20a8b9'
+                    '75219ddc1204efd169e947dd4cbad73f')
+    DESERIALIZER = lib_tx.DeserializerNubits
+    DAEMON = daemon.LegacyRPCDaemon
+    TO_PARK_OPS = [OpCodes.OP_RETURN, OpCodes.OP_3, -1, -1]
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 14002
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def block(cls, raw_block, height):
+        if height > 0:
+            return super().block(raw_block, height)
+        else:
+            return Block(raw_block, cls.block_header(raw_block, height), [])
+
+    @classmethod
+    def hashX_from_script(cls, script):
+        if script and script[0] == OP_RETURN:
+            try:
+                ops = Script.get_ops(script)
+            except ScriptError:
+                return None
+            else:
+                # Check if park script
+                is_park = _match_ops(ops, cls.TO_PARK_OPS)
+                if not is_park:
+                    return None
+        return sha256(script).digest()[:HASHX_LEN]
+
+    @classmethod
+    def address_from_script(cls, script):
+        try:
+            ops = Script.get_ops(script)
+        except ScriptError:
+            return cls.address_handlers.unspendable()
+        else:
+            if _match_ops(ops, cls.TO_PARK_OPS):
+                return cls.address_handlers.strange(script)
+            else:
+                return ScriptPubKey.pay_to(cls.address_handlers, script)
+
+
+class Nubits(Nushares):
+    NAME = "Nubits"
+    SHORTNAME = "USNBT"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("19")
+    P2SH_VERBYTES = [bytes.fromhex("1a")]
+    WIF_BYTE = bytes.fromhex("96")
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 14002
+    REORG_LIMIT = 5000
+
+
+class Vivo(Coin):
+    NAME = "Vivo"
+    SHORTNAME = "VIVO"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("46")
+    P2SH_VERBYTES = [bytes.fromhex("0a")]
+    WIF_BYTE = bytes.fromhex("c6")
+    GENESIS_HASH = ('00000f6be3e151f9082a2b82c2916192'
+                    'a791090015b80979934a45d625460d62')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9323
+    SESSIONCLS = DashElectrumX
+    DAEMON = daemon.DashDaemon
+    REORG_LIMIT = 8000
+
+    @classmethod
+    def header_hash(cls, header):
+        import neoscrypt
+        return neoscrypt.getPoWHash(header)
+
+
+class Wincoin(Coin):
+    NAME = "Wincoin"
+    SHORTNAME = "WC"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("4e")
+    P2SH_VERBYTES = [bytes.fromhex("57")]
+    WIF_BYTE = bytes.fromhex("ce")
+    GENESIS_HASH = ('00001739b7e63f1b724f5594f3e8dee0'
+                    'e73a314b48181ea5ec17325a6e8c95b6')
+    DESERIALIZER = lib_tx.DeserializerTxTime
+    DAEMON = daemon.LegacyRPCDaemon
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9129
+    REORG_LIMIT = 5000
+    HEADER_HASH = None
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return the hash.'''
+        import x11_hash
+        return x11_hash.getPoWHash(header)
+
+
+class Crave(Coin):
+    NAME = "Crave"
+    SHORTNAME = "CRAVE"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("46")
+    P2SH_VERBYTES = [bytes.fromhex("55")]
+    WIF_BYTE = bytes.fromhex("99")
+    GENESIS_HASH = ('7084c9af2c34a1179522d71ceaef27d8'
+                    '7855365793ed9c9dd47ff4f8721462c1')
+    BASIC_HEADER_SIZE = 80
+    HEADER_SIZE_V4 = 112
+    HEADER_V4_HEIGHT = 1002
+    # This offset is derived when calculating v4 offsets (height >= 1002):
+    # header_offset = 1002 * 80 + (height - 1002) * 112 =
+    # 1002 * (80 - 112) + height * 112 = HEADER_V4_OFFSET + height * 112
+    HEADER_V4_OFFSET = HEADER_V4_HEIGHT * (BASIC_HEADER_SIZE - HEADER_SIZE_V4)
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9137
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def static_header_offset(cls, height):
+        assert cls.STATIC_BLOCK_HEADERS
+        if height >= cls.HEADER_V4_HEIGHT:
+            return cls.HEADER_V4_OFFSET + height * cls.HEADER_SIZE_V4
+        else:
+            return height * cls.BASIC_HEADER_SIZE
+
+    @classmethod
+    def header_hash(cls, header):
+        version, = struct.unpack('<I', header[:4])
+        if version >= 4:
+            return super().header_hash(header)
+        else:
+            import quark_hash
+            return quark_hash.getPoWHash(header)
+
+
+class Exclusivecoin(Coin):
+    NAME = "Exclusivecoin"
+    SHORTNAME = "EXCL"
+    NET = "mainnet"
+    GENESIS_HASH = ('000018acd81f025bbff343a186c9007a'
+                    '3cb13313a9af840ec1068fac6a7d6b3f')
+    XPUB_VERBYTES = bytes.fromhex("0488B21E")
+    XPRV_VERBYTES = bytes.fromhex("0488ADE4")
+    P2PKH_VERBYTE = bytes.fromhex("21")
+    P2SH_VERBYTES = [bytes.fromhex("89")]
+    WIF_BYTE = bytes.fromhex("a1")
+    TX_COUNT_HEIGHT = 1
+    TX_COUNT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9150
+    DAEMON = daemon.LegacyRPCDaemon
+    DESERIALIZER = lib_tx.DeserializerZcash
+
+    @classmethod
+    def header_hash(cls, header):
+        import quark_hash
+        return quark_hash.getPoWHash(header)
+
+
+class Monkey(Coin):
+    NAME = "Monkey"
+    SHORTNAME = "MONK"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("33")
+    P2SH_VERBYTES = [bytes.fromhex("1c")]
+    WIF_BYTE = bytes.fromhex("37")
+    GENESIS_HASH = ('0000072442df3910d2d8ff1f3bcfe623'
+                    '4025d1bd532f7182927cd559b8e9e386')
+    TX_COUNT = 118715
+    TX_COUNT_HEIGHT = 54267
+    TX_PER_BLOCK = 2
+    RPC_PORT = 9152
+    REORG_LIMIT = 5000
+
+    @classmethod
+    def header_hash(cls, header):
+        import quark_hash
+        return quark_hash.getPoWHash(header)
+
+
+class Horizen(EquihashMixin, Coin):
+    NAME = "Horizen"
+    SHORTNAME = "ZEN"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("2089")
+    P2SH_VERBYTES = [bytes.fromhex("2096")]
+    WIF_BYTE = bytes.fromhex("80")
+    GENESIS_HASH = ('0007104ccda289427919efc39dc9e4d4'
+                    '99804b7bebc22df55f8b834301260602')
+    DESERIALIZER = lib_tx.DeserializerHorizen
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 1
+    RPC_PORT = 9387
+    REORG_LIMIT = 5000
