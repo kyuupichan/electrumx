@@ -25,7 +25,7 @@ process.  Ideally it should have at least 4 servers that have shown
 commitment to reliable service.
 
 In ElectrumX this is a per-coin property in `lib/coins.py
-<https://github.com/kyuupichan/electrumx/blob/master/lib/coins.py>`_.
+<https://github.com/kyuupichan/electrumx/blob/master/electrumx/lib/coins.py>`_.
 
 
 server.peers.subscribe
