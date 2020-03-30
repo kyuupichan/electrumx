@@ -612,7 +612,6 @@ class BitcoinSegwit(BitcoinMixin, Coin):
 
 
 class BitcoinGold(EquihashMixin, BitcoinMixin, Coin):
-    CHUNK_SIZE = 252
     NAME = "BitcoinGold"
     SHORTNAME = "BTG"
     FORK_HEIGHT = 491407
@@ -1379,7 +1378,6 @@ class SnowGem(EquihashMixin, Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 16112
     REORG_LIMIT = 800
-    CHUNK_SIZE = 200
 
 
 class BitcoinZ(EquihashMixin, Coin):
@@ -2652,7 +2650,6 @@ class Minexcoin(EquihashMixin, Coin):
     TX_COUNT_HEIGHT = 74495
     TX_PER_BLOCK = 5
     RPC_PORT = 8022
-    CHUNK_SIZE = 960
     PEERS = [
         'electrumx.xpresit.net s t',
         'elex01-ams.turinex.eu s t',
@@ -3796,7 +3793,6 @@ class Syscoin(AuxPowMixin, Coin):
     CHUNK_SIZE = 360
     DEFAULT_MAX_SEND = 10000000
 
-    PEER_DEFAULT_PORTS = {'t': '58881', 's': '58882'}
     PEERS = []
 
     PEER_DEFAULT_PORTS = {'s': '58882'}
@@ -3812,7 +3808,8 @@ class SyscoinTestnetMixin(object):
     P2PKH_VERBYTE = bytes.fromhex("41")
     P2SH_VERBYTES = bytes.fromhex("c4")
     WIF_BYTE = bytes.fromhex("ef")
-    PEER_DEFAULT_PORTS = {'t': '59991', 's': '59992'}
+    PEER_DEFAULT_PORTS = {'s': '59992'}
+    RPC_PORT = 18368
 
 
 class SyscoinTestnet(Syscoin, SyscoinTestnetMixin):
@@ -3821,8 +3818,10 @@ class SyscoinTestnet(Syscoin, SyscoinTestnetMixin):
     NET = "testnet"
     GENESIS_HASH = '0000064430008f1fe74ba0bf54080f1cf6e73da3372df7617e33648529940fc3'
     PEERS = [
-             '104.248.3.80 s t',
-             ]
+        'electrumx1.syscoin.org s',
+        'electrumx2.syscoin.org s',
+        'electrumx3.syscoin.org s',
+    ]
 
 
 class SyscoinRegtest(Syscoin, SyscoinTestnetMixin):
