@@ -12,7 +12,7 @@
 import asyncio
 import time
 
-from aiorpcx import TaskGroup, run_in_thread
+from aiorpcx import TaskGroup, run_in_thread, CancelledError
 
 import electrumx
 from electrumx.server.daemon import DaemonError
@@ -187,6 +187,9 @@ class BlockProcessor(object):
         # is consistent with self.height
         self.state_lock = asyncio.Lock()
 
+        # Signalled after backing up during a reorg
+        self.backed_up_event = asyncio.Event()
+
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
         # cancellations from shutdown don't lose work - when the task
@@ -270,6 +273,8 @@ class BlockProcessor(object):
             await self.run_in_thread_with_lock(flush_backup)
             last -= len(raw_blocks)
         await self.prefetcher.reset_height(self.height)
+        self.backed_up_event.set()
+        self.backed_up_event.clear()
 
     async def reorg_hashes(self, count):
         '''Return a pair (start, last, hashes) of blocks to back up during a
@@ -675,8 +680,9 @@ class BlockProcessor(object):
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_prefetched_blocks())
-        finally:
-            # Shut down block processing
+        # Don't flush for arbitrary exceptions as they might be a cause or consequence of
+        # corrupted data
+        except CancelledError:
             self.logger.info('flushing to DB for a clean shutdown...')
             await self.flush(True)
 
