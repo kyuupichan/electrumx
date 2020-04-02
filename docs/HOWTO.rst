@@ -250,7 +250,7 @@ from heights 363,000 to 378,000 is the most sluggish::
   447,168       2d 13h 20m      9h 47m
 
 *Machine A*: a low-spec 2011 1.6GHz AMD E-350 dual-core fanless CPU,
-8GB RAM and a DragonFlyBSD UFS fileystem on an SSD.  It requests
+8GB RAM and a DragonFlyBSD UFS filesystem on an SSD.  It requests
 blocks over the LAN from a bitcoind on machine B.  :envvar:`DB_CACHE`
 the default of 1,200.  LevelDB.
 
@@ -258,7 +258,7 @@ the default of 1,200.  LevelDB.
 Intel i5 CPU with an HDD and 24GB RAM.  Running bitcoind on the same
 machine.  :envvar:`DB_CACHE` set to 1,800.  LevelDB.
 
-For chains other than bitcoin-mainnet sychronization should be much
+For chains other than bitcoin-mainnet synchronization should be much
 faster.
 
 .. note:: ElectrumX will not serve normal client connections until it

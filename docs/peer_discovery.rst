@@ -3,7 +3,7 @@
 Peer Discovery
 ==============
 
-This was imlpemented in ElectrumX as of version 0.11.0.  Support for
+This was implemented in ElectrumX as of version 0.11.0.  Support for
 IRC peer discovery was removed in ElectrumX version 1.2.1.
 
 The :dfn:`peer database` is an in-memory store of peers with at least

@@ -22,7 +22,7 @@ install:
   - pip install pytest-cov
   - pip install Sphinx
 # hashes
-  - pip install tribus-hash
+  - pip install git+https://github.com/carsenk/tribus-hash
   - pip install blake256
   - pip install scrypt
   - pip install x11_hash
@@ -36,6 +36,7 @@ install:
   - pip install git+https://github.com/Electra-project/nist5_hash
   - pip install git+https://github.com/RitoProject/x21s_hash
   - pip install git+https://github.com/traysi/x16rv2_hash
+  - pip install git+https://github.com/VerusCoin/verushashpy
   - pip install bell-yespower
   - pip install cpupower
 # command to run tests
