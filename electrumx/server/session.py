@@ -898,7 +898,7 @@ class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
     PROTOCOL_MIN = (1, 4)
-    PROTOCOL_MAX = (1, 4, 2)
+    PROTOCOL_MAX = (1, 5, 0)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1183,6 +1183,19 @@ class ElectrumX(SessionBase):
             cost += 1.0
             last_height = start_height + count - 1
             result.update(await self._merkle_proof(cp_height, last_height))
+
+        if self.protocol_tuple >= (1, 5, 0):
+            del result['hex']
+            height = start_height
+            cursor = 0
+            result['headers'] = []
+            while cursor < len(headers):
+                header_size = self.db.dynamic_header_len(height)
+                header = headers[cursor:cursor + header_size]
+                result['headers'].append(header)
+                cursor += header_size
+                height += 1
+
         self.bump_cost(cost)
         return result
 
