@@ -3775,6 +3775,7 @@ class Donu(Coin):
     RPC_PORT = 26381
     REORG_LIMIT = 800
 
+
 class Quebecoin(AuxPowMixin, Coin):
     NAME = "Quebecoin"
     SHORTNAME = "QBC"
