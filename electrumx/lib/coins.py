@@ -3492,8 +3492,8 @@ class Primecoin(PrimeChainPowMixin, Coin):
                     '674e2546822badff26837db9a0152106')
     DAEMON = daemon.FakeEstimateFeeDaemon
     ESTIMATE_FEE = 1.024
-    TX_COUNT = 7000000
-    TX_COUNT_HEIGHT = 3600000
+    TX_COUNT = 7138730
+    TX_COUNT_HEIGHT = 3639500
     TX_PER_BLOCK = 2
     RPC_PORT = 9912
     REORG_LIMIT = 5000
