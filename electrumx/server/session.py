@@ -1170,6 +1170,8 @@ class ElectrumX(SessionBase):
         start_height and count must be non-negative integers.  At most
         MAX_CHUNK_SIZE headers will be returned.
         '''
+        if self.protocol_tuple >= (1, 5, 0):
+            return self.block_headers_array(start_height, count, cp_height)
         start_height = non_negative_integer(start_height)
         count = non_negative_integer(count)
         cp_height = non_negative_integer(cp_height)
@@ -1183,18 +1185,38 @@ class ElectrumX(SessionBase):
             cost += 1.0
             last_height = start_height + count - 1
             result.update(await self._merkle_proof(cp_height, last_height))
+        self.bump_cost(cost)
+        return result
 
-        if self.protocol_tuple >= (1, 5, 0):
-            del result['hex']
-            height = start_height
-            cursor = 0
-            result['headers'] = []
-            while cursor < len(headers):
-                header_size = self.db.dynamic_header_len(height)
-                header = headers[cursor:cursor + header_size]
-                result['headers'].append(header)
-                cursor += header_size
-                height += 1
+    async def block_headers_array(self, start_height, count, cp_height=0):
+        '''Return block headers in an array for the main chain;
+        starting at start_height.
+
+        start_height and count must be non-negative integers.  At most
+        MAX_CHUNK_SIZE headers will be returned.
+        '''
+        start_height = non_negative_integer(start_height)
+        count = non_negative_integer(count)
+        cp_height = non_negative_integer(cp_height)
+        cost = count / 50
+
+        max_size = self.MAX_CHUNK_SIZE
+        count = min(count, max_size)
+        headers, count = await self.db.read_headers(start_height, count)
+        cursor = 0
+        result = {'count': count, 'max': max_size, 'headers': []}
+        if count and cp_height:
+            cost += 1.0
+            last_height = start_height + count - 1
+            result.update(await self._merkle_proof(cp_height, last_height))
+
+        height = 0
+        while cursor < len(headers):
+            header_size = self.db.dynamic_header_len(height)
+            header = headers[cursor:cursor + header_size]
+            result['headers'].append(header)
+            cursor += header_size
+            height += 1
 
         self.bump_cost(cost)
         return result
