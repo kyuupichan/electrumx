@@ -3498,6 +3498,9 @@ class Primecoin(PrimeChainPowMixin, Coin):
     TX_PER_BLOCK = 2
     RPC_PORT = 9912
     REORG_LIMIT = 5000
+    PEERS = [
+        'electrumx.primecoin.org s t',
+    ]
 
 
 class PrimecoinTestnet(Primecoin):
@@ -3510,6 +3513,9 @@ class PrimecoinTestnet(Primecoin):
     GENESIS_HASH = ('221156cf301bc3585e72de34fe1efdb6'
                     'fbd703bc27cfc468faa1cdd889d0efa0')
     RPC_PORT = 9914
+    PEERS = [
+        'electrumx.testnet.primecoin.org s t',
+    ]
 
 
 class Unobtanium(AuxPowMixin, Coin):
