@@ -3514,7 +3514,7 @@ class PrimecoinTestnet(Primecoin):
                     'fbd703bc27cfc468faa1cdd889d0efa0')
     RPC_PORT = 9914
     PEERS = [
-        'electrumx.testnet.primecoin.org s t',
+        'electrumx.testnet.primecoin.org t',
     ]
 
 
