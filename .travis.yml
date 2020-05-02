@@ -35,10 +35,11 @@ install:
   - pip install pycryptodomex
   - pip install git+https://github.com/Electra-project/nist5_hash
   - pip install git+https://github.com/RitoProject/x21s_hash
-  - pip install git+https://github.com/traysi/x16rv2_hash
+  - pip install x16rv2_hash
   - pip install git+https://github.com/VerusCoin/verushashpy
   - pip install bell-yespower
   - pip install cpupower
+  - pip install kawpow
 # command to run tests
 script:
   - pytest --cov=electrumx
