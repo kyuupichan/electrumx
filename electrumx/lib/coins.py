@@ -3774,3 +3774,22 @@ class Donu(Coin):
     TX_PER_BLOCK = 10
     RPC_PORT = 26381
     REORG_LIMIT = 800
+
+
+class Quebecoin(AuxPowMixin, Coin):
+    NAME = "Quebecoin"
+    SHORTNAME = "QBC"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("3a")
+    P2SH_VERBYTES = [bytes.fromhex("05")]
+    WIF_BYTE = bytes.fromhex("ba")
+    GENESIS_HASH = ('000008c2d57759af6462352ee9f4923d'
+                    '97401cb599a9318e6595a2a74c26ea74')
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 20
+    REORG_LIMIT = 2000
+    RPC_PORT = 10890
