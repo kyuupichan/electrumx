@@ -3928,51 +3928,6 @@ class Lbry(Coin):
         }
 
 
-class Lbry(Coin):
-    NAME = "LBRY"
-    SHORTNAME = "LBC"
-    NET = "mainnet"
-    XPUB_VERBYTES = bytes.fromhex("019C354f")
-    XPRV_VERBYTES = bytes.fromhex("019C3118")
-    P2PKH_VERBYTE = bytes.fromhex("55")
-    P2SH_VERBYTES = [bytes.fromhex("7a")]
-    WIF_BYTE = bytes.fromhex("1c")
-    GENESIS_HASH = ('9c89283ba0f3227f6c03b70216b9f665'
-                    'f0118d5e0fa729cedf4fb34d6a34f463')
-    DESERIALIZER = lib_tx.DeserializerSegWit
-    BASIC_HEADER_SIZE = 112
-    TX_COUNT = 1
-    TX_COUNT_HEIGHT = 1
-    TX_PER_BLOCK = 1
-    RPC_PORT = 9245
-    REORG_LIMIT = 5000
-
-    @classmethod
-    def genesis_block(cls, block):
-        header = cls.block_header(block, 0)
-        header_hex_hash = hash_to_hex_str(cls.header_hash(header))
-        if header_hex_hash != cls.GENESIS_HASH:
-            raise CoinError('genesis block has hash {} expected {}'
-                            .format(header_hex_hash, cls.GENESIS_HASH))
-
-        return block
-
-    @classmethod
-    def electrum_header(cls, header, height):
-        version, = struct.unpack('<I', header[:4])
-        timestamp, bits, nonce = struct.unpack('<III', header[100:112])
-
-        return {
-            'block_height': height,
-            'version': version,
-            'prev_block_hash': hash_to_hex_str(header[4:36]),
-            'merkle_root': hash_to_hex_str(header[36:68]),
-            'timestamp': timestamp,
-            'bits': bits,
-            'nonce': nonce,
-        }
-
-
 class Insane(Coin):
     NAME = "Insane"
     SHORTNAME = "INSN"
