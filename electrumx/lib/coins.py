@@ -3321,3 +3321,22 @@ class BitcoinRoyale(Coin):
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
     DAEMON = daemon.FakeEstimateFeeDaemon
+
+
+class BitcoinVaultRegTest(Coin):
+    NAME = "BitcoinVaultRegTest"
+    SHORTNAME = "BTVRT"
+    NET = "regtest"
+    DESERIALIZER = lib_tx.DeserializerSegWit
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTE = [bytes.fromhex("C4")]
+    GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')
+    XPUB_VERBYTES = bytes.fromhex("04 35 87 CF")
+    XPRV_VERBYTES = bytes.fromhex("04 35 83 94")
+    RPC_PORT = 8332
+    TX_COUNT = 3300
+    TX_COUNT_HEIGHT = 3300
+    TX_PER_BLOCK = 2000
+    ESTIMATE_FEE = 0.00001
+    RELAY_FEE = 0.00001
+    DAEMON = daemon.FakeEstimateFeeDaemon
