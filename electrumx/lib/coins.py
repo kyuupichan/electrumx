@@ -1916,7 +1916,7 @@ class CanadaeCoin(AuxPowMixin, Coin):
 
 class Denarius(Coin):
     NAME = "Denarius"
-    SHORTNAME = "DNR"
+    SHORTNAME = "D"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
@@ -1937,8 +1937,8 @@ class Denarius(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import tribus_hash
-        return tribus_hash.getPoWHash(header)
+        import tribushashm
+        return tribushashm.getPoWHash(header)
 
 
 class DenariusTestnet(Denarius):

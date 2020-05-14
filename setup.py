@@ -15,7 +15,7 @@ setuptools.setup(
         'blake256': ['blake256>=0.1.1'],
         'crypto': ['pycryptodomex>=3.8.1'],
         'groestl': ['groestlcoin-hash>=1.0.1'],
-        'tribus-hash': ['tribus-hash>=1.0.2'],
+        'tribushashm': ['tribushashm>=1.0.5'],
         'xevan-hash': ['xevan-hash'],
         'x11-hash': ['x11-hash>=1.4'],
         'zny-yespower-0-5': ['zny-yespower-0-5'],
