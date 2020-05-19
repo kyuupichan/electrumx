@@ -44,6 +44,7 @@ from electrumx.lib.script import (_match_ops, Script, ScriptError,
                                   ScriptPubKey, OpCodes)
 import electrumx.lib.tx as lib_tx
 import electrumx.lib.tx_dash as lib_tx_dash
+import electrumx.lib.tx_bitgreen as lib_tx_bitgreen
 import electrumx.lib.tx_axe as lib_tx_axe
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
@@ -2771,9 +2772,8 @@ class PivxTestnet(Pivx):
     ZEROCOIN_START_HEIGHT = 201564
 
 
-class Bitg(Coin):
-
-    NAME = "BitcoinGreen"
+class Bitgreen(Coin):
+    NAME = "Bitgreen"
     SHORTNAME = "BITG"
     NET = "mainnet"
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
@@ -2782,24 +2782,19 @@ class Bitg(Coin):
     P2SH_VERBYTES = [bytes.fromhex("06")]
     WIF_BYTE = bytes.fromhex("2e")
     GENESIS_HASH = (
-        '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
-    DAEMON = daemon.DashDaemon
-    TX_COUNT = 1000
-    TX_COUNT_HEIGHT = 10000
-    TX_PER_BLOCK = 1
+        '0000025289d6b03cbda4950e825cd865'
+        '185f34fbb3e098295534b63d78beba15')
+    TX_COUNT = 268247
+    TX_COUNT_HEIGHT = 70004
+    TX_PER_BLOCK = 2
     RPC_PORT = 9332
     REORG_LIMIT = 1000
     SESSIONCLS = DashElectrumX
-    DAEMON = daemon.DashDaemon
-
-    @classmethod
-    def header_hash(cls, header):
-        '''Given a header return the hash.'''
-        import quark_hash
-        return quark_hash.getPoWHash(header)
+    # DAEMON = daemon.DashDaemon
+    DESERIALIZER = lib_tx_bitgreen.DeserializerBitgreen
 
 
-class tBitg(Bitg):
+class BitgreenTestnet(Bitgreen):
     SHORTNAME = "tBITG"
     NET = "testnet"
     XPUB_VERBYTES = bytes.fromhex("043587cf")
@@ -2808,7 +2803,8 @@ class tBitg(Bitg):
     P2SH_VERBYTES = [bytes.fromhex("0c")]
     WIF_BYTE = bytes.fromhex("6c")
     GENESIS_HASH = (
-        '000008467c3a9c587533dea06ad9380cded3ed32f9742a6c0c1aebc21bf2bc9b')
+        '00000546a6b03a54ae05f94119e37c55'
+        '202e90a953058c35364d112d41ded06a')
     RPC_PORT = 19332
 
 

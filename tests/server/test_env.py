@@ -122,9 +122,9 @@ def test_COIN_NET():
     e = Env()
     assert e.coin == lib_coins.DecredTestnet
     os.environ.pop('NET')
-    os.environ['COIN'] = ' BitcoinGreen '
+    os.environ['COIN'] = ' Bitgreen '
     e = Env()
-    assert e.coin == lib_coins.Bitg
+    assert e.coin == lib_coins.Bitgreen
     os.environ['NET'] = 'mainnet'
     e = Env()
     os.environ.pop('NET')
@@ -178,7 +178,7 @@ def test_bad_SERVICES():
     setup_base_env()
     os.environ['SERVICES'] = 'tcp:foo.bar:1234'
     with pytest.raises(ServiceError) as err:
-         Env()
+        Env()
     assert 'invalid service string' in str(err.value)
     os.environ['SERVICES'] = 'xxx://foo.com:50001'
     with pytest.raises(ServiceError) as err:
