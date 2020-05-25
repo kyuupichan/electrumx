@@ -3325,7 +3325,7 @@ class BitcoinRoyale(Coin):
 
 class BitcoinVaultRegTest(Coin):
     NAME = "BitcoinVaultRegTest"
-    SHORTNAME = "BTVRT"
+    SHORTNAME = "BTCVRT"
     NET = "regtest"
     DESERIALIZER = lib_tx.DeserializerSegWit
     P2PKH_VERBYTE = bytes.fromhex("6F")
