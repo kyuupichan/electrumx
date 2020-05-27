@@ -2,10 +2,28 @@
  ChangeLog
 ===========
 
+.. note:: Version 1.15.0 will be the final ElectrumX release with altcoin support, future
+   releases will be Bitcoin-only.  ElectrumX needs to scale quickly and support for
+   various other coins and their idiosyncracies is distracting and unhelpful.  Anyone
+   wishing to maintain an ElectrumX repository with altcoin support is free to do so as
+   explained in the licence.
+
 .. note:: It is strongly recommended you upgrade to Python 3.7, which
    fixes bugs in asyncio that caused an ever-growing open file count
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
+
+
+Version 1.15.0 (27 May 2020)
+============================
+
+* switch to 5-byte txnums to handle larger blockchains.  Upgrade DBs during restart.
+* accurate clearing of stale caches
+* coin additions / updates: NavCoin + Hush + VersusCoin + Zero (cipig), DashRegtest (colmenero),
+  Quebecoin (morinpa), Primecoin (Sunny King), multiple (Panagiotis David), RVN (standard-error),
+  Sumcoin
+* other: Jeremy Rand, Jin Eguchi, ddude, Jonathan Cross, Carsen Klock, cipig
+
 
 Version 1.14.0 (19 Jan 2020)
 ============================
