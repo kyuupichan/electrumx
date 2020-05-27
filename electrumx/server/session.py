@@ -8,7 +8,6 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import codecs
-import datetime
 import itertools
 import json
 import math
@@ -1237,21 +1236,17 @@ class ElectrumX(SessionBase):
         '''The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool.'''
         self.bump_cost(1.0)
-        return await self.daemon_request('relayfee')
+        return 0.000001
 
-    async def estimatefee(self, number, mode=None):
+    async def estimatefee(self, number):
         '''The estimated transaction fee per kilobyte to be paid for a
         transaction to be included within a certain number of blocks.
 
         number: the number of blocks
         mode: CONSERVATIVE or ECONOMICAL estimation mode
         '''
-        number = non_negative_integer(number)
         self.bump_cost(2.0)
-        if mode:
-            return await self.daemon_request('estimatefee', number, mode)
-        else:
-            return await self.daemon_request('estimatefee', number)
+        return 0.00001
 
     async def ping(self):
         '''Serves as a connection keep-alive mechanism and for the client to
@@ -1284,8 +1279,6 @@ class ElectrumX(SessionBase):
         ptuple, client_min = util.protocol_version(
             protocol_version, self.PROTOCOL_MIN, self.PROTOCOL_MAX)
 
-        await self.crash_old_client(ptuple, self.env.coin.CRASH_CLIENT_VER)
-
         if ptuple is None:
             if client_min > self.PROTOCOL_MIN:
                 self.logger.info(f'client requested future protocol version '
@@ -1296,18 +1289,6 @@ class ElectrumX(SessionBase):
         self.set_request_handlers(ptuple)
 
         return (electrumx.version, self.protocol_version_string())
-
-    async def crash_old_client(self, ptuple, crash_client_ver):
-        if crash_client_ver:
-            client_ver = util.protocol_tuple(self.client)
-            is_old_protocol = ptuple is None or ptuple <= (1, 2)
-            is_old_client = client_ver != (0,) and client_ver <= crash_client_ver
-            if is_old_protocol and is_old_client:
-                self.logger.info(f'attempting to crash old client with version {self.client}')
-                # this can crash electrum client 2.6 <= v < 3.1.2
-                await self.send_notification('blockchain.relayfee', ())
-                # this can crash electrum client (v < 2.8.2) UNION (3.0.0 <= v < 3.3.0)
-                await self.send_notification('blockchain.estimatefee', ())
 
     async def transaction_broadcast(self, raw_tx):
         '''Broadcast a raw transaction to the network.

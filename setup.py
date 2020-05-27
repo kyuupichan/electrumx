@@ -11,16 +11,6 @@ setuptools.setup(
     extras_require={
         'rocksdb': ['python-rocksdb>=0.6.9'],
         'uvloop': ['uvloop>=0.14'],
-        # For various coins
-        'blake256': ['blake256>=0.1.1'],
-        'crypto': ['pycryptodomex>=3.8.1'],
-        'groestl': ['groestlcoin-hash>=1.0.1'],
-        'tribushashm': ['tribushashm>=1.0.5'],
-        'xevan-hash': ['xevan-hash'],
-        'x11-hash': ['x11-hash>=1.4'],
-        'zny-yespower-0-5': ['zny-yespower-0-5'],
-        'bell-yespower': ['bell-yespower'],
-        'cpupower': ['cpupower'],
     },
     packages=setuptools.find_packages(include=('electrumx*',)),
     description='ElectrumX Server',

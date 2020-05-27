@@ -172,7 +172,7 @@ Originally Electrum clients would download all block headers and
 verify the chain of hashes and header difficulty in order to confirm
 the merkle roots with which to check transaction inclusion.
 
-With the BTC and BCH chains now past height 500,000, the headers form
+With the Bitcoin chain now past height 500,000, the headers form
 over 40MB of raw data which becomes 80MB if downloaded as text from
 Electrum servers.  The situation is worse for testnet and coins with
 more frequent blocks.  Downloading and verifying all this data on

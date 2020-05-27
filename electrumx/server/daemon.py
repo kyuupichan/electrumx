@@ -12,15 +12,11 @@ import asyncio
 import itertools
 import json
 import time
-from calendar import timegm
-from struct import pack
 
 import aiohttp
 from aiorpcx import JSONRPC
 
-from electrumx.lib.util import hex_to_bytes, class_logger,\
-    unpack_le_uint16_from, pack_varint
-from electrumx.lib.hash import hex_str_to_hash, hash_to_hex_str
+from electrumx.lib.util import hex_to_bytes, class_logger
 
 
 class DaemonError(Exception):
@@ -231,29 +227,9 @@ class Daemon(object):
         '''Update our record of the daemon's mempool hashes.'''
         return await self._send_single('getrawmempool')
 
-    async def estimatefee(self, block_count, estimate_mode=None):
-        '''Return the fee estimate for the block count.  Units are whole
-        currency units per KB, e.g. 0.00000995, or -1 if no estimate
-        is available.
-        '''
-        if estimate_mode:
-            args = (block_count, estimate_mode)
-        else:
-            args = (block_count, )
-        if await self._is_rpc_available('estimatesmartfee'):
-            estimate = await self._send_single('estimatesmartfee', args)
-            return estimate.get('feerate', -1)
-        return await self._send_single('estimatefee', args)
-
     async def getnetworkinfo(self):
         '''Return the result of the 'getnetworkinfo' RPC call.'''
         return await self._send_single('getnetworkinfo')
-
-    async def relayfee(self):
-        '''The minimum fee a low-priority tx must pay in order to be accepted
-        to the daemon's memory pool.'''
-        network_info = await self.getnetworkinfo()
-        return network_info['relayfee']
 
     async def getrawtransaction(self, hex_hash, verbose=False):
         '''Return the serialized raw transaction with the given hash.'''
