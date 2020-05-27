@@ -3128,20 +3128,50 @@ class Ravencoin(Coin):
     GENESIS_HASH = ('0000006b444bc2f2ffe627be9d9e7e7a'
                     '0730000870ef6eb6da46c8eae389df90')
     DESERIALIZER = lib_tx.DeserializerSegWit
-    X16RV2_ACTIVATION_TIME = 1569945600  # algo switch to x16rv2 at this timestamp
+    X16RV2_ACTIVATION_TIME = 1569945600   # algo switch to x16rv2 at this timestamp
+    KAWPOW_ACTIVATION_TIME = 1588788000  # kawpow algo activation time
+    KAWPOW_ACTIVATION_HEIGHT = 1219736
+    KAWPOW_HEADER_SIZE = 120
     TX_COUNT = 5626682
     TX_COUNT_HEIGHT = 887000
     TX_PER_BLOCK = 6
     RPC_PORT = 8766
-    REORG_LIMIT = 55
+    REORG_LIMIT = 100
     PEERS = [
     ]
+
+    @classmethod
+    def static_header_offset(cls, height):
+        '''Given a header height return its offset in the headers file.'''
+        if cls.KAWPOW_ACTIVATION_HEIGHT < 0 or height <= cls.KAWPOW_ACTIVATION_HEIGHT:
+            result = height * cls.BASIC_HEADER_SIZE
+        else:  # RVN block header size increased with kawpow fork
+            baseoffset = cls.KAWPOW_ACTIVATION_HEIGHT * cls.BASIC_HEADER_SIZE
+            result = baseoffset + ((height-cls.KAWPOW_ACTIVATION_HEIGHT) * cls.KAWPOW_HEADER_SIZE)
+        return result
 
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
         timestamp = util.unpack_le_uint32_from(header, 68)[0]
-        if timestamp >= cls.X16RV2_ACTIVATION_TIME:
+        assert cls.KAWPOW_ACTIVATION_TIME > 0
+
+        def reverse_bytes(data):
+            b = bytearray(data)
+            b.reverse()
+            return bytes(b)
+
+        if timestamp >= cls.KAWPOW_ACTIVATION_TIME:
+            import kawpow
+            nNonce64 = util.unpack_le_uint64_from(header, 80)[0]  # uint64_t
+            mix_hash = reverse_bytes(header[88:120])  # uint256
+
+            header_hash = reverse_bytes(double_sha256(header[:80]))
+
+            final_hash = reverse_bytes(kawpow.light_verify(header_hash, mix_hash, nNonce64))
+            return final_hash
+
+        elif timestamp >= cls.X16RV2_ACTIVATION_TIME:
             import x16rv2_hash
             return x16rv2_hash.getPoWHash(header)
         else:
@@ -3159,12 +3189,14 @@ class RavencoinTestnet(Ravencoin):
     GENESIS_HASH = ('000000ecfc5e6324a079542221d00e10'
                     '362bdc894d56500c414060eea8a3ad5a')
     X16RV2_ACTIVATION_TIME = 1567533600
+    KAWPOW_ACTIVATION_HEIGHT = 231544
+    KAWPOW_ACTIVATION_TIME = 1585159200
     TX_COUNT = 496158
     TX_COUNT_HEIGHT = 420500
     TX_PER_BLOCK = 1
     RPC_PORT = 18766
     PEER_DEFAULT_PORTS = {'t': '50003', 's': '50004'}
-    REORG_LIMIT = 55
+    REORG_LIMIT = 100
     PEERS = [
     ]
 
