@@ -215,6 +215,7 @@ Subscribe to receive block headers when a new block is found.
   when a new block is found.  The notification's signature is:
 
     .. function:: blockchain.headers.subscribe(header)
+       :noindex:
 
     * *header*
 
@@ -474,6 +475,7 @@ Subscribe to a script hash.
   hash changes.  Its signature is
 
     .. function:: blockchain.scripthash.subscribe(scripthash, status)
+       :noindex:
 
 blockchain.scripthash.unsubscribe
 =================================
