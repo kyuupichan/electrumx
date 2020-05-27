@@ -448,11 +448,6 @@ some of this.
   will autodetect any proxy running on the usual ports 9050 (Tor),
   9150 (Tor browser bundle) and 1080 (socks).
 
-.. envvar:: BLACKLIST_URL
-
-  URL to retrieve a list of blacklisted peers.  If not set, a coin-
-  specific default is used.
-
 
 Cache
 =====

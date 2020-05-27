@@ -79,8 +79,6 @@ class PeerManager:
         self.proxy = None
         self.group = TaskGroup()
         self.recent_peer_adds = {}
-        # refreshed
-        self.blacklist = set()
 
     def _my_clearnet_peer(self):
         '''Returns the clearnet peer representing this server, if any.'''
@@ -134,42 +132,11 @@ class PeerManager:
                                   for real_name in self.env.coin.PEERS)
         await self._note_peers(imported_peers, limit=None)
 
-    async def _refresh_blacklist(self):
-        url = self.env.blacklist_url
-        if not url:
-            return
-
-        async def read_blacklist():
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    text = await response.text()
-            return set(entry.lower() for entry in json.loads(text))
-
-        while True:
-            try:
-                self.blacklist = await read_blacklist()
-            except Exception as e:
-                self.logger.error(f'could not retrieve blacklist from {url}: {e}')
-            else:
-                self.logger.info(f'blacklist from {url} has {len(self.blacklist)} entries')
-                # Got new blacklist. Now check our current peers against it
-                for peer in self.peers:
-                    if self._is_blacklisted(peer):
-                        peer.retry_event.set()
-            await sleep(600)
-
-    def _is_blacklisted(self, peer):
-        host = peer.host.lower()
-        second_level_domain = '*.' + '.'.join(host.split('.')[-2:])
-        return any(item in self.blacklist
-                   for item in (host, second_level_domain, peer.ip_addr))
-
     def _get_recent_good_peers(self):
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers
                   if peer.last_good > cutoff and
                   not peer.bad and peer.is_public]
-        recent = [peer for peer in recent if not self._is_blacklisted(peer)]
         return recent
 
     async def _detect_proxy(self):
@@ -328,9 +295,6 @@ class PeerManager:
             if isinstance(address.host, (IPv4Address, IPv6Address)):
                 peer.ip_addr = str(address.host)
 
-        if self._is_blacklisted(peer):
-            raise BadPeerError('blacklisted')
-
         # Bucket good recent peers; forbid many servers from similar IPs
         # FIXME there's a race here, when verifying multiple peers
         #       that belong to the same bucket ~simultaneously
@@ -454,7 +418,6 @@ class PeerManager:
         self.logger.info(f'force use of proxy: {self.env.force_proxy}')
         self.logger.info(f'beginning peer discovery...')
         async with self.group as group:
-            await group.spawn(self._refresh_blacklist())
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
 
