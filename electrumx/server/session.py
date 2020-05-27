@@ -1392,7 +1392,7 @@ class ElectrumX(SessionBase):
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
             'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
-            'mempool.get_fee_histogram': self.mempool.compact_fee_histogram,
+            'mempool.get_fee_histogram': self.compact_fee_histogram,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
             'server.donation_address': self.donation_address,
