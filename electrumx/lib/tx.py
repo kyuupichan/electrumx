@@ -1070,3 +1070,16 @@ class DeserializerSimplicity(Deserializer):
                 self._read_outputs(),   # outputs
                 self._read_le_uint32()  # locktime
             )
+
+
+class DeserializerPrimecoin(Deserializer):
+    def read_header(self, static_header_size):
+        '''Return the block header bytes'''
+        start = self.cursor
+        # Decode the block header size including multiplier then read it as bytes
+        self.cursor += static_header_size
+        multiplier_size = self._read_varint()
+        self.cursor += multiplier_size
+        header_end = self.cursor
+        self.cursor = start
+        return self._read_nbytes(header_end - start)
