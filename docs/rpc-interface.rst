@@ -87,9 +87,7 @@ A typical result is as follows (with annotated comments)::
       "request counts": {              # Count of RPC requests by method name
           "blockchain.block.header": 245,
           "blockchain.block.headers": 70,
-          "blockchain.estimatefee": 12776,
           "blockchain.headers.subscribe": 2825,
-          "blockchain.relayfee": 740,
           "blockchain.scripthash.get_history": 196,
           "blockchain.scripthash.subscribe": 184626,
           "blockchain.transaction.broadcast": 19,
@@ -97,7 +95,6 @@ A typical result is as follows (with annotated comments)::
           "blockchain.transaction.get_merkle": 289,
           "getinfo": 3,
           "groups": 1,
-          "mempool.get_fee_histogram": 3194,
           "server.add_peer": 9,
           "server.banner": 740,
           "server.donation_address": 754,

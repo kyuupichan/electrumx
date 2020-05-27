@@ -748,6 +748,7 @@ pool, weighted by transaction size.
 
   .. function:: mempool.get_fee_histogram()
   .. versionadded:: 1.2
+  .. deprecated:: 1.4.2
 
 **Result**
 

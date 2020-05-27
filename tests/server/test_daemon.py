@@ -235,21 +235,6 @@ async def test_broadcast_transaction(daemon):
 
 
 @pytest.mark.asyncio
-async def test_relayfee(daemon):
-    response = {"relayfee": sats, "other:": "cruft"}
-    daemon.session = ClientSessionGood(('getnetworkinfo', [], response))
-    assert await daemon.getnetworkinfo() == response
-
-
-@pytest.mark.asyncio
-async def test_relayfee(daemon):
-    sats = 2
-    response = {"relayfee": sats, "other:": "cruft"}
-    daemon.session = ClientSessionGood(('getnetworkinfo', [], response))
-    assert await daemon.relayfee() == sats
-
-
-@pytest.mark.asyncio
 async def test_mempool_hashes(daemon):
     hashes = ['hex_hash1', 'hex_hash2']
     daemon.session = ClientSessionGood(('getrawmempool', [], hashes))
@@ -262,33 +247,6 @@ async def test_deserialised_block(daemon):
     result = {'some': 'mess'}
     daemon.session = ClientSessionGood(('getblock', [block_hash, True], result))
     assert await daemon.deserialised_block(block_hash) == result
-
-
-@pytest.mark.asyncio
-async def test_estimatefee(daemon):
-    method_not_found = RPCError(JSONRPCv1.METHOD_NOT_FOUND, 'nope')
-    result = -1
-    daemon.session = ClientSessionGood(
-            ('estimatesmartfee', [], method_not_found),
-            ('estimatefee', [2], result)
-    )
-    assert await daemon.estimatefee(2) == result
-
-
-@pytest.mark.asyncio
-async def test_estimatefee_smart(daemon):
-    bad_args = RPCError(JSONRPCv1.INVALID_ARGS, 'bad args')
-    rate = 0.0002
-    result = {'feerate': rate}
-    daemon.session = ClientSessionGood(
-        ('estimatesmartfee', [], bad_args),
-        ('estimatesmartfee', [2], result)
-    )
-    assert await daemon.estimatefee(2) == rate
-
-    # Test the rpc_available_cache is used
-    daemon.session = ClientSessionGood(('estimatesmartfee', [2], result))
-    assert await daemon.estimatefee(2) == rate
 
 
 @pytest.mark.asyncio

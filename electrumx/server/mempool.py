@@ -108,11 +108,8 @@ class MemPool(object):
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.txs = {}
         self.hashXs = defaultdict(set)  # None can be a key
-        self.cached_compact_histogram = []
         self.refresh_secs = refresh_secs
         self.log_status_secs = log_status_secs
-        # Prevents mempool refreshes during fee histogram calculation
-        self.lock = Lock()
 
     async def _logging(self, synchronized_event):
         '''Print regular logs of mempool stats.'''
@@ -128,41 +125,6 @@ class MemPool(object):
                              f'touching {len(self.hashXs):,d} addresses')
             await sleep(self.log_status_secs)
             await synchronized_event.wait()
-
-    async def _refresh_histogram(self, synchronized_event):
-        while True:
-            await synchronized_event.wait()
-            async with self.lock:
-                # Threaded as can be expensive
-                await run_in_thread(self._update_histogram, 100_000)
-            await sleep(self.coin.MEMPOOL_HISTOGRAM_REFRESH_SECS)
-
-    def _update_histogram(self, bin_size):
-        # Build a histogram by fee rate
-        histogram = defaultdict(int)
-        for tx in self.txs.values():
-            histogram[tx.fee // tx.size] += tx.size
-
-        # Now compact it.  For efficiency, get_fees returns a
-        # compact histogram with variable bin size.  The compact
-        # histogram is an array of (fee_rate, vsize) values.
-        # vsize_n is the cumulative virtual size of mempool
-        # transactions with a fee rate in the interval
-        # [rate_(n-1), rate_n)], and rate_(n-1) > rate_n.
-        # Intervals are chosen to create tranches containing at
-        # least 100kb of transactions
-        compact = []
-        cum_size = 0
-        r = 0   # ?
-        for fee_rate, size in sorted(histogram.items(), reverse=True):
-            cum_size += size
-            if cum_size + r > bin_size:
-                compact.append((fee_rate, cum_size))
-                r += cum_size - bin_size
-                cum_size = 0
-                bin_size *= 1.1
-        self.logger.info(f'compact fee histogram: {compact}')
-        self.cached_compact_histogram = compact
 
     def _accept_transactions(self, tx_map, utxo_map, touched):
         '''Accept transactions in tx_map to the mempool if all their inputs
@@ -220,8 +182,7 @@ class MemPool(object):
                 continue
             hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
             try:
-                async with self.lock:
-                    await self._process_mempool(hashes, touched, height)
+                await self._process_mempool(hashes, touched, height)
             except DBSyncError:
                 # The UTXO DB is not at the same height as the
                 # mempool; wait and try again
@@ -331,7 +292,6 @@ class MemPool(object):
         '''Keep the mempool synchronized with the daemon.'''
         async with TaskGroup() as group:
             await group.spawn(self._refresh_hashes(synchronized_event))
-            await group.spawn(self._refresh_histogram(synchronized_event))
             await group.spawn(self._logging(synchronized_event))
 
     async def balance_delta(self, hashX):
@@ -346,10 +306,6 @@ class MemPool(object):
                 value -= sum(v for h168, v in tx.in_pairs if h168 == hashX)
                 value += sum(v for h168, v in tx.out_pairs if h168 == hashX)
         return value
-
-    async def compact_fee_histogram(self):
-        '''Return a compact fee histogram of the current mempool.'''
-        return self.cached_compact_histogram
 
     async def potential_spends(self, hashX):
         '''Return a set of (prev_hash, prev_idx) pairs from mempool

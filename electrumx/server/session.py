@@ -1372,7 +1372,7 @@ class ElectrumX(SessionBase):
 
     async def compact_fee_histogram(self):
         self.bump_cost(1.0)
-        return await self.mempool.compact_fee_histogram()
+        return []
 
     def set_request_handlers(self, ptuple):
         self.protocol_tuple = ptuple

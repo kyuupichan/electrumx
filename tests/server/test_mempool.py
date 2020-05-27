@@ -273,7 +273,6 @@ async def test_keep_synchronized(caplog):
             await group.cancel_remaining()
 
     assert in_caplog(caplog, 'beginning processing of daemon mempool')
-    assert in_caplog(caplog, 'compact fee histogram')
     assert in_caplog(caplog, 'synced in ')
     assert in_caplog(caplog, '0 txs')
     assert in_caplog(caplog, 'touching 0 addresses')
@@ -301,27 +300,6 @@ async def test_balance_delta():
     for hashX in api.hashXs:
         expected = deltas.get(hashX, 0)
         assert await mempool.balance_delta(hashX) == expected
-
-
-@pytest.mark.asyncio
-async def test_compact_fee_histogram():
-    api = API()
-    api.initialize()
-    mempool = MemPool(coin, api)
-    event = Event()
-    async with TaskGroup() as group:
-        await group.spawn(mempool.keep_synchronized, event)
-        await event.wait()
-        await group.cancel_remaining()
-
-    histogram = await mempool.compact_fee_histogram()
-    assert histogram == []
-    bin_size = 1000
-    mempool._update_histogram(bin_size)
-    histogram = await mempool.compact_fee_histogram()
-    assert len(histogram) > 0
-    rates, sizes = zip(*histogram)
-    assert all(rates[n] < rates[n - 1] for n in range(1, len(rates)))
 
 
 @pytest.mark.asyncio
