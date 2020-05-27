@@ -1393,6 +1393,22 @@ class SnowGem(EquihashMixin, Coin):
     CHUNK_SIZE = 200
 
 
+class Zero(EquihashMixin, Coin):
+    NAME = "Zero"
+    SHORTNAME = "ZER"
+    NET = "mainnet"
+    P2PKH_VERBYTE = bytes.fromhex("1CB8")
+    P2SH_VERBYTES = [bytes.fromhex("1CBD")]
+    GENESIS_HASH = ('068cbb5db6bc11be5b93479ea4df41fa'
+                    '7e012e92ca8603c315f9b1a2202205c6')
+    DESERIALIZER = lib_tx.DeserializerZcash
+    TX_COUNT = 329998
+    TX_COUNT_HEIGHT = 847425
+    TX_PER_BLOCK = 2
+    RPC_PORT = 23811
+    REORG_LIMIT = 800
+
+
 class BitcoinZ(EquihashMixin, Coin):
     NAME = "BitcoinZ"
     SHORTNAME = "BTCZ"
