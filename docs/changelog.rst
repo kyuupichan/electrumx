@@ -3,7 +3,7 @@
 ===========
 
 .. note:: Version 1.15.0 will be the final ElectrumX release with altcoin support, future
-   releases will be Bitcoin-only.  ElectrumX needs to scale quickly and support for
+   releases will be Bitcoin SV-only.  ElectrumX needs to scale quickly and support for
    various other coins and their idiosyncracies is distracting and unhelpful.  Anyone
    wishing to maintain an ElectrumX repository with altcoin support is free to do so as
    explained in the licence.

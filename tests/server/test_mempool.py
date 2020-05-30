@@ -9,13 +9,13 @@ import pytest
 from aiorpcx import Event, TaskGroup, sleep, spawn, ignore_after
 
 from electrumx.server.mempool import MemPool, MemPoolAPI
-from electrumx.lib.coins import Bitcoin
+from electrumx.lib.coins import BitcoinSV
 from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash, hash_to_hex_str
 from electrumx.lib.tx import Tx, TxInput, TxOutput
 from electrumx.lib.util import make_logger
 
 
-coin = Bitcoin
+coin = BitcoinSV
 tx_hash_fn = coin.DESERIALIZER.TX_HASH_FN
 # Change seed daily
 seed(datetime.date.today().toordinal)

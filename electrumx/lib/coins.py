@@ -331,6 +331,3 @@ class BitcoinSVRegtest(BitcoinSVTestnet):
     TX_COUNT = 1
     TX_COUNT_HEIGHT = 1
     GENESIS_ACTIVATION = 10_000
-
-
-Bitcoin = BitcoinSV

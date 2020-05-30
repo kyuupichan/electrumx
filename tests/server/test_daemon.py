@@ -9,11 +9,11 @@ from aiorpcx import (
     JSONRPCv1, JSONRPCLoose, RPCError, ignore_after,
     Request, Batch,
 )
-from electrumx.lib.coins import Bitcoin, CoinError
+from electrumx.lib.coins import BitcoinSV, CoinError
 from electrumx.server.daemon import Daemon, DaemonError
 
 
-coin = Bitcoin
+coin = BitcoinSV
 
 # These should be full, canonical URLs
 urls = ['http://rpc_user:rpc_pass@127.0.0.1:8332/',
@@ -22,7 +22,7 @@ urls = ['http://rpc_user:rpc_pass@127.0.0.1:8332/',
 
 @pytest.fixture
 def daemon():
-    return coin.DAEMON(Bitcoin, ','.join(urls))
+    return coin.DAEMON(BitcoinSV, ','.join(urls))
 
 
 class ResponseBase(object):
