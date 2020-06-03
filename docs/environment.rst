@@ -281,6 +281,13 @@ These environment variables are optional:
   version string. For example to drop versions from 1.0 to 1.2 use
   the regex ``1\.[0-2]\.\d+``.
 
+.. envvar:: DROP_CLIENT_UNKNOWN
+
+  Set to anything non-empty to deny serving clients, which do not
+  identify themselves first by issuing the server.version method
+  call with a non-empty client identifier. The connection is dropped 
+  on first actual method call. This might help to filter out simple 
+  robots. This behavior is off by default.
 
 Resource Usage Limits
 =====================

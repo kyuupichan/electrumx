@@ -69,6 +69,7 @@ class Env(EnvBase):
         self.log_level = self.default('LOG_LEVEL', 'info').upper()
         self.donation_address = self.default('DONATION_ADDRESS', '')
         self.drop_client = self.custom("DROP_CLIENT", None, re.compile)
+        self.drop_client_unknown = self.boolean('DROP_CLIENT_UNKNOWN', False)
         self.cache_MB = self.integer('CACHE_MB', 1200)
         self.reorg_limit = self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
 
