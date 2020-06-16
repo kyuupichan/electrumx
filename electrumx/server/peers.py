@@ -175,6 +175,11 @@ class PeerManager:
                     for match in matches:
                         if match.check_ports(peer):
                             self.logger.info(f'ports changed for {peer}')
+                            # Retry connecting to the peer. First we will try the existing
+                            # ports and then try the new ports. Note that check_ports above
+                            # had a side_effect to temporarily store the new ports.
+                            # If we manage to connect, we will call 'server.features',
+                            # and the ports for this peer will be updated to the return values.
                             match.retry_event.set()
             else:
                 match_set.add(peer)
@@ -435,7 +440,7 @@ class PeerManager:
 
     async def add_localRPC_peer(self, real_name):
         '''Add a peer passed by the admin over LocalRPC.'''
-        await self._note_peers([Peer.from_real_name(real_name, 'RPC')])
+        await self._note_peers([Peer.from_real_name(real_name, 'RPC')], check_ports=True)
 
     async def on_add_peer(self, features, source_addr):
         '''Add a peer (but only if the peer resolves to the source).'''
