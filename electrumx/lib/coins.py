@@ -50,6 +50,8 @@ import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
                                       SmartCashElectrumX, AuxPoWElectrumX)
 
+from electrumx.lib.atx import BTCV3KeysDeserializer
+
 
 Block = namedtuple("Block", "raw header transactions")
 
@@ -3340,3 +3342,7 @@ class BitcoinVaultRegTest(Coin):
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
     DAEMON = daemon.FakeEstimateFeeDaemon
+
+
+class BitcoinVault3Keys(BitcoinVaultRegTest):
+    DESERIALIZER = BTCV3KeysDeserializer
