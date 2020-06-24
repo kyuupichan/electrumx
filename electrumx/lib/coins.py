@@ -3322,9 +3322,9 @@ class BitcoinRoyale(Coin):
     DAEMON = daemon.FakeEstimateFeeDaemon
 
 
-class BitcoinVaultRegTest(Coin):
-    NAME = "BitcoinVaultRegTest"
-    SHORTNAME = "BTCVRT"
+class BitcoinVault(Coin):
+    NAME = "BitcoinVault"
+    SHORTNAME = "BTCV"
     NET = "mainnet"
     DESERIALIZER = lib_tx.DeserializerBitcoinVault
     P2PKH_VERBYTE = bytes.fromhex("6F")
@@ -3340,6 +3340,14 @@ class BitcoinVaultRegTest(Coin):
     RELAY_FEE = 0.00001
     DAEMON = daemon.FakeEstimateFeeDaemon
 
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        header = cls.block_header(raw_block, height)
+        txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
+        return Block(raw_block, header, txs)
 
-class BitcoinVault3Keys(BitcoinVaultRegTest):
-    DESERIALIZER = BTCV3KeysDeserializer
+
+class BitcoinVaultRegTest(BitcoinVault):
+    SHORTNAME = "BTCVRT"
+    NET = "regtest"
