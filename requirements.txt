@@ -1,0 +1,27 @@
+aiohttp
+aiorpcX
+ecdsa
+plyvel
+pycodestyle
+pylru
+python-rocksdb
+pytest-asyncio
+pytest-cov
+Sphinx
+# hashes
+tribushashm
+blake256
+scrypt
+x11_hash
+git+https://github.com/bitcoinplusorg/x13-hash
+xevan_hash
+quark_hash
+groestlcoin_hash
+neoscrypt
+x16r_hash
+pycryptodomex
+git+https://github.com/Electra-project/nist5_hash
+git+https://github.com/RitoProject/x21s_hash
+git+https://github.com/traysi/x16rv2_hash
+bell-yespower
+cpupower

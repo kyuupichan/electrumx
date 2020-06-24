@@ -1871,8 +1871,8 @@ class Denarius(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import tribus_hash
-        return tribus_hash.getPoWHash(header)
+        import tribushashm
+        return tribushashm.getPoWHash(header)
 
 
 class DenariusTestnet(Denarius):
