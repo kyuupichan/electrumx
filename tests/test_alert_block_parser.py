@@ -1,6 +1,6 @@
 from unittest import TestCase
 from electrumx.lib.coins import BitcoinVault
-from electrumx.lib.tx import TxSegWit, TxAlert, TxAlertSegWit
+from electrumx.lib.tx import TxSegWit, TxVault, TxVaultSegWit
 
 HEADER = '000000201004f91b5a85f563092ad7d8f57385db3e64d6276d55be3ff03da45aea394e1d8df1ee43d09ebdadd54fc50f773845d496a43db7191e9e02cb4ec1df62ebcf82e14bc65effff7f2004000000'
 
@@ -22,9 +22,12 @@ class TestParsingAlertTransaction(TestCase):
         )
         block = self.coin.block(raw_block, 0)
         transactions = block.transactions
+        alerts = block.alerts
 
-        self.assertEqual(len(transactions), 2)
-        self.assertIsInstance(transactions[1][0], TxAlert)
+        self.assertEqual(len(transactions), 1)
+        self.assertEqual(len(alerts), 1)
+        self.assertIsInstance(alerts[0][0], TxVault)
+        self.assertEqual(alerts[0][0].type, 'alert')
 
     def test_segwit_atx(self):
         raw_block = bytes.fromhex(
@@ -34,9 +37,12 @@ class TestParsingAlertTransaction(TestCase):
         )
         block = self.coin.block(raw_block, 0)
         transactions = block.transactions
+        alerts = block.alerts
 
-        self.assertEqual(len(transactions), 2)
-        self.assertIsInstance(transactions[1][0], TxAlertSegWit)
+        self.assertEqual(len(transactions), 1)
+        self.assertEqual(len(alerts), 1)
+        self.assertIsInstance(alerts[0][0], TxVaultSegWit)
+        self.assertEqual(alerts[0][0].type, 'alert')
 
     def test_no_atx(self):
         raw_block = bytes.fromhex(
@@ -45,6 +51,8 @@ class TestParsingAlertTransaction(TestCase):
         )
         block = self.coin.block(raw_block, 0)
         transactions = block.transactions
+        alerts = block.alerts
 
         self.assertEqual(len(transactions), 1)
+        self.assertEqual(len(alerts), 0)
         self.assertIsInstance(transactions[0][0], TxSegWit)

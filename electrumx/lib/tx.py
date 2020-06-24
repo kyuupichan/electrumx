@@ -1017,7 +1017,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
             atx_no = self._read_varint()
             atx = [read() for _ in range(atx_no)]
 
-        return tx + atx
+        return tx, atx
 
     def get_tx_vault_type(self, tx):
         pass

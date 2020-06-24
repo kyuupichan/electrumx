@@ -51,6 +51,7 @@ from electrumx.server.session import (ElectrumX, DashElectrumX,
                                       SmartCashElectrumX, AuxPoWElectrumX)
 
 Block = namedtuple("Block", "raw header transactions")
+BitcoinVaultBlock = namedtuple("Block", "raw header transactions alerts")
 
 
 class CoinError(Exception):
@@ -3344,8 +3345,8 @@ class BitcoinVault(Coin):
     def block(cls, raw_block, height):
         '''Return a Block namedtuple given a raw block and its height.'''
         header = cls.block_header(raw_block, height)
-        txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
-        return Block(raw_block, header, txs)
+        txs, atxs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
+        return BitcoinVaultBlock(raw_block, header, txs, atxs)
 
 
 class BitcoinVaultRegTest(BitcoinVault):
