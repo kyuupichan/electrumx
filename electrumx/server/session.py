@@ -959,37 +959,40 @@ class ElectrumX(SessionBase):
         '''Notify the client about changes to touched addresses (from mempool
         updates or new blocks) and height.
         '''
-        if height_changed and self.subscribe_headers:
-            args = (await self.subscribe_headers_result(), )
-            await self.send_notification('blockchain.headers.subscribe', args)
+        try:
+            if height_changed and self.subscribe_headers:
+                args = (await self.subscribe_headers_result(), )
+                await self.send_notification('blockchain.headers.subscribe', args)
 
-        touched = touched.intersection(self.hashX_subs)
-        if touched or (height_changed and self.mempool_statuses):
-            changed = {}
+            touched = touched.intersection(self.hashX_subs)
+            if touched or (height_changed and self.mempool_statuses):
+                changed = {}
 
-            for hashX in touched:
-                alias = self.hashX_subs.get(hashX)
-                if alias:
-                    status = await self.subscription_address_status(hashX)
-                    changed[alias] = status
-
-            # Check mempool hashXs - the status is a function of the confirmed state of
-            # other transactions.
-            mempool_statuses = self.mempool_statuses.copy()
-            for hashX, old_status in mempool_statuses.items():
-                alias = self.hashX_subs.get(hashX)
-                if alias:
-                    status = await self.subscription_address_status(hashX)
-                    if status != old_status:
+                for hashX in touched:
+                    alias = self.hashX_subs.get(hashX)
+                    if alias:
+                        status = await self.subscription_address_status(hashX)
                         changed[alias] = status
 
-            method = 'blockchain.scripthash.subscribe'
-            for alias, status in changed.items():
-                await self.send_notification(method, (alias, status))
+                # Check mempool hashXs - the status is a function of the confirmed state of
+                # other transactions.
+                mempool_statuses = self.mempool_statuses.copy()
+                for hashX, old_status in mempool_statuses.items():
+                    alias = self.hashX_subs.get(hashX)
+                    if alias:
+                        status = await self.subscription_address_status(hashX)
+                        if status != old_status:
+                            changed[alias] = status
 
-            if changed:
-                es = '' if len(changed) == 1 else 'es'
-                self.logger.info(f'notified of {len(changed):,d} address{es}')
+                method = 'blockchain.scripthash.subscribe'
+                for alias, status in changed.items():
+                    await self.send_notification(method, (alias, status))
+
+                if changed:
+                    es = '' if len(changed) == 1 else 'es'
+                    self.logger.info(f'notified of {len(changed):,d} address{es}')
+        except:
+            self.connection_lost()
 
     async def subscribe_headers_result(self):
         '''The result of a header subscription or notification.'''
