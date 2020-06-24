@@ -991,7 +991,8 @@ class ElectrumX(SessionBase):
                 if changed:
                     es = '' if len(changed) == 1 else 'es'
                     self.logger.info(f'notified of {len(changed):,d} address{es}')
-        except:
+        except Exception as e:
+            self.logger.error(f'Error: {e}')
             self.connection_lost()
 
     async def subscribe_headers_result(self):
