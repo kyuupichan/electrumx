@@ -50,9 +50,6 @@ import electrumx.server.daemon as daemon
 from electrumx.server.session import (ElectrumX, DashElectrumX,
                                       SmartCashElectrumX, AuxPoWElectrumX)
 
-from electrumx.lib.atx import BTCV3KeysDeserializer
-
-
 Block = namedtuple("Block", "raw header transactions")
 
 
@@ -3328,8 +3325,8 @@ class BitcoinRoyale(Coin):
 class BitcoinVaultRegTest(Coin):
     NAME = "BitcoinVaultRegTest"
     SHORTNAME = "BTCVRT"
-    NET = "regtest"
-    DESERIALIZER = lib_tx.DeserializerSegWit
+    NET = "mainnet"
+    DESERIALIZER = lib_tx.DeserializerBitcoinVault
     P2PKH_VERBYTE = bytes.fromhex("6F")
     P2SH_VERBYTE = [bytes.fromhex("C4")]
     GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')

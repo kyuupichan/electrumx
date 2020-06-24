@@ -968,3 +968,64 @@ class DeserializerXaya(DeserializerSegWit, DeserializerAuxPow):
         end = self.cursor
         self.cursor = start
         return self._read_nbytes(end - start)
+
+
+class TxVault(namedtuple("Tx", "version inputs outputs locktime type")):
+    '''Class representing transaction alert.'''
+
+
+class TxVaultSegWit(namedtuple(
+        "Tx", "version marker flag inputs outputs witness locktime type")):
+    '''Class representing a SegWit transaction alert.'''
+
+
+class DeserializerBitcoinVault(DeserializerSegWit):
+    def _read_tx_and_hash_segwit(self):
+        return DeserializerSegWit.read_tx_and_hash(self)
+
+    def _read_atx_and_hash_segwit(self):
+        tx, tx_hash = DeserializerSegWit.read_tx_and_hash(self)
+
+        if isinstance(tx, TxSegWit):
+            tx = TxVaultSegWit(tx.version, tx.marker,
+                                 tx.flag, tx.inputs,
+                                 tx.outputs, tx.witness,
+                                 tx.locktime, "alert")
+        else:
+            tx = TxVault(tx.version, tx.inputs, tx.outputs,
+                         tx.locktime, "alert")
+
+        return tx, tx_hash
+
+    def _check_if_alert_exist(self):
+        if self.binary_length > self.cursor:
+            return True
+        return False
+
+    def _check_if_alert_is_segwit(self):
+        # check if maker byte exists by compare it to 0x00
+        return self.binary[5] == 0x00
+
+    def read_tx_block(self):
+        read = self._read_tx_and_hash_segwit
+        tx_no = self._read_varint()
+        tx = [read() for _ in range(tx_no)]
+
+        atx = []
+        if self._check_if_alert_exist():
+            read = self._read_atx_and_hash_segwit
+            atx_no = self._read_varint()
+            atx = [read() for _ in range(atx_no)]
+
+        return tx + atx
+
+    def get_tx_vault_type(self, tx):
+        pass
+
+        # ar
+        # 6351675268 # 0:4 bytes => OP_IF 1 OP_ELSE 2 OP_ENDIF
+        # 52ae # -2:0 bytes => 2 OP_CHECKMULTISIG
+
+        # air
+        #635167635267536868 # 0:9 bytes => OP_IF 1 OP_ELSE OP_IF 2 OP_ELSE 3 OP_ENDIF OP_ENDIF
+        # 53ae # -2:0 bytes => 3 OP_CHECKMULTISIG
