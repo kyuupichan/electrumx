@@ -26,11 +26,11 @@
 # and warranty status of this software.
 
 '''Transaction-related classes and functions.'''
-
+import enum
 from collections import namedtuple
 from hashlib import blake2s
 
-from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
+from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.script import OpCodes
 from electrumx.lib.util import (
     unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
@@ -979,21 +979,26 @@ class TxVaultSegWit(namedtuple(
     '''Class representing a SegWit transaction alert.'''
 
 
+class VaultTxType(enum.Enum):
+    NONVAULT = 'nonvault'
+    ALERT = 'alert'
+    INSTANT = 'instant'
+    RECOVERY = 'recovery'
+
+
 class DeserializerBitcoinVault(DeserializerSegWit):
-    def _read_tx_and_hash_segwit(self):
-        return DeserializerSegWit.read_tx_and_hash(self)
-
-    def _read_atx_and_hash_segwit(self):
+    def _read_tx_and_hash(self):
         tx, tx_hash = DeserializerSegWit.read_tx_and_hash(self)
-
-        if isinstance(tx, TxSegWit):
+        is_segwit = isinstance(tx, TxSegWit)
+        vault_tx_type = self.get_vault_tx_type(tx, is_segwit)
+        if is_segwit:
             tx = TxVaultSegWit(tx.version, tx.marker,
                                  tx.flag, tx.inputs,
                                  tx.outputs, tx.witness,
-                                 tx.locktime, "alert")
+                                 tx.locktime, vault_tx_type)
         else:
             tx = TxVault(tx.version, tx.inputs, tx.outputs,
-                         tx.locktime, "alert")
+                         tx.locktime, vault_tx_type)
 
         return tx, tx_hash
 
@@ -1002,30 +1007,67 @@ class DeserializerBitcoinVault(DeserializerSegWit):
             return True
         return False
 
-    def _check_if_alert_is_segwit(self):
-        # check if maker byte exists by compare it to 0x00
-        return self.binary[5] == 0x00
-
     def read_tx_block(self):
-        read = self._read_tx_and_hash_segwit
+        read = self._read_tx_and_hash
         tx_no = self._read_varint()
         tx = [read() for _ in range(tx_no)]
 
         atx = []
         if self._check_if_alert_exist():
-            read = self._read_atx_and_hash_segwit
             atx_no = self._read_varint()
             atx = [read() for _ in range(atx_no)]
 
         return tx, atx
 
-    def get_tx_vault_type(self, tx):
-        pass
+    @staticmethod
+    def get_vault_tx_type(tx, is_segwit):
+        ar_script_len = 75
+        air_script_len = 113
 
-        # ar
-        # 6351675268 # 0:4 bytes => OP_IF 1 OP_ELSE 2 OP_ENDIF
-        # 52ae # -2:0 bytes => 2 OP_CHECKMULTISIG
+        def is_ar_type(rs):
+            rs_hex = hash_to_hex_str(rs)
+            tail = 'ae52'  # 0:4 bytes => 2 OP_CHECKMULTISIG
+            head = '6852675163'  # -10:0 bytes => OP_IF 1 OP_ELSE 2 OP_ENDIF
+            return rs_hex[:4] == tail and rs_hex[ar_script_len * 2 - len(head):ar_script_len * 2] == head
 
-        # air
-        #635167635267536868 # 0:9 bytes => OP_IF 1 OP_ELSE OP_IF 2 OP_ELSE 3 OP_ENDIF OP_ENDIF
-        # 53ae # -2:0 bytes => 3 OP_CHECKMULTISIG
+        def is_air_type(rs):
+            rs_hex = hash_to_hex_str(rs)
+            tail = 'ae53'  # 0:4 bytes => 3 OP_CHECKMULTISIG
+            head = '686853675263675163'  # -18:0 bytes => OP_IF 1 OP_ELSE OP_IF 2 OP_ELSE 3 OP_ENDIF OP_ENDIF
+            return rs_hex[:4] == tail and rs_hex[air_script_len * 2 - len(head):air_script_len * 2] == head
+
+        vault_tx_type = VaultTxType.NONVAULT
+        ar_flag = ''
+        air_flag = ''
+        redeem_script = ''
+
+        if is_segwit and len(tx.witness[0]) >= 4:
+            redeem_script = tx.witness[0][-1]
+            ar_flag = tx.witness[0][-2]
+            air_flag = tx.witness[0][-3]
+        elif not is_segwit:
+            redeem_script = tx.inputs[0].script
+
+        if redeem_script:
+            if is_ar_type(redeem_script):
+                if not is_segwit:
+                    ar_flag = tx.inputs[0].script[-ar_script_len-3:-ar_script_len-2]
+
+                if ar_flag == hex_str_to_hash('01'):
+                    vault_tx_type = VaultTxType.ALERT
+                elif ar_flag == hex_str_to_hash(''):
+                    vault_tx_type = VaultTxType.RECOVERY
+            elif is_air_type(redeem_script):
+                if not is_segwit:
+                    ar_flag = tx.inputs[0].script[-air_script_len-4:-air_script_len-3]
+                    air_flag = tx.inputs[0].script[-air_script_len-5:-air_script_len-4]
+
+                if ar_flag == hex_str_to_hash('01'):
+                    vault_tx_type = VaultTxType.ALERT
+                elif ar_flag == hex_str_to_hash('') and air_flag == hex_str_to_hash('01'):
+                    vault_tx_type = VaultTxType.INSTANT
+                elif ar_flag == hex_str_to_hash('') and air_flag == hex_str_to_hash(''):
+                    vault_tx_type = VaultTxType.RECOVERY
+
+        return vault_tx_type
+
