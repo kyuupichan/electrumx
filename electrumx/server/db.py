@@ -30,6 +30,7 @@ from electrumx.server.history import History
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
+BtcoinVaultUTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value spend_height")
 
 
 @attr.s(slots=True)
@@ -38,6 +39,21 @@ class FlushData(object):
     tx_count = attr.ib()
     headers = attr.ib()
     block_tx_hashes = attr.ib()
+    # The following are flushed to the UTXO DB if undo_infos is not None
+    undo_infos = attr.ib()
+    adds = attr.ib()
+    deletes = attr.ib()
+    tip = attr.ib()
+
+
+@attr.s(slots=True)
+class FlushBitcoinVaultData(object):
+    height = attr.ib()
+    tx_count = attr.ib()
+    atx_count = attr.ib()
+    headers = attr.ib()
+    block_tx_hashes = attr.ib()
+    block_atx_hashes = attr.ib()
     # The following are flushed to the UTXO DB if undo_infos is not None
     undo_infos = attr.ib()
     adds = attr.ib()
