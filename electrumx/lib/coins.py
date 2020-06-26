@@ -3328,6 +3328,7 @@ class BitcoinVault(Coin):
     SHORTNAME = "BTCV"
     NET = "mainnet"
     DESERIALIZER = lib_tx.DeserializerBitcoinVault
+    BLOCK_PROCESSOR = block_proc.BitcoinVaultBlockProcessor
     P2PKH_VERBYTE = bytes.fromhex("6F")
     P2SH_VERBYTE = [bytes.fromhex("C4")]
     GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')

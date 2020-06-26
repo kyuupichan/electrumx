@@ -46,21 +46,6 @@ class FlushData(object):
     tip = attr.ib()
 
 
-@attr.s(slots=True)
-class FlushBitcoinVaultData(object):
-    height = attr.ib()
-    tx_count = attr.ib()
-    atx_count = attr.ib()
-    headers = attr.ib()
-    block_tx_hashes = attr.ib()
-    block_atx_hashes = attr.ib()
-    # The following are flushed to the UTXO DB if undo_infos is not None
-    undo_infos = attr.ib()
-    adds = attr.ib()
-    deletes = attr.ib()
-    tip = attr.ib()
-
-
 class DB(object):
     '''Simple wrapper of the backend database for querying.
 

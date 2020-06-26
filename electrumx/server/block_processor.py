@@ -814,3 +814,109 @@ class LTORBlockProcessor(BlockProcessor):
                     add_touched(cache_value[:-12])
 
         self.tx_count -= len(txs)
+
+
+class BitcoinVaultBlockProcessor(BlockProcessor):
+
+    def __init__(self, env, db, daemon, notifications):
+        super(BitcoinVaultBlockProcessor, self).__init__(env, db, daemon, notifications)
+
+        self.atx_count = 0
+
+    def estimate_txs_remaining(self):
+        # Try to estimate how many txs there are to go
+        daemon_height = self.daemon.cached_height()
+        coin = self.coin
+        tail_count = daemon_height - max(self.height, coin.TX_COUNT_HEIGHT)
+        # Damp the initial enthusiasm
+        realism = max(2.0 - 0.9 * self.height / coin.TX_COUNT_HEIGHT, 1.0)
+        return (tail_count * coin.TX_PER_BLOCK +
+                max(coin.TX_COUNT - (self.tx_count + self.atx_count), 0)) * realism
+
+    def flush_data(self):
+        assert self.state_lock.locked()
+        return FlushData(self.height, self.tx_count + self.atx_count, self.headers,
+                         self.tx_hashes, self.undo_infos, self.utxo_cache,
+                         self.db_deletes, self.tip)
+
+    def advance_blocks(self, blocks):
+        min_height = self.db.min_undo_height(self.daemon.cached_height())
+        height = self.height
+
+        for block in blocks:
+            height += 1
+            undo_info = self.advance_txs_and_atxs(block.transactions, block.alerts, height)
+            if height >= min_height:
+                self.undo_infos.append((undo_info, height))
+                self.db.write_raw_block(block.raw, height)
+
+        headers = [block.header for block in blocks]
+        self.height = height
+        self.headers.extend(headers)
+        self.tip = self.coin.header_hash(headers[-1])
+
+    def advance_txs_and_atxs(self, txs, atxs, height):
+        self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs + atxs))
+
+        # Use local vars for speed in the loops
+        undo_info = []
+        tx_num = self.tx_count
+        atx_num = self.atx_count
+        script_hashX = self.coin.hashX_from_script
+        s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        confirm_utxo = self.spend_utxo
+        undo_info_append = undo_info.append
+        update_touched = self.touched.update
+        hashXs_by_tx = []
+        append_hashXs = hashXs_by_tx.append
+
+        for tx, tx_hash in txs:
+            hashXs = []
+            append_hashX = hashXs.append
+            tx_numb = s_pack('<I', tx_num)
+
+            # Confirm the inputs
+            for txin in tx.inputs:
+                if txin.is_generation():
+                    continue
+                cache_value = confirm_utxo(txin.prev_hash, txin.prev_idx)
+                undo_info_append(cache_value)
+                append_hashX(cache_value[:-12])
+
+            # Add the new UTXOs
+            for idx, txout in enumerate(tx.outputs):
+                # Get the hashX.  Ignore unspendable outputs
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    append_hashX(hashX)
+                    put_utxo(tx_hash + s_pack('<H', idx),
+                             hashX + tx_numb + s_pack('<Q', txout.value) + s_pack('<I', 0))
+
+            append_hashXs(hashXs)
+            update_touched(hashXs)
+            tx_num += 1
+
+        for atx, atx_hash in atxs:
+            hashXs = []
+            append_hashX = hashXs.append
+
+            # Spend the inputs by confirming and re-adding it
+            for atxin in atx.inputs:
+                cache_value = confirm_utxo(atxin.prev_hash, atxin.prev_idx)
+                spend_height = s_pack('<I', height)
+                put_utxo(atxin.prev_hash + s_pack('<H', atxin.prev_idx),
+                         cache_value[:-len(spend_height)] + s_pack('<I', height))
+                undo_info_append(cache_value)
+                append_hashX(cache_value[:-12])
+
+            append_hashXs(hashXs)
+            update_touched(hashXs)
+            atx_num += 1
+
+        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count + self.atx_count)
+        self.tx_count = tx_num
+        self.atx_count = atx_num
+        self.db.tx_counts.append(tx_num + atx_num)
+
+        return undo_info
