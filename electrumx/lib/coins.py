@@ -47,6 +47,7 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.lib.tx_axe as lib_tx_axe
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
+from electrumx.server.db import BitcoinVaultDB, DB
 from electrumx.server.session import (ElectrumX, DashElectrumX,
                                       SmartCashElectrumX, AuxPoWElectrumX)
 
@@ -72,6 +73,7 @@ class Coin(object):
     DEFAULT_MAX_SEND = 1000000
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
+    DATABASE = DB
     BLOCK_PROCESSOR = block_proc.BlockProcessor
     HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'timestamp',
                      'bits', 'nonce')
@@ -3341,6 +3343,7 @@ class BitcoinVault(Coin):
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
     DAEMON = daemon.FakeEstimateFeeDaemon
+    DATABASE = BitcoinVaultDB
 
     @classmethod
     def block(cls, raw_block, height):

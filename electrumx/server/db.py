@@ -30,7 +30,7 @@ from electrumx.server.history import History
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
-BtcoinVaultUTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value spend_height")
+BitcoinVaultUTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value spent_height")
 
 
 @attr.s(slots=True)
@@ -693,3 +693,29 @@ class DB(object):
 
         hashX_pairs = await run_in_thread(lookup_hashXs)
         return await run_in_thread(lookup_utxos, hashX_pairs)
+
+
+class BitcoinVaultDB(DB):
+
+    async def all_utxos(self, hashX):
+        def read_utxos():
+            utxos = []
+            utxos_append = utxos.append
+            s_unpack = unpack
+            # Key: b'u' + address_hashX + tx_idx + tx_num
+            # Value: the UTXO value as a 64-bit unsigned integer
+            prefix = b'u' + hashX
+            for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
+                tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
+                value, spent_height = unpack('<QI', db_value)
+                tx_hash, height = self.fs_tx_hash(tx_num)
+                utxos_append(BitcoinVaultUTXO(tx_num, tx_pos, tx_hash, height, value, spent_height))
+            return utxos
+
+        while True:
+            utxos = await run_in_thread(read_utxos)
+            if all(utxo.tx_hash is not None for utxo in utxos):
+                return utxos
+            self.logger.warning(f'all_utxos: tx hash not '
+                                f'found (reorg?), retrying...')
+            await sleep(0.25)

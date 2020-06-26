@@ -12,7 +12,6 @@ from aiorpcx import _version as aiorpcx_version, TaskGroup
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
-from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
 
@@ -96,6 +95,7 @@ class Controller(ServerBase):
         notifications = Notifications()
         Daemon = env.coin.DAEMON
         BlockProcessor = env.coin.BLOCK_PROCESSOR
+        DB = env.coin.DATABASE
 
         async with Daemon(env.coin, env.daemon_url) as daemon:
             db = DB(env)

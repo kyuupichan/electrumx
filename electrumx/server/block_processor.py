@@ -904,9 +904,9 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             # Spend the inputs by confirming and re-adding it
             for atxin in atx.inputs:
                 cache_value = confirm_utxo(atxin.prev_hash, atxin.prev_idx)
-                spend_height = s_pack('<I', height)
+                spent_height = s_pack('<I', height)
                 put_utxo(atxin.prev_hash + s_pack('<H', atxin.prev_idx),
-                         cache_value[:-len(spend_height)] + s_pack('<I', height))
+                         cache_value[:-len(spent_height)] + s_pack('<I', height))
                 undo_info_append(cache_value)
                 append_hashX(cache_value[:-12])
 
@@ -920,3 +920,5 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         self.db.tx_counts.append(tx_num + atx_num)
 
         return undo_info
+
+    # TODO: Fix undo_info for alerts in backup_blocks()
