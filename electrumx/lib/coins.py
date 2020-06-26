@@ -3353,6 +3353,11 @@ class BitcoinVault(Coin):
         return BitcoinVaultBlock(raw_block, header, txs, atxs)
 
 
+class BitcoinVaultTestnet(BitcoinVault):
+    SHORTNAME = "BTCVT"
+    NET = "testnet"
+
+
 class BitcoinVaultRegTest(BitcoinVault):
     SHORTNAME = "BTCVRT"
     NET = "regtest"
