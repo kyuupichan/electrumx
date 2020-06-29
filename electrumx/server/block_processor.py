@@ -16,6 +16,7 @@ import time
 from aiorpcx import TaskGroup, run_in_thread
 
 import electrumx
+from electrumx.lib.tx import VaultTxType
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, class_logger
@@ -891,9 +892,11 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                 # Get the hashX.  Ignore unspendable outputs
                 hashX = script_hashX(txout.pk_script)
                 if hashX:
+                    if tx.type == VaultTxType.ALERT_CONFIRMED:
+                        confirm_utxo(tx_hash, idx)
                     append_hashX(hashX)
                     put_utxo(tx_hash + s_pack('<H', idx),
-                             hashX + tx_numb + s_pack('<Q', txout.value) + s_pack('<I', 0))
+                             hashX + tx_numb + s_pack('<Q', txout.value) + s_pack('<i', 0))
 
             append_hashXs(hashXs)
             update_touched(hashXs)
@@ -902,14 +905,24 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         for atx, atx_hash in atxs:
             hashXs = []
             append_hashX = hashXs.append
+            atx_numb = s_pack('<I', atx_num)
 
-            # Spend the inputs by confirming and re-adding it
+            # Spend and re-add the inputs with spent_height=height => alert_locked
             for atxin in atx.inputs:
                 cache_value = confirm_utxo(atxin.prev_hash, atxin.prev_idx)
                 put_utxo(atxin.prev_hash + s_pack('<H', atxin.prev_idx),
-                         cache_value[:-4] + s_pack('<I', height))
+                         cache_value[:-4] + s_pack('<i', height))
                 undo_info_append(cache_value)
                 append_hashX(cache_value[:-16])
+
+            # Add the new UTXOs with spent_height=-1 => alert_pending
+            for idx, txout in enumerate(atx.outputs):
+                # Get the hashX.  Ignore unspendable outputs
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    append_hashX(hashX)
+                    put_utxo(atx_hash + s_pack('<H', idx),
+                             hashX + atx_numb + s_pack('<Q', txout.value) + s_pack('<i', -1))
 
             append_hashXs(hashXs)
             update_touched(hashXs)

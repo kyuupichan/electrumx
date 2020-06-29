@@ -1694,10 +1694,11 @@ class BitcoinVaultElectrumX(ElectrumX):
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos if utxo.spent_height == 0)
-        alerted = sum(utxo.value for utxo in utxos if utxo.spent_height > 0)
+        alert_pending = sum(utxo.value for utxo in utxos if utxo.spent_height == -1)
+        alert_locked = sum(utxo.value for utxo in utxos if utxo.spent_height > 0)
         unconfirmed = await self.mempool.balance_delta(hashX)
         self.bump_cost(1.0 + len(utxos) / 50)
-        return {'confirmed': confirmed, 'unconfirmed': unconfirmed, 'alerted': alerted}
+        return {'confirmed': confirmed, 'unconfirmed': unconfirmed + alert_pending, 'alerted': alert_locked}
 
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server

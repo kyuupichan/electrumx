@@ -820,7 +820,7 @@ class BitcoinVaultDB(DB):
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
                 tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
-                value, spent_height = unpack('<QI', db_value)
+                value, spent_height = unpack('<Qi', db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 utxos_append(BitcoinVaultUTXO(tx_num, tx_pos, tx_hash, height, value, spent_height))
             return utxos
@@ -870,7 +870,7 @@ class BitcoinVaultDB(DB):
                     # This can happen if the DB was updated between
                     # getting the hashXs and getting the UTXOs
                     return None
-                value, _ = unpack('<QI', db_value)
+                value, _ = unpack('<Qi', db_value)
                 return hashX, value
             return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 
