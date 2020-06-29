@@ -19,7 +19,7 @@ import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.util import chunks, class_logger
-from electrumx.server.db import FlushData
+from electrumx.server.db import FlushData, BitcoinVaultFlushData
 
 
 class Prefetcher(object):
@@ -822,6 +822,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         super(BitcoinVaultBlockProcessor, self).__init__(env, db, daemon, notifications)
 
         self.atx_count = 0
+        self.tx_types = []
 
     def estimate_txs_remaining(self):
         # Try to estimate how many txs there are to go
@@ -835,9 +836,9 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
 
     def flush_data(self):
         assert self.state_lock.locked()
-        return FlushData(self.height, self.tx_count + self.atx_count, self.headers,
+        return BitcoinVaultFlushData(self.height, self.tx_count + self.atx_count, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
-                         self.db_deletes, self.tip)
+                         self.db_deletes, self.tip, self.tx_types)
 
     def advance_blocks(self, blocks):
         min_height = self.db.min_undo_height(self.daemon.cached_height())
@@ -857,6 +858,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
 
     def advance_txs_and_atxs(self, txs, atxs, height):
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs + atxs))
+        self.tx_types.append(b''.join(bytes([tx.type.value]) for tx, _ in txs + atxs))
 
         # Use local vars for speed in the loops
         undo_info = []

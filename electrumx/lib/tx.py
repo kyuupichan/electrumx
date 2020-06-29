@@ -980,21 +980,21 @@ class TxVaultSegWit(namedtuple(
 
 
 class VaultTxType(enum.Enum):
-    NONVAULT = 'nonvault'
-    ALERT = 'alert'
-    CONFIRMED = 'confirmed alert'
-    RECOVERED = 'recovered alert'
-    INSTANT = 'instant'
-    RECOVERY = 'recovery'
+    NONVAULT = 0
+    ALERT_PENDING = 1
+    ALERT_CONFIRMED = 2
+    ALERT_RECOVERED = 3
+    INSTANT = 4
+    RECOVERY = 5
 
 
 class DeserializerBitcoinVault(DeserializerSegWit):
     def _read_tx_and_hash(self, is_tx_section=True):
         tx, tx_hash = DeserializerSegWit.read_tx_and_hash(self)
         vault_tx_type = self.get_vault_tx_type(tx)
-        if is_tx_section and vault_tx_type == VaultTxType.ALERT:
+        if is_tx_section and vault_tx_type == VaultTxType.ALERT_PENDING:
             # Mark Alerts in tx section as confirmed
-            vault_tx_type = VaultTxType.CONFIRMED
+            vault_tx_type = VaultTxType.ALERT_CONFIRMED
         if self.is_segwit(tx):
             tx = TxVaultSegWit(tx.version, tx.marker,
                                  tx.flag, tx.inputs,
@@ -1059,7 +1059,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
                     ar_flag = tx.inputs[0].script[-ar_script_len-3:-ar_script_len-2]
 
                 if ar_flag == hex_str_to_hash('01'):
-                    vault_tx_type = VaultTxType.ALERT
+                    vault_tx_type = VaultTxType.ALERT_PENDING
                 elif ar_flag == hex_str_to_hash(''):
                     vault_tx_type = VaultTxType.RECOVERY
             elif is_air_type(redeem_script):
@@ -1068,7 +1068,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
                     air_flag = tx.inputs[0].script[-air_script_len-5:-air_script_len-4]
 
                 if ar_flag == hex_str_to_hash('01'):
-                    vault_tx_type = VaultTxType.ALERT
+                    vault_tx_type = VaultTxType.ALERT_PENDING
                 elif ar_flag == hex_str_to_hash('') and air_flag == hex_str_to_hash('01'):
                     vault_tx_type = VaultTxType.INSTANT
                 elif ar_flag == hex_str_to_hash('') and air_flag == hex_str_to_hash(''):

@@ -1705,7 +1705,7 @@ class BitcoinVaultElectrumX(ElectrumX):
         result = [{'tx_hash': hash_to_hex_str(tx.hash),
                    'height': -tx.has_unconfirmed_inputs,
                    'fee': tx.fee,
-                   'tx_type': DeserializerBitcoinVault.get_vault_tx_type(tx)}
+                   'tx_type': DeserializerBitcoinVault.get_vault_tx_type(tx).name}
                   for tx in await self.mempool.transaction_summaries(hashX)]
         self.bump_cost(0.25 + len(result) / 50)
         return result
@@ -1715,6 +1715,6 @@ class BitcoinVaultElectrumX(ElectrumX):
         history, cost = await self.session_mgr.limited_history(hashX)
         self.bump_cost(cost)
         conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height,
-                 'tx_type': tx_type}
+                 'tx_type': VaultTxType(int.from_bytes(tx_type, 'big')).name}
                 for tx_hash, height, tx_type in history]
         return conf + await self.unconfirmed_history(hashX)

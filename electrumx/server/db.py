@@ -46,6 +46,11 @@ class FlushData(object):
     tip = attr.ib()
 
 
+@attr.s(slots=True)
+class BitcoinVaultFlushData(FlushData):
+    block_tx_types = attr.ib()
+
+
 class DB(object):
     '''Simple wrapper of the backend database for querying.
 
@@ -696,6 +701,51 @@ class DB(object):
 
 
 class BitcoinVaultDB(DB):
+    def __init__(self, env):
+        super().__init__(env)
+        self.tx_types_file = util.LogicalFile('meta/types', 4, 16000000)
+
+    def flush_fs(self, flush_data):
+        prior_tx_count = (self.tx_counts[self.fs_height]
+                          if self.fs_height >= 0 else 0)
+        assert len(flush_data.block_tx_hashes) == len(flush_data.headers)
+        assert len(flush_data.block_tx_types) == len(flush_data.headers)
+        assert flush_data.height == self.fs_height + len(flush_data.headers)
+        assert flush_data.tx_count == (self.tx_counts[-1] if self.tx_counts
+                                       else 0)
+        assert len(self.tx_counts) == flush_data.height + 1
+        hashes = b''.join(flush_data.block_tx_hashes)
+        flush_data.block_tx_hashes.clear()
+        assert len(hashes) % 32 == 0
+        assert len(hashes) // 32 == flush_data.tx_count - prior_tx_count
+
+        types = b''.join(flush_data.block_tx_types)
+        flush_data.block_tx_types.clear()
+        assert len(types) == flush_data.tx_count - prior_tx_count
+
+        # Write the headers, tx counts, and tx hashes
+        start_time = time.time()
+        height_start = self.fs_height + 1
+        offset = self.header_offset(height_start)
+        self.headers_file.write(offset, b''.join(flush_data.headers))
+        self.fs_update_header_offsets(offset, height_start, flush_data.headers)
+        flush_data.headers.clear()
+
+        offset = height_start * self.tx_counts.itemsize
+        self.tx_counts_file.write(offset,
+                                  self.tx_counts[height_start:].tobytes())
+        offset = prior_tx_count * 32
+        self.hashes_file.write(offset, hashes)
+
+        offset = prior_tx_count
+        self.tx_types_file.write(offset, types)
+
+        self.fs_height = flush_data.height
+        self.fs_tx_count = flush_data.tx_count
+
+        if self.utxo_db.for_sync:
+            elapsed = time.time() - start_time
+            self.logger.info(f'flushed filesystem data in {elapsed:.2f}s')
 
     def flush_utxo_db(self, batch, flush_data):
         start_time = time.time()
@@ -735,6 +785,30 @@ class BitcoinVaultDB(DB):
         self.db_height = flush_data.height
         self.db_tx_count = flush_data.tx_count
         self.db_tip = flush_data.tip
+
+    def fs_tx_hash_and_type(self, tx_num):
+        tx_height = bisect_right(self.tx_counts, tx_num)
+        if tx_height > self.db_height:
+            tx_hash = None
+            tx_type = None
+        else:
+            tx_hash = self.hashes_file.read(tx_num * 32, 32)
+            tx_type = self.tx_types_file.read(tx_num, 1)
+        return tx_hash, tx_height, tx_type
+
+    async def limited_history(self, hashX, *, limit=1000):
+        def read_history():
+            tx_nums = list(self.history.get_txnums(hashX, limit))
+            fs_tx_hash_and_type = self.fs_tx_hash_and_type
+            return [fs_tx_hash_and_type(tx_num) for tx_num in tx_nums]
+
+        while True:
+            history = await run_in_thread(read_history)
+            if all(hash is not None for hash, height, tx_type in history):
+                return history
+            self.logger.warning(f'limited_history: tx hash '
+                                f'not found (reorg?), retrying...')
+            await sleep(0.25)
 
     async def all_utxos(self, hashX):
         def read_utxos():
