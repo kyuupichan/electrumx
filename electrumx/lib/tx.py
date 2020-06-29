@@ -982,16 +982,20 @@ class TxVaultSegWit(namedtuple(
 class VaultTxType(enum.Enum):
     NONVAULT = 'nonvault'
     ALERT = 'alert'
+    CONFIRMED = 'confirmed alert'
+    RECOVERED = 'recovered alert'
     INSTANT = 'instant'
     RECOVERY = 'recovery'
 
 
 class DeserializerBitcoinVault(DeserializerSegWit):
-    def _read_tx_and_hash(self):
+    def _read_tx_and_hash(self, is_tx_section=True):
         tx, tx_hash = DeserializerSegWit.read_tx_and_hash(self)
-        is_segwit = isinstance(tx, TxSegWit)
-        vault_tx_type = self.get_vault_tx_type(tx, is_segwit)
-        if is_segwit:
+        vault_tx_type = self.get_vault_tx_type(tx)
+        if is_tx_section and vault_tx_type == VaultTxType.ALERT:
+            # Mark Alerts in tx section as confirmed
+            vault_tx_type = VaultTxType.CONFIRMED
+        if self.is_segwit(tx):
             tx = TxVaultSegWit(tx.version, tx.marker,
                                  tx.flag, tx.inputs,
                                  tx.outputs, tx.witness,
@@ -1015,12 +1019,12 @@ class DeserializerBitcoinVault(DeserializerSegWit):
         atx = []
         if self._check_if_alert_exist():
             atx_no = self._read_varint()
-            atx = [read() for _ in range(atx_no)]
+            atx = [read(is_tx_section=False) for _ in range(atx_no)]
 
         return tx, atx
 
     @staticmethod
-    def get_vault_tx_type(tx, is_segwit):
+    def get_vault_tx_type(tx):
         ar_script_len = 75
         air_script_len = 113
 
@@ -1041,6 +1045,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
         air_flag = ''
         redeem_script = ''
 
+        is_segwit = DeserializerBitcoinVault.is_segwit(tx)
         if is_segwit and len(tx.witness[0]) >= 4:
             redeem_script = tx.witness[0][-1]
             ar_flag = tx.witness[0][-2]
@@ -1071,3 +1076,6 @@ class DeserializerBitcoinVault(DeserializerSegWit):
 
         return vault_tx_type
 
+    @staticmethod
+    def is_segwit(tx):
+        return isinstance(tx, TxSegWit) or isinstance(tx, TxVaultSegWit)
