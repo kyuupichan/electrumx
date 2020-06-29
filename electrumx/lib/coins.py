@@ -49,7 +49,8 @@ import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.db import BitcoinVaultDB, DB
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
+                                      SmartCashElectrumX, AuxPoWElectrumX,
+                                      BitcoinVaultElectrumX)
 
 Block = namedtuple("Block", "raw header transactions")
 BitcoinVaultBlock = namedtuple("Block", "raw header transactions alerts")
@@ -3342,8 +3343,10 @@ class BitcoinVault(Coin):
     TX_PER_BLOCK = 2000
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DAEMON = daemon.FakeEstimateFeeDaemon
     DATABASE = BitcoinVaultDB
+    SESSIONCLS = BitcoinVaultElectrumX
 
     @classmethod
     def block(cls, raw_block, height):

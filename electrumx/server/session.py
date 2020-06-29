@@ -33,6 +33,7 @@ from electrumx.lib.text import sessions_lines
 import electrumx.lib.util as util
 from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
                                 HASHX_LEN, Base58Error)
+from electrumx.lib.tx import VaultTxType, DeserializerBitcoinVault
 from electrumx.server.daemon import DaemonError
 from electrumx.server.peers import PeerManager
 
@@ -1686,3 +1687,34 @@ class AuxPoWElectrumX(ElectrumX):
             height += 1
 
         return headers.hex()
+
+
+class BitcoinVaultElectrumX(ElectrumX):
+
+    async def get_balance(self, hashX):
+        utxos = await self.db.all_utxos(hashX)
+        confirmed = sum(utxo.value for utxo in utxos if utxo.spent_height == 0)
+        alerted = sum(utxo.value for utxo in utxos if utxo.spent_height > 0)
+        unconfirmed = await self.mempool.balance_delta(hashX)
+        self.bump_cost(1.0 + len(utxos) / 50)
+        return {'confirmed': confirmed, 'unconfirmed': unconfirmed, 'alerted': alerted}
+
+    async def unconfirmed_history(self, hashX):
+        # Note unconfirmed history is unordered in electrum-server
+        # height is -1 if it has unconfirmed inputs, otherwise 0
+        result = [{'tx_hash': hash_to_hex_str(tx.hash),
+                   'height': -tx.has_unconfirmed_inputs,
+                   'fee': tx.fee,
+                   'tx_type': DeserializerBitcoinVault.get_vault_tx_type(tx)}
+                  for tx in await self.mempool.transaction_summaries(hashX)]
+        self.bump_cost(0.25 + len(result) / 50)
+        return result
+
+    async def confirmed_and_unconfirmed_history(self, hashX):
+        # Note history is ordered but unconfirmed is unordered in e-s
+        history, cost = await self.session_mgr.limited_history(hashX)
+        self.bump_cost(cost)
+        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height,
+                 'tx_type': tx_type}
+                for tx_hash, height, tx_type in history]
+        return conf + await self.unconfirmed_history(hashX)
