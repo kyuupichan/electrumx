@@ -882,7 +882,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                     continue
                 cache_value = confirm_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
-                append_hashX(cache_value[:-12])
+                append_hashX(cache_value[:-16])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
@@ -904,11 +904,10 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             # Spend the inputs by confirming and re-adding it
             for atxin in atx.inputs:
                 cache_value = confirm_utxo(atxin.prev_hash, atxin.prev_idx)
-                spent_height = s_pack('<I', height)
                 put_utxo(atxin.prev_hash + s_pack('<H', atxin.prev_idx),
-                         cache_value[:-len(spent_height)] + s_pack('<I', height))
+                         cache_value[:-4] + s_pack('<I', height))
                 undo_info_append(cache_value)
-                append_hashX(cache_value[:-12])
+                append_hashX(cache_value[:-16])
 
             append_hashXs(hashXs)
             update_touched(hashXs)
