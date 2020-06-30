@@ -17,6 +17,7 @@ AIR_RECOVERY_SEGWIT = '02000000000101d8fbcabcee7962dc3827b18f7059c446a30a9711f40
 
 AIR_ALERT_NON_SEGWIT = '0200000001528a5bd018582633521f45bde42c350fc36864eb328b192ca4fa954ac0d5cc7600000000bd0047304402206202bbe65e9495786a170c337c878d1e75609ed43d1684e8f5d2862f81b6f25c02206567951bc4b1e43a014b58366021a7f542a81049c73fbcfc0c2fff782406f96a01514c71635167635267536868210282163aaebde9f9e06913a1781035f4f0ea76bc4b10df86ec212e3dce04e980d9210263451a52f3d3ae6918969e1c5ce934743185578481ef8130336ad1726ba61ddb2102ecec100acb89f3049285ae01e7f03fb469e6b54d44b0f3c8240b1958e893cb8c53aeffffffff01c08c05130400000017a91452c92b0c21d03b5d81b313b8742e40083ab57b958700000000'
 
+
 class TestParsingAlertTransaction(TestCase):
     def setUp(self):
         self.coin = BitcoinVault()
@@ -34,7 +35,7 @@ class TestParsingAlertTransaction(TestCase):
         self.assertEqual(len(transactions), 1)
         self.assertEqual(len(alerts), 1)
         self.assertIsInstance(alerts[0][0], TxVault)
-        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT_PENDING)
 
     def test_segwit_atx(self):
         raw_block = bytes.fromhex(
@@ -49,7 +50,7 @@ class TestParsingAlertTransaction(TestCase):
         self.assertEqual(len(transactions), 1)
         self.assertEqual(len(alerts), 1)
         self.assertIsInstance(alerts[0][0], TxVaultSegWit)
-        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT_PENDING)
 
     def test_no_atx(self):
         raw_block = bytes.fromhex(
@@ -82,11 +83,11 @@ class TestVaultTxTypeDiscovery(TestCase):
 
         self.assertEqual(len(transactions), 1)
         self.assertIsInstance(transactions[0][0], TxVaultSegWit)
-        self.assertEqual(transactions[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(transactions[0][0].type, VaultTxType.ALERT_CONFIRMED)
 
         self.assertEqual(len(alerts), 1)
         self.assertIsInstance(alerts[0][0], TxVaultSegWit)
-        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT_PENDING)
 
     def test_discover_ar_alert_nonsegwit(self):
         raw_block = bytes.fromhex(
@@ -100,7 +101,7 @@ class TestVaultTxTypeDiscovery(TestCase):
 
         self.assertEqual(len(alerts), 1)
         self.assertIsInstance(alerts[0][0], TxVault)
-        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT_PENDING)
 
     def test_discover_ar_recovery(self):
         raw_block = bytes.fromhex(
@@ -129,11 +130,11 @@ class TestVaultTxTypeDiscovery(TestCase):
 
         self.assertEqual(len(transactions), 1)
         self.assertIsInstance(transactions[0][0], TxVaultSegWit)
-        self.assertEqual(transactions[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(transactions[0][0].type, VaultTxType.ALERT_CONFIRMED)
 
         self.assertEqual(len(alerts), 1)
         self.assertIsInstance(alerts[0][0], TxVaultSegWit)
-        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT_PENDING)
 
     def test_discover_air_alert_nonsegwit(self):
         raw_block = bytes.fromhex(
@@ -147,7 +148,7 @@ class TestVaultTxTypeDiscovery(TestCase):
 
         self.assertEqual(len(alerts), 1)
         self.assertIsInstance(alerts[0][0], TxVault)
-        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT)
+        self.assertEqual(alerts[0][0].type, VaultTxType.ALERT_PENDING)
 
     def test_discover_air_instant(self):
         raw_block = bytes.fromhex(
