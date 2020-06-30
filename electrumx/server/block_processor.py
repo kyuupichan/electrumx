@@ -864,7 +864,6 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         # Use local vars for speed in the loops
         undo_info = []
         tx_num = self.tx_count
-        atx_num = self.atx_count
         script_hashX = self.coin.hashX_from_script
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
@@ -905,7 +904,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         for atx, atx_hash in atxs:
             hashXs = []
             append_hashX = hashXs.append
-            atx_numb = s_pack('<I', atx_num)
+            tx_numb = s_pack('<I', tx_num)
 
             # Spend and re-add the inputs with spent_height=height => alert_locked
             for atxin in atx.inputs:
@@ -922,16 +921,15 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                 if hashX:
                     append_hashX(hashX)
                     put_utxo(atx_hash + s_pack('<H', idx),
-                             hashX + atx_numb + s_pack('<Q', txout.value) + s_pack('<i', -1))
+                             hashX + tx_numb + s_pack('<Q', txout.value) + s_pack('<i', -1))
 
             append_hashXs(hashXs)
             update_touched(hashXs)
-            atx_num += 1
+            tx_num += 1
 
         self.db.history.add_unflushed(hashXs_by_tx, self.tx_count + self.atx_count)
         self.tx_count = tx_num
-        self.atx_count = atx_num
-        self.db.tx_counts.append(tx_num + atx_num)
+        self.db.tx_counts.append(tx_num)
 
         return undo_info
 
