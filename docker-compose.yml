@@ -1,0 +1,42 @@
+version: '3.5'
+
+services:
+
+  bitcoind:
+    image: nexus-01.minebest.local:5001/bitcoind
+    build:
+      context: ./docker
+      dockerfile: bitcoind.Dockerfile
+    ports:
+      - "8332:8332"
+      - "18444:18444"
+    entrypoint: ["bvaultd","-conf=/bitcoin/bitcoind-regtest.conf"]
+    labels:
+      io.rancher.container.pull_image: always
+
+  electrumx:
+    build:
+      context: .
+      dockerfile: docker/electrumx.Dockerfile
+    ports:
+      - "50001:50001"
+      - "50002:50002"
+      - "50004:50004"
+      - "10000:10000"
+    volumes:
+      - ./:/electrumx/
+    environment:
+      HOME: /electrumx/data
+      DB_DIRECTORY: /electrumx/data
+      DAEMON_URL: user:pass@bitcoind:8332
+      COIN: BitcoinVault
+      NET: regtest
+      SERVICES: tcp://:50001,ssl://:50002,wss://:50004,rpc://0.0.0.0:10000
+    command:
+      - sh
+      - -c
+      - |
+        cd /electrumx/
+        mkdir data
+        python setup.py install
+        python electrumx_server
