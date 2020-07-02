@@ -1,5 +1,6 @@
 aiohttp==3.6.2
 aiorpcX==0.18.4
+Cython==0.29.20
 ecdsa==0.15
 plyvel==1.2.0
 pycodestyle==2.6.0
