@@ -979,7 +979,7 @@ class TxVaultSegWit(namedtuple(
     '''Class representing a SegWit transaction alert.'''
 
 
-class VaultTxType(enum.Enum):
+class VaultTxType(enum.IntEnum):
     NONVAULT = 0
     ALERT_PENDING = 1
     ALERT_CONFIRMED = 2
