@@ -273,15 +273,15 @@ Return the confirmed and unconfirmed balances of a :ref:`script hash
 **Result**
 
   A dictionary with keys `confirmed` and `unconfirmed`.  The value of
-  each is the appropriate balance in coin units as a string.
+  each is the appropriate balance in minimum coin units (satoshis).
 
 **Result Example**
 
 ::
 
   {
-    "confirmed": "1.03873966",
-    "unconfirmed": "0.236844"
+    "confirmed": 103873966,
+    "unconfirmed": 23684400
   }
 
 blockchain.scripthash.get_history
