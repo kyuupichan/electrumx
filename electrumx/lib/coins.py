@@ -48,6 +48,7 @@ import electrumx.lib.tx_axe as lib_tx_axe
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
 from electrumx.server.db import BitcoinVaultDB, DB
+from electrumx.server.mempool import MemPool, BitcoinVaultMemPool
 from electrumx.server.session import (ElectrumX, DashElectrumX,
                                       SmartCashElectrumX, AuxPoWElectrumX,
                                       BitcoinVaultElectrumX)
@@ -76,6 +77,7 @@ class Coin(object):
     DAEMON = daemon.Daemon
     DATABASE = DB
     BLOCK_PROCESSOR = block_proc.BlockProcessor
+    MEMPOOL = MemPool
     HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'timestamp',
                      'bits', 'nonce')
     HEADER_UNPACK = struct.Struct('< I 32s 32s I I I').unpack_from
@@ -3347,6 +3349,7 @@ class BitcoinVault(Coin):
     DAEMON = daemon.FakeEstimateFeeDaemon
     DATABASE = BitcoinVaultDB
     SESSIONCLS = BitcoinVaultElectrumX
+    MEMPOOL = BitcoinVaultMemPool
 
     @classmethod
     def block(cls, raw_block, height):

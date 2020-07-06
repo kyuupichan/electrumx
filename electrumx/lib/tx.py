@@ -989,8 +989,16 @@ class VaultTxType(enum.IntEnum):
 
 
 class DeserializerBitcoinVault(DeserializerSegWit):
-    def _read_tx_and_hash(self, is_tx_section=True):
+
+    def read_tx_and_hash(self, is_tx_section=False):
         tx, tx_hash = DeserializerSegWit.read_tx_and_hash(self)
+        return self._tx_to_vault_tx(tx, is_tx_section), tx_hash
+
+    def read_tx_and_vsize(self, is_tx_section=False):
+        tx, vsize = DeserializerSegWit.read_tx_and_vsize(self)
+        return self._tx_to_vault_tx(tx, is_tx_section), vsize
+
+    def _tx_to_vault_tx(self, tx, is_tx_section):
         vault_tx_type = self.get_vault_tx_type(tx)
         if is_tx_section and vault_tx_type == VaultTxType.ALERT_PENDING:
             # Mark Alerts in tx section as confirmed
@@ -1004,7 +1012,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
             tx = TxVault(tx.version, tx.inputs, tx.outputs,
                          tx.locktime, vault_tx_type)
 
-        return tx, tx_hash
+        return tx
 
     def _check_if_alert_exist(self):
         if self.binary_length > self.cursor:
@@ -1012,9 +1020,9 @@ class DeserializerBitcoinVault(DeserializerSegWit):
         return False
 
     def read_tx_block(self):
-        read = self._read_tx_and_hash
+        read = self.read_tx_and_hash
         tx_no = self._read_varint()
-        tx = [read() for _ in range(tx_no)]
+        tx = [read(is_tx_section=True) for _ in range(tx_no)]
 
         atx = []
         if self._check_if_alert_exist():

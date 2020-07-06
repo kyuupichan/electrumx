@@ -1701,6 +1701,7 @@ class BitcoinVaultElectrumX(ElectrumX):
                          for tx_hash, height, tx_type in db_history)
         status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
                           f'{-tx.has_unconfirmed_inputs:d}:'
+                          f'{VaultTxType(tx.type).name:s}:'
                           for tx in mempool)
 
         # Add status hashing cost
@@ -1734,7 +1735,7 @@ class BitcoinVaultElectrumX(ElectrumX):
         result = [{'tx_hash': hash_to_hex_str(tx.hash),
                    'height': -tx.has_unconfirmed_inputs,
                    'fee': tx.fee,
-                   'tx_type': DeserializerBitcoinVault.get_vault_tx_type(tx).name}
+                   'tx_type': VaultTxType(tx.type).name }
                   for tx in await self.mempool.transaction_summaries(hashX)]
         self.bump_cost(0.25 + len(result) / 50)
         return result
