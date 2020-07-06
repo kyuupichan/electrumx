@@ -527,7 +527,7 @@ class SessionManager:
                 continue
             n = None
             history = await db.limited_history(hashX, limit=limit)
-            for n, (tx_hash, height) in enumerate(history):
+            for n, (tx_hash, height, *_) in enumerate(history):
                 lines.append(f'History #{n:,d}: height {height:,d} '
                              f'tx_hash {hash_to_hex_str(tx_hash)}')
             if n is None:
