@@ -1691,6 +1691,33 @@ class AuxPoWElectrumX(ElectrumX):
 
 class BitcoinVaultElectrumX(ElectrumX):
 
+    async def address_status(self, hashX):
+        db_history, cost = await self.session_mgr.limited_history(hashX)
+        mempool = await self.mempool.transaction_summaries(hashX)
+
+        status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                         f'{height:d}:'
+                         f'{VaultTxType(int.from_bytes(tx_type, "big")).name:s}:'
+                         for tx_hash, height, tx_type in db_history)
+        status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                          f'{-tx.has_unconfirmed_inputs:d}:'
+                          for tx in mempool)
+
+        # Add status hashing cost
+        self.bump_cost(cost + 0.1 + len(status) * 0.00002)
+
+        if status:
+            status = sha256(status.encode()).hex()
+        else:
+            status = None
+
+        if mempool:
+            self.mempool_statuses[hashX] = status
+        else:
+            self.mempool_statuses.pop(hashX, None)
+
+        return status
+
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos if utxo.spent_height == 0)

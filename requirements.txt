@@ -26,3 +26,4 @@ git+https://github.com/RitoProject/x21s_hash
 git+https://github.com/traysi/x16rv2_hash
 bell-yespower==1.0.3
 cpupower==1.0.1
+websockets==8.1
