@@ -1036,6 +1036,12 @@ class DeserializerBitcoinVault(DeserializerSegWit):
         ar_script_len = 75
         air_script_len = 113
 
+        def is_one(flag):
+            return flag == hex_str_to_hash('01') or flag == hex_str_to_hash('51')
+
+        def is_zero(flag):
+            return flag == hex_str_to_hash('')
+
         def is_ar_type(rs):
             rs_hex = hash_to_hex_str(rs)
             tail = 'ae52'  # 0:4 bytes => 2 OP_CHECKMULTISIG
@@ -1066,20 +1072,20 @@ class DeserializerBitcoinVault(DeserializerSegWit):
                 if not is_segwit:
                     ar_flag = tx.inputs[0].script[-ar_script_len-3:-ar_script_len-2]
 
-                if ar_flag == hex_str_to_hash('01'):
+                if is_one(ar_flag):
                     vault_tx_type = VaultTxType.ALERT_PENDING
-                elif ar_flag == hex_str_to_hash(''):
+                elif is_zero(ar_flag):
                     vault_tx_type = VaultTxType.RECOVERY
             elif is_air_type(redeem_script):
                 if not is_segwit:
                     ar_flag = tx.inputs[0].script[-air_script_len-4:-air_script_len-3]
                     air_flag = tx.inputs[0].script[-air_script_len-5:-air_script_len-4]
 
-                if ar_flag == hex_str_to_hash('01'):
+                if is_one(ar_flag):
                     vault_tx_type = VaultTxType.ALERT_PENDING
-                elif ar_flag == hex_str_to_hash('') and air_flag == hex_str_to_hash('01'):
+                elif is_zero(ar_flag) and is_one(air_flag):
                     vault_tx_type = VaultTxType.INSTANT
-                elif ar_flag == hex_str_to_hash('') and air_flag == hex_str_to_hash(''):
+                elif is_zero(ar_flag) and is_zero(air_flag):
                     vault_tx_type = VaultTxType.RECOVERY
 
         return vault_tx_type
