@@ -411,7 +411,9 @@ class BitcoinVaultMemPool(MemPool):
             # mempool or it may have gotten in a block
             if not raw_tx:
                 continue
-            tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
+
+            alerts_enabled = self.api.db_height() + 1 >= self.coin.ALERTS_HEIGHT
+            tx, tx_size = deserializer(raw_tx, alerts_enabled=alerts_enabled).read_tx_and_vsize()
             # Convert the inputs and outputs into (hashX, value) pairs
             # Drop generation-like inputs from BitcoinVaultMemPoolTx.prevouts
             txin_pairs = tuple((txin.prev_hash, txin.prev_idx)

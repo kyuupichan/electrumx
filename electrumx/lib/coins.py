@@ -3339,6 +3339,7 @@ class BitcoinVault(Coin):
     GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')
     XPUB_VERBYTES = bytes.fromhex("04 35 87 CF")
     XPRV_VERBYTES = bytes.fromhex("04 35 83 94")
+    ALERTS_HEIGHT = 0
     RPC_PORT = 8332
     TX_COUNT = 3300
     TX_COUNT_HEIGHT = 3300
@@ -3355,15 +3356,18 @@ class BitcoinVault(Coin):
     def block(cls, raw_block, height):
         '''Return a Block namedtuple given a raw block and its height.'''
         header = cls.block_header(raw_block, height)
-        txs, atxs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
+        alerts_enabled = height >= cls.ALERTS_HEIGHT
+        txs, atxs = cls.DESERIALIZER(raw_block, start=len(header), alerts_enabled=alerts_enabled).read_tx_block()
         return BitcoinVaultBlock(raw_block, header, txs, atxs)
 
 
 class BitcoinVaultTestnet(BitcoinVault):
     SHORTNAME = "BTCVT"
     NET = "testnet"
+    ALERTS_HEIGHT = 0
 
 
 class BitcoinVaultRegTest(BitcoinVault):
     SHORTNAME = "BTCVRT"
     NET = "regtest"
+    ALERTS_HEIGHT = 1
