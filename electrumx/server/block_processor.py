@@ -938,4 +938,85 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
 
         return undo_info
 
-    # TODO: Fix undo_info for alerts in backup_blocks()
+    def backup_blocks(self, raw_blocks):
+        self.db.assert_flushed(self.flush_data())
+        assert self.height >= len(raw_blocks)
+
+        coin = self.coin
+        for raw_block in raw_blocks:
+            # Check and update self.tip
+            block = coin.block(raw_block, self.height)
+            header_hash = coin.header_hash(block.header)
+            if header_hash != self.tip:
+                raise ChainError('backup block {} not tip {} at height {:,d}'
+                                 .format(hash_to_hex_str(header_hash),
+                                         hash_to_hex_str(self.tip),
+                                         self.height))
+            self.tip = coin.header_prevhash(block.header)
+            self.backup_txs_and_atx(block.transactions, block.alerts)
+            self.height -= 1
+            self.db.tx_counts.pop()
+            self.db.atx_counts.pop()
+
+        self.logger.info('backed up to height {:,d}'.format(self.height))
+
+    def backup_txs_and_atx(self, txs, atxs):
+        undo_info = self.db.read_undo_info(self.height)
+        if undo_info is None:
+            raise ChainError('no undo information found for height {:,d}'
+                             .format(self.height))
+        n = len(undo_info)
+
+        # Use local vars for speed in the loops
+        s_pack = pack
+        put_utxo = self.utxo_cache.__setitem__
+        confirm_utxo = self.spend_utxo
+        script_hashX = self.coin.hashX_from_script
+        touched = self.touched
+        undo_entry_len = 16 + HASHX_LEN
+
+        for tx, tx_hash in reversed(txs):
+            for idx, txout in enumerate(tx.outputs):
+                # Spend the TX outputs.  Be careful with unspendable
+                # outputs - we didn't save those in the first place.
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    cache_value = confirm_utxo(tx_hash, idx)
+                    if tx.type == VaultTxType.ALERT_CONFIRMED:
+                        # Re-add the alert output with spent_height=height => alert_pending
+                        put_utxo(tx_hash + s_pack('<H', idx),
+                                 cache_value[:-4] + s_pack('<i', -1))
+                    touched.add(cache_value[:-16])
+
+            # Restore the inputs
+            for txin in reversed(tx.inputs):
+                if txin.is_generation():
+                    continue
+                n -= undo_entry_len
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                         undo_item)
+                touched.add(undo_item[:-16])
+
+        for atx, atx_hash in reversed(atxs):
+            for idx, txout in enumerate(atx.outputs):
+                # Spend the ATX outputs.  Be careful with unspendable
+                # outputs - we didn't save those in the first place.
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    cache_value = confirm_utxo(atx_hash, idx)
+                    touched.add(cache_value[:-16])
+
+            # Restore the inputs
+            for txin in reversed(atx.inputs):
+                if txin.is_generation():
+                    continue
+                n -= undo_entry_len
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                         undo_item)
+                touched.add(undo_item[:-16])
+
+        assert n == 0
+        self.tx_count -= len(txs)
+        self.atx_count -= 0
