@@ -822,8 +822,9 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
     def __init__(self, env, db, daemon, notifications):
         super(BitcoinVaultBlockProcessor, self).__init__(env, db, daemon, notifications)
 
-        self.atx_count = 0
         self.tx_types = []
+        # helper counter, atx are counted also for tx_count
+        self.atx_count = 0
 
     def estimate_txs_remaining(self):
         # Try to estimate how many txs there are to go
@@ -833,11 +834,11 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         # Damp the initial enthusiasm
         realism = max(2.0 - 0.9 * self.height / coin.TX_COUNT_HEIGHT, 1.0)
         return (tail_count * coin.TX_PER_BLOCK +
-                max(coin.TX_COUNT - (self.tx_count + self.atx_count), 0)) * realism
+                max(coin.TX_COUNT - self.tx_count, 0)) * realism
 
     def flush_data(self):
         assert self.state_lock.locked()
-        return BitcoinVaultFlushData(self.height, self.tx_count + self.atx_count, self.headers,
+        return BitcoinVaultFlushData(self.height, self.tx_count, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip, self.tx_types)
 
@@ -864,6 +865,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         # Use local vars for speed in the loops
         undo_info = []
         tx_num = self.tx_count
+        atx_num = 0
         script_hashX = self.coin.hashX_from_script
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
@@ -926,10 +928,13 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             append_hashXs(hashXs)
             update_touched(hashXs)
             tx_num += 1
+            atx_num += 1
 
-        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count + self.atx_count)
+        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
         self.tx_count = tx_num
+        self.atx_count = atx_num
         self.db.tx_counts.append(tx_num)
+        self.db.atx_counts.append(atx_num)
 
         return undo_info
 
