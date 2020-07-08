@@ -412,7 +412,7 @@ class BitcoinVaultMemPool(MemPool):
             if not raw_tx:
                 continue
 
-            alerts_enabled = self.api.db_height() + 1 >= self.coin.ALERTS_HEIGHT
+            alerts_enabled = self.coin.are_alerts_enabled(self.api.db_height() + 1)
             tx, tx_size = deserializer(raw_tx, alerts_enabled=alerts_enabled).read_tx_and_vsize()
             # Convert the inputs and outputs into (hashX, value) pairs
             # Drop generation-like inputs from BitcoinVaultMemPoolTx.prevouts

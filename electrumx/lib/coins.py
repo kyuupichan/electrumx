@@ -3356,9 +3356,17 @@ class BitcoinVault(Coin):
     def block(cls, raw_block, height):
         '''Return a Block namedtuple given a raw block and its height.'''
         header = cls.block_header(raw_block, height)
-        alerts_enabled = height >= cls.ALERTS_HEIGHT
-        txs, atxs = cls.DESERIALIZER(raw_block, start=len(header), alerts_enabled=alerts_enabled).read_tx_block()
+        alerts_enabled = cls.are_alerts_enabled(height)
+        txs, atxs = cls.DESERIALIZER(raw_block,
+                                     start=len(header),
+                                     alerts_enabled=alerts_enabled
+                                     ).read_tx_block()
         return BitcoinVaultBlock(raw_block, header, txs, atxs)
+
+    @classmethod
+    def are_alerts_enabled(cls, height):
+        # ALERTS_HEIGHT <= 0 means it's disabled
+        return 0 < cls.ALERTS_HEIGHT <= height
 
 
 class BitcoinVaultTestnet(BitcoinVault):
