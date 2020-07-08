@@ -1021,7 +1021,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
         return tx
 
     def _check_if_alert_exist(self):
-        return self.binary_length > self.cursor
+        return self.alerts_enabled and self.binary_length > self.cursor
 
     def read_tx_block(self):
         read = self.read_tx_and_hash
@@ -1044,7 +1044,7 @@ class DeserializerBitcoinVault(DeserializerSegWit):
             return flag == hex_str_to_hash('01') or flag == hex_str_to_hash('51')
 
         def is_zero(flag):
-            return flag == hex_str_to_hash('')
+            return flag == hex_str_to_hash('') or flag == hex_str_to_hash('00')
 
         def is_ar_type(rs):
             rs_hex = hash_to_hex_str(rs)
@@ -1075,6 +1075,8 @@ class DeserializerBitcoinVault(DeserializerSegWit):
             if is_ar_type(redeem_script):
                 if not is_segwit:
                     ar_flag = tx.inputs[0].script[-ar_script_len-3:-ar_script_len-2]
+                    if (is_one(ar_flag)):
+                        ar_flag = tx.inputs[0].script[-ar_script_len-2:-ar_script_len-1]
 
                 if is_one(ar_flag):
                     vault_tx_type = VaultTxType.ALERT_PENDING
@@ -1083,7 +1085,11 @@ class DeserializerBitcoinVault(DeserializerSegWit):
             elif is_air_type(redeem_script):
                 if not is_segwit:
                     ar_flag = tx.inputs[0].script[-air_script_len-4:-air_script_len-3]
+                    if (is_one(ar_flag)):
+                        ar_flag = tx.inputs[0].script[-air_script_len-3:-air_script_len-2]
                     air_flag = tx.inputs[0].script[-air_script_len-5:-air_script_len-4]
+                    if (is_one(air_flag)):
+                        air_flag = tx.inputs[0].script[-air_script_len-4:-air_script_len-3]
 
                 if is_one(ar_flag):
                     vault_tx_type = VaultTxType.ALERT_PENDING
