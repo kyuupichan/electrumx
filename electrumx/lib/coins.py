@@ -3888,3 +3888,19 @@ class Quebecoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 20
     REORG_LIMIT = 2000
     RPC_PORT = 10890
+
+class Stratis(ScryptMixin, Coin):
+    NAME = "Stratis"
+    SHORTNAME = "STRAT"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("63")
+    P2SH_VERBYTES = [bytes.fromhex("125")]
+    GENESIS_HASH = ('0000066e91e46e5a264d42c89e120496'
+                    '3b2ee6be230b443e9159020539d972af')
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 3
+    RPC_PORT = 16174
+    REORG_LIMIT = 500
