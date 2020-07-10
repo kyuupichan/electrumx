@@ -3372,7 +3372,7 @@ class BitcoinVault(Coin):
 class BitcoinVaultTestnet(BitcoinVault):
     SHORTNAME = "BTCVT"
     NET = "testnet"
-    ALERTS_HEIGHT = 0
+    ALERTS_HEIGHT = 81000
 
 
 class BitcoinVaultRegTest(BitcoinVault):
