@@ -3336,7 +3336,7 @@ class BitcoinVault(Coin):
     BLOCK_PROCESSOR = block_proc.BitcoinVaultBlockProcessor
     P2PKH_VERBYTE = bytes.fromhex("6F")
     P2SH_VERBYTE = [bytes.fromhex("C4")]
-    GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')
+    GENESIS_HASH = ('0000000028ce26975b32feda3d75ac3fe10372f75062366cfba4e934dcc6a48b')
     XPUB_VERBYTES = bytes.fromhex("04 35 87 CF")
     XPRV_VERBYTES = bytes.fromhex("04 35 83 94")
     ALERTS_HEIGHT = 0
@@ -3371,6 +3371,7 @@ class BitcoinVault(Coin):
 
 class BitcoinVaultTestnet(BitcoinVault):
     SHORTNAME = "BTCVT"
+    GENESIS_HASH = ('0000000092bdcddd8bcf515ef5820dfc05dafaf708d316b35cd841c59f498637')
     NET = "testnet"
     ALERTS_HEIGHT = 81000
 
@@ -3378,4 +3379,5 @@ class BitcoinVaultTestnet(BitcoinVault):
 class BitcoinVaultRegTest(BitcoinVault):
     SHORTNAME = "BTCVRT"
     NET = "regtest"
+    GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')
     ALERTS_HEIGHT = 1
