@@ -17,8 +17,9 @@ import attr
 from aiorpcx import TaskGroup, run_in_thread, sleep
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
+from electrumx.lib.tx import VaultTxType
 from electrumx.lib.util import class_logger, chunks
-from electrumx.server.db import UTXO
+from electrumx.server.db import UTXO, BitcoinVaultUTXO
 
 
 @attr.s(slots=True)
@@ -432,3 +433,13 @@ class BitcoinVaultMemPool(MemPool):
             has_ui = any(hash in self.txs for hash, idx in tx.prevouts)
             result.append(BitcoinVaultMemPoolTxSummary(tx_hash, tx.fee, has_ui, tx.type))
         return result
+
+    async def unordered_UTXOs(self, hashX):
+        utxos = []
+        for tx_hash in self.hashXs.get(hashX, ()):
+            tx = self.txs.get(tx_hash)
+            spent_height = -1 if tx.type == VaultTxType.ALERT_PENDING else 0
+            for pos, (hX, value) in enumerate(tx.out_pairs):
+                if hX == hashX:
+                    utxos.append(BitcoinVaultUTXO(-1, pos, tx_hash, 0, value, spent_height))
+        return utxos

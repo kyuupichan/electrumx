@@ -1719,6 +1719,20 @@ class BitcoinVaultElectrumX(ElectrumX):
 
         return status
 
+    async def hashX_listunspent(self, hashX):
+        utxos = await self.db.all_utxos(hashX)
+        utxos = sorted(utxos)
+        utxos.extend(await self.mempool.unordered_UTXOs(hashX))
+        self.bump_cost(1.0 + len(utxos) / 50)
+        spends = await self.mempool.potential_spends(hashX)
+
+        return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value,
+                 'spent_height': utxo.spent_height}
+                for utxo in utxos
+                if (utxo.tx_hash, utxo.tx_pos) not in spends]
+
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
         confirmed = sum(utxo.value for utxo in utxos if utxo.spent_height == 0)
