@@ -3907,3 +3907,12 @@ class Stratis(Coin):
     REORG_LIMIT = 500
     DAEMON = daemon.PreLegacyRPCDaemon
     DESERIALIZER = lib_tx.DeserializerTxTime
+
+    @classmethod
+    def header_hash(cls, header):
+        version, = util.unpack_le_uint32_from(header)
+
+        if version > 2:
+            return double_sha256(header)
+        else:
+            return hex_str_to_hash(Stratis.GENESIS_HASH)
