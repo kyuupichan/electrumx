@@ -3917,4 +3917,3 @@ class Stratis(Coin):
             return double_sha256(header)
         else:
             return hex_str_to_hash(Stratis.GENESIS_HASH)
-
