@@ -3889,6 +3889,7 @@ class Quebecoin(AuxPowMixin, Coin):
     REORG_LIMIT = 2000
     RPC_PORT = 10890
 
+
 class Stratis(Coin):
     NAME = "Stratis"
     SHORTNAME = "STRAT"
@@ -3900,8 +3901,8 @@ class Stratis(Coin):
     WIF_BYTE = bytes.fromhex("bf")
     GENESIS_HASH = ('0000066e91e46e5a264d42c89e120496'
                     '3b2ee6be230b443e9159020539d972af')
-    TX_COUNT = 1
-    TX_COUNT_HEIGHT = 1
+    TX_COUNT = 4492040
+    TX_COUNT_HEIGHT = 1856348
     TX_PER_BLOCK = 3
     RPC_PORT = 16174
     REORG_LIMIT = 500
@@ -3916,3 +3917,4 @@ class Stratis(Coin):
             return double_sha256(header)
         else:
             return hex_str_to_hash(Stratis.GENESIS_HASH)
+
