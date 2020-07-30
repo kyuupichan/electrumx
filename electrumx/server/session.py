@@ -1729,15 +1729,15 @@ class BitcoinVaultElectrumX(ElectrumX):
         return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
                  'tx_pos': utxo.tx_pos,
                  'height': utxo.height, 'value': utxo.value,
-                 'spent_height': utxo.spent_height}
+                 'spend_tx_num': utxo.spend_tx_num}
                 for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
-        confirmed = sum(utxo.value for utxo in utxos if utxo.spent_height == 0)
-        alert_incoming = sum(utxo.value for utxo in utxos if utxo.spent_height == -1)
-        alert_outgoing = sum(utxo.value for utxo in utxos if utxo.spent_height > 0)
+        confirmed = sum(utxo.value for utxo in utxos if utxo.spend_tx_num == 0)
+        alert_incoming = sum(utxo.value for utxo in utxos if utxo.spend_tx_num == -1)
+        alert_outgoing = sum(utxo.value for utxo in utxos if utxo.spend_tx_num > 0)
         unconfirmed = await self.mempool.balance_delta(hashX)
         self.bump_cost(1.0 + len(utxos) / 50)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed,

@@ -30,7 +30,7 @@ from electrumx.server.history import History
 
 
 UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
-BitcoinVaultUTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value spent_height")
+BitcoinVaultUTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value spend_tx_num")
 
 
 @attr.s(slots=True)
@@ -865,9 +865,9 @@ class BitcoinVaultDB(DB):
             prefix = b'u' + hashX
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
                 tx_pos, tx_num = s_unpack('<HI', db_key[-6:])
-                value, spent_height = unpack('<Qi', db_value)
+                value, spend_tx_num = unpack('<Qi', db_value)
                 tx_hash, height = self.fs_tx_hash(tx_num)
-                utxos_append(BitcoinVaultUTXO(tx_num, tx_pos, tx_hash, height, value, spent_height))
+                utxos_append(BitcoinVaultUTXO(tx_num, tx_pos, tx_hash, height, value, spend_tx_num))
             return utxos
 
         while True:

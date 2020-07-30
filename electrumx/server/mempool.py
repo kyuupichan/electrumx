@@ -438,8 +438,8 @@ class BitcoinVaultMemPool(MemPool):
         utxos = []
         for tx_hash in self.hashXs.get(hashX, ()):
             tx = self.txs.get(tx_hash)
-            spent_height = -1 if tx.type == VaultTxType.ALERT_PENDING else 0
+            spend_tx_num = -1 if tx.type == VaultTxType.ALERT_PENDING else 0
             for pos, (hX, value) in enumerate(tx.out_pairs):
                 if hX == hashX:
-                    utxos.append(BitcoinVaultUTXO(-1, pos, tx_hash, 0, value, spent_height))
+                    utxos.append(BitcoinVaultUTXO(-1, pos, tx_hash, 0, value, spend_tx_num))
         return utxos

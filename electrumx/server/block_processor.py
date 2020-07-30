@@ -848,7 +848,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
 
         for block in blocks:
             height += 1
-            undo_info = self.advance_txs_and_atxs(block.transactions, block.alerts, height)
+            undo_info = self.advance_txs_and_atxs(block.transactions, block.alerts)
             if height >= min_height:
                 self.undo_infos.append((undo_info, height))
                 self.db.write_raw_block(block.raw, height)
@@ -858,10 +858,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         self.headers.extend(headers)
         self.tip = self.coin.header_hash(headers[-1])
 
-    def advance_txs_and_atxs(self, txs, atxs, height):
-        self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs + atxs))
-        self.tx_types.append(b''.join(bytes([tx.type.value]) for tx, _ in txs + atxs))
-
+    def advance_txs_and_atxs(self, txs, atxs):
         # Use local vars for speed in the loops
         undo_info = []
         tx_num = self.tx_count
@@ -874,6 +871,9 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         update_touched = self.touched.update
         hashXs_by_tx = []
         append_hashXs = hashXs_by_tx.append
+        recovered_atx_nums = set()
+        # tx_num: hashX[]
+        recovered_atx_hashXs = {}
 
         for tx, tx_hash in txs:
             hashXs = []
@@ -887,6 +887,12 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                 cache_value = confirm_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
                 append_hashX(cache_value[:-16])
+                if tx.type == VaultTxType.RECOVERY:
+                    spend_tx_num = unpack('<I', cache_value[-4:])[0]
+                    if spend_tx_num not in recovered_atx_hashXs:
+                        recovered_atx_hashXs[spend_tx_num] = []
+                    recovered_atx_hashXs[spend_tx_num].append(cache_value[:-16])
+                    recovered_atx_nums.add(spend_tx_num)
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
@@ -908,15 +914,15 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             append_hashX = hashXs.append
             tx_numb = s_pack('<I', tx_num)
 
-            # Spend and re-add the inputs with spent_height=height => alert_locked
+            # Spend and re-add the inputs with spend_tx_num => alert_locked
             for atxin in atx.inputs:
                 cache_value = confirm_utxo(atxin.prev_hash, atxin.prev_idx)
                 put_utxo(atxin.prev_hash + s_pack('<H', atxin.prev_idx),
-                         cache_value[:-4] + s_pack('<i', height))
+                         cache_value[:-4] + s_pack('<i', tx_num))
                 undo_info_append(cache_value)
                 append_hashX(cache_value[:-16])
 
-            # Add the new UTXOs with spent_height=-1 => alert_pending
+            # Add the new UTXOs with spend_tx_num=-1 => alert_pending
             for idx, txout in enumerate(atx.outputs):
                 # Get the hashX.  Ignore unspendable outputs
                 hashX = script_hashX(txout.pk_script)
@@ -929,6 +935,39 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             update_touched(hashXs)
             tx_num += 1
             atx_num += 1
+
+        # Handle recovered ALERTs
+        recovered_atx = []
+        for num in recovered_atx_nums:
+            recovered_atx_hash, recovered_atx_height = self.db.fs_tx_hash(num)
+            if recovered_atx_hash is None:
+                recovered_atx_hash = self.get_tx_hash_from_cache(num, recovered_atx_height)
+            recovered_atx.append(recovered_atx_hash)
+
+            append_hashX = recovered_atx_hashXs[num].append
+            vout_index = 0
+            while True:
+                try:
+                    cache_value = confirm_utxo(recovered_atx_hash, vout_index)
+                    undo_info_append(cache_value)
+                    append_hashX(cache_value[:-16])
+                except ChainError:
+                    break
+                vout_index += 1
+
+            append_hashXs(recovered_atx_hashXs[num])
+            update_touched(recovered_atx_hashXs[num])
+            tx_num += 1
+            # TODO: use separate counter for recovered alerts
+            #       when get_alert_merkle_root method is implemented
+            atx_num += 1
+
+        self.tx_hashes.append(
+            b''.join([tx_hash for tx, tx_hash in txs + atxs] + recovered_atx))
+        self.tx_types.append(b''.join(
+            [bytes([tx.type.value]) for tx, _ in txs + atxs] +
+            [bytes([VaultTxType.ALERT_RECOVERED.value]) for _ in recovered_atx]
+        ))
 
         self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
         self.tx_count = tx_num
@@ -983,7 +1022,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                 if hashX:
                     cache_value = confirm_utxo(tx_hash, idx)
                     if tx.type == VaultTxType.ALERT_CONFIRMED:
-                        # Re-add the alert output with spent_height=height => alert_pending
+                        # Re-add the alert output with spend_tx_num=height => alert_pending
                         put_utxo(tx_hash + s_pack('<H', idx),
                                  cache_value[:-4] + s_pack('<i', -1))
                     touched.add(cache_value[:-16])
@@ -1019,4 +1058,10 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
 
         assert n == 0
         self.tx_count -= len(txs)
-        self.atx_count -= 0
+        self.atx_count = 0
+
+    def get_tx_hash_from_cache(self, tx_num, tx_height):
+        height_tx_count = self.db.tx_counts[tx_height - 1]
+        index = (tx_num - height_tx_count) * 32
+        tx_hash = self.tx_hashes[tx_height][index:index + 32]
+        return tx_hash
