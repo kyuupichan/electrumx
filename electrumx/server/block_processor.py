@@ -832,7 +832,7 @@ class LTORBlockProcessor(BlockProcessor):
                     continue
 
                 # Get the hashX
-                hashX = script_hashX(txout.script)
+                hashX = script_hashX(txout.pk_script)
                 cache_value = spend_utxo(tx_hash, idx)
                 add_touched(cache_value[:-13])
 
