@@ -886,7 +886,7 @@ class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
     PROTOCOL_MIN = (1, 4)
-    PROTOCOL_MAX = (1, 4, 2)
+    PROTOCOL_MAX = (2, 0)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

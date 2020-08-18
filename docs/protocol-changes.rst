@@ -166,3 +166,19 @@ New methods
 -----------
 
   * :func:`blockchain.scipthash.unsubscribe` to unsubscribe from a script hash.
+
+
+Version 2.0
+=============
+
+Changes
+-------
+
+  * :func:`blockchain.scripthash.get_balance` -
+    added `alert_incoming` and `alert_outgoing` balances
+
+  * :func:`blockchain.scripthash.get_history` - added `tx_type` to each transaction
+
+  * :func:`blockchain.scripthash.get_mempool` - added `tx_type` to each transaction
+
+  * :func:`blockchain.scripthash.listunspent` - added `spend_tx_num`

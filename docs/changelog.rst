@@ -7,6 +7,12 @@
    and memory consumption whilst serving clients.  Those problems
    should not occur with Python 3.7.
 
+Version 2.0 (18 Aug 2020)
+============================
+
+* coin additions / updates: BitcoinVault (BTCV)
+* require clients use protocol 2.0 or higher
+
 Version 1.13.0 (26 Sep 2019)
 ============================
 
