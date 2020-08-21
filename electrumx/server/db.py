@@ -705,11 +705,19 @@ class BitcoinVaultDB(DB):
         super().__init__(env)
         # helper counters, atx are counted also for db_tx_count and tx_counts
         self.atx_counts = None
+        self.ratx_counts = None
         self.tx_types_file = util.LogicalFile('meta/types', 4, 16000000)
         self.atx_counts_file = util.LogicalFile('meta/atxcounts', 2, 2000000)
+        self.ratx_counts_file = util.LogicalFile('meta/ratxcounts', 2, 2000000)
 
     async def _read_tx_counts(self):
         size = (self.db_height + 1) * 4
+
+        if self.ratx_counts is None:
+            # ratx_counts[N] has the number of recovered atxs at the height N
+            ratx_counts = self.ratx_counts_file.read(0, size)
+            assert len(ratx_counts) == size
+            self.ratx_counts = array.array('I', ratx_counts)
 
         if self.tx_counts is None:
             # tx_counts[N] has the cumulative number of txs at the end of
@@ -723,8 +731,7 @@ class BitcoinVaultDB(DB):
                 assert self.db_tx_count == 0
 
         if self.atx_counts is None:
-            # atx_counts[N] has the cumulative number of atxs at the end of
-            # height N
+            # atx_counts[N] has the number of atxs at the height N
             atx_counts = self.atx_counts_file.read(0, size)
             assert len(atx_counts) == size
             self.atx_counts = array.array('I', atx_counts)
@@ -739,6 +746,7 @@ class BitcoinVaultDB(DB):
                                        else 0)
         assert len(self.tx_counts) == flush_data.height + 1
         assert len(self.atx_counts) == flush_data.height + 1
+        assert len(self.ratx_counts) == flush_data.height + 1
         hashes = b''.join(flush_data.block_tx_hashes)
         flush_data.block_tx_hashes.clear()
         assert len(hashes) % 32 == 0
@@ -763,6 +771,10 @@ class BitcoinVaultDB(DB):
         offset = height_start * self.atx_counts.itemsize
         self.atx_counts_file.write(offset,
                                    self.atx_counts[height_start:].tobytes())
+
+        offset = height_start * self.ratx_counts.itemsize
+        self.ratx_counts_file.write(offset,
+                                   self.ratx_counts[height_start:].tobytes())
 
         offset = prior_tx_count * 32
         self.hashes_file.write(offset, hashes)
@@ -833,10 +845,12 @@ class BitcoinVaultDB(DB):
         if block_height > 0:
             first_tx_num = self.tx_counts[block_height - 1]
             atx_num = self.atx_counts[block_height]
+            ratx_num = self.ratx_counts[block_height]
         else:
             first_tx_num = 0
             atx_num = 0
-        num_txs_in_block = self.tx_counts[block_height] - first_tx_num - atx_num
+            ratx_num = 0
+        num_txs_in_block = self.tx_counts[block_height] - first_tx_num - atx_num - ratx_num
         tx_hashes = self.hashes_file.read(first_tx_num * 32, num_txs_in_block * 32)
         assert num_txs_in_block == len(tx_hashes) // 32
         return [tx_hashes[idx * 32: (idx + 1) * 32] for idx in range(num_txs_in_block)]

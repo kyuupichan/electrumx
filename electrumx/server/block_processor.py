@@ -825,6 +825,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         self.tx_types = []
         # helper counter, atx are counted also for tx_count
         self.atx_count = 0
+        self.ratx_count = 0
 
     def estimate_txs_remaining(self):
         # Try to estimate how many txs there are to go
@@ -863,6 +864,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         undo_info = []
         tx_num = self.tx_count
         atx_num = 0
+        ratx_num = 0
         script_hashX = self.coin.hashX_from_script
         s_pack = pack
         put_utxo = self.utxo_cache.__setitem__
@@ -888,7 +890,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                 undo_info_append(cache_value)
                 append_hashX(cache_value[:-16])
                 if tx.type == VaultTxType.RECOVERY:
-                    spend_tx_num = unpack('<I', cache_value[-4:])[0]
+                    spend_tx_num = unpack('<i', cache_value[-4:])[0]
                     if spend_tx_num not in recovered_atx_hashXs:
                         recovered_atx_hashXs[spend_tx_num] = []
                     recovered_atx_hashXs[spend_tx_num].append(cache_value[:-16])
@@ -958,9 +960,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             append_hashXs(recovered_atx_hashXs[num])
             update_touched(recovered_atx_hashXs[num])
             tx_num += 1
-            # TODO: use separate counter for recovered alerts
-            #       when get_alert_merkle_root method is implemented
-            atx_num += 1
+            ratx_num += 1
 
         self.tx_hashes.append(
             b''.join([tx_hash for tx, tx_hash in txs + atxs] + recovered_atx))
@@ -972,8 +972,10 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
         self.tx_count = tx_num
         self.atx_count = atx_num
+        self.ratx_count = ratx_num
         self.db.tx_counts.append(tx_num)
         self.db.atx_counts.append(atx_num)
+        self.db.ratx_counts.append(ratx_num)
 
         return undo_info
 
@@ -996,6 +998,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
             self.height -= 1
             self.db.tx_counts.pop()
             self.db.atx_counts.pop()
+            self.db.ratx_counts.pop()
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
@@ -1013,7 +1016,59 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         script_hashX = self.coin.hashX_from_script
         touched = self.touched
         undo_entry_len = 16 + HASHX_LEN
+        recovered_atx_nums = set()
 
+        # collect recovered alerts tx_nums
+        m = 0
+        for tx, tx_hash in txs:
+            for txin in tx.inputs:
+                if txin.is_generation():
+                    continue
+                if tx.type == VaultTxType.RECOVERY:
+                    undo_item = undo_info[m:m + undo_entry_len]
+                    spend_tx_num = unpack('<i', undo_item[-4:])[0]
+                    recovered_atx_nums.add(spend_tx_num)
+                m += undo_entry_len
+
+        # undo recovered alerts
+        for num in recovered_atx_nums:
+            recovered_atx_hash, recovered_atx_height = self.db.fs_tx_hash(num)
+            if recovered_atx_hash is None:
+                recovered_atx_hash = self.get_tx_hash_from_cache(num, recovered_atx_height)
+
+            m = n - undo_entry_len
+            undo_item = undo_info[m:m + undo_entry_len]
+            vout_index = 0
+            while n >= undo_entry_len and undo_info[n-undo_entry_len:n][-16:-12] == undo_item[-16:-12]:
+                n -= undo_entry_len
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(recovered_atx_hash + s_pack('<H', vout_index),
+                         undo_item)
+                touched.add(undo_item[:-16])
+                vout_index += 1
+
+        # undo alerts
+        for atx, atx_hash in reversed(atxs):
+            for idx, txout in enumerate(atx.outputs):
+                # Spend the ATX outputs.  Be careful with unspendable
+                # outputs - we didn't save those in the first place.
+                hashX = script_hashX(txout.pk_script)
+                if hashX:
+                    cache_value = confirm_utxo(atx_hash, idx)
+                    touched.add(cache_value[:-16])
+
+            # Restore the inputs
+            for txin in reversed(atx.inputs):
+                if txin.is_generation():
+                    continue
+                confirm_utxo(txin.prev_hash, txin.prev_idx)
+                n -= undo_entry_len
+                undo_item = undo_info[n:n + undo_entry_len]
+                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
+                         undo_item)
+                touched.add(undo_item[:-16])
+
+        # undo transactions
         for tx, tx_hash in reversed(txs):
             for idx, txout in enumerate(tx.outputs):
                 # Spend the TX outputs.  Be careful with unspendable
@@ -1022,7 +1077,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                 if hashX:
                     cache_value = confirm_utxo(tx_hash, idx)
                     if tx.type == VaultTxType.ALERT_CONFIRMED:
-                        # Re-add the alert output with spend_tx_num=height => alert_pending
+                        # Re-add the alert output with spend_tx_num=-1 => alert_pending
                         put_utxo(tx_hash + s_pack('<H', idx),
                                  cache_value[:-4] + s_pack('<i', -1))
                     touched.add(cache_value[:-16])
@@ -1037,28 +1092,10 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
                          undo_item)
                 touched.add(undo_item[:-16])
 
-        for atx, atx_hash in reversed(atxs):
-            for idx, txout in enumerate(atx.outputs):
-                # Spend the ATX outputs.  Be careful with unspendable
-                # outputs - we didn't save those in the first place.
-                hashX = script_hashX(txout.pk_script)
-                if hashX:
-                    cache_value = confirm_utxo(atx_hash, idx)
-                    touched.add(cache_value[:-16])
-
-            # Restore the inputs
-            for txin in reversed(atx.inputs):
-                if txin.is_generation():
-                    continue
-                n -= undo_entry_len
-                undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + s_pack('<H', txin.prev_idx),
-                         undo_item)
-                touched.add(undo_item[:-16])
-
         assert n == 0
-        self.tx_count -= len(txs)
+        self.tx_count -= len(txs) + len(atxs) + len(recovered_atx_nums)
         self.atx_count = 0
+        self.ratx_count = 0
 
     def get_tx_hash_from_cache(self, tx_num, tx_height):
         height_tx_count = self.db.tx_counts[tx_height - 1]
