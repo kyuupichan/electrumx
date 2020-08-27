@@ -1691,18 +1691,33 @@ class AuxPoWElectrumX(ElectrumX):
 
 class BitcoinVaultElectrumX(ElectrumX):
 
+    ALERTS_PROTOCOL_VERSION = (2, 0)
+
+    def _is_alerts_compatible_protocol(self):
+        return self.protocol_tuple >= self.ALERTS_PROTOCOL_VERSION
+
     async def address_status(self, hashX):
         db_history, cost = await self.session_mgr.limited_history(hashX)
         mempool = await self.mempool.transaction_summaries(hashX)
 
-        status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
-                         f'{height:d}:'
-                         f'{VaultTxType(int.from_bytes(tx_type, "big")).name:s}:'
-                         for tx_hash, height, tx_type in db_history)
-        status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
-                          f'{-tx.has_unconfirmed_inputs:d}:'
-                          f'{VaultTxType(tx.type).name:s}:'
-                          for tx in mempool)
+        if not self._is_alerts_compatible_protocol():
+            status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                             f'{height:d}:'
+                             for tx_hash, height, tx_type in db_history
+                             if int.from_bytes(tx_type, 'big') != VaultTxType.ALERT_PENDING)
+            status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                              f'{-tx.has_unconfirmed_inputs:d}:'
+                              for tx in mempool
+                              if tx.type != VaultTxType.ALERT_PENDING)
+        else:
+            status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                             f'{height:d}:'
+                             f'{VaultTxType(int.from_bytes(tx_type, "big")).name:s}:'
+                             for tx_hash, height, tx_type in db_history)
+            status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                              f'{-tx.has_unconfirmed_inputs:d}:'
+                              f'{VaultTxType(tx.type).name:s}:'
+                              for tx in mempool)
 
         # Add status hashing cost
         self.bump_cost(cost + 0.1 + len(status) * 0.00002)
@@ -1726,12 +1741,20 @@ class BitcoinVaultElectrumX(ElectrumX):
         self.bump_cost(1.0 + len(utxos) / 50)
         spends = await self.mempool.potential_spends(hashX)
 
-        return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
-                 'tx_pos': utxo.tx_pos,
-                 'height': utxo.height, 'value': utxo.value,
-                 'spend_tx_num': utxo.spend_tx_num}
-                for utxo in utxos
-                if (utxo.tx_hash, utxo.tx_pos) not in spends]
+        if not self._is_alerts_compatible_protocol():
+            return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                     'tx_pos': utxo.tx_pos,
+                     'height': utxo.height, 'value': utxo.value}
+                    for utxo in utxos
+                    if (utxo.tx_hash, utxo.tx_pos) not in spends
+                    and utxo.spend_tx_num == 0]
+        else:
+            return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                     'tx_pos': utxo.tx_pos,
+                     'height': utxo.height, 'value': utxo.value,
+                     'spend_tx_num': utxo.spend_tx_num}
+                    for utxo in utxos
+                    if (utxo.tx_hash, utxo.tx_pos) not in spends]
 
     async def get_balance(self, hashX):
         utxos = await self.db.all_utxos(hashX)
@@ -1740,17 +1763,29 @@ class BitcoinVaultElectrumX(ElectrumX):
         alert_outgoing = sum(utxo.value for utxo in utxos if utxo.spend_tx_num > 0)
         unconfirmed = await self.mempool.balance_delta(hashX)
         self.bump_cost(1.0 + len(utxos) / 50)
-        return {'confirmed': confirmed, 'unconfirmed': unconfirmed,
-                'alert_incoming': alert_incoming, 'alert_outgoing': alert_outgoing}
+
+        if not self._is_alerts_compatible_protocol():
+            return {'confirmed': confirmed, 'unconfirmed': unconfirmed + alert_incoming}
+        else:
+            return {'confirmed': confirmed, 'unconfirmed': unconfirmed,
+                    'alert_incoming': alert_incoming, 'alert_outgoing': alert_outgoing}
 
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
         # height is -1 if it has unconfirmed inputs, otherwise 0
-        result = [{'tx_hash': hash_to_hex_str(tx.hash),
-                   'height': -tx.has_unconfirmed_inputs,
-                   'fee': tx.fee,
-                   'tx_type': VaultTxType(tx.type).name }
-                  for tx in await self.mempool.transaction_summaries(hashX)]
+
+        if not self._is_alerts_compatible_protocol():
+            result = [{'tx_hash': hash_to_hex_str(tx.hash),
+                       'height': -tx.has_unconfirmed_inputs,
+                       'fee': tx.fee }
+                      for tx in await self.mempool.transaction_summaries(hashX)
+                      if tx.type != VaultTxType.ALERT_PENDING]
+        else:
+            result = [{'tx_hash': hash_to_hex_str(tx.hash),
+                       'height': -tx.has_unconfirmed_inputs,
+                       'fee': tx.fee,
+                       'tx_type': VaultTxType(tx.type).name }
+                      for tx in await self.mempool.transaction_summaries(hashX)]
         self.bump_cost(0.25 + len(result) / 50)
         return result
 
@@ -1758,7 +1793,14 @@ class BitcoinVaultElectrumX(ElectrumX):
         # Note history is ordered but unconfirmed is unordered in e-s
         history, cost = await self.session_mgr.limited_history(hashX)
         self.bump_cost(cost)
-        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height,
-                 'tx_type': VaultTxType(int.from_bytes(tx_type, 'big')).name}
-                for tx_hash, height, tx_type in history]
+
+        if not self._is_alerts_compatible_protocol():
+            conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
+                    for tx_hash, height, tx_type in history
+                    if int.from_bytes(tx_type, 'big') != VaultTxType.ALERT_PENDING]
+        else:
+            conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height,
+                     'tx_type': VaultTxType(int.from_bytes(tx_type, 'big')).name}
+                    for tx_hash, height, tx_type in history]
+
         return conf + await self.unconfirmed_history(hashX)
