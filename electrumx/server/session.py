@@ -1797,7 +1797,8 @@ class BitcoinVaultElectrumX(ElectrumX):
         if not self._is_alerts_compatible_protocol():
             conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
                     for tx_hash, height, tx_type in history
-                    if int.from_bytes(tx_type, 'big') != VaultTxType.ALERT_PENDING]
+                    if int.from_bytes(tx_type, 'big') not in \
+                    [VaultTxType.ALERT_PENDING, VaultTxType.ALERT_RECOVERED]]
         else:
             conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height,
                      'tx_type': VaultTxType(int.from_bytes(tx_type, 'big')).name}
