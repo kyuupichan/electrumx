@@ -426,6 +426,26 @@ class BitcoinVaultMemPool(MemPool):
                                               0, tx_size, tx.type)
         return txs
 
+    async def balance_delta(self, hashX):
+        value = 0
+        alert_incoming_delta = 0
+        alert_outgoing_delta = 0
+        if hashX in self.hashXs:
+            for hash in self.hashXs[hashX]:
+                tx = self.txs[hash]
+                in_value = sum(v for h168, v in tx.in_pairs if h168 == hashX)
+                out_value = sum(v for h168, v in tx.out_pairs if h168 == hashX)
+                if tx.type == VaultTxType.ALERT_PENDING:
+                    alert_outgoing_delta += in_value
+                    alert_incoming_delta += out_value
+                    value -= in_value - out_value
+                elif tx.type == VaultTxType.RECOVERY:
+                    value += out_value
+                else:
+                    value -= in_value
+                    value += out_value
+        return value, alert_incoming_delta, alert_outgoing_delta
+
     async def transaction_summaries(self, hashX):
         result = []
         for tx_hash in self.hashXs.get(hashX, ()):

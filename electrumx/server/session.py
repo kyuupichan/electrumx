@@ -1762,14 +1762,16 @@ class BitcoinVaultElectrumX(ElectrumX):
         confirmed = sum(utxo.value for utxo in utxos if utxo.spend_tx_num == 0)
         alert_incoming = sum(utxo.value for utxo in utxos if utxo.spend_tx_num == -1)
         alert_outgoing = sum(utxo.value for utxo in utxos if utxo.spend_tx_num > 0)
-        unconfirmed = await self.mempool.balance_delta(hashX)
+        unconfirmed, alert_incoming_delta, alert_outgoing_delta = await self.mempool.balance_delta(hashX)
         self.bump_cost(1.0 + len(utxos) / 50)
 
         if not self._is_alerts_compatible_protocol():
-            return {'confirmed': confirmed, 'unconfirmed': unconfirmed + alert_incoming}
+            return {'confirmed': confirmed,
+                    'unconfirmed': unconfirmed + alert_incoming + alert_incoming_delta}
         else:
             return {'confirmed': confirmed, 'unconfirmed': unconfirmed,
-                    'alert_incoming': alert_incoming, 'alert_outgoing': alert_outgoing}
+                    'alert_incoming': alert_incoming + alert_incoming_delta,
+                    'alert_outgoing': alert_outgoing + alert_outgoing_delta}
 
     async def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
