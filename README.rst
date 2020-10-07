@@ -11,12 +11,8 @@ For a future network with bigger blocks.
 
   :Licence: MIT
   :Language: Python (>= 3.6)
-  :Author: Neil Booth
 
 Documentation
 =============
 
 See `readthedocs <https://electrumx.readthedocs.io/>`_.
-
-
-**Neil Booth**  kyuupichan@gmail.com  https://github.com/kyuupichan
