@@ -17,6 +17,7 @@ import time
 from collections import defaultdict
 from functools import partial
 from ipaddress import IPv4Address, IPv6Address
+from typing import Optional
 
 import attr
 from aiorpcx import (
@@ -769,15 +770,21 @@ class SessionManager:
     def _ip_addr_group_name(self, session):
         host = session.remote_address().host
         if isinstance(host, IPv4Address):
-            return '.'.join(str(host).split('.')[:3])
+            if host.is_private:  # exempt private addresses
+                return None
+            return '.'.join(str(host).split('.')[:3])  # /24
         if isinstance(host, IPv6Address):
-            return ':'.join(host.exploded.split(':')[:3])
+            if host.is_private:
+                return None
+            return ':'.join(host.exploded.split(':')[:3])  # /48
         return 'unknown_addr'
 
     def _timeslice_name(self, session):
         return f't{int(session.start_time - self.start_time) // 300}'
 
     def _session_group(self, name, weight):
+        if name is None:
+            return None
         group = self.session_groups.get(name)
         if not group:
             group = SessionGroup(name, weight, set(), 0)
@@ -791,6 +798,7 @@ class SessionManager:
             self._session_group(self._timeslice_name(session), 0.03),
             self._session_group(self._ip_addr_group_name(session), 1.0),
         )
+        groups = [group for group in groups if group is not None]
         self.sessions[session] = groups
         for group in groups:
             group.sessions.add(session)
