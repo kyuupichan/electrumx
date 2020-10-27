@@ -272,9 +272,9 @@ async def time_it():
     await cache.initialize(cp_length)
     cp_hashes = await source(0, cp_length)
     brs2 = []
-    t1 = time.time()
+    t1 = time.monotonic()
     for index in range(5, 400000, 500):
         brs2.append(await cache.branch_and_root(cp_length, index))
-    t2 = time.time()
+    t2 = time.monotonic()
     print(t2 - t1)
     assert False

@@ -113,7 +113,7 @@ class Daemon(object):
         '''
         def log_error(error):
             nonlocal last_error_log, retry
-            now = time.time()
+            now = time.monotonic()
             if now - last_error_log > 60:
                 last_error_log = now
                 self.logger.error(f'{error}.  Retrying occasionally...')
@@ -121,7 +121,7 @@ class Daemon(object):
                 retry = 0
 
         on_good_message = None
-        last_error_log = 0
+        last_error_log = -1000   # Monotonic time starts at 0
         data = json.dumps(payload)
         retry = self.init_retry
         while True:

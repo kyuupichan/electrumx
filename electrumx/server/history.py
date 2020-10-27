@@ -138,7 +138,7 @@ class History(object):
         assert not self.unflushed
 
     def flush(self):
-        start_time = time.time()
+        start_time = time.monotonic()
         self.flush_count += 1
         flush_id = pack_be_uint16(self.flush_count)
         unflushed = self.unflushed
@@ -154,7 +154,7 @@ class History(object):
         self.unflushed_count = 0
 
         if self.db.for_sync:
-            elapsed = time.time() - start_time
+            elapsed = time.monotonic() - start_time
             self.logger.info(f'flushed history in {elapsed:.1f}s '
                              f'for {count:,d} addrs')
 
@@ -364,12 +364,12 @@ class History(object):
                 self.write_state(batch)
             return count
 
-        last = time.time()
+        last = time.monotonic()
         count = 0
 
         for cursor in range(self.upgrade_cursor + 1, 65536):
             count += upgrade_cursor(cursor)
-            now = time.time()
+            now = time.monotonic()
             if now > last + 10:
                 last = now
                 self.logger.info(f'DB 3 of 3: {count:,d} entries updated, '

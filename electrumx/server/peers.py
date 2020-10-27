@@ -260,6 +260,8 @@ class PeerManager:
                 self.logger.info(f'{peer_text} {e}')
 
         if is_good:
+            # Monotonic time would be better, but last_good and last_try are
+            # exported to admin RPC client.
             now = time.time()
             elapsed = now - peer.last_try
             self.logger.info(f'{peer_text} verified in {elapsed:.1f}s')

@@ -215,14 +215,14 @@ class BlockProcessor(object):
         chain = [self.tip] + [self.coin.header_hash(h) for h in headers[:-1]]
 
         if hprevs == chain:
-            start = time.time()
+            start = time.monotonic()
             await self.run_in_thread_with_lock(self.advance_blocks, blocks)
             await self._maybe_flush()
             if not self.db.first_sync:
                 s = '' if len(blocks) == 1 else 's'
                 blocks_size = sum(len(block) for block in raw_blocks) / 1_000_000
                 self.logger.info(f'processed {len(blocks):,d} block{s} size {blocks_size:.2f} MB '
-                                 f'in {time.time() - start:.1f}s')
+                                 f'in {time.monotonic() - start:.1f}s')
             if self._caught_up_event.is_set():
                 await self.notifications.on_block(self.touched, self.height)
             self.touched = set()
@@ -352,11 +352,11 @@ class BlockProcessor(object):
         # performed on the DB.
         if self._caught_up_event.is_set():
             await self.flush(True)
-        elif time.time() > self.next_cache_check:
+        elif time.monotonic() > self.next_cache_check:
             flush_arg = self.check_cache_size()
             if flush_arg is not None:
                 await self.flush(flush_arg)
-            self.next_cache_check = time.time() + 30
+            self.next_cache_check = time.monotonic() + 30
 
     def check_cache_size(self):
         '''Flush a cache if it gets too big.'''

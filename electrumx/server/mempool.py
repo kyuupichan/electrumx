@@ -115,9 +115,9 @@ class MemPool(object):
         '''Print regular logs of mempool stats.'''
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
-        start = time.time()
+        start = time.monotonic()
         await synchronized_event.wait()
-        elapsed = time.time() - start
+        elapsed = time.monotonic() - start
         self.logger.info(f'synced in {elapsed:.2f}s')
         while True:
             mempool_size = sum(tx.size for tx in self.txs.values()) / 1_000_000
