@@ -1103,3 +1103,30 @@ class DeserializerBitcoinVault(DeserializerSegWit):
     @staticmethod
     def is_segwit(tx):
         return isinstance(tx, TxSegWit) or isinstance(tx, TxVaultSegWit)
+
+
+class DeserializerBitcoinVaultAuxPoW(DeserializerBitcoinVault, DeserializerAuxPow):
+    VERSION_AUXPOW = (1 << 8)
+
+    def is_merged_block(self):
+        start = self.cursor
+        self.cursor = 0
+        version = self._read_le_uint32()
+        self.cursor = start
+        if version & self.VERSION_AUXPOW:
+            return True
+        return False
+
+    def read_header(self, static_header_size):
+        start = self.cursor
+
+        if self.is_merged_block():
+            self.cursor = start
+            self.cursor += static_header_size  # Block normal header
+            self.read_auxpow()
+            header_end = self.cursor
+        else:
+            header_end = start + static_header_size
+
+        self.cursor = start
+        return self._read_nbytes(header_end - start)

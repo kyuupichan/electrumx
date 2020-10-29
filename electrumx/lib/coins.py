@@ -51,7 +51,7 @@ from electrumx.server.db import BitcoinVaultDB, DB
 from electrumx.server.mempool import MemPool, BitcoinVaultMemPool
 from electrumx.server.session import (ElectrumX, DashElectrumX,
                                       SmartCashElectrumX, AuxPoWElectrumX,
-                                      BitcoinVaultElectrumX)
+                                      BitcoinVaultElectrumX, BitcoinVaultAuxPoWElectrumX)
 
 Block = namedtuple("Block", "raw header transactions")
 BitcoinVaultBlock = namedtuple("Block", "raw header transactions alerts")
@@ -3332,7 +3332,7 @@ class BitcoinVault(Coin):
     NAME = "BitcoinVault"
     SHORTNAME = "BTCV"
     NET = "mainnet"
-    DESERIALIZER = lib_tx.DeserializerBitcoinVault
+    DESERIALIZER = lib_tx.DeserializerBitcoinVaultAuxPoW
     BLOCK_PROCESSOR = block_proc.BitcoinVaultBlockProcessor
     P2PKH_VERBYTE = bytes.fromhex("4E")
     P2SH_VERBYTE = [bytes.fromhex("3C")]
@@ -3349,8 +3349,25 @@ class BitcoinVault(Coin):
     PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DAEMON = daemon.FakeEstimateFeeDaemon
     DATABASE = BitcoinVaultDB
-    SESSIONCLS = BitcoinVaultElectrumX
+    SESSIONCLS = BitcoinVaultAuxPoWElectrumX
     MEMPOOL = BitcoinVaultMemPool
+    DEFAULT_MAX_SEND = 10_000_000
+    STATIC_BLOCK_HEADERS = False
+    TRUNCATED_HEADER_SIZE = 80
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Returns the block header given a block and its height.'''
+        deserializer = cls.DESERIALIZER(block)
+
+        if deserializer.is_merged_block():
+            return deserializer.read_header(cls.BASIC_HEADER_SIZE)
+        return block[:cls.BASIC_HEADER_SIZE]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        return double_sha256(header[:cls.BASIC_HEADER_SIZE])
 
     @classmethod
     def block(cls, raw_block, height):
@@ -3377,7 +3394,7 @@ class BitcoinVaultTestnet(BitcoinVault):
     P2SH_VERBYTE = [bytes.fromhex("C4")]
     XPUB_VERBYTES = bytes.fromhex("043587CF")
     XPRV_VERBYTES = bytes.fromhex("04358394")
-    ALERTS_HEIGHT = 81000
+    ALERTS_HEIGHT = 92960
 
 
 class BitcoinVaultRegTest(BitcoinVault):
@@ -3389,3 +3406,4 @@ class BitcoinVaultRegTest(BitcoinVault):
     XPUB_VERBYTES = bytes.fromhex("043587CF")
     XPRV_VERBYTES = bytes.fromhex("04358394")
     ALERTS_HEIGHT = 1
+
