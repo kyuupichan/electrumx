@@ -850,8 +850,8 @@ class SessionBase(RPCSession):
         self.logger = util.ConnectionLogger(logger, context)
         self.logger.info(f'{self.kind} {self.remote_address_string()}, '
                          f'{self.session_mgr.session_count():,d} total')
-        self.recalc_concurrency()
         self.session_mgr.add_session(self)
+        self.recalc_concurrency()  # must be called after session_mgr.add_session
         self.request_handlers = {}
 
     async def notify(self, touched, height_changed):
