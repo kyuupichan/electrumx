@@ -957,6 +957,12 @@ class ElectrumX(SessionBase):
     def extra_cost(self):
         return self.session_mgr.extra_cost(self)
 
+    def on_disconnect_due_to_excessive_session_cost(self):
+        ip_addr = self.remote_address().host
+        groups = self.session_mgr.sessions[self]
+        group_names = [group.name for group in groups]
+        self.logger.info(f"closing session over res usage. ip: {ip_addr}. groups: {group_names}")
+
     def sub_count(self):
         return len(self.hashX_subs)
 
