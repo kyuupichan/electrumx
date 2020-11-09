@@ -93,6 +93,9 @@ class Env(EnvBase):
             self.ssl_keyfile = self.required('SSL_KEYFILE')
         self.report_services = self.services_to_report()
 
+        # ElectrumX protocol
+        self.use_max_version = self.boolean('USE_MAX_VERSION', False)
+
     def sane_max_sessions(self):
         '''Return the maximum number of sessions to permit.  Normally this
         is MAX_SESSIONS.  However, to prevent open file exhaustion, ajdust

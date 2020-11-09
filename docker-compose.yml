@@ -32,6 +32,9 @@ services:
       COIN: BitcoinVault
       NET: regtest
       SERVICES: tcp://:50001,ssl://:50002,wss://:50004,rpc://0.0.0.0:10000
+      SSL_CERTFILE: /electrumx/data/electrumx.crt
+      SSL_KEYFILE: /electrumx/data/electrumx.key
+      USE_MAX_VERSION: 0
     command:
       - sh
       - -c
