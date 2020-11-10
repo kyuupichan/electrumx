@@ -473,7 +473,7 @@ async def test_notifications(caplog):
         api.txs = {hash: txs[hash] for hash in second_hashes}
         # Delay the DB update
         assert not in_caplog(caplog, 'waiting for DB to sync')
-        async with ignore_after(mempool.refresh_secs * 2):
+        async with ignore_after(max(mempool.refresh_secs * 2, 0.5)):
             await event.wait()
         assert in_caplog(caplog, 'waiting for DB to sync')
         assert len(api.on_mempool_calls) == 2
