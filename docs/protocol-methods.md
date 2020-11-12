@@ -1,4 +1,3 @@
-==================
  Protocol Methods
 ==================
 
@@ -8,70 +7,69 @@ blockchain.block.header
 Return the block header at the given height.
 
 **Signature**
+```
+  blockchain.block.header(height, cp_height=0)
+```
++ version added: 1.3
++ version changed: 1.4 *cp_height* parameter added
++ version changed: 1.4.1
 
-  .. function:: blockchain.block.header(height, cp_height=0)
-  .. versionadded:: 1.3
-  .. versionchanged:: 1.4
-     *cp_height* parameter added
-  .. versionchanged:: 1.4.1
+**Arguments**
 
-  *height*
+*height*
+```
+The height of the block, a non-negative integer.
+```
+*cp_height*
+```
+Checkpoint height, a non-negative integer.  Ignored if zero,
+otherwise the following must hold:
 
-    The height of the block, a non-negative integer.
-
-  *cp_height*
-
-    Checkpoint height, a non-negative integer.  Ignored if zero,
-    otherwise the following must hold:
-
-      *height* <= *cp_height*
-
+height <= cp_height
+```
 **Result**
 
-  If *cp_height* is zero, the raw block header as a hexadecimal
-  string.
+If *cp_height* is zero, the raw block header as a hexadecimal
+string.
 
-  Otherwise a dictionary with the following keys.  This provides a
-  proof that the given header is present in the blockchain; presumably
-  the client has the merkle root hard-coded as a checkpoint.
+Otherwise a dictionary with the following keys.  This provides a
+proof that the given header is present in the blockchain; presumably
+the client has the merkle root hard-coded as a checkpoint.
 
-  * *branch*
-
-    The merkle branch of *header* up to *root*, deepest pairing first.
-
-  * *header*
-
-    The raw block header as a hexadecimal string.  Starting with version 1.4.1,
-    AuxPoW data (if present in the original header) is truncated.
-
-  * *root*
-
-    The merkle root of all blockchain headers up to and including
-    *cp_height*.
-
+*branch*
+```
+The merkle branch of *header* up to *root*, deepest pairing first.
+```
+*header*
+```
+The raw block header as a hexadecimal string.  Starting with version 1.4.1,
+AuxPoW data (if present in the original header) is truncated.
+```
+*root*
+```
+The merkle root of all blockchain headers up to and including cp_height.
+```
 
 **Example Result**
 
 With *height* 5 and *cp_height* 0 on the Bitcoin Cash chain:
+```
+"0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477"
+```
 
-::
-
-   "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477"
-
-.. _cp_height example:
-
-With *cp_height* 8::
-
-  {
+With *cp_height* 8:
+```
+{
     "branch": [
-       "000000004ebadb55ee9096c9a2f8880e09da59c0d68b1c228da88e48844a1485",
-       "96cbbc84783888e4cc971ae8acf86dd3c1a419370336bb3c634c97695a8c5ac9",
-       "965ac94082cebbcffe458075651e9cc33ce703ab0115c72d9e8b1a9906b2b636",
-       "89e5daa6950b895190716dd26054432b564ccdc2868188ba1da76de8e1dc7591"
-       ],
+        "000000004ebadb55ee9096c9a2f8880e09da59c0d68b1c228da88e48844a1485",
+        "96cbbc84783888e4cc971ae8acf86dd3c1a419370336bb3c634c97695a8c5ac9",
+        "965ac94082cebbcffe458075651e9cc33ce703ab0115c72d9e8b1a9906b2b636",
+        "89e5daa6950b895190716dd26054432b564ccdc2868188ba1da76de8e1dc7591"
+    ],
     "header": "0100000085144a84488ea88d221c8bd6c059da090e88f8a2c99690ee55dbba4e00000000e11c48fecdd9e72510ca84f023370c9a38bf91ac5cae88019bee94d24528526344c36649ffff001d1d03e477",
     "root": "e347b1c43fd9b5415bf0d92708db8284b78daf4d0e24f9c3405f45feb85e25db"
-  }
+}
+```
 
 blockchain.block.headers
 ========================
@@ -79,78 +77,76 @@ blockchain.block.headers
 Return a concatenated chunk of block headers from the main chain.
 
 **Signature**
+```
+blockchain.block.headers(start_height, count, cp_height=0)
+```
++ versionadded: 1.2
++ versionchanged: 1.4 *cp_height* parameter added
++ versionchanged: 1.4.1
 
-  .. function:: blockchain.block.headers(start_height, count, cp_height=0)
-  .. versionadded:: 1.2
-  .. versionchanged:: 1.4
-     *cp_height* parameter added
-  .. versionchanged:: 1.4.1
+*start_height*
+```
+The height of the first header requested, a non-negative integer.
+```
+*count*
+```
+The number of headers requested, a non-negative integer.
+```
+*cp_height*
+```
+Checkpoint height, a non-negative integer.  Ignored if zero,
+otherwise the following must hold:
 
-  *start_height*
-
-    The height of the first header requested, a non-negative integer.
-
-  *count*
-
-    The number of headers requested, a non-negative integer.
-
-  *cp_height*
-
-    Checkpoint height, a non-negative integer.  Ignored if zero,
-    otherwise the following must hold:
-
-      *start_height* + (*count* - 1) <= *cp_height*
-
+start_height + (count - 1) <= cp_height
+```
 **Result**
 
-  A dictionary with the following members:
+A dictionary with the following members:
 
-  * *count*
+*count*
+```
+The number of headers returned, between zero and the number
+requested.  If the chain has not extended sufficiently far, only
+the available headers will be returned.  If more headers than
+max were requested at most "max" will be returned.
+```
+*hex*
+```
+The binary block headers concatenated together in-order as a
+hexadecimal string.  Starting with version 1.4.1, AuxPoW data (if present
+in the original header) is truncated if "cp_height" is nonzero.
+```
+*max*
+```
+The maximum number of headers the server will return in a single
+request.
 
-    The number of headers returned, between zero and the number
-    requested.  If the chain has not extended sufficiently far, only
-    the available headers will be returned.  If more headers than
-    *max* were requested at most *max* will be returned.
-
-  * *hex*
-
-    The binary block headers concatenated together in-order as a
-    hexadecimal string.  Starting with version 1.4.1, AuxPoW data (if present
-    in the original header) is truncated if *cp_height* is nonzero.
-
-  * *max*
-
-    The maximum number of headers the server will return in a single
-    request.
-
-  The dictionary additionally has the following keys if *count* and
-  *cp_height* are not zero.  This provides a proof that all the given
-  headers are present in the blockchain; presumably the client has the
-  merkle root hard-coded as a checkpoint.
-
-  * *root*
-
-    The merkle root of all blockchain headers up to and including
-    *cp_height*.
-
-  * *branch*
-
-    The merkle branch of the last returned header up to *root*,
-    deepest pairing first.
-
+The dictionary additionally has the following keys if "count" and
+"cp_height" are not zero.  This provides a proof that all the given
+headers are present in the blockchain; presumably the client has the
+merkle root hard-coded as a checkpoint.
+```
+*root*
+```
+The merkle root of all blockchain headers up to and including
+"cp_height".
+```
+*branch*
+```
+The merkle branch of the last returned header up to "root",
+deepest pairing first.
+```
 
 **Example Response**
 
-See :ref:`here <cp_height example>` for an example of *root* and
-*branch* keys.
-
-::
-
-  {
+See *cp_height* for an example of *root* and *branch* keys.
+```
+{
     "count": 2,
     "hex": "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e36299"
     "max": 2016
-  }
+}
+```
 
 blockchain.estimatefee
 ======================
@@ -160,7 +156,8 @@ be confirmed within a certain number of blocks.
 
 **Signature**
 
-  .. function:: blockchain.estimatefee(number)
+  function: blockchain.estimatefee(number)
+  deprecated: 1.4.2
 
   *number*
 
@@ -176,7 +173,7 @@ be confirmed within a certain number of blocks.
 
 ::
 
-  0.00101079
+  0.00001
 
 
 blockchain.headers.subscribe
@@ -186,7 +183,7 @@ Subscribe to receive block headers when a new block is found.
 
 **Signature**
 
-  .. function:: blockchain.headers.subscribe()
+  function: blockchain.headers.subscribe()
 
 **Result**
 
@@ -211,10 +208,11 @@ Subscribe to receive block headers when a new block is found.
 
 **Notifications**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when a new block is found.  The notification's signature is:
 
-    .. function:: blockchain.headers.subscribe(header)
+  function: blockchain.headers.subscribe(header)
+       
 
     * *header*
 
@@ -240,33 +238,29 @@ be accepted to the daemon's memory pool.
 
 **Signature**
 
-  .. function:: blockchain.relayfee()
+  function: blockchain.relayfee()
+  deprecated: 1.4.2
 
 **Result**
 
-  The fee in whole coin units (BTC, not satoshis for Bitcoin) as a
-  floating point number.
+  The fee in whole coin units as a floating point number.
 
 **Example Results**
 
 ::
 
-   1e-05
-
-::
-
-   0.0
+   0.000001
 
 blockchain.scripthash.get_balance
 =================================
 
-Return the confirmed and unconfirmed balances of a :ref:`script hash
+Return the confirmed and unconfirmed balances of a `script hash
 <script hashes>`.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.get_balance(scripthash)
-  .. versionadded:: 1.1
+  function: blockchain.scripthash.get_balance(scripthash)
+  versionadded: 1.1
 
   *scripthash*
 
@@ -292,13 +286,13 @@ Return the confirmed and unconfirmed balances of a :ref:`script hash
 blockchain.scripthash.get_history
 =================================
 
-Return the confirmed and unconfirmed history of a :ref:`script hash
+Return the confirmed and unconfirmed history of a `script hash
 <script hashes>`.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.get_history(scripthash)
-  .. versionadded:: 1.1
+  function: blockchain.scripthash.get_history(scripthash)
+  versionadded: 1.1
 
   *scripthash*
 
@@ -307,7 +301,7 @@ Return the confirmed and unconfirmed history of a :ref:`script hash
 **Result**
 
   A list of confirmed transactions in blockchain order, with the
-  output of :func:`blockchain.scripthash.get_mempool` appended to the
+  output of `blockchain.scripthash.get_mempool` appended to the
   list.  Each confirmed transaction is a dictionary with the following
   keys:
 
@@ -324,7 +318,7 @@ Return the confirmed and unconfirmed history of a :ref:`script hash
     The transaction type as one of: `NONVAULT`, `ALERT_PENDING`, `ALERT_CONFIRMED`,
     `ALERT_RECOVERED`, `INSTANT`, `RECOVERY`.
 
-  See :func:`blockchain.scripthash.get_mempool` for how mempool
+  See `blockchain.scripthash.get_mempool` for how mempool
   transactions are returned.
 
 **Result Examples**
@@ -358,13 +352,13 @@ Return the confirmed and unconfirmed history of a :ref:`script hash
 blockchain.scripthash.get_mempool
 =================================
 
-Return the unconfirmed transactions of a :ref:`script hash <script
+Return the unconfirmed transactions of a `script hash <script
 hashes>`.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.get_mempool(scripthash)
-  .. versionadded:: 1.1
+  function: blockchain.scripthash.get_mempool(scripthash)
+  versionadded: 1.1
 
   *scripthash*
 
@@ -412,8 +406,8 @@ Return an ordered list of UTXOs sent to a script hash.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.listunspent(scripthash)
-  .. versionadded:: 1.1
+  function: blockchain.scripthash.listunspent(scripthash)
+  versionadded: 1.1
 
   *scripthash*
 
@@ -482,8 +476,8 @@ Subscribe to a script hash.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.subscribe(scripthash)
-  .. versionadded:: 1.1
+  function: blockchain.scripthash.subscribe(scripthash)
+  versionadded: 1.1
 
   *scripthash*
 
@@ -491,25 +485,24 @@ Subscribe to a script hash.
 
 **Result**
 
-  The :ref:`status <status>` of the script hash.
+  The `status <status>` of the script hash.
 
 **Notifications**
 
-  The client will receive a notification when the :ref:`status <status>` of the script
-  hash changes.  Its signature is
-
-    .. function:: blockchain.scripthash.subscribe(scripthash, status)
+  The client will receive a notification when the `status <status>` of the script
+  hash changes.  Its signature is `blockchain.scripthash.subscribe(scripthash, status)`
+       
 
 blockchain.scripthash.unsubscribe
 =================================
 
-Unsubscribe from a script hash, preventing future notifications if its :ref:`status
+Unsubscribe from a script hash, preventing future notifications if its `status
 <status>` changes.
 
 **Signature**
 
-  .. function:: blockchain.scripthash.unsubscribe(scripthash)
-  .. versionadded:: 1.4.2
+  function: blockchain.scripthash.unsubscribe(scripthash)
+  versionadded: 1.4.2
 
   *scripthash*
 
@@ -517,9 +510,9 @@ Unsubscribe from a script hash, preventing future notifications if its :ref:`sta
 
 **Result**
 
-  Returns :const:`True` if the scripthash was subscribed to, otherwise :const:`False`.
-  Note that :const:`False` might be returned even for something subscribed to earlier,
-  becuase the server can drop subscriptions in rare circumstances.
+  Returns `True` if the scripthash was subscribed to, otherwise `False`.
+  Note that `False` might be returned even for something subscribed to earlier,
+  because the server can drop subscriptions in rare circumstances.
 
 blockchain.transaction.broadcast
 ================================
@@ -528,8 +521,8 @@ Broadcast a transaction to the network.
 
 **Signature**
 
-  .. function:: blockchain.transaction.broadcast(raw_tx)
-  .. versionchanged:: 1.1
+  function: blockchain.transaction.broadcast(raw_tx)
+  versionchanged: 1.1
      errors returned as JSON RPC errors rather than as a result.
 
   *raw_tx*
@@ -566,10 +559,10 @@ Return a raw transaction.
 
 **Signature**
 
-  .. function:: blockchain.transaction.get(tx_hash, verbose=false, merkle=false)
-  .. versionchanged:: 1.1
+  function: blockchain.transaction.get(tx_hash, verbose=false)
+  versionchanged: 1.1
      ignored argument *height* removed
-  .. versionchanged:: 1.2
+  versionchanged: 1.2
      *verbose* argument added
 
   *tx_hash*
@@ -582,11 +575,11 @@ Return a raw transaction.
 
 **Result**
 
-    If *verbose* is :const:`false`:
+    If *verbose* is `false`:
 
        The raw transaction as a hexadecimal string.
 
-    If *verbose* is :const:`true`:
+    If *verbose* is `true`:
 
        The result is a coin-specific dictionary -- whatever the coin
        daemon returns when asked for a verbose form of the raw
@@ -594,7 +587,7 @@ Return a raw transaction.
 
 **Example Results**
 
-When *verbose* is :const:`false`::
+When *verbose* is `false`::
 
   "01000000015bb9142c960a838329694d3fe9ba08c2a6421c5158d8f7044cb7c48006c1b48"
   "4000000006a4730440220229ea5359a63c2b83a713fcc20d8c41b20d48fe639a639d2a824"
@@ -604,7 +597,7 @@ When *verbose* is :const:`false`::
   "4fe5f88ac50a8cf00000000001976a91445dac110239a7a3814535c15858b939211f85298"
   "88ac61ee0700"
 
-When *verbose* is :const:`true`::
+When *verbose* is `true`::
 
  {
    "blockhash": "0000000000000000015a4f37ece911e5e3549f988e855548ce7494a0a08b2ad6",
@@ -648,7 +641,7 @@ and height.
 
 **Signature**
 
-  .. function:: blockchain.transaction.get_merkle(tx_hash, height)
+  :blockchain.transaction.get_merkle(tx_hash, height)
 
   *tx_hash*
 
@@ -708,8 +701,8 @@ given a block height and a position in the block.
 
 **Signature**
 
-  .. function:: blockchain.transaction.id_from_pos(height, tx_pos, merkle=false)
-  .. versionadded:: 1.4
+  :blockchain.transaction.id_from_pos(height, tx_pos, merkle=false)
+  versionadded: 1.4
 
   *height*
 
@@ -725,8 +718,8 @@ given a block height and a position in the block.
 
 **Result**
 
-  If *merkle* is :const:`false`, the transaction hash as a hexadecimal string.
-  If :const:`true`, a dictionary with the following keys:
+  If *merkle* is `false`, the transaction hash as a hexadecimal string.
+  If `true`, a dictionary with the following keys:
 
   * *tx_hash*
 
@@ -740,11 +733,11 @@ given a block height and a position in the block.
 
 **Example Results**
 
-When *merkle* is :const:`false`::
+When *merkle* is `false`::
 
   "fc12dfcb4723715a456c6984e298e00c479706067da81be969e8085544b0ba08"
 
-When *merkle* is :const:`true`::
+When *merkle* is `true`::
 
   {
     "tx_hash": "fc12dfcb4723715a456c6984e298e00c479706067da81be969e8085544b0ba08",
@@ -772,18 +765,15 @@ pool, weighted by transaction size.
 
 **Signature**
 
-  .. function:: mempool.get_fee_histogram()
-  .. versionadded:: 1.2
+  :mempool.get_fee_histogram()
+  versionadded: 1.2
+  deprecated: 1.4.2
 
 **Result**
 
-  The histogram is an array of [*fee*, *vsize*] pairs, where |vsize_n|
+  The histogram is an array of [*fee*, *vsize*] pairs, where vsize\n
   is the cumulative virtual size of mempool transactions with a fee rate
-  in the interval [|fee_n1|, |fee_n|], and |fee_n1| > |fee_n|.
-
-  .. |vsize_n| replace:: vsize\ :sub:`n`
-  .. |fee_n| replace:: fee\ :sub:`n`
-  .. |fee_n1| replace:: fee\ :sub:`n-1`
+  in the interval [fee\n-1, fee\n], and fee\n-1 > fee\n.
 
   Fee intervals may have variable size.  The choice of appropriate
   intervals is currently not part of the protocol.
@@ -799,23 +789,23 @@ server.add_peer
 ===============
 
 A newly-started server uses this call to get itself into other servers'
-peers lists.  It sould not be used by wallet clients.
+peers lists.  It should not be used by wallet clients.
 
 **Signature**
 
-  .. function:: server.add_peer(features)
+  :server.add_peer(features)
 
-  .. versionadded:: 1.1
+  versionadded: 1.1
 
   * *features*
 
     The same information that a call to the sender's
-    :func:`server.features` RPC call would return.
+    `server.features` RPC call would return.
 
 **Result**
 
   A boolean indicating whether the request was tentatively accepted.
-  The requesting server will appear in :func:`server.peers.subscribe`
+  The requesting server will appear in `server.peers.subscribe`
   when further sanity checks complete successfully.
 
 
@@ -826,7 +816,7 @@ Return a banner to be shown in the Electrum console.
 
 **Signature**
 
-  .. function:: server.banner()
+  function: server.banner()
 
 **Result**
 
@@ -846,7 +836,7 @@ Return a server donation address.
 
 **Signature**
 
-  .. function:: server.donation_address()
+  function: server.donation_address()
 
 **Result**
 
@@ -866,7 +856,7 @@ Return a list of features and services supported by the server.
 
 **Signature**
 
-  .. function:: server.features()
+  function: server.features()
 
 **Result**
 
@@ -887,12 +877,12 @@ Return a list of features and services supported by the server.
 
     * *ssl_port*
 
-      An integer.  Omit or set to :const:`null` if SSL connectivity
+      An integer.  Omit or set to `null` if SSL connectivity
       is not provided.
 
     * *tcp_port*
 
-      An integer.  Omit or set to :const:`null` if TCP connectivity is
+      An integer.  Omit or set to `null` if TCP connectivity is
       not provided.
 
     A server should ignore information provided about any host other
@@ -905,7 +895,7 @@ Return a list of features and services supported by the server.
 
   * *hash_function*
 
-    The hash function the server uses for :ref:`script hashing
+    The hash function the server uses for `script hashing
     <script hashes>`.  The client must use this function to hash
     pay-to-scripts to produce script hashes to send to the server.
     The default is "sha256".  "sha256" is currently the only
@@ -914,7 +904,7 @@ Return a list of features and services supported by the server.
   * *server_version*
 
     A string that identifies the server software.  Should be the same
-    as the result to the :func:`server.version` RPC call.
+    as the first element of the result to the `server.version` RPC call.
 
   * *protocol_max*
   * *protocol_min*
@@ -924,7 +914,7 @@ Return a list of features and services supported by the server.
 
   * *pruning*
 
-    An integer, the pruning limit.  Omit or set to :const:`null` if
+    An integer, the pruning limit.  Omit or set to `null` if
     there is no pruning limit.  Should be the same as what would
     suffix the letter ``p`` in the IRC real name.
 
@@ -951,7 +941,7 @@ subscription and the server must send no notifications.
 
 **Signature**
 
-  .. function:: server.peers.subscribe()
+  function: server.peers.subscribe()
 
 **Result**
 
@@ -980,22 +970,22 @@ for roughly 10 minutes.
 
 **Signature**
 
-  .. function:: server.ping()
-  .. versionadded:: 1.2
+  function: server.ping()
+  versionadded: 1.2
 
 **Result**
 
-  Returns :const:`null`.
+  Returns `null`.
 
 server.version
 ==============
 
 Identify the client to the server and negotiate the protocol version.
-Only the first :func:`server.version` message is accepted.
+Only the first `server.version` message is accepted.
 
 **Signature**
 
-  .. function:: server.version(client_name="", protocol_version="1.4")
+  function: server.version(client_name="", protocol_version="1.4")
 
   * *client_name*
 
@@ -1053,7 +1043,7 @@ validate messages from it.
 
 **Signature**
 
-  .. function:: masternode.announce.broadcast(signmnb)
+  function: masternode.announce.broadcast(signmnb)
 
   * *signmnb*
 
@@ -1061,8 +1051,8 @@ validate messages from it.
 
 **Result**
 
-  :const:`true` if the message was broadcasted succesfully otherwise
-  :const:`false`.
+  `true` if the message was broadcasted successfully otherwise
+  `false`.
 
 **Example**::
 
@@ -1079,7 +1069,7 @@ Returns the status of masternode.
 
 **Signature**
 
-  .. function:: masternode.subscribe(collateral)
+  function: masternode.subscribe(collateral)
 
   * *collateral*
 
@@ -1093,7 +1083,7 @@ Returns the status of masternode.
 
 **Result**
 
-  As this is a subcription, the client will receive a notification
+  As this is a subscription, the client will receive a notification
   when the masternode status changes.
 
   The status depends on the server the masternode is hosted, the
@@ -1115,7 +1105,7 @@ Returns the list of masternodes.
 
 **Signature**
 
-  .. function:: masternode.list(payees)
+  function: masternode.list(payees)
 
   * *payees*
 
@@ -1180,7 +1170,7 @@ The result also contains proof data.
 
 **Signature**
 
-  .. function:: protx.diff(base_height, height)
+  function: protx.diff(base_height, height)
 
   *base_height*
 
@@ -1232,7 +1222,7 @@ Returns detailed information about a deterministic masternode.
 
 **Signature**
 
-  .. function:: protx.info(protx_hash)
+  function: protx.info(protx_hash)
 
   *protx_hash*
 

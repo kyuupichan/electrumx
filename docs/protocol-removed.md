@@ -10,7 +10,7 @@ versions, but not the most recent one.
 Deserialized Headers
 --------------------
 
-A :dfn:`deserialized header` is a dictionary describing a block at a
+A `deserialized header` is a dictionary describing a block at a
 given height.
 
 A typical example would be similar to this template::
@@ -48,7 +48,7 @@ Return the confirmed and unconfirmed balances of a bitcoin address.
 
 **Result**
 
-  See :func:`blockchain.scripthash.get_balance`.
+  See `blockchain.scripthash.get_balance`.
 
 blockchain.address.get_history
 ==============================
@@ -66,7 +66,7 @@ Return the confirmed and unconfirmed history of a bitcoin address.
 
 **Result**
 
-  As for :func:`blockchain.scripthash.get_history`.
+  As for `blockchain.scripthash.get_history`.
 
 blockchain.address.get_mempool
 ==============================
@@ -84,7 +84,7 @@ Return the unconfirmed transactions of a bitcoin address.
 
 **Result**
 
-  As for :func:`blockchain.scripthash.get_mempool`.
+  As for `blockchain.scripthash.get_mempool`.
 
 blockchain.address.listunspent
 ==============================
@@ -102,7 +102,7 @@ Return an ordered list of UTXOs sent to a bitcoin address.
 
 **Result**
 
-  As for :func:`blockchain.scripthash.listunspent`.
+  As for `blockchain.scripthash.listunspent`.
 
 blockchain.address.subscribe
 ============================
@@ -120,12 +120,12 @@ Subscribe to a bitcoin address.
 
 **Result**
 
-  The :ref:`status <status>` of the address.
+  The `status <status>` of the address.
 
 **Notifications**
 
   As this is a subcription, the client will receive a notification
-  when the :ref:`status <status>` of the address changes.  Its
+  when the `status <status>` of the address changes.  Its
   signature is
 
   .. function:: blockchain.address.subscribe(address, status)
@@ -139,9 +139,9 @@ Subscribe to receive block headers when a new block is found.
 
   .. blockchain.headers.subscribe()
   .. versionchanged:: 1.2
-     Optional *raw* parameter added, defaulting to :const:`false`.
+     Optional *raw* parameter added, defaulting to `false`.
   .. versionchanged:: 1.3
-     *raw* parameter deafults to :const:`true`.
+     *raw* parameter deafults to `true`.
   .. versionchanged:: 1.4
      *raw* parameter removed; responses and notifications pass raw
      headers.
@@ -149,13 +149,13 @@ Subscribe to receive block headers when a new block is found.
   * *raw*
 
     This single boolean argument exists in protocol versions 1.2
-    (defaulting to :const:`false`) and 1.3 (defaulting to
-    :const:`true`) only.
+    (defaulting to `false`) and 1.3 (defaulting to
+    `true`) only.
 
 **Result**
 
   The header of the current block chain tip.  If *raw* is
-  :const:`true` the result is a dictionary with two members:
+  `true` the result is a dictionary with two members:
 
   * *hex*
 
@@ -165,12 +165,12 @@ Subscribe to receive block headers when a new block is found.
 
     The height of the header, an integer.
 
-  If *raw* is :const:`false` the result is the coin-specific
-  :ref:`deserialized header <deserialized header>`.
+  If *raw* is `false` the result is the coin-specific
+  `deserialized header <deserialized header>`.
 
 **Example Result**
 
-  With *raw* :const:`false`::
+  With *raw* `false`::
 
    {
      "bits": 402858285,
@@ -182,7 +182,7 @@ Subscribe to receive block headers when a new block is found.
      "version": 536870912
    }
 
-  With *raw* :const:`true`::
+  With *raw* `true`::
 
    {
      "height": 520481,
@@ -253,15 +253,15 @@ Return the address paid to by a UTXO.
 
 **Result**
 
-  A Base58 address string, or :const:`null`.  If the transaction
+  A Base58 address string, or `null`.  If the transaction
   doesn't exist, the index is out of range, or the output is not paid
-  to an address, :const:`null` must be returned.  If the output is
-  spent :const:`null` *may* be returned.
+  to an address, `null` must be returned.  If the output is
+  spent `null` *may* be returned.
 
 blockchain.block.get_header
 ===========================
 
-Return the :ref:`deserialized header <deserialized header>` of the
+Return the `deserialized header <deserialized header>` of the
 block at the given height.
 
 **Signature**
@@ -275,7 +275,7 @@ block at the given height.
 
 **Result**
 
-  The coin-specific :ref:`deserialized header <deserialized header>`.
+  The coin-specific `deserialized header <deserialized header>`.
 
 **Example Result**
 
@@ -332,10 +332,10 @@ Identify the client to the server and negotiate the protocol version.
   .. versionchanged:: 1.1
      *protocol_version* is not ignored.
   .. versionchanged:: 1.2
-     Use :func:`server.ping` rather than sending version requests as a
+     Use `server.ping` rather than sending version requests as a
      ping mechanism.
   .. versionchanged:: 1.4
-     Only the first :func:`server.version` message is accepted.
+     Only the first `server.version` message is accepted.
 
   * *client_name*
 

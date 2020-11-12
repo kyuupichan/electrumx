@@ -57,7 +57,7 @@ blockchain indexer:
   eliminate CPU idling.  As a Python program ElectrumX is unavoidably
   single-threaded in its essence; we must keep that CPU core busy.
 
-Python's :mod:`asyncio` means ElectrumX has no (direct) use for threads
+Python's `asyncio` means ElectrumX has no (direct) use for threads
 and associated complications.
 
 Roadmap
