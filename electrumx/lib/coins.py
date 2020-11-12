@@ -3339,7 +3339,7 @@ class BitcoinVault(Coin):
     GENESIS_HASH = ('0000000028ce26975b32feda3d75ac3fe10372f75062366cfba4e934dcc6a48b')
     XPUB_VERBYTES = bytes.fromhex("0488b21e")
     XPRV_VERBYTES = bytes.fromhex("0488ade4")
-    ALERTS_HEIGHT = 0
+    ALERTS_HEIGHT = 58420
     RPC_PORT = 8332
     TX_COUNT = 3300
     TX_COUNT_HEIGHT = 3300
