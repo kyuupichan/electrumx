@@ -47,11 +47,14 @@ import electrumx.lib.tx_dash as lib_tx_dash
 import electrumx.lib.tx_axe as lib_tx_axe
 import electrumx.server.block_processor as block_proc
 import electrumx.server.daemon as daemon
+from electrumx.server.db import BitcoinVaultDB, DB
+from electrumx.server.mempool import MemPool, BitcoinVaultMemPool
 from electrumx.server.session import (ElectrumX, DashElectrumX,
-                                      SmartCashElectrumX, AuxPoWElectrumX)
-
+                                      SmartCashElectrumX, AuxPoWElectrumX,
+                                      BitcoinVaultElectrumX, BitcoinVaultAuxPoWElectrumX)
 
 Block = namedtuple("Block", "raw header transactions")
+BitcoinVaultBlock = namedtuple("Block", "raw header transactions alerts")
 
 
 class CoinError(Exception):
@@ -72,7 +75,9 @@ class Coin(object):
     DEFAULT_MAX_SEND = 1000000
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
+    DATABASE = DB
     BLOCK_PROCESSOR = block_proc.BlockProcessor
+    MEMPOOL = MemPool
     HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'timestamp',
                      'bits', 'nonce')
     HEADER_UNPACK = struct.Struct('< I 32s 32s I I I').unpack_from
@@ -1869,8 +1874,8 @@ class Denarius(Coin):
     @classmethod
     def header_hash(cls, header):
         '''Given a header return the hash.'''
-        import tribus_hash
-        return tribus_hash.getPoWHash(header)
+        import tribushashm
+        return tribushashm.getPoWHash(header)
 
 
 class DenariusTestnet(Denarius):
@@ -3323,20 +3328,82 @@ class BitcoinRoyale(Coin):
     DAEMON = daemon.FakeEstimateFeeDaemon
 
 
-class BitcoinVaultRegTest(Coin):
-    NAME = "BitcoinVaultRegTest"
-    SHORTNAME = "BTCVRT"
-    NET = "regtest"
-    DESERIALIZER = lib_tx.DeserializerSegWit
-    P2PKH_VERBYTE = bytes.fromhex("6F")
-    P2SH_VERBYTE = [bytes.fromhex("C4")]
-    GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')
-    XPUB_VERBYTES = bytes.fromhex("04 35 87 CF")
-    XPRV_VERBYTES = bytes.fromhex("04 35 83 94")
+class BitcoinVault(Coin):
+    NAME = "BitcoinVault"
+    SHORTNAME = "BTCV"
+    NET = "mainnet"
+    DESERIALIZER = lib_tx.DeserializerBitcoinVaultAuxPoW
+    BLOCK_PROCESSOR = block_proc.BitcoinVaultBlockProcessor
+    P2PKH_VERBYTE = bytes.fromhex("4E")
+    P2SH_VERBYTE = [bytes.fromhex("3C")]
+    GENESIS_HASH = ('0000000028ce26975b32feda3d75ac3fe10372f75062366cfba4e934dcc6a48b')
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    ALERTS_HEIGHT = 0
     RPC_PORT = 8332
     TX_COUNT = 3300
     TX_COUNT_HEIGHT = 3300
     TX_PER_BLOCK = 2000
     ESTIMATE_FEE = 0.00001
     RELAY_FEE = 0.00001
+    PEER_DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DAEMON = daemon.FakeEstimateFeeDaemon
+    DATABASE = BitcoinVaultDB
+    SESSIONCLS = BitcoinVaultAuxPoWElectrumX
+    MEMPOOL = BitcoinVaultMemPool
+    DEFAULT_MAX_SEND = 10_000_000
+    STATIC_BLOCK_HEADERS = False
+    TRUNCATED_HEADER_SIZE = 80
+
+    @classmethod
+    def block_header(cls, block, height):
+        '''Returns the block header given a block and its height.'''
+        deserializer = cls.DESERIALIZER(block)
+
+        if deserializer.is_merged_block():
+            return deserializer.read_header(cls.BASIC_HEADER_SIZE)
+        return block[:cls.BASIC_HEADER_SIZE]
+
+    @classmethod
+    def header_hash(cls, header):
+        '''Given a header return hash'''
+        return double_sha256(header[:cls.BASIC_HEADER_SIZE])
+
+    @classmethod
+    def block(cls, raw_block, height):
+        '''Return a Block namedtuple given a raw block and its height.'''
+        header = cls.block_header(raw_block, height)
+        alerts_enabled = cls.are_alerts_enabled(height)
+        txs, atxs = cls.DESERIALIZER(raw_block,
+                                     start=len(header),
+                                     alerts_enabled=alerts_enabled
+                                     ).read_tx_block()
+        return BitcoinVaultBlock(raw_block, header, txs, atxs)
+
+    @classmethod
+    def are_alerts_enabled(cls, height):
+        # ALERTS_HEIGHT <= 0 means it's disabled
+        return 0 < cls.ALERTS_HEIGHT <= height
+
+
+class BitcoinVaultTestnet(BitcoinVault):
+    SHORTNAME = "BTCVT"
+    NET = "testnet"
+    GENESIS_HASH = ('0000000092bdcddd8bcf515ef5820dfc05dafaf708d316b35cd841c59f498637')
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTE = [bytes.fromhex("C4")]
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    ALERTS_HEIGHT = 92960
+
+
+class BitcoinVaultRegTest(BitcoinVault):
+    SHORTNAME = "BTCVRT"
+    NET = "regtest"
+    GENESIS_HASH = ('01cead69f2b51e214e1c2cd50e3744428cae526db87b2ff8f32489ff801d0f1d')
+    P2PKH_VERBYTE = bytes.fromhex("6F")
+    P2SH_VERBYTE = [bytes.fromhex("C4")]
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    ALERTS_HEIGHT = 1
+

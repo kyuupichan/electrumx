@@ -12,7 +12,6 @@ from aiorpcx import _version as aiorpcx_version, TaskGroup
 import electrumx
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
-from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
 
@@ -96,6 +95,8 @@ class Controller(ServerBase):
         notifications = Notifications()
         Daemon = env.coin.DAEMON
         BlockProcessor = env.coin.BLOCK_PROCESSOR
+        DB = env.coin.DATABASE
+        MEMPOOL = env.coin.MEMPOOL
 
         async with Daemon(env.coin, env.daemon_url) as daemon:
             db = DB(env)
@@ -111,7 +112,7 @@ class Controller(ServerBase):
             notifications.raw_transactions = daemon.getrawtransactions
             notifications.lookup_utxos = db.lookup_utxos
             MemPoolAPI.register(Notifications)
-            mempool = MemPool(env.coin, notifications)
+            mempool = MEMPOOL(env.coin, notifications)
 
             session_mgr = SessionManager(env, db, bp, daemon, mempool,
                                          shutdown_event)

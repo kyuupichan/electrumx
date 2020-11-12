@@ -140,6 +140,21 @@ def test_COIN_NET():
     os.environ['COIN'] = ' TokenPay '
     e = Env()
     assert e.coin == lib_coins.TokenPay
+    os.environ.pop('NET')
+    os.environ['NET'] = 'mainnet'
+    os.environ['COIN'] = ' BitcoinVault '
+    e = Env()
+    assert e.coin == lib_coins.BitcoinVault
+    os.environ.pop('NET')
+    os.environ['NET'] = 'testnet'
+    os.environ['COIN'] = ' BitcoinVault '
+    e = Env()
+    assert e.coin == lib_coins.BitcoinVaultTestnet
+    os.environ.pop('NET')
+    os.environ['NET'] = 'regtest'
+    os.environ['COIN'] = ' BitcoinVault '
+    e = Env()
+    assert e.coin == lib_coins.BitcoinVaultRegTest
 
 def test_CACHE_MB():
     assert_integer('CACHE_MB', 'cache_MB', 1200)

@@ -17,6 +17,7 @@ import os
 import ssl
 import time
 from collections import defaultdict
+from copy import deepcopy
 from functools import partial
 from ipaddress import IPv4Address, IPv6Address
 
@@ -33,6 +34,7 @@ from electrumx.lib.text import sessions_lines
 import electrumx.lib.util as util
 from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
                                 HASHX_LEN, Base58Error)
+from electrumx.lib.tx import VaultTxType, DeserializerBitcoinVault
 from electrumx.server.daemon import DaemonError
 from electrumx.server.peers import PeerManager
 
@@ -154,6 +156,8 @@ class SessionManager:
     def _ssl_context(self):
         if self._sslc is None:
             self._sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            self._sslc.options |= ssl.OP_NO_TLSv1
+            self._sslc.options |= ssl.OP_NO_TLSv1_1
             self._sslc.load_cert_chain(self.env.ssl_certfile, keyfile=self.env.ssl_keyfile)
         return self._sslc
 
@@ -526,7 +530,7 @@ class SessionManager:
                 continue
             n = None
             history = await db.limited_history(hashX, limit=limit)
-            for n, (tx_hash, height) in enumerate(history):
+            for n, (tx_hash, height, *_) in enumerate(history):
                 lines.append(f'History #{n:,d}: height {height:,d} '
                              f'tx_hash {hash_to_hex_str(tx_hash)}')
             if n is None:
@@ -885,7 +889,7 @@ class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
 
     PROTOCOL_MIN = (1, 4)
-    PROTOCOL_MAX = (1, 4, 2)
+    PROTOCOL_MAX = (2, 0)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1647,10 +1651,6 @@ class AuxPoWElectrumX(ElectrumX):
     async def block_header(self, height, cp_height=0):
         result = await super().block_header(height, cp_height)
 
-        # Older protocol versions don't truncate AuxPoW
-        if self.protocol_tuple < (1, 4, 1):
-            return result
-
         # Not covered by a checkpoint; return full AuxPoW data
         if cp_height == 0:
             return result
@@ -1661,10 +1661,6 @@ class AuxPoWElectrumX(ElectrumX):
 
     async def block_headers(self, start_height, count, cp_height=0):
         result = await super().block_headers(start_height, count, cp_height)
-
-        # Older protocol versions don't truncate AuxPoW
-        if self.protocol_tuple < (1, 4, 1):
-            return result
 
         # Not covered by a checkpoint; return full AuxPoW data
         if cp_height == 0:
@@ -1686,3 +1682,174 @@ class AuxPoWElectrumX(ElectrumX):
             height += 1
 
         return headers.hex()
+
+
+class BitcoinVaultElectrumX(ElectrumX):
+
+    ALERTS_PROTOCOL_VERSION = (2, 0)
+
+    def _is_alerts_compatible_protocol(self):
+        return self.protocol_tuple >= self.ALERTS_PROTOCOL_VERSION
+
+    async def address_status(self, hashX):
+        db_history, cost = await self.session_mgr.limited_history(hashX)
+        mempool = await self.mempool.transaction_summaries(hashX)
+
+        if not self._is_alerts_compatible_protocol():
+            status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                             f'{height:d}:'
+                             for tx_hash, height, tx_type in db_history
+                             if int.from_bytes(tx_type, 'big') not in
+                             [VaultTxType.ALERT_PENDING, VaultTxType.ALERT_RECOVERED])
+            status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                              f'{-tx.has_unconfirmed_inputs:d}:'
+                              for tx in mempool
+                              if tx.type != VaultTxType.ALERT_PENDING)
+        else:
+            status = ''.join(f'{hash_to_hex_str(tx_hash)}:'
+                             f'{height:d}:'
+                             f'{VaultTxType(int.from_bytes(tx_type, "big")).name:s}:'
+                             for tx_hash, height, tx_type in db_history)
+            status += ''.join(f'{hash_to_hex_str(tx.hash)}:'
+                              f'{-tx.has_unconfirmed_inputs:d}:'
+                              f'{VaultTxType(tx.type).name:s}:'
+                              for tx in mempool)
+
+        # Add status hashing cost
+        self.bump_cost(cost + 0.1 + len(status) * 0.00002)
+
+        if status:
+            status = sha256(status.encode()).hex()
+        else:
+            status = None
+
+        if mempool:
+            self.mempool_statuses[hashX] = status
+        else:
+            self.mempool_statuses.pop(hashX, None)
+
+        return status
+
+    async def hashX_listunspent(self, hashX):
+        utxos = await self.db.all_utxos(hashX)
+        utxos = sorted(utxos)
+        utxos.extend(await self.mempool.unordered_UTXOs(hashX))
+        self.bump_cost(1.0 + len(utxos) / 50)
+        spends = await self.mempool.potential_spends(hashX)
+
+        if not self._is_alerts_compatible_protocol():
+            return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                     'tx_pos': utxo.tx_pos,
+                     'height': utxo.height, 'value': utxo.value}
+                    for utxo in utxos
+                    if (utxo.tx_hash, utxo.tx_pos) not in spends
+                    and utxo.spend_tx_num == 0]
+        else:
+            return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                     'tx_pos': utxo.tx_pos,
+                     'height': utxo.height, 'value': utxo.value,
+                     'spend_tx_num': utxo.spend_tx_num}
+                    for utxo in utxos
+                    if (utxo.tx_hash, utxo.tx_pos) not in spends]
+
+    async def get_balance(self, hashX):
+        utxos = await self.db.all_utxos(hashX)
+        confirmed = sum(utxo.value for utxo in utxos if utxo.spend_tx_num == 0)
+        alert_incoming = sum(utxo.value for utxo in utxos if utxo.spend_tx_num == -1)
+        alert_outgoing = sum(utxo.value for utxo in utxos if utxo.spend_tx_num > 0)
+        unconfirmed, alert_incoming_delta, alert_outgoing_delta = await self.mempool.balance_delta(hashX)
+        self.bump_cost(1.0 + len(utxos) / 50)
+
+        if not self._is_alerts_compatible_protocol():
+            return {'confirmed': confirmed,
+                    'unconfirmed': unconfirmed + alert_incoming + alert_incoming_delta}
+        else:
+            return {'confirmed': confirmed, 'unconfirmed': unconfirmed,
+                    'alert_incoming': alert_incoming + alert_incoming_delta,
+                    'alert_outgoing': alert_outgoing + alert_outgoing_delta}
+
+    async def unconfirmed_history(self, hashX):
+        # Note unconfirmed history is unordered in electrum-server
+        # height is -1 if it has unconfirmed inputs, otherwise 0
+
+        if not self._is_alerts_compatible_protocol():
+            result = [{'tx_hash': hash_to_hex_str(tx.hash),
+                       'height': -tx.has_unconfirmed_inputs,
+                       'fee': tx.fee }
+                      for tx in await self.mempool.transaction_summaries(hashX)
+                      if tx.type != VaultTxType.ALERT_PENDING]
+        else:
+            result = [{'tx_hash': hash_to_hex_str(tx.hash),
+                       'height': -tx.has_unconfirmed_inputs,
+                       'fee': tx.fee,
+                       'tx_type': VaultTxType(tx.type).name }
+                      for tx in await self.mempool.transaction_summaries(hashX)]
+        self.bump_cost(0.25 + len(result) / 50)
+        return result
+
+    async def confirmed_and_unconfirmed_history(self, hashX):
+        # Note history is ordered but unconfirmed is unordered in e-s
+        history, cost = await self.session_mgr.limited_history(hashX)
+        self.bump_cost(cost)
+
+        if not self._is_alerts_compatible_protocol():
+            conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
+                    for tx_hash, height, tx_type in history
+                    if int.from_bytes(tx_type, 'big') not in
+                    [VaultTxType.ALERT_PENDING, VaultTxType.ALERT_RECOVERED]]
+        else:
+            conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height,
+                     'tx_type': VaultTxType(int.from_bytes(tx_type, 'big')).name}
+                    for tx_hash, height, tx_type in history]
+
+        return conf + await self.unconfirmed_history(hashX)
+
+
+class BitcoinVaultAuxPoWElectrumX(BitcoinVaultElectrumX, AuxPoWElectrumX):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.env.use_max_version:
+            self.set_request_handlers(self.PROTOCOL_MAX)
+
+    def set_request_handlers(self, ptuple):
+        super().set_request_handlers(ptuple)
+        self.request_handlers.update(
+            {
+                'blockchain.merged-mining.aux-pow-header': self.get_aux_pow_header,
+            }
+        )
+
+    async def get_aux_pow_header(self, height):
+        header = await super().block_header(height, cp_height=0)
+        aux_pow_header = bytes.fromhex(header)[self.coin.TRUNCATED_HEADER_SIZE:].hex()
+        return {
+            'aux_pow_header': aux_pow_header,
+        }
+
+    async def subscribe_headers_result(self):
+        results = deepcopy(self.session_mgr.hsub_results)
+        header = bytes.fromhex(results['hex'])
+        results['hex'] = header[:self.coin.TRUNCATED_HEADER_SIZE].hex()
+        return results
+
+    async def block_header(self, height, cp_height=0):
+        result = await super().block_header(height, cp_height)
+
+        if cp_height == 0:
+            header = result
+        else:
+            header = result['header']
+
+        header = self.truncate_auxpow(header, height)
+        if cp_height == 0:
+            return header
+        return {'header': header}
+
+    async def block_headers(self, start_height, count, cp_height=0):
+        result = await super().block_headers(start_height, count, cp_height)
+
+        # Covered by a checkpoint; truncate AuxPoW data
+        result['hex'] = self.truncate_auxpow(result['hex'], start_height)
+        return result

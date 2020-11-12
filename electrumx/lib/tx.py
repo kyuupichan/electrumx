@@ -26,11 +26,11 @@
 # and warranty status of this software.
 
 '''Transaction-related classes and functions.'''
-
+import enum
 from collections import namedtuple
 from hashlib import blake2s
 
-from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
+from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str, hex_str_to_hash
 from electrumx.lib.script import OpCodes
 from electrumx.lib.util import (
     unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
@@ -968,3 +968,165 @@ class DeserializerXaya(DeserializerSegWit, DeserializerAuxPow):
         end = self.cursor
         self.cursor = start
         return self._read_nbytes(end - start)
+
+
+class TxVault(namedtuple("Tx", "version inputs outputs locktime type")):
+    '''Class representing transaction alert.'''
+
+
+class TxVaultSegWit(namedtuple(
+        "Tx", "version marker flag inputs outputs witness locktime type")):
+    '''Class representing a SegWit transaction alert.'''
+
+
+class VaultTxType(enum.IntEnum):
+    NONVAULT = 0
+    ALERT_PENDING = 1
+    ALERT_CONFIRMED = 2
+    ALERT_RECOVERED = 3
+    INSTANT = 4
+    RECOVERY = 5
+
+
+class DeserializerBitcoinVault(DeserializerSegWit):
+
+    def __init__(self, binary, start=0, alerts_enabled=False):
+        super().__init__(binary, start=start)
+        self.alerts_enabled = alerts_enabled
+
+    def read_tx_and_hash(self, is_tx_section=False):
+        tx, tx_hash = DeserializerSegWit.read_tx_and_hash(self)
+        return self._tx_to_vault_tx(tx, is_tx_section), tx_hash
+
+    def read_tx_and_vsize(self, is_tx_section=False):
+        tx, vsize = DeserializerSegWit.read_tx_and_vsize(self)
+        return self._tx_to_vault_tx(tx, is_tx_section), vsize
+
+    def _tx_to_vault_tx(self, tx, is_tx_section):
+        vault_tx_type = VaultTxType.NONVAULT
+        if self.alerts_enabled:
+            vault_tx_type = self.get_vault_tx_type(tx)
+            if is_tx_section and vault_tx_type == VaultTxType.ALERT_PENDING:
+                # Mark Alerts in tx section as confirmed
+                vault_tx_type = VaultTxType.ALERT_CONFIRMED
+        if self.is_segwit(tx):
+            tx = TxVaultSegWit(tx.version, tx.marker,
+                                 tx.flag, tx.inputs,
+                                 tx.outputs, tx.witness,
+                                 tx.locktime, vault_tx_type)
+        else:
+            tx = TxVault(tx.version, tx.inputs, tx.outputs,
+                         tx.locktime, vault_tx_type)
+
+        return tx
+
+    def _check_if_alert_exist(self):
+        return self.alerts_enabled and self.binary_length > self.cursor
+
+    def read_tx_block(self):
+        read = self.read_tx_and_hash
+        tx_no = self._read_varint()
+        tx = [read(is_tx_section=True) for _ in range(tx_no)]
+
+        atx = []
+        if self._check_if_alert_exist():
+            atx_no = self._read_varint()
+            atx = [read(is_tx_section=False) for _ in range(atx_no)]
+
+        return tx, atx
+
+    @staticmethod
+    def get_vault_tx_type(tx):
+        ar_script_len = 75
+        air_script_len = 113
+
+        def is_one(flag):
+            return flag == hex_str_to_hash('01') or flag == hex_str_to_hash('51')
+
+        def is_zero(flag):
+            return flag == hex_str_to_hash('') or flag == hex_str_to_hash('00')
+
+        def is_ar_type(rs):
+            rs_hex = hash_to_hex_str(rs)
+            tail = 'ae52'  # 0:4 bytes => 2 OP_CHECKMULTISIG
+            head = '6852675163'  # -10:0 bytes => OP_IF 1 OP_ELSE 2 OP_ENDIF
+            return rs_hex[:4] == tail and rs_hex[ar_script_len * 2 - len(head):ar_script_len * 2] == head
+
+        def is_air_type(rs):
+            rs_hex = hash_to_hex_str(rs)
+            tail = 'ae53'  # 0:4 bytes => 3 OP_CHECKMULTISIG
+            head = '686853675263675163'  # -18:0 bytes => OP_IF 1 OP_ELSE OP_IF 2 OP_ELSE 3 OP_ENDIF OP_ENDIF
+            return rs_hex[:4] == tail and rs_hex[air_script_len * 2 - len(head):air_script_len * 2] == head
+
+        vault_tx_type = VaultTxType.NONVAULT
+        ar_flag = ''
+        air_flag = ''
+        redeem_script = ''
+
+        is_segwit = DeserializerBitcoinVault.is_segwit(tx)
+        if is_segwit and len(tx.witness[0]) >= 4:
+            redeem_script = tx.witness[0][-1]
+            ar_flag = tx.witness[0][-2]
+            air_flag = tx.witness[0][-3]
+        elif not is_segwit:
+            redeem_script = tx.inputs[0].script
+
+        if redeem_script:
+            if is_ar_type(redeem_script):
+                if not is_segwit:
+                    ar_flag = tx.inputs[0].script[-ar_script_len-3:-ar_script_len-2]
+                    if (is_one(ar_flag)):
+                        ar_flag = tx.inputs[0].script[-ar_script_len-2:-ar_script_len-1]
+
+                if is_one(ar_flag):
+                    vault_tx_type = VaultTxType.ALERT_PENDING
+                elif is_zero(ar_flag):
+                    vault_tx_type = VaultTxType.RECOVERY
+            elif is_air_type(redeem_script):
+                if not is_segwit:
+                    ar_flag = tx.inputs[0].script[-air_script_len-4:-air_script_len-3]
+                    if (is_one(ar_flag)):
+                        ar_flag = tx.inputs[0].script[-air_script_len-3:-air_script_len-2]
+                    air_flag = tx.inputs[0].script[-air_script_len-5:-air_script_len-4]
+                    if (is_one(air_flag)):
+                        air_flag = tx.inputs[0].script[-air_script_len-4:-air_script_len-3]
+
+                if is_one(ar_flag):
+                    vault_tx_type = VaultTxType.ALERT_PENDING
+                elif is_zero(ar_flag) and is_one(air_flag):
+                    vault_tx_type = VaultTxType.INSTANT
+                elif is_zero(ar_flag) and is_zero(air_flag):
+                    vault_tx_type = VaultTxType.RECOVERY
+
+        return vault_tx_type
+
+    @staticmethod
+    def is_segwit(tx):
+        return isinstance(tx, TxSegWit) or isinstance(tx, TxVaultSegWit)
+
+
+class DeserializerBitcoinVaultAuxPoW(DeserializerBitcoinVault, DeserializerAuxPow):
+    VERSION_AUXPOW = (1 << 8)
+
+    def is_merged_block(self):
+        start = self.cursor
+        self.cursor = 0
+        version = self._read_le_uint32()
+        self.cursor = start
+        if version & self.VERSION_AUXPOW:
+            return True
+        return False
+
+    def read_header(self, static_header_size):
+        start = self.cursor
+
+        if self.is_merged_block():
+            self.cursor = start
+            self.cursor += static_header_size  # Block normal header
+            self.read_auxpow()
+            header_end = self.cursor
+        else:
+            header_end = start + static_header_size
+
+        self.cursor = start
+        return self._read_nbytes(header_end - start)

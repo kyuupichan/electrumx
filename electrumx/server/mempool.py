@@ -17,8 +17,9 @@ import attr
 from aiorpcx import TaskGroup, run_in_thread, sleep
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
+from electrumx.lib.tx import VaultTxType
 from electrumx.lib.util import class_logger, chunks
-from electrumx.server.db import UTXO
+from electrumx.server.db import UTXO, BitcoinVaultUTXO
 
 
 @attr.s(slots=True)
@@ -285,30 +286,8 @@ class MemPool(object):
         hex_hashes_iter = (hash_to_hex_str(hash) for hash in hashes)
         raw_txs = await self.api.raw_transactions(hex_hashes_iter)
 
-        def deserialize_txs():    # This function is pure
-            to_hashX = self.coin.hashX_from_script
-            deserializer = self.coin.DESERIALIZER
-
-            txs = {}
-            for hash, raw_tx in zip(hashes, raw_txs):
-                # The daemon may have evicted the tx from its
-                # mempool or it may have gotten in a block
-                if not raw_tx:
-                    continue
-                tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
-                # Convert the inputs and outputs into (hashX, value) pairs
-                # Drop generation-like inputs from MemPoolTx.prevouts
-                txin_pairs = tuple((txin.prev_hash, txin.prev_idx)
-                                   for txin in tx.inputs
-                                   if not txin.is_generation())
-                txout_pairs = tuple((to_hashX(txout.pk_script), txout.value)
-                                    for txout in tx.outputs)
-                txs[hash] = MemPoolTx(txin_pairs, None, txout_pairs,
-                                      0, tx_size)
-            return txs
-
         # Thread this potentially slow operation so as not to block
-        tx_map = await run_in_thread(deserialize_txs)
+        tx_map = await run_in_thread(self._deserialize_txs, hashes, raw_txs)
 
         # Determine all prevouts not in the mempool, and fetch the
         # UTXO information from the database.  Failed prevout lookups
@@ -322,6 +301,28 @@ class MemPool(object):
         utxo_map = {prevout: utxo for prevout, utxo in zip(prevouts, utxos)}
 
         return self._accept_transactions(tx_map, utxo_map, touched)
+
+    def _deserialize_txs(self, hashes, raw_txs):    # This function is pure
+        to_hashX = self.coin.hashX_from_script
+        deserializer = self.coin.DESERIALIZER
+
+        txs = {}
+        for hash, raw_tx in zip(hashes, raw_txs):
+            # The daemon may have evicted the tx from its
+            # mempool or it may have gotten in a block
+            if not raw_tx:
+                continue
+            tx, tx_size = deserializer(raw_tx).read_tx_and_vsize()
+            # Convert the inputs and outputs into (hashX, value) pairs
+            # Drop generation-like inputs from MemPoolTx.prevouts
+            txin_pairs = tuple((txin.prev_hash, txin.prev_idx)
+                               for txin in tx.inputs
+                               if not txin.is_generation())
+            txout_pairs = tuple((to_hashX(txout.pk_script), txout.value)
+                                for txout in tx.outputs)
+            txs[hash] = MemPoolTx(txin_pairs, None, txout_pairs,
+                                  0, tx_size)
+        return txs
 
     #
     # External interface
@@ -386,4 +387,79 @@ class MemPool(object):
             for pos, (hX, value) in enumerate(tx.out_pairs):
                 if hX == hashX:
                     utxos.append(UTXO(-1, pos, tx_hash, 0, value))
+        return utxos
+
+
+@attr.s(slots=True)
+class BitcoinVaultMemPoolTx(MemPoolTx):
+    type = attr.ib()
+
+
+@attr.s(slots=True)
+class BitcoinVaultMemPoolTxSummary(MemPoolTxSummary):
+    type = attr.ib()
+
+
+class BitcoinVaultMemPool(MemPool):
+
+    def _deserialize_txs(self, hashes, raw_txs):    # This function is pure
+        to_hashX = self.coin.hashX_from_script
+        deserializer = self.coin.DESERIALIZER
+
+        txs = {}
+        for hash, raw_tx in zip(hashes, raw_txs):
+            # The daemon may have evicted the tx from its
+            # mempool or it may have gotten in a block
+            if not raw_tx:
+                continue
+
+            alerts_enabled = self.coin.are_alerts_enabled(self.api.db_height() + 1)
+            tx, tx_size = deserializer(raw_tx, alerts_enabled=alerts_enabled).read_tx_and_vsize()
+            # Convert the inputs and outputs into (hashX, value) pairs
+            # Drop generation-like inputs from BitcoinVaultMemPoolTx.prevouts
+            txin_pairs = tuple((txin.prev_hash, txin.prev_idx)
+                               for txin in tx.inputs
+                               if not txin.is_generation())
+            txout_pairs = tuple((to_hashX(txout.pk_script), txout.value)
+                                for txout in tx.outputs)
+            txs[hash] = BitcoinVaultMemPoolTx(txin_pairs, None, txout_pairs,
+                                              0, tx_size, tx.type)
+        return txs
+
+    async def balance_delta(self, hashX):
+        value = 0
+        alert_incoming_delta = 0
+        alert_outgoing_delta = 0
+        if hashX in self.hashXs:
+            for hash in self.hashXs[hashX]:
+                tx = self.txs[hash]
+                in_value = sum(v for h168, v in tx.in_pairs if h168 == hashX)
+                out_value = sum(v for h168, v in tx.out_pairs if h168 == hashX)
+                if tx.type == VaultTxType.ALERT_PENDING:
+                    alert_outgoing_delta += in_value
+                    alert_incoming_delta += out_value
+                    value -= in_value - out_value
+                elif tx.type == VaultTxType.RECOVERY:
+                    value += out_value
+                else:
+                    value -= in_value
+                    value += out_value
+        return value, alert_incoming_delta, alert_outgoing_delta
+
+    async def transaction_summaries(self, hashX):
+        result = []
+        for tx_hash in self.hashXs.get(hashX, ()):
+            tx = self.txs[tx_hash]
+            has_ui = any(hash in self.txs for hash, idx in tx.prevouts)
+            result.append(BitcoinVaultMemPoolTxSummary(tx_hash, tx.fee, has_ui, tx.type))
+        return result
+
+    async def unordered_UTXOs(self, hashX):
+        utxos = []
+        for tx_hash in self.hashXs.get(hashX, ()):
+            tx = self.txs.get(tx_hash)
+            spend_tx_num = -1 if tx.type == VaultTxType.ALERT_PENDING else 0
+            for pos, (hX, value) in enumerate(tx.out_pairs):
+                if hX == hashX:
+                    utxos.append(BitcoinVaultUTXO(-1, pos, tx_hash, 0, value, spend_tx_num))
         return utxos
