@@ -3354,13 +3354,19 @@ class BitcoinVault(Coin):
     DEFAULT_MAX_SEND = 10_000_000
     STATIC_BLOCK_HEADERS = False
     TRUNCATED_HEADER_SIZE = 80
+    FAKE_AUXPOW_BLOCKS = [
+        "00000000000000002027ff541d87aa8c8f86b6c9a0d382e64317fd0759a3e059",
+        "00000000000000001f681336cb01354a5f61116fd7441822b4dfa43ee000ecc2",
+        "0000000000000000297cdc35b437991e391665d027bde8e3e67bfa3cb4364911",
+        "00000000000000000491ee8ac245c4cc31e64ee1e5d00ae9b0d258c17dd97ad1"
+    ]
 
     @classmethod
     def block_header(cls, block, height):
         '''Returns the block header given a block and its height.'''
         deserializer = cls.DESERIALIZER(block)
-
-        if deserializer.is_merged_block():
+        blk_hash = cls.header_hash(block)
+        if deserializer.is_merged_block() and blk_hash not in cls.FAKE_AUXPOW_BLOCKS:
             return deserializer.read_header(cls.BASIC_HEADER_SIZE)
         return block[:cls.BASIC_HEADER_SIZE]
 
