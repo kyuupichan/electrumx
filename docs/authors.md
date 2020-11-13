@@ -1,7 +1,10 @@
-.. _Authors:
+BTCV Authors
+==========
 
-Authors
-=======
+* BTCV Team
+
+Original Authors
+================
 
 * Neil Booth
 
