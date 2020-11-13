@@ -3366,7 +3366,7 @@ class BitcoinVault(Coin):
         '''Returns the block header given a block and its height.'''
         deserializer = cls.DESERIALIZER(block)
         blk_hash = cls.header_hash(block)
-        if deserializer.is_merged_block() and blk_hash not in cls.FAKE_AUXPOW_BLOCKS:
+        if deserializer.is_merged_block() and blk_hash.hex() not in cls.FAKE_AUXPOW_BLOCKS:
             return deserializer.read_header(cls.BASIC_HEADER_SIZE)
         return block[:cls.BASIC_HEADER_SIZE]
 
