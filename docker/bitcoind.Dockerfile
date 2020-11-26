@@ -20,10 +20,10 @@ RUN add-apt-repository ppa:bitcoin/bitcoin
 RUN apt-get update && apt-get -y install libdb4.8-dev libdb4.8++-dev
 
 WORKDIR /source
-RUN curl -L -k -f  https://github.com/bitcoinvault/bitcoinvault/archive/dev.zip -o dev.zip
-RUN unzip dev.zip
-RUN rm dev.zip
-WORKDIR /source/bitcoinvault-dev
+RUN curl -L -k -f  https://github.com/bitcoinvault/bitcoinvault/archive/master.zip -o bitcoinvault.zip
+RUN unzip bitcoinvault.zip
+RUN rm bitcoinvault.zip
+WORKDIR /source/bitcoinvault-master
 RUN env CFLAGS=-O2 CXXFLAGS=-O2 \
     ./autogen.sh
 RUN ./configure --disable-bench --disable-tests  --disable-wallet --with-gui=no

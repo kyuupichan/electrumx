@@ -3,7 +3,6 @@ version: '3.5'
 services:
 
   bitcoind:
-    image: nexus-01.minebest.local:5001/bitcoind
     build:
       context: ./docker
       dockerfile: bitcoind.Dockerfile
