@@ -1,0 +1,10 @@
+.git
+.dockerignore
+.gitignore
+contrib
+build
+.editorconfig
+.idea
+README.md
+Makefile
+.coverage
