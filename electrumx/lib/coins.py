@@ -3888,3 +3888,35 @@ class Quebecoin(AuxPowMixin, Coin):
     TX_PER_BLOCK = 20
     REORG_LIMIT = 2000
     RPC_PORT = 10890
+
+
+class ElectricCash(AuxPowMixin, Coin):
+    NAME = "ElectricCash"
+    SHORTNAME = "ELCASH"
+    NET = "mainnet"
+    XPUB_VERBYTES = bytes.fromhex("0488b21e")
+    XPRV_VERBYTES = bytes.fromhex("0488ade4")
+    P2PKH_VERBYTE = bytes.fromhex("21")  # E
+    P2SH_VERBYTES = [bytes.fromhex("57")]  # c
+    GENESIS_HASH = ('00000000a9811adc411f15a9c525d667'
+                    'ca467d83dc5461e2d7fc791d1d3926de')
+    DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
+
+
+class ElectricCashTestnet(ElectricCash):
+    SHORTNAME = "ELCASHT"
+    NET = "testnet"
+    GENESIS_HASH = ('00000000d491a4c437cab521a329bb96'
+                    '7c3a2bcb849a83a2c53f7f3c50179ab6')
+    XPUB_VERBYTES = bytes.fromhex("043587CF")
+    XPRV_VERBYTES = bytes.fromhex("04358394")
+    P2PKH_VERBYTE = bytes.fromhex("41")  # T
+    P2SH_VERBYTE = [bytes.fromhex("5C")]  # e
+    WIF_BYTE = bytes.fromhex("EF")
+
+
+class ElectricCashRegTest(ElectricCashTestnet):
+    SHORTNAME = "ELCASHRT"
+    NET = "regtest"
+    GENESIS_HASH = ('4dc8472d9478d135f8f63bcf266ba819'
+                    'ba3a35546d388ee55659233a8d065089')
