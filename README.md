@@ -1,8 +1,7 @@
 ![Release](https://github.com/electric-cash/electrumx/workflows/Release/badge.svg)
 
-===============================================
 ElectrumX - Reimplementation of electrum-server
-===============================================
+=====================================
 
 For a future network with bigger blocks.
 
