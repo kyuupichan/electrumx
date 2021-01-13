@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.0.2 (2021-01-13)
+### Fix
+* **readme:** Fix + version bump ([`647ce45`](https://github.com/electric-cash/electrumx/commit/647ce4518d90d4c3b6c163dd9c3c967d8bf509a5))
+
 ## v0.0.1 (2021-01-12)
 ### Fix
 * Estimatesmartfee when there is no feerate from daemon ([#306](https://github.com/electric-cash/electrumx/issues/306)) ([`e2b15d7`](https://github.com/electric-cash/electrumx/commit/e2b15d7fe117ef3ebe1e91c42772dbe82a8c5c1f))
