@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.0.3 (2021-01-13)
+### Fix
+* **github-actions:** Disable build command on release workflow ([`8ca5ff1`](https://github.com/electric-cash/electrumx/commit/8ca5ff192d50fa323f89f1f1217f82e0d2148b63))
+
 ## v0.0.2 (2021-01-13)
 ### Fix
 * **readme:** Fix + version bump ([`647ce45`](https://github.com/electric-cash/electrumx/commit/647ce4518d90d4c3b6c163dd9c3c967d8bf509a5))
