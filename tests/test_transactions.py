@@ -11,7 +11,7 @@ from binascii import unhexlify
 
 import pytest
 
-from electrumx.lib.coins import Coin, Namecoin
+from electrumx.lib.coins import Coin
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.script import OpCodes, Script
 
@@ -22,6 +22,7 @@ TRANSACTION_DIR = os.path.join(
 # Those that are not installed will be skipped
 transactions = []
 
+
 for name in os.listdir(TRANSACTION_DIR):
     try:
         name_parts = name.split("_")
@@ -30,7 +31,6 @@ for name in os.listdir(TRANSACTION_DIR):
             transactions.append((coinFound, json.load(f)))
     except Exception as e:
         transactions.append(pytest.fail(name))
-
 
 @pytest.fixture(params=transactions)
 def transaction_details(request):
@@ -52,7 +52,7 @@ def test_transaction(transaction_details):
     vout = tx_info['vout']
     for i in range(len(vout)):
         # value pk_script
-        assert vout[i]['value'] == tx.outputs[i].value
+        assert vout[i]['value'] * 1e8 == tx.outputs[i].value
         spk = vout[i]['scriptPubKey']
         tx_pks = tx.outputs[i].pk_script
         assert spk['hex'] == tx_pks.hex()
@@ -62,16 +62,3 @@ def test_transaction(transaction_details):
         else:
             address = spk["address"]
         assert coin.address_to_hashX(address) == coin.hashX_from_script(tx_pks)
-        if issubclass(coin, Namecoin):
-            if "nameOp" not in spk or "name" not in spk["nameOp"]:
-                assert coin.name_hashX_from_script(tx_pks) is None
-            else:
-                OP_NAME_UPDATE = OpCodes.OP_3
-                normalized_name_op_script = bytearray()
-                normalized_name_op_script.append(OP_NAME_UPDATE)
-                normalized_name_op_script.extend(Script.push_data(spk["nameOp"]["name"].encode("ascii")))
-                normalized_name_op_script.extend(Script.push_data(bytes([])))
-                normalized_name_op_script.append(OpCodes.OP_2DROP)
-                normalized_name_op_script.append(OpCodes.OP_DROP)
-                normalized_name_op_script.append(OpCodes.OP_RETURN)
-                assert coin.name_hashX_from_script(tx_pks) == Coin.hashX_from_script(normalized_name_op_script)

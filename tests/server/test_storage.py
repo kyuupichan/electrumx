@@ -11,7 +11,7 @@ for c in subclasses(Storage):
     try:
         c.import_module()
     except ImportError:
-        db_engines.append(pytest.mark.skip(c.__name__))
+        pass
     else:
         db_engines.append(c.__name__)
 

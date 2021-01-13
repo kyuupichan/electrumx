@@ -41,6 +41,7 @@ BLOCKS_DIR = os.path.join(
 # Those that are not installed will be skipped
 blocks = []
 
+
 for name in os.listdir(BLOCKS_DIR):
     try:
         name_parts = name.split("_")
@@ -49,7 +50,6 @@ for name in os.listdir(BLOCKS_DIR):
             blocks.append((coin, json.load(f)))
     except Exception as e:
         blocks.append(pytest.fail(name))
-
 
 @pytest.fixture(params=blocks)
 def block_details(request):

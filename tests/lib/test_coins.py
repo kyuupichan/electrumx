@@ -2,7 +2,7 @@
 
 import pytest
 
-from electrumx.lib.coins import BitcoinSV, NameMixin
+from electrumx.lib.coins import NameMixin
 from electrumx.lib.script import OpCodes, Script
 
 
