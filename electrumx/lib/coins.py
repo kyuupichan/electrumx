@@ -3901,6 +3901,9 @@ class ElectricCash(AuxPowMixin, Coin):
     GENESIS_HASH = ('00000000a9811adc411f15a9c525d667'
                     'ca467d83dc5461e2d7fc791d1d3926de')
     DESERIALIZER = lib_tx.DeserializerAuxPowSegWit
+    TX_COUNT = 1
+    TX_COUNT_HEIGHT = 1
+    TX_PER_BLOCK = 8000
 
 
 class ElectricCashTestnet(ElectricCash):
