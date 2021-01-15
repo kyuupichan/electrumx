@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.1.0 (2021-01-15)
+### Feature
+* **ci:** New ECR registry ([`cb8a674`](https://github.com/electric-cash/electrumx/commit/cb8a674e0ac342e9155d65d0c1d41ced0e0ad074))
+
 ## v0.0.3 (2021-01-13)
 ### Fix
 * **github-actions:** Disable build command on release workflow ([`8ca5ff1`](https://github.com/electric-cash/electrumx/commit/8ca5ff192d50fa323f89f1f1217f82e0d2148b63))
