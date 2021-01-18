@@ -16,6 +16,7 @@ import os
 import ssl
 import time
 from collections import defaultdict
+from copy import deepcopy
 from functools import partial
 from ipaddress import IPv4Address, IPv6Address
 
@@ -1699,3 +1700,45 @@ class AuxPoWElectrumX(ElectrumX):
             height += 1
 
         return headers.hex()
+
+
+class AuxPoWElectrumXElCash(AuxPoWElectrumX):
+    def set_request_handlers(self, ptuple):
+        super().set_request_handlers(ptuple)
+        self.request_handlers.update(
+            {
+                'blockchain.merged-mining.aux-pow-header': self.get_aux_pow_header,
+            }
+        )
+
+    async def get_aux_pow_header(self, height):
+        header = await super().block_header(height, cp_height=0)
+        aux_pow_header = bytes.fromhex(header)[self.coin.TRUNCATED_HEADER_SIZE:].hex()
+        return {
+            'aux_pow_header': aux_pow_header,
+        }
+
+    async def block_header(self, height, cp_height=0):
+        result = await super().block_header(height, cp_height)
+
+        if cp_height == 0:
+            header = result
+        else:
+            header = result['header']
+
+        header = self.truncate_auxpow(header, height)
+        if cp_height == 0:
+            return header
+        return {'header': header}
+
+    async def block_headers(self, start_height, count, cp_height=0):
+        result = await super().block_headers(start_height, count, cp_height)
+        # Covered by a checkpoint; truncate AuxPoW data
+        result['hex'] = self.truncate_auxpow(result['hex'], start_height)
+        return result
+
+    async def subscribe_headers_result(self):
+        results = deepcopy(self.session_mgr.hsub_results)
+        header = bytes.fromhex(results['hex'])
+        results['hex'] = header[:self.coin.TRUNCATED_HEADER_SIZE].hex()
+        return results
