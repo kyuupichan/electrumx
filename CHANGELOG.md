@@ -2,6 +2,10 @@
 
 <!--next-version-placeholder-->
 
+## v0.2.1 (2021-01-26)
+### Fix
+* **ci:** Add new ECR registry ([`e891f2b`](https://github.com/electric-cash/electrumx/commit/e891f2bcaf42ddfafacb7de303b497937d684ea3))
+
 ## v0.2.0 (2021-01-18)
 ### Feature
 * **elcash:** Added merged-mining for elcash ([#10](https://github.com/electric-cash/electrumx/issues/10)) ([`88cb320`](https://github.com/electric-cash/electrumx/commit/88cb320a4c0a51a5745978c9be48732589a84461))
