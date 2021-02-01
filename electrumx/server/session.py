@@ -20,7 +20,7 @@ from ipaddress import IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
+    CancelledError, RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
