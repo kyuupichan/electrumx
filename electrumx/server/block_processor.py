@@ -57,7 +57,7 @@ class Prefetcher(object):
                     await asyncio.sleep(self.polling_delay)
             except DaemonError as e:
                 self.logger.info(f'ignoring daemon error: {e}')
-            except asyncio.CancelledError as e:
+            except CancelledError as e:
                 self.logger.info(f'cancelled; prefetcher stopping {e}')
                 raise
             except Exception:

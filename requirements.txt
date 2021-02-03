@@ -1,5 +1,5 @@
-aiorpcX[ws]>=0.18.3,<0.19
+aiorpcX[ws]>=0.19,<0.20
 attrs
 plyvel
 pylru
-aiohttp>=3.3
+aiohttp>=3.3,<4.0

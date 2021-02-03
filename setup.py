@@ -8,7 +8,7 @@ setuptools.setup(
     name='electrumX',
     version=version,
     scripts=['electrumx_server', 'electrumx_rpc', 'electrumx_compact_history'],
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     install_requires=requirements,
     extras_require={
         'rocksdb': ['python-rocksdb>=0.6.9'],

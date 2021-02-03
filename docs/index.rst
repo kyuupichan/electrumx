@@ -14,10 +14,8 @@ The current version is |release|.
 Source Code
 ===========
 
-The project is hosted on `GitHub
-<https://github.com/kyuupichan/electrumx/>`_.  and uses `Travis
-<https://travis-ci.org/kyuupichan/electrumx>`_ for Continuous
-Integration.
+The project is hosted on `GitHub <https://github.com/kyuupichan/electrumx/>`_.  and uses
+Azure Pipelines for Continuous Integration.
 
 Please submit an issue on the `bug tracker
 <https://github.com/kyuupichan/electrumx/issues>`_ if you have found a
@@ -27,7 +25,7 @@ Authors and License
 ===================
 
 Neil Booth wrote the vast majority of the code; see :ref:`Authors`.
-Python version at least 3.7 is required.
+Python version at least 3.8 is required.
 
 The code is released under the `MIT Licence
 <https://github.com/kyuupichan/electrumx/LICENCE>`_.

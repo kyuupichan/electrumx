@@ -959,8 +959,6 @@ class ElectrumX(SessionBase):
         '''Wrap _notify_inner; websockets raises exceptions for unclear reasons.'''
         try:
             await self._notify_inner(touched, height_changed)
-        except CancelledError:
-            raise
         except Exception:
             self.logger.exception('unexpected exception notifying client')
 
