@@ -109,38 +109,6 @@ class ScriptPubKey(object):
     TO_P2SH_OPS = [OpCodes.OP_HASH160, -1, OpCodes.OP_EQUAL]
     TO_PUBKEY_OPS = [-1, OpCodes.OP_CHECKSIG]
 
-    PayToHandlers = namedtuple('PayToHandlers', 'address script_hash pubkey '
-                               'unspendable strange')
-
-    @classmethod
-    def pay_to(cls, handlers, script):
-        '''Parse a script, invoke the appropriate handler and
-        return the result.
-
-        One of the following handlers is invoked:
-           handlers.address(hash160)
-           handlers.script_hash(hash160)
-           handlers.pubkey(pubkey)
-           handlers.unspendable()
-           handlers.strange(script)
-        '''
-        try:
-            ops = Script.get_ops(script)
-        except ScriptError:
-            return handlers.unspendable()
-
-        match = _match_ops
-
-        if match(ops, cls.TO_ADDRESS_OPS):
-            return handlers.address(ops[2][-1])
-        if match(ops, cls.TO_P2SH_OPS):
-            return handlers.script_hash(ops[1][-1])
-        if match(ops, cls.TO_PUBKEY_OPS):
-            return handlers.pubkey(ops[0][-1])
-        if ops and ops[0] == OpCodes.OP_RETURN:
-            return handlers.unspendable()
-        return handlers.strange(script)
-
     @classmethod
     def P2SH_script(cls, hash160):
         return (bytes([OpCodes.OP_HASH160])

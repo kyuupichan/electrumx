@@ -37,7 +37,7 @@ from decimal import Decimal
 from hashlib import sha256
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import Base58, hash160, double_sha256, hash_to_hex_str
+from electrumx.lib.hash import Base58, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey
 import electrumx.lib.tx as lib_tx
@@ -159,23 +159,6 @@ class Coin:
     def address_to_hashX(cls, address):
         '''Return a hashX given a coin address.'''
         return cls.hashX_from_script(cls.pay_to_address_script(address))
-
-    @classmethod
-    def P2PKH_address_from_hash160(cls, hash160):
-        '''Return a P2PKH address given a public key.'''
-        assert len(hash160) == 20
-        return cls.ENCODE_CHECK(cls.P2PKH_VERBYTE + hash160)
-
-    @classmethod
-    def P2PKH_address_from_pubkey(cls, pubkey):
-        '''Return a coin address given a public key.'''
-        return cls.P2PKH_address_from_hash160(hash160(pubkey))
-
-    @classmethod
-    def P2SH_address_from_hash160(cls, hash160):
-        '''Return a coin address given a hash160.'''
-        assert len(hash160) == 20
-        return cls.ENCODE_CHECK(cls.P2SH_VERBYTES[0] + hash160)
 
     @classmethod
     def hash160_to_P2PKH_script(cls, hash160):

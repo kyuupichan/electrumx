@@ -6,7 +6,7 @@ from functools import partial
 from random import randrange, choice, seed
 
 import pytest
-from aiorpcx import Event, TaskGroup, sleep, spawn, ignore_after
+from aiorpcx import Event, TaskGroup, sleep, ignore_after
 
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.lib.coins import Bitcoin

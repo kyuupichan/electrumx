@@ -136,8 +136,7 @@ def main():
             print(f'error making request: {e}')
             return 1
 
-    loop = asyncio.get_event_loop()
-    code = loop.run_until_complete(send_request())
+    code = asyncio.run(send_request())
     sys.exit(code)
 
 
