@@ -1,5 +1,5 @@
 import setuptools
-version = '1.15.0'
+version = '1.16.0'
 
 with open('requirements.txt', 'r') as f:
     requirements = f.read().splitlines()

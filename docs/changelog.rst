@@ -14,6 +14,16 @@
    should not occur with Python 3.7.
 
 
+Version 1.16.0 (03 Feb 2021)
+============================
+
+* Require Python 3.8.
+* Bitcoin only (BSV).
+* Disable resource limits for private sessions (ghost43).
+* Various bug fixes (jtarthur, ghost43) particularly in peer discovery.
+* other: AustEcon, Roger Taylor, Franco Benner
+
+
 Version 1.15.0 (27 May 2020)
 ============================
 
