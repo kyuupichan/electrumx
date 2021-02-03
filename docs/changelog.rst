@@ -2,17 +2,6 @@
  ChangeLog
 ===========
 
-.. note:: Version 1.15.0 will be the final ElectrumX release with altcoin support, future
-   releases will be Bitcoin-only.  ElectrumX needs to scale quickly and support for
-   various other coins and their idiosyncracies is distracting and unhelpful.  Anyone
-   wishing to maintain an ElectrumX repository with altcoin support is free to do so as
-   explained in the licence.
-
-.. note:: It is strongly recommended you upgrade to Python 3.7, which
-   fixes bugs in asyncio that caused an ever-growing open file count
-   and memory consumption whilst serving clients.  Those problems
-   should not occur with Python 3.7.
-
 
 Version 1.16.0 (03 Feb 2021)
 ============================
