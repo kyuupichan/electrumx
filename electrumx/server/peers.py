@@ -249,6 +249,11 @@ class PeerManager:
                     await self._verify_peer(session, peer)
                 is_good = True
                 break
+            except CancelledError as e:
+                # A send_request was cancelled
+                self.logger.error('peer dropped verification connection')
+                peer.mark_bad()
+                break
             except BadPeerError as e:
                 self.logger.error(f'{peer_text} marking bad: ({e})')
                 peer.mark_bad()
@@ -327,10 +332,7 @@ class PeerManager:
 
         # server.version goes first
         message = 'server.version'
-        try:
-            result = await session.send_request(message, self.server_version_args)
-        except CancelledError:
-            raise BadPeerError('terminated before server.version response')
+        result = await session.send_request(message, self.server_version_args)
 
         assert_good(message, result, list)
 
@@ -355,10 +357,7 @@ class PeerManager:
         if features:
             self.logger.info(f'registering ourself with {peer}')
             # We only care to wait for the response
-            try:
-                await session.send_request('server.add_peer', [features])
-            except CancelledError:
-                raise BadPeerError('terminated before server.add_peer response')
+            await session.send_request('server.add_peer', [features])
 
     async def _send_headers_subscribe(self, session):
         message = 'blockchain.headers.subscribe'
