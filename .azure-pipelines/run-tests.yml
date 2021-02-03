@@ -1,0 +1,36 @@
+parameters:
+  name: ''  # defaults for any parameters that aren't specified
+  vmImage: ''
+  pythonVersion: ''
+
+jobs:
+- job: ${{ parameters.name }}
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: ${{ parameters.pythonVersion }}
+      addToPath: true
+      architecture: x64
+  - template: prepare-env.yml
+  - script: |
+      coverage run -m pytest --junitxml=junit/test-results.xml tests
+      coverage xml
+    displayName: 'Test with pytest'
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFiles: 'junit/test-*.xml'
+      testRunTitle: 'Publish test results for Python ${{ parameters.pythonVersion }}'
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: cobertura
+      summaryFileLocation: coverage.xml
+  - bash: |
+      COVERALLS_REPO_TOKEN=$(COVERALLS_REPO_TOKEN) coveralls
+    displayName: 'Coveralls'
+  - bash: |
+      pycodestyle --max-line-length=100 electrumx/lib/*.py electrumx/server/*.py *.py
+    condition: succeededOrFailed()
+    displayName: 'Validate code style'

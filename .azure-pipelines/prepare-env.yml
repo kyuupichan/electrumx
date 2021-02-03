@@ -1,0 +1,19 @@
+parameters:
+  onlyPullRequests: false
+
+steps:
+- script: |
+    python -m pip install aiohttp aiorpcX attrs plyvel pylru python-rocksdb
+    python -m pip install pycodestyle coveralls coverage pytest pytest-asyncio Sphinx
+  displayName: Prepare general environment
+  condition: |
+    and(
+      succeeded(),
+      or(
+        eq(variables['Build.Reason'], 'PullRequest'),
+        eq(${{ parameters.onlyPullRequests }}, false)
+      )
+    )
+  enabled: true
+  continueOnError: false
+  failOnStderr: false
