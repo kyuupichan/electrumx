@@ -1,5 +1,7 @@
 import setuptools
-version = '1.16.0'
+import electrumx
+
+version = electrumx.version.split(' ')[-1]
 
 with open('requirements.txt', 'r') as f:
     requirements = f.read().splitlines()

@@ -3,6 +3,12 @@
 ===========
 
 
+Version 1.17.0 (04 Feb 2021)
+============================
+
+* Fix a couple of issues raised by pylint
+
+
 Version 1.16.0 (03 Feb 2021)
 ============================
 
