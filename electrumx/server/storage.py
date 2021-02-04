@@ -15,10 +15,10 @@ import electrumx.lib.util as util
 
 def db_class(name):
     '''Returns a DB engine class.'''
-    for db_class in util.subclasses(Storage):
-        if db_class.__name__.lower() == name.lower():
-            db_class.import_module()
-            return db_class
+    for db_class_ in util.subclasses(Storage):
+        if db_class_.__name__.lower() == name.lower():
+            db_class_.import_module()
+            return db_class_
     raise RuntimeError('unrecognised DB engine "{}"'.format(name))
 
 
@@ -67,6 +67,8 @@ class Storage(object):
         '''
         raise NotImplementedError
 
+# pylint:disable=W0223
+
 
 class LevelDB(Storage):
     '''LevelDB database engine.'''
@@ -89,8 +91,15 @@ class LevelDB(Storage):
                                    sync=True)
 
 
+# pylint:disable=E1101
+
+
 class RocksDB(Storage):
     '''RocksDB database engine.'''
+
+    def __init__(self, *args):
+        self.db = None
+        super().__init__(*args)
 
     @classmethod
     def import_module(cls):

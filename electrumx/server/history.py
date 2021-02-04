@@ -13,7 +13,6 @@ import ast
 import bisect
 import time
 from collections import defaultdict
-from functools import partial
 
 import electrumx.lib.util as util
 from electrumx.lib.util import (
@@ -264,6 +263,7 @@ class History(object):
         # compacted.
         write_size = 0
         keys_to_delete.update(hist_map)
+        n = 0   # In case of no loops
         for n, chunk in enumerate(util.chunks(full_hist, max_row_size)):
             key = hashX + pack_be_uint16(n)
             if hist_map.get(key) == chunk:

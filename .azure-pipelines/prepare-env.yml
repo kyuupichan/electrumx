@@ -5,6 +5,7 @@ steps:
 - script: |
     python -m pip install aiohttp aiorpcX attrs plyvel pylru python-rocksdb
     python -m pip install pycodestyle coveralls coverage pytest pytest-asyncio Sphinx
+    python -m pip install pylint
   displayName: Prepare general environment
   condition: |
     and(

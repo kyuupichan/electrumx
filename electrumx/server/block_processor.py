@@ -60,8 +60,8 @@ class Prefetcher(object):
             except CancelledError as e:
                 self.logger.info(f'cancelled; prefetcher stopping {e}')
                 raise
-            except Exception:
-                self.logger.exception(f'ignoring unexpected exception')
+            except Exception:   # pylint:disable=W0703
+                self.logger.exception('ignoring unexpected exception')
 
     def get_prefetched_blocks(self):
         '''Called by block processor when it is processing queued blocks.'''
@@ -500,7 +500,6 @@ class BlockProcessor(object):
         # Use local vars for speed in the loops
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
-        script_hashX = self.coin.hashX_from_script
         touched = self.touched
         undo_entry_len = 13 + HASHX_LEN
 
@@ -511,8 +510,6 @@ class BlockProcessor(object):
                 if is_unspendable(txout.pk_script):
                     continue
 
-                # Get the hashX
-                hashX = script_hashX(txout.pk_script)
                 cache_value = spend_utxo(tx_hash, idx)
                 touched.add(cache_value[:-13])
 
@@ -608,9 +605,9 @@ class BlockProcessor(object):
 
             if len(candidates) > 1:
                 tx_num, = unpack_le_uint64(tx_num_packed + bytes(3))
-                hash, _height = self.db.fs_tx_hash(tx_num)
-                if hash != tx_hash:
-                    assert hash is not None  # Should always be found
+                fs_hash, _height = self.db.fs_tx_hash(tx_num)
+                if fs_hash != tx_hash:
+                    assert fs_hash is not None  # Should always be found
                     continue
 
             # Key: b'u' + address_hashX + tx_idx + tx_num
@@ -805,7 +802,6 @@ class LTORBlockProcessor(BlockProcessor):
         # Use local vars for speed in the loops
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
-        script_hashX = self.coin.hashX_from_script
         add_touched = self.touched.add
         undo_entry_len = 13 + HASHX_LEN
 
@@ -831,8 +827,6 @@ class LTORBlockProcessor(BlockProcessor):
                 if is_unspendable(txout.pk_script):
                     continue
 
-                # Get the hashX
-                hashX = script_hashX(txout.pk_script)
                 cache_value = spend_utxo(tx_hash, idx)
                 add_touched(cache_value[:-13])
 

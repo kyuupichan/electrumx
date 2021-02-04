@@ -49,7 +49,7 @@ class EnvBase(object):
             return int(value)
         except Exception:
             raise cls.Error('cannot convert envvar {} value {} to an integer'
-                            .format(envvar, value))
+                            .format(envvar, value)) from None
 
     @classmethod
     def custom(cls, envvar, default, parse):

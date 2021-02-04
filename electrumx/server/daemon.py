@@ -202,7 +202,7 @@ class Daemon(object):
                 await self._send_single(method)
             except DaemonError as e:
                 err = e.args[0]
-                error_code = err.get("code")
+                error_code = err.get("code")   # pylint:disable=E1101
                 available = error_code != JSONRPC.METHOD_NOT_FOUND
             self.available_rpcs[method] = available
         return available

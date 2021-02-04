@@ -91,7 +91,7 @@ class Merkle(object):
         _branch, root = self.branch_and_root(hashes, 0, length)
         return root
 
-    def root_from_proof(self, hash, branch, index):
+    def root_from_proof(self, hash_, branch, index):
         '''Return the merkle root given a hash, a merkle branch to it, and
         its index in the hashes array.
 
@@ -107,13 +107,13 @@ class Merkle(object):
         hash_func = self.hash_func
         for elt in branch:
             if index & 1:
-                hash = hash_func(elt + hash)
+                hash_ = hash_func(elt + hash_)
             else:
-                hash = hash_func(hash + elt)
+                hash_ = hash_func(hash_ + elt)
             index >>= 1
         if index:
             raise ValueError('index out of range for branch')
-        return hash
+        return hash_
 
     def level(self, hashes, depth_higher):
         '''Return a level of the merkle tree of hashes the given depth

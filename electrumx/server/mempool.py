@@ -10,7 +10,6 @@
 import itertools
 import time
 from abc import ABC, abstractmethod
-from asyncio import Lock
 from collections import defaultdict
 
 import attr
@@ -139,7 +138,7 @@ class MemPool(object):
         deferred = {}
         unspent = set(utxo_map)
         # Try to find all prevouts so we can accept the TX
-        for hash, tx in tx_map.items():
+        for tx_hash, tx in tx_map.items():
             in_pairs = []
             try:
                 for prevout in tx.prevouts:
@@ -150,7 +149,7 @@ class MemPool(object):
                         utxo = txs[prev_hash].out_pairs[prev_index]
                     in_pairs.append(utxo)
             except KeyError:
-                deferred[hash] = tx
+                deferred[tx_hash] = tx
                 continue
 
             # Spend the prevouts
@@ -162,11 +161,11 @@ class MemPool(object):
             # because some in_parts would be missing
             tx.fee = max(0, (sum(v for _, v in tx.in_pairs) -
                              sum(v for _, v in tx.out_pairs)))
-            txs[hash] = tx
+            txs[tx_hash] = tx
 
             for hashX, _value in itertools.chain(tx.in_pairs, tx.out_pairs):
                 touched.add(hashX)
-                hashXs[hashX].add(hash)
+                hashXs[hashX].add(tx_hash)
 
         return deferred, {prevout: utxo_map[prevout] for prevout in unspent}
 
@@ -251,7 +250,7 @@ class MemPool(object):
             deserializer = self.coin.DESERIALIZER
 
             txs = {}
-            for hash, raw_tx in zip(hashes, raw_txs):
+            for tx_hash, raw_tx in zip(hashes, raw_txs):
                 # The daemon may have evicted the tx from its
                 # mempool or it may have gotten in a block
                 if not raw_tx:
@@ -264,8 +263,8 @@ class MemPool(object):
                                    if not txin.is_generation())
                 txout_pairs = tuple((to_hashX(txout.pk_script), txout.value)
                                     for txout in tx.outputs)
-                txs[hash] = MemPoolTx(txin_pairs, None, txout_pairs,
-                                      0, tx_size)
+                txs[tx_hash] = MemPoolTx(txin_pairs, None, txout_pairs,
+                                         0, tx_size)
             return txs
 
         # Thread this potentially slow operation so as not to block
@@ -301,8 +300,8 @@ class MemPool(object):
         '''
         value = 0
         if hashX in self.hashXs:
-            for hash in self.hashXs[hashX]:
-                tx = self.txs[hash]
+            for hash_ in self.hashXs[hashX]:
+                tx = self.txs[hash_]
                 value -= sum(v for h168, v in tx.in_pairs if h168 == hashX)
                 value += sum(v for h168, v in tx.out_pairs if h168 == hashX)
         return value

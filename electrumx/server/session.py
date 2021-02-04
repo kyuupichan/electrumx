@@ -17,11 +17,10 @@ import time
 from collections import defaultdict
 from functools import partial
 from ipaddress import IPv4Address, IPv6Address
-from typing import Optional
 
 import attr
 from aiorpcx import (
-    CancelledError, RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
@@ -258,7 +257,7 @@ class SessionManager:
         '''Clear caches on chain reorgs.'''
         while True:
             await self.bp.backed_up_event.wait()
-            self.logger.info(f'reorg signalled; clearing tx_hashes and merkle caches')
+            self.logger.info('reorg signalled; clearing tx_hashes and merkle caches')
             self._reorg_count += 1
             self._tx_hashes_cache.clear()
             self._merkle_cache.clear()
@@ -480,7 +479,7 @@ class SessionManager:
         try:
             self.daemon.set_url(daemon_url)
         except Exception as e:
-            raise RPCError(BAD_REQUEST, f'an error occured: {e!r}')
+            raise RPCError(BAD_REQUEST, f'an error occured: {e!r}') from None
         return f'now using daemon at {self.daemon.logged_url()}'
 
     async def rpc_stop(self):
@@ -666,8 +665,9 @@ class SessionManager:
         try:
             tx_pos = tx_hashes.index(tx_hash)
         except ValueError:
-            raise RPCError(BAD_REQUEST,
-                           f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}')
+            raise RPCError(
+                BAD_REQUEST, f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}'
+            ) from None
         branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, tx_pos, tx_hashes_cost + merkle_cost
 
@@ -677,8 +677,9 @@ class SessionManager:
         try:
             tx_hash = tx_hashes[tx_pos]
         except IndexError:
-            raise RPCError(BAD_REQUEST,
-                           f'no tx at position {tx_pos:,d} in block at height {height:,d}')
+            raise RPCError(
+                BAD_REQUEST, f'no tx at position {tx_pos:,d} in block at height {height:,d}'
+            ) from None
         branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, hash_to_hex_str(tx_hash), tx_hashes_cost + merkle_cost
 
@@ -700,7 +701,7 @@ class SessionManager:
             try:
                 tx_hashes = await self.db.tx_hashes_at_blockheight(height)
             except self.db.DBError as e:
-                raise RPCError(BAD_REQUEST, f'db error: {e!r}')
+                raise RPCError(BAD_REQUEST, f'db error: {e!r}') from None
             if reorg_count == self._reorg_count:
                 break
 
@@ -748,7 +749,7 @@ class SessionManager:
             result = await self.db.limited_history(hashX, limit=limit)
             cost += 0.1 + len(result) * 0.001
             if len(result) >= limit:
-                result = RPCError(BAD_REQUEST, f'history too large', cost=cost)
+                result = RPCError(BAD_REQUEST, 'history too large', cost=cost)
             self._history_cache[hashX] = result
 
         if isinstance(result, Exception):
@@ -848,6 +849,7 @@ class SessionBase(RPCSession):
                          f'{self.session_mgr.session_count():,d} total')
         self.recalc_concurrency()
         self.session_mgr.add_session(self)
+        self.request_handlers = {}
 
     async def notify(self, touched, height_changed):
         pass
@@ -974,7 +976,7 @@ class ElectrumX(SessionBase):
         '''Wrap _notify_inner; websockets raises exceptions for unclear reasons.'''
         try:
             await self._notify_inner(touched, height_changed)
-        except Exception:
+        except Exception:   # pylint:disable=W0703
             self.logger.exception('unexpected exception notifying client')
 
     async def _notify_inner(self, touched, height_changed):
@@ -1260,7 +1262,7 @@ class ElectrumX(SessionBase):
         self.bump_cost(1.0)
         return 0.000001
 
-    async def estimatefee(self, number):
+    async def estimatefee(self, _number):
         '''The estimated transaction fee per kilobyte to be paid for a
         transaction to be included within a certain number of blocks.
 
@@ -1285,7 +1287,7 @@ class ElectrumX(SessionBase):
         '''
         self.bump_cost(0.5)
         if self.sv_seen:
-            raise RPCError(BAD_REQUEST, f'server.version already sent')
+            raise RPCError(BAD_REQUEST, 'server.version already sent')
         self.sv_seen = True
 
         if client_name:
@@ -1322,10 +1324,10 @@ class ElectrumX(SessionBase):
             hex_hash = await self.session_mgr.broadcast_transaction(raw_tx)
         except DaemonError as e:
             error, = e.args
-            message = error['message']
+            message = error['message']   # pylint:disable=E1126
             self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
-                           f'network rules.\n\n{message}\n[{raw_tx}]')
+                           f'network rules.\n\n{message}\n[{raw_tx}]') from None
         else:
             self.txs_sent += 1
             client_ver = util.protocol_tuple(self.client)
@@ -1387,8 +1389,9 @@ class ElectrumX(SessionBase):
             try:
                 tx_hash = tx_hashes[tx_pos]
             except IndexError:
-                raise RPCError(BAD_REQUEST,
-                               f'no tx at position {tx_pos:,d} in block at height {height:,d}')
+                raise RPCError(
+                    BAD_REQUEST, f'no tx at position {tx_pos:,d} in block at height {height:,d}'
+                ) from None
             self.bump_cost(cost)
             return hash_to_hex_str(tx_hash)
 

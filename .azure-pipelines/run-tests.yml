@@ -18,6 +18,8 @@ jobs:
       coverage run -m pytest --junitxml=junit/test-results.xml tests
       coverage xml
     displayName: 'Test with pytest'
+  - bash: ./pylint
+    displayName: pylint
   - task: PublishTestResults@2
     condition: succeededOrFailed()
     inputs:

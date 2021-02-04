@@ -9,17 +9,15 @@
 
 import asyncio
 from ipaddress import IPv4Address, IPv6Address
-import json
 import random
 import socket
 import ssl
 import time
 from collections import defaultdict, Counter
 
-import aiohttp
 from aiorpcx import (connect_rs, RPCSession, SOCKSProxy, Notification, handler_invocation,
-                     SOCKSError, RPCError, TaskTimeout, TaskGroup, Event,
-                     sleep, ignore_after, CancelledError)
+                     SOCKSError, TaskTimeout, TaskGroup, Event,
+                     sleep, ignore_after, CancelledError, RPCError, ProtocolError)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger
@@ -249,20 +247,20 @@ class PeerManager:
                     await self._verify_peer(session, peer)
                 is_good = True
                 break
-            except CancelledError as e:
-                # A send_request was cancelled
-                self.logger.error('peer dropped verification connection')
-                peer.mark_bad()
-                break
             except BadPeerError as e:
                 self.logger.error(f'{peer_text} marking bad: ({e})')
                 peer.mark_bad()
                 break
-            except CodeMessageError as e:
+            except (RPCError, ProtocolError) as e:
                 self.logger.error(f'{peer_text} RPC error: {e.message} '
                                   f'({e.code})')
             except (OSError, SOCKSError, ConnectionError, TaskTimeout) as e:
                 self.logger.info(f'{peer_text} {e}')
+            except CancelledError:
+                # A send_request was cancelled
+                self.logger.error('peer dropped verification connection')
+                peer.mark_bad()
+                break
 
         if is_good:
             # Monotonic time would be better, but last_good and last_try are
@@ -409,7 +407,7 @@ class PeerManager:
             return [Peer.from_real_name(real_name, str(peer))
                     for real_name in real_names]
         except Exception:
-            raise BadPeerError('bad server.peers.subscribe response')
+            raise BadPeerError('bad server.peers.subscribe response') from None
 
     #
     # External interface
@@ -429,7 +427,7 @@ class PeerManager:
         self.logger.info(f'announce ourself: {self.env.peer_announce}')
         self.logger.info(f'my clearnet self: {self._my_clearnet_peer()}')
         self.logger.info(f'force use of proxy: {self.env.force_proxy}')
-        self.logger.info(f'beginning peer discovery...')
+        self.logger.info('beginning peer discovery...')
         async with self.group as group:
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())

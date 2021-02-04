@@ -27,8 +27,6 @@
 '''Script-related classes and functions.'''
 
 
-from collections import namedtuple
-
 from electrumx.lib.enum import Enumeration
 from electrumx.lib.util import unpack_le_uint16_from, unpack_le_uint32_from, \
     pack_le_uint16, pack_le_uint32
@@ -157,7 +155,7 @@ class Script(object):
         except Exception:
             # Truncated script; e.g. tx_hash
             # ebc9fa1196a59e192352d76c0f6e73167046b9d37b8302b6bb6968dfd279b767
-            raise ScriptError('truncated script')
+            raise ScriptError('truncated script') from None
 
         return ops
 
