@@ -3,8 +3,17 @@ parameters:
 
 steps:
 - script: |
-    python -m pip install aiohttp aiorpcX attrs plyvel pylru python-rocksdb
-    python -m pip install pycodestyle coveralls coverage pytest pytest-asyncio Sphinx
+    python -m pip install aiohttp
+    python -m pip install aiorpcX
+    python -m pip install attrs
+    python -m pip install pylru
+    python -m pip install uvloop
+    python -m pip install pycodestyle
+    python -m pip install coveralls
+    python -m pip install coverage
+    python -m pip install pytest
+    python -m pip install pytest-asyncio
+    python -m pip install Sphinx
     python -m pip install pylint
   displayName: Prepare general environment
   condition: |

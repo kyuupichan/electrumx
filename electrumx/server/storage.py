@@ -75,7 +75,7 @@ class LevelDB(Storage):
 
     @classmethod
     def import_module(cls):
-        import plyvel
+        import plyvel    # pylint:disable=E0401
         cls.module = plyvel
 
     def open(self, name, create):
@@ -103,7 +103,7 @@ class RocksDB(Storage):
 
     @classmethod
     def import_module(cls):
-        import rocksdb
+        import rocksdb    # pylint:disable=E0401
         cls.module = rocksdb
 
     def open(self, name, create):

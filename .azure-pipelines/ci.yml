@@ -15,11 +15,6 @@ jobs:
     pythonVersion: '3.8'
 - template: run-tests.yml
   parameters:
-    name: Py38_Win
-    vmImage: 'windows-2019'
-    pythonVersion: '3.8'
-- template: run-tests.yml
-  parameters:
     name: Py39_Ubuntu
     vmImage: 'ubuntu-16.04'
     pythonVersion: '3.9'
@@ -27,9 +22,4 @@ jobs:
   parameters:
     name: Py39_Mac
     vmImage: 'macOS-10.14'
-    pythonVersion: '3.9'
-- template: run-tests.yml
-  parameters:
-    name: Py39_Win
-    vmImage: 'windows-2019'
     pythonVersion: '3.9'
