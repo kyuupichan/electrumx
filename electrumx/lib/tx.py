@@ -95,8 +95,6 @@ class Deserializer(object):
     millions of times during sync.
     '''
 
-    TX_HASH_FN = staticmethod(double_sha256)
-
     def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
         self.binary = binary
@@ -119,7 +117,7 @@ class Deserializer(object):
         we process it in the natural serialized order.
         '''
         start = self.cursor
-        return self.read_tx(), self.TX_HASH_FN(self.binary[start:self.cursor])
+        return self.read_tx(), double_sha256(self.binary[start:self.cursor])
 
     def read_tx_and_vsize(self):
         '''Return a (deserialized TX, vsize) pair.'''
