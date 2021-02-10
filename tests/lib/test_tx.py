@@ -1,4 +1,9 @@
-import electrumx.lib.tx as tx_lib
+import pytest
+
+from electrumx.lib.tx import Deserializer, TxStream
+from electrumx.lib.hash import sha256
+import random
+
 
 tests = [
     "020000000192809f0b234cb850d71d020e678e93f074648ed0df5affd0c46d3bcb177f"
@@ -32,6 +37,51 @@ tests = [
 def test_tx_serialiazation():
     for test in tests:
         test = bytes.fromhex(test)
-        deser = tx_lib.Deserializer(test)
+        deser = Deserializer(test)
         tx = deser.read_tx()
         assert tx.serialize() == test
+
+
+class EndOfStream(Exception):
+    pass
+
+
+class StreamedData:
+
+    def __init__(self, data):
+        self.data = data
+        self.cursor = 0
+
+    async def fetch_next(self):
+        remaining = len(self.data) - self.cursor
+        if remaining == 0:
+            raise EndOfStream
+        size = random.randrange(0, remaining) + 1
+        cursor = self.cursor
+        self.cursor += size
+        return self.data[cursor: self.cursor]
+
+
+class TestTxStream:
+
+    @pytest.mark.asyncio
+    async def test_simple(self):
+        data = bytes(range(64))
+        sdata = StreamedData(data)
+        stream = TxStream(sdata.fetch_next)
+        expected_hash = sha256(data)
+        stream_data = await stream.read(len(data))
+        stream_hash = stream.get_hash()
+        assert stream_data.hex() == data.hex()
+        assert stream_hash.hex() == expected_hash.hex()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("raw_tx_hex", tests)
+    async def test_read_tx(self, raw_tx_hex):
+        raw_tx = bytes.fromhex(raw_tx_hex)
+        sdata = StreamedData(raw_tx)
+        stream = TxStream(sdata.fetch_next)
+        expected_tx_hash = sha256(raw_tx)
+        tx, tx_hash = await stream.read_tx()
+        assert tx.serialize().hex() == raw_tx_hex
+        assert tx_hash == expected_tx_hash

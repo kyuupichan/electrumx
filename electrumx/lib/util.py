@@ -317,9 +317,13 @@ unpack_le_uint64_from = struct_le_Q.unpack_from
 unpack_be_uint16_from = struct_be_H.unpack_from
 unpack_be_uint32_from = struct_be_I.unpack_from
 
+unpack_be_uint32 = struct_be_I.unpack
+unpack_le_int32 = struct_le_i.unpack
+unpack_le_int64 = struct_le_q.unpack
+unpack_le_uint16 = struct_le_H.unpack
 unpack_le_uint32 = struct_le_I.unpack
 unpack_le_uint64 = struct_le_Q.unpack
-unpack_be_uint32 = struct_be_I.unpack
+unpack_byte = structB.unpack
 
 pack_le_int32 = struct_le_i.pack
 pack_le_int64 = struct_le_q.pack

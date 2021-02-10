@@ -28,13 +28,15 @@
 '''Transaction-related classes and functions.'''
 
 from collections import namedtuple
+from io import BytesIO
+from struct import error as struct_error
 
-from electrumx.lib.hash import double_sha256, hash_to_hex_str
+from electrumx.lib.hash import double_sha256, hash_to_hex_str, _sha256
 from electrumx.lib.util import (
     unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
-    unpack_be_uint16_from,
     unpack_le_uint32_from, unpack_le_uint64_from, pack_le_int32, pack_varint,
-    pack_le_uint32, pack_le_int64, pack_varbytes,
+    pack_le_uint32, pack_le_int64, pack_varbytes, unpack_byte,
+    unpack_le_uint16, unpack_le_uint32, unpack_le_uint64, unpack_le_int32, unpack_le_int64
 )
 
 ZERO = bytes(32)
@@ -130,8 +132,8 @@ class Deserializer(object):
         return [read() for _ in range(self._read_varint())]
 
     def _read_inputs(self):
-        read_input = self._read_input
-        return [read_input() for i in range(self._read_varint())]
+        read_input_ = self._read_input
+        return [read_input_() for i in range(self._read_varint())]
 
     def _read_input(self):
         return TxInput(
@@ -142,8 +144,8 @@ class Deserializer(object):
         )
 
     def _read_outputs(self):
-        read_output = self._read_output
-        return [read_output() for i in range(self._read_varint())]
+        read_output_ = self._read_output
+        return [read_output_() for i in range(self._read_varint())]
 
     def _read_output(self):
         return TxOutput(
@@ -191,11 +193,6 @@ class Deserializer(object):
         self.cursor += 2
         return result
 
-    def _read_be_uint16(self):
-        result, = unpack_be_uint16_from(self.binary, self.cursor)
-        self.cursor += 2
-        return result
-
     def _read_le_uint32(self):
         result, = unpack_le_uint32_from(self.binary, self.cursor)
         self.cursor += 4
@@ -205,3 +202,133 @@ class Deserializer(object):
         result, = unpack_le_uint64_from(self.binary, self.cursor)
         self.cursor += 8
         return result
+
+
+class TxStream:
+
+    def __init__(self, fetch_next):
+        self.fetch_next = fetch_next
+        self.buf = b''
+        self.start = 0
+        self.cursor = 0
+        self._read = BytesIO(self.buf).read
+        self._hash = None
+
+    async def read(self, n):
+        data = self._read(n)
+        dlen = len(data)
+        self.cursor += dlen
+        if dlen == n:
+            return data
+
+        parts = [data]
+        n -= dlen
+        while n:
+            self.update_hash()
+            self.start = 0
+            self.buf = await self.fetch_next()
+            self._read = BytesIO(self.buf).read
+            data = self._read(n)
+            dlen = len(data)
+            parts.append(data)
+            n -= dlen
+            self.cursor += dlen
+
+        return b''.join(parts)
+
+    def update_hash(self):
+        if self._hash is None:
+            self._hash = _sha256()
+        start = self.start
+        self.start = self.cursor
+        self._hash.update(self.buf[start: self.cursor])
+
+    def get_hash(self):
+        self.update_hash()
+        result = self._hash.digest()
+        self._hash = None
+        return result
+
+    async def read_tx(self):
+        tx = await read_tx(self.read)
+        return tx, self.get_hash()
+
+
+# Stream operations
+
+async def read_le_int32(read):
+    result, = unpack_le_int32(await read(4))
+    return result
+
+
+async def read_le_int64(read):
+    result, = unpack_le_int64(await read(8))
+    return result
+
+
+async def read_le_uint16(read):
+    result, = unpack_le_uint16(await read(2))
+    return result
+
+
+async def read_le_uint32(read):
+    result, = unpack_le_uint32(await read(4))
+    return result
+
+
+async def read_le_uint64(read):
+    result, = unpack_le_uint64(await read(8))
+    return result
+
+
+async def read_varint(read):
+    # read_byte is supported by mmap objects but not BytesIO
+    n, = unpack_byte(await read(1))
+    if n < 253:
+        return n
+    if n == 253:
+        return await read_le_uint16(read)
+    if n == 254:
+        return await read_le_uint32(read)
+    return await read_le_uint64(read)
+
+
+async def read_varbytes(read):
+    n = await read_varint(read)
+    result = await read(n)
+    if len(result) != n:
+        raise struct_error(f'varbytes requires a buffer of {n:,d} bytes')
+    return result
+
+
+async def read_list(read, read_one):
+    '''Return a list of items.
+
+    Each item is read with read_one, the stream begins with a count of the items.'''
+    return [await read_one(read) for _ in range(await read_varint(read))]
+
+
+async def read_tx(read):
+    '''Return a deserialized transaction.'''
+    return Tx(
+        await read_le_int32(read),           # version
+        await read_list(read, read_input),   # inputs
+        await read_list(read, read_output),  # outputs
+        await read_le_uint32(read)           # locktime
+    )
+
+
+async def read_input(read):
+    return TxInput(
+        await read(32),              # prev_hash
+        await read_le_uint32(read),  # prev_idx
+        await read_varbytes(read),   # script
+        await read_le_uint32(read)   # sequence
+    )
+
+
+async def read_output(read):
+    return TxOutput(
+        await read_le_int64(read),  # value
+        await read_varbytes(read),  # pk_script
+    )
