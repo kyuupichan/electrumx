@@ -356,64 +356,44 @@ class BlockProcessor:
         return None
 
     async def check_and_advance_blocks(self, raw_blocks):
-        '''Process the list of raw blocks passed.  Detects and handles
-        reorgs.
-        '''
-        if not raw_blocks:
-            return
-        blocks = [self.coin.block(raw_block) for raw_block in raw_blocks]
-        headers = [block.header for block in blocks]
-        hprevs = [self.coin.header_prevhash(h) for h in headers]
-        chain = [self.tip] + [self.coin.header_hash(h) for h in headers[:-1]]
+        '''Process the list of raw blocks passed.  Detects and handles reorgs.'''
+        start = time.monotonic()
+        for raw_block in raw_blocks:
+            block = self.coin.block(raw_block)
+            if self.coin.header_prevhash(block.header) != self.tip:
+                self.schedule_reorg(-1)
+                return
+            await self.advance_block(block)
 
-        if hprevs == chain:
-            start = time.monotonic()
-            await self.run_with_lock(self.advance_blocks(blocks))
-            await self._maybe_flush()
-            if not self.db.first_sync:
-                s = '' if len(blocks) == 1 else 's'
-                blocks_size = sum(len(block) for block in raw_blocks) / 1_000_000
-                self.logger.info(f'processed {len(blocks):,d} block{s} size {blocks_size:.2f} MB '
-                                 f'in {time.monotonic() - start:.1f}s')
-            if self._caught_up_event.is_set():
-                await self.notifications.on_block(self.touched, self.height)
-            self.touched = set()
-        elif hprevs[0] != chain[0]:
-            self.schedule_reorg(-1)
-        else:
-            # It is probably possible but extremely rare that what
-            # bitcoind returns doesn't form a chain because it
-            # reorg-ed the chain as it was processing the batched
-            # block hash requests.  Should this happen it's simplest
-            # just to reset the prefetcher and try again.
-            self.logger.warning('daemon blocks do not form a chain; '
-                                'resetting the prefetcher')
-            await self.prefetcher.reset_height(self.height)
+        await self._maybe_flush()
 
-    async def advance_blocks(self, blocks):
-        '''Advance the blocks.
+        if not self.db.first_sync:
+            s = '' if len(raw_blocks) == 1 else 's'
+            blocks_size = sum(len(block) for block in raw_blocks) / 1_000_000
+            self.logger.info(f'processed {len(raw_blocks):,d} block{s} size {blocks_size:.2f} MB '
+                             f'in {time.monotonic() - start:.1f}s')
 
-        It is already verified they correctly connect onto our tip.
-        '''
+        if self._caught_up_event.is_set():
+            await self.notifications.on_block(self.touched, self.height)
+        self.touched = set()
+
+    async def advance_block(self, block):
+        '''Advance once block.  It is already verified they correctly connect onto our tip.'''
         min_height = self.db.min_undo_height(self.daemon.cached_height())
-        height = self.height
-        genesis_activation = self.coin.GENESIS_ACTIVATION
+        height = self.height + 1
 
-        for block in blocks:
-            height += 1
-            is_unspendable = (is_unspendable_genesis if height >= genesis_activation
-                              else is_unspendable_legacy)
-            undo_info = self.advance_txs(block.transactions, is_unspendable)
-            if height >= min_height:
-                self.undo_infos.append((undo_info, height))
-                self.db.write_raw_block(block.raw, height)
+        is_unspendable = (is_unspendable_genesis if height >= self.coin.GENESIS_ACTIVATION
+                          else is_unspendable_legacy)
+        undo_info = self.advance_txs(block.transactions, is_unspendable)
+        if height >= min_height:
+            self.undo_infos.append((undo_info, height))
+            self.db.write_raw_block(block.raw, height)
 
-            await sleep(0)
-
-        headers = [block.header for block in blocks]
         self.height = height
-        self.headers.extend(headers)
-        self.tip = self.coin.header_hash(headers[-1])
+        self.headers.append(block.header)
+        self.tip = self.coin.header_hash(block.header)
+
+        await sleep(0)
 
     def advance_txs(self, txs, is_unspendable):
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
