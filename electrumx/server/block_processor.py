@@ -11,8 +11,9 @@
 
 import asyncio
 import time
+from asyncio import sleep
 
-from aiorpcx import TaskGroup, run_in_thread, CancelledError
+from aiorpcx import TaskGroup, CancelledError
 
 import electrumx
 from electrumx.server.daemon import DaemonError
@@ -54,7 +55,7 @@ class Prefetcher:
                 # Sleep a while if there is nothing to prefetch
                 await self.refill_event.wait()
                 if not await self._prefetch_blocks():
-                    await asyncio.sleep(self.polling_delay)
+                    await sleep(self.polling_delay)
             except DaemonError as e:
                 self.logger.info(f'ignoring daemon error: {e}')
             except CancelledError as e:
@@ -190,16 +191,14 @@ class BlockProcessor:
         # Signalled after backing up during a reorg
         self.backed_up_event = asyncio.Event()
 
-    async def run_in_thread_with_lock(self, func, *args):
-        # Run in a thread to prevent blocking.  Shielded so that
-        # cancellations from shutdown don't lose work - when the task
-        # completes the data will be flushed and then we shut down.
-        # Take the state lock to be certain in-memory state is
-        # consistent and not being updated elsewhere.
-        async def run_in_thread_locked():
+    async def run_with_lock(self, coro):
+        # Shielded so that cancellations from shutdown don't lose work - when the task
+        # completes the data will be flushed and then we shut down.  Take the state lock
+        # to be certain in-memory state is consistent and not being updated elsewhere.
+        async def run_locked():
             async with self.state_lock:
-                return await run_in_thread(func, *args)
-        return await asyncio.shield(run_in_thread_locked())
+                return await coro
+        return await asyncio.shield(run_locked())
 
     async def check_and_advance_blocks(self, raw_blocks):
         '''Process the list of raw blocks passed.  Detects and handles
@@ -214,7 +213,7 @@ class BlockProcessor:
 
         if hprevs == chain:
             start = time.monotonic()
-            await self.run_in_thread_with_lock(self.advance_blocks, blocks)
+            await self.run_with_lock(self.advance_blocks(blocks))
             await self._maybe_flush()
             if not self.db.first_sync:
                 s = '' if len(blocks) == 1 else 's'
@@ -256,9 +255,10 @@ class BlockProcessor:
             except FileNotFoundError:
                 return await self.daemon.raw_blocks(hex_hashes)
 
-        def flush_backup():
+        async def backup_and_flush(raw_blocks):
             # self.touched can include other addresses which is
             # harmless, but remove None.
+            await self.backup_blocks(raw_blocks)
             self.touched.discard(None)
             self.db.flush_backup(self.flush_data(), self.touched)
 
@@ -267,8 +267,7 @@ class BlockProcessor:
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
-            await self.run_in_thread_with_lock(self.backup_blocks, raw_blocks)
-            await self.run_in_thread_with_lock(flush_backup)
+            await self.run_with_lock(backup_and_flush(raw_blocks))
             last -= len(raw_blocks)
         await self.prefetcher.reset_height(self.height)
         self.backed_up_event.set()
@@ -340,10 +339,10 @@ class BlockProcessor:
                          self.db_deletes, self.tip)
 
     async def flush(self, flush_utxos):
-        def flush():
+        async def flush():
             self.db.flush_dbs(self.flush_data(), flush_utxos,
                               self.estimate_txs_remaining)
-        await self.run_in_thread_with_lock(flush)
+        await self.run_with_lock(flush())
 
     async def _maybe_flush(self):
         # If caught up, flush everything as client queries are
@@ -382,8 +381,8 @@ class BlockProcessor:
             return utxo_MB >= cache_MB * 4 // 5
         return None
 
-    def advance_blocks(self, blocks):
-        '''Synchronously advance the blocks.
+    async def advance_blocks(self, blocks):
+        '''Advance the blocks.
 
         It is already verified they correctly connect onto our tip.
         '''
@@ -399,6 +398,8 @@ class BlockProcessor:
             if height >= min_height:
                 self.undo_infos.append((undo_info, height))
                 self.db.write_raw_block(block.raw, height)
+
+            await sleep(0)
 
         headers = [block.header for block in blocks]
         self.height = height
@@ -457,7 +458,7 @@ class BlockProcessor:
 
         return undo_info
 
-    def backup_blocks(self, raw_blocks):
+    async def backup_blocks(self, raw_blocks):
         '''Backup the raw blocks and flush.
 
         The blocks should be in order of decreasing height, starting at.
@@ -483,6 +484,8 @@ class BlockProcessor:
             self.backup_txs(block.transactions, is_unspendable)
             self.height -= 1
             self.db.tx_counts.pop()
+
+            await sleep(0)
 
         self.logger.info('backed up to height {:,d}'.format(self.height))
 
