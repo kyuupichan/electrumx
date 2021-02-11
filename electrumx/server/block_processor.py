@@ -613,8 +613,10 @@ class BlockProcessor:
             if self.reorg_count is not None:
                 await self._reorg_chain(self.reorg_count)
                 self.reorg_count = None
-            blocks = self.prefetcher.get_prefetched_blocks()
-            await self._advance_blocks(blocks)
+                # Prefetcher block cache cleared so nothing to process
+            else:
+                blocks = self.prefetcher.get_prefetched_blocks()
+                await self._advance_blocks(blocks)
 
         # This must be done to set state before the main loop
         if self.height == self.daemon.cached_height():
