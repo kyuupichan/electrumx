@@ -32,7 +32,6 @@ necessary for appropriate handling.
 
 from collections import namedtuple
 import re
-import struct
 from decimal import Decimal
 from hashlib import sha256
 
@@ -62,24 +61,14 @@ class Coin:
     # Not sure if these are coin-specific
     RPC_URL_REGEX = re.compile('.+@(\\[[0-9a-fA-F:]+\\]|[^:]+)(:[0-9]+)?')
     VALUE_PER_COIN = 100000000
-    CHUNK_SIZE = 2016
-    BASIC_HEADER_SIZE = 80
     SESSIONCLS = ElectrumX
     DEFAULT_MAX_SEND = 1000000
     DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
     BLOCK_PROCESSOR = block_proc.BlockProcessor
-    HEADER_VALUES = ('version', 'prev_block_hash', 'merkle_root', 'timestamp',
-                     'bits', 'nonce')
-    HEADER_UNPACK = struct.Struct('< I 32s 32s I I I').unpack_from
     P2PKH_VERBYTE = bytes.fromhex("00")
     P2SH_VERBYTES = [bytes.fromhex("05")]
-    XPUB_VERBYTES = bytes.fromhex("0488b21e")
-    XPRV_VERBYTES = bytes.fromhex("0488ade4")
     RPC_PORT = 8332
-    WIF_BYTE = bytes.fromhex("80")
-    ENCODE_CHECK = Base58.encode_check
-    DECODE_CHECK = Base58.decode_check
     GENESIS_HASH = ('000000000019d6689c085ae165831e93'
                     '4ff763ae46a2a6c172b3f1b60a8ce26f')
     GENESIS_ACTIVATION = 100_000_000
@@ -131,7 +120,7 @@ class Coin:
 
         Return the block less its unspendable coinbase.
         '''
-        header = cls.block_header(block, 0)
+        header = block[:80]
         header_hex_hash = hash_to_hex_str(cls.header_hash(header))
         if header_hex_hash != cls.GENESIS_HASH:
             raise CoinError('genesis block has hash {} expected {}'
@@ -143,16 +132,6 @@ class Coin:
     def hashX_from_script(cls, script):
         '''Returns a hashX from a script.'''
         return sha256(script).digest()[:HASHX_LEN]
-
-    @staticmethod
-    def lookup_xverbytes(verbytes):
-        '''Return a (is_xpub, coin_class) pair given xpub/xprv verbytes.'''
-        for coin in util.subclasses(Coin):
-            if verbytes == coin.XPUB_VERBYTES:
-                return True, coin
-            if verbytes == coin.XPRV_VERBYTES:
-                return False, coin
-        raise CoinError('version bytes unrecognised')
 
     @classmethod
     def address_to_hashX(cls, address):
@@ -173,7 +152,7 @@ class Coin:
 
         Pass the address (either P2PKH or P2SH) in base58 form.
         '''
-        raw = cls.DECODE_CHECK(address)
+        raw = Base58.decode_check(address)
 
         # Require version byte(s) plus hash160.
         verbyte = -1
@@ -189,14 +168,6 @@ class Coin:
         raise CoinError('invalid address: {}'.format(address))
 
     @classmethod
-    def privkey_WIF(cls, privkey_bytes, compressed):
-        '''Return the private key encoded in Wallet Import Format.'''
-        payload = bytearray(cls.WIF_BYTE) + privkey_bytes
-        if compressed:
-            payload.append(0x01)
-        return cls.ENCODE_CHECK(payload)
-
-    @classmethod
     def header_hash(cls, header):
         '''Given a header return hash'''
         return double_sha256(header)
@@ -207,14 +178,9 @@ class Coin:
         return header[4:36]
 
     @classmethod
-    def block_header(cls, block, height):
-        '''Returns the block header given a block and its height.'''
-        return block[:80]
-
-    @classmethod
-    def block(cls, raw_block, height):
+    def block(cls, raw_block):
         '''Return a Block namedtuple given a raw block and its height.'''
-        header = cls.block_header(raw_block, height)
+        header = raw_block[:80]
         txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
         return Block(raw_block, header, txs)
 
@@ -226,10 +192,6 @@ class Coin:
         For example 1 BSV is returned for 100 million satoshis.
         '''
         return Decimal(value) / cls.VALUE_PER_COIN
-
-    @classmethod
-    def warn_old_client_on_tx_broadcast(cls, _client_ver):
-        return False
 
 
 class BitcoinSV(Coin):
@@ -249,8 +211,6 @@ class BitcoinSV(Coin):
 class BitcoinTestnetMixin:
     SHORTNAME = "XTN"
     NET = "testnet"
-    XPUB_VERBYTES = bytes.fromhex("043587cf")
-    XPRV_VERBYTES = bytes.fromhex("04358394")
     P2PKH_VERBYTE = bytes.fromhex("6f")
     P2SH_VERBYTES = [bytes.fromhex("c4")]
     WIF_BYTE = bytes.fromhex("ef")

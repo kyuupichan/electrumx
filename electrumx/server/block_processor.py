@@ -207,9 +207,7 @@ class BlockProcessor:
         '''
         if not raw_blocks:
             return
-        first = self.height + 1
-        blocks = [self.coin.block(raw_block, first + n)
-                  for n, raw_block in enumerate(raw_blocks)]
+        blocks = [self.coin.block(raw_block) for raw_block in raw_blocks]
         headers = [block.header for block in blocks]
         hprevs = [self.coin.header_prevhash(h) for h in headers]
         chain = [self.tip] + [self.coin.header_hash(h) for h in headers[:-1]]
@@ -472,7 +470,7 @@ class BlockProcessor:
         coin = self.coin
         for raw_block in raw_blocks:
             # Check and update self.tip
-            block = coin.block(raw_block, self.height)
+            block = coin.block(raw_block)
             header_hash = coin.header_hash(block.header)
             if header_hash != self.tip:
                 raise ChainError('backup block {} not tip {} at height {:,d}'

@@ -1330,14 +1330,6 @@ class ElectrumX(SessionBase):
                            f'network rules.\n\n{message}\n[{raw_tx}]') from None
         else:
             self.txs_sent += 1
-            client_ver = util.protocol_tuple(self.client)
-            if client_ver != (0, ):
-                msg = self.coin.warn_old_client_on_tx_broadcast(client_ver)
-                if msg:
-                    self.logger.info(f'sent tx: {hex_hash}. and warned user to upgrade their '
-                                     f'client from {self.client}')
-                    return msg
-
             self.logger.info(f'sent tx: {hex_hash}')
             return hex_hash
 

@@ -24,7 +24,7 @@ import electrumx.lib.util as util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import (
-    formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint64, pack_le_uint32,
+    formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint32,
     unpack_le_uint32, unpack_be_uint32, unpack_le_uint64
 )
 from electrumx.server.storage import db_class
@@ -415,7 +415,7 @@ class DB(object):
         offset = 0
         hlen = 80
         headers = []
-        for n in range(count):
+        for _ in range(count):
             headers.append(headers_concat[offset:offset + hlen])
             offset += hlen
 
