@@ -66,7 +66,6 @@ class DB(object):
 
         # Setup block header size handlers
         self.header_offset = self.coin.static_header_offset
-        self.header_len = self.coin.static_header_len
 
         self.logger.info(f'switching current directory to {env.db_dir}')
         os.chdir(env.db_dir)
@@ -417,9 +416,9 @@ class DB(object):
             raise self.DBError('only got {:,d} headers starting at {:,d}, not '
                                '{:,d}'.format(headers_count, height, count))
         offset = 0
+        hlen = 80
         headers = []
         for n in range(count):
-            hlen = self.header_len(height + n)
             headers.append(headers_concat[offset:offset + hlen])
             offset += hlen
 

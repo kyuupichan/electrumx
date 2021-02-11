@@ -215,15 +215,9 @@ class Coin:
         return height * cls.BASIC_HEADER_SIZE
 
     @classmethod
-    def static_header_len(cls, height):
-        '''Given a header height return its length.'''
-        return (cls.static_header_offset(height + 1)
-                - cls.static_header_offset(height))
-
-    @classmethod
     def block_header(cls, block, height):
         '''Returns the block header given a block and its height.'''
-        return block[:cls.static_header_len(height)]
+        return block[:80]
 
     @classmethod
     def block(cls, raw_block, height):
