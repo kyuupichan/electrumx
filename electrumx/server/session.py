@@ -148,7 +148,7 @@ class SessionManager:
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
                 'query reorg sessions stop'.split())
-        LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
+        self.rpc_request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
     def _ssl_context(self):
@@ -1432,6 +1432,7 @@ class LocalRPC(SessionBase):
         super().__init__(*args, **kwargs)
         self.client = 'RPC'
         self.connection.max_response_size = 0
+        self.request_handlers = self.session_mgr.rpc_request_handlers
 
     def protocol_version_string(self):
         return 'RPC'
