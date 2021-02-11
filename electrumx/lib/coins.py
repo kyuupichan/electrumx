@@ -64,7 +64,6 @@ class Coin:
     VALUE_PER_COIN = 100000000
     CHUNK_SIZE = 2016
     BASIC_HEADER_SIZE = 80
-    STATIC_BLOCK_HEADERS = True
     SESSIONCLS = ElectrumX
     DEFAULT_MAX_SEND = 1000000
     DESERIALIZER = lib_tx.Deserializer
@@ -213,7 +212,6 @@ class Coin:
 
         If header sizes change at some point, this is the only code
         that needs updating.'''
-        assert cls.STATIC_BLOCK_HEADERS
         return height * cls.BASIC_HEADER_SIZE
 
     @classmethod

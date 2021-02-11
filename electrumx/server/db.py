@@ -65,12 +65,8 @@ class DB(object):
         self.coin = env.coin
 
         # Setup block header size handlers
-        if self.coin.STATIC_BLOCK_HEADERS:
-            self.header_offset = self.coin.static_header_offset
-            self.header_len = self.coin.static_header_len
-        else:
-            self.header_offset = self.dynamic_header_offset
-            self.header_len = self.dynamic_header_len
+        self.header_offset = self.coin.static_header_offset
+        self.header_len = self.coin.static_header_len
 
         self.logger.info(f'switching current directory to {env.db_dir}')
         os.chdir(env.db_dir)
@@ -100,9 +96,6 @@ class DB(object):
         self.headers_file = util.LogicalFile('meta/headers', 2, 16000000)
         self.tx_counts_file = util.LogicalFile('meta/txcounts', 2, 2000000)
         self.hashes_file = util.LogicalFile('meta/hashes', 4, 16000000)
-        if not self.coin.STATIC_BLOCK_HEADERS:
-            self.headers_offsets_file = util.LogicalFile(
-                'meta/headers_offsets', 2, 16000000)
 
     async def _read_tx_counts(self):
         if self.tx_counts is not None:
@@ -130,8 +123,6 @@ class DB(object):
             with util.open_file('COIN', create=True) as f:
                 f.write(f'ElectrumX databases and metadata for '
                         f'{self.coin.NAME} {self.coin.NET}'.encode())
-            if not self.coin.STATIC_BLOCK_HEADERS:
-                self.headers_offsets_file.write(0, bytes(8))
         else:
             self.logger.info(f'opened UTXO DB (for sync: {for_sync})')
         self.read_utxo_state()
@@ -261,7 +252,6 @@ class DB(object):
         height_start = self.fs_height + 1
         offset = self.header_offset(height_start)
         self.headers_file.write(offset, b''.join(flush_data.headers))
-        self.fs_update_header_offsets(offset, height_start, flush_data.headers)
         flush_data.headers.clear()
 
         offset = height_start * self.tx_counts.itemsize
@@ -352,28 +342,6 @@ class DB(object):
         self.logger.info(f'backup flush #{self.history.flush_count:,d} took '
                          f'{elapsed:.1f}s.  Height {flush_data.height:,d} '
                          f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d})')
-
-    def fs_update_header_offsets(self, offset_start, height_start, headers):
-        if self.coin.STATIC_BLOCK_HEADERS:
-            return
-        offset = offset_start
-        offsets = []
-        for h in headers:
-            offset += len(h)
-            offsets.append(pack_le_uint64(offset))
-        # For each header we get the offset of the next header, hence we
-        # start writing from the next height
-        pos = (height_start + 1) * 8
-        self.headers_offsets_file.write(pos, b''.join(offsets))
-
-    def dynamic_header_offset(self, height):
-        assert not self.coin.STATIC_BLOCK_HEADERS
-        offset, = unpack_le_uint64(self.headers_offsets_file.read(height * 8, 8))
-        return offset
-
-    def dynamic_header_len(self, height):
-        return self.dynamic_header_offset(height + 1)\
-               - self.dynamic_header_offset(height)
 
     def backup_fs(self, height, tx_count):
         '''Back up during a reorg.  This just updates our pointers.'''
