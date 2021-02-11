@@ -207,14 +207,6 @@ class Coin:
         return header[4:36]
 
     @classmethod
-    def static_header_offset(cls, height):
-        '''Given a header height return its offset in the headers file.
-
-        If header sizes change at some point, this is the only code
-        that needs updating.'''
-        return height * cls.BASIC_HEADER_SIZE
-
-    @classmethod
     def block_header(cls, block, height):
         '''Returns the block header given a block and its height.'''
         return block[:80]

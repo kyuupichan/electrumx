@@ -64,9 +64,6 @@ class DB(object):
         self.env = env
         self.coin = env.coin
 
-        # Setup block header size handlers
-        self.header_offset = self.coin.static_header_offset
-
         self.logger.info(f'switching current directory to {env.db_dir}')
         os.chdir(env.db_dir)
 
@@ -249,7 +246,7 @@ class DB(object):
         # Write the headers, tx counts, and tx hashes
         start_time = time.monotonic()
         height_start = self.fs_height + 1
-        offset = self.header_offset(height_start)
+        offset = height_start * 80
         self.headers_file.write(offset, b''.join(flush_data.headers))
         flush_data.headers.clear()
 
@@ -373,8 +370,8 @@ class DB(object):
             # Read some from disk
             disk_count = max(0, min(count, self.db_height + 1 - start_height))
             if disk_count:
-                offset = self.header_offset(start_height)
-                size = self.header_offset(start_height + disk_count) - offset
+                offset = start_height * 80
+                size = disk_count * 80
                 return self.headers_file.read(offset, size), disk_count
             return b'', 0
 
