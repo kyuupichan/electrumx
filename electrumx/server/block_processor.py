@@ -229,20 +229,17 @@ class BlockProcessor:
             except FileNotFoundError:
                 return await self.daemon.raw_blocks(hex_hashes)
 
-        async def backup_and_flush(raw_blocks):
-            # self.touched can include other addresses which is
-            # harmless, but remove None.
-            await self.backup_blocks(raw_blocks)
-            self.touched.discard(None)
-            self.db.flush_backup(self.flush_data(), self.touched)
-
         _start, last, hashes = await self.reorg_hashes(count)
         # Reverse and convert to hex strings.
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
-            await backup_and_flush(raw_blocks)
+            await self.backup_blocks(raw_blocks)
+            # self.touched can include other addresses which is harmless, but remove None.
+            self.touched.discard(None)
+            self.db.flush_backup(self.flush_data(), self.touched)
             last -= len(raw_blocks)
+
         await self.prefetcher.reset_height(self.height)
         self.backed_up_event.set()
         self.backed_up_event.clear()
@@ -624,9 +621,9 @@ class BlockProcessor:
             if self.reorg_count is not None:
                 await self.run_with_lock(self.reorg_chain(self.reorg_count))
                 self.reorg_count = None
-            else:
-                blocks = self.prefetcher.get_prefetched_blocks()
-                await self.run_with_lock(self.check_and_advance_blocks(blocks))
+
+            blocks = self.prefetcher.get_prefetched_blocks()
+            await self.run_with_lock(self.check_and_advance_blocks(blocks))
 
     async def _first_caught_up(self):
         self.logger.info(f'caught up to height {self.height}')
