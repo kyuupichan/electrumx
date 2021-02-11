@@ -241,7 +241,7 @@ class BlockProcessor:
         hashes = [hash_to_hex_str(hash) for hash in reversed(hashes)]
         for hex_hashes in chunks(hashes, 50):
             raw_blocks = await get_raw_blocks(last, hex_hashes)
-            await self.run_with_lock(backup_and_flush(raw_blocks))
+            await backup_and_flush(raw_blocks)
             last -= len(raw_blocks)
         await self.prefetcher.reset_height(self.height)
         self.backed_up_event.set()
@@ -313,10 +313,7 @@ class BlockProcessor:
                          self.db_deletes, self.tip)
 
     async def flush(self, flush_utxos):
-        async def flush():
-            self.db.flush_dbs(self.flush_data(), flush_utxos,
-                              self.estimate_txs_remaining)
-        await self.run_with_lock(flush())
+        self.db.flush_dbs(self.flush_data(), flush_utxos, self.estimate_txs_remaining)
 
     async def _maybe_flush(self):
         # If caught up, flush everything as client queries are
@@ -618,18 +615,18 @@ class BlockProcessor:
         while True:
             if self.height == self.daemon.cached_height():
                 if not self._caught_up_event.is_set():
-                    await self._first_caught_up()
+                    await self.run_with_lock(self._first_caught_up())
                     self._caught_up_event.set()
 
             await self.blocks_event.wait()
             self.blocks_event.clear()
 
             if self.reorg_count is not None:
-                await self.reorg_chain(self.reorg_count)
+                await self.run_with_lock(self.reorg_chain(self.reorg_count))
                 self.reorg_count = None
             else:
                 blocks = self.prefetcher.get_prefetched_blocks()
-                await self.check_and_advance_blocks(blocks)
+                await self.run_with_lock(self.check_and_advance_blocks(blocks))
 
     async def _first_caught_up(self):
         self.logger.info(f'caught up to height {self.height}')
@@ -672,7 +669,8 @@ class BlockProcessor:
         # corrupted data
         except CancelledError:
             self.logger.info('flushing to DB for a clean shutdown...')
-            await self.flush(True)
+            await self.run_with_lock(self.flush(True))
+            self.logger.info('flushed cleanly')
 
     def force_chain_reorg(self, count):
         '''Force a reorg of the given number of blocks.
