@@ -1,0 +1,60 @@
+name: "Release"
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  ECR_REPOSITORY: electrumx
+  IMAGE_TAG: ${{ github.sha }}
+  BUILD_NAME: bitcoin-vault-electrumx-build-${{ github.run_id }}
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.CI_DEPLOYER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CI_DEPLOYER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+          role-to-assume: ${{ secrets.CI_DEPLOYER_AWS_ROLE_TO_ASSUME }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        # Ignore the failure of a step and avoid terminating the job.
+        continue-on-error: true
+
+      - name: Python Semantic Release
+        uses: relekang/python-semantic-release@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pypi_token: false
+
+      - name: Pull docker docker image (for layers that we dont have)
+        continue-on-error: true
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Builder image
+        run: docker build -t $BUILD_NAME .
+
+      - name: Tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag $BUILD_NAME $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $BUILD_NAME $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
