@@ -1061,15 +1061,16 @@ class DeserializerBitcoinVault(DeserializerSegWit):
         vault_tx_type = VaultTxType.NONVAULT
         ar_flag = ''
         air_flag = ''
-        redeem_script = ''
 
         is_segwit = DeserializerBitcoinVault.is_segwit(tx)
-        if is_segwit and len(tx.witness[0]) >= 4:
+        if is_segwit and tx.witness and len(tx.witness[0]) >= 4:
             redeem_script = tx.witness[0][-1]
             ar_flag = tx.witness[0][-2]
             air_flag = tx.witness[0][-3]
         elif not is_segwit:
             redeem_script = tx.inputs[0].script
+        else:
+            return vault_tx_type
 
         if redeem_script:
             if is_ar_type(redeem_script):
