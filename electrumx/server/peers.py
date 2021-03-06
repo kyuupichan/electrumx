@@ -347,6 +347,9 @@ class PeerManager:
             peers_task = await g.spawn(self._send_peers_subscribe
                                        (session, peer))
 
+        # Propagate failed task exception
+        g.result()
+
         # Process reported peers if remote peer is good
         peers = peers_task.result()
         await self._note_peers(peers)

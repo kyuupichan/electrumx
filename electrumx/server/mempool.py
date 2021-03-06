@@ -219,8 +219,6 @@ class MemPool(object):
             for hashes in chunks(new_hashes, 200):
                 coro = self._fetch_and_accept(hashes, all_hashes, touched)
                 await group.spawn(coro)
-            if mempool_height != self.api.db_height():
-                raise DBSyncError
 
             tx_map = {}
             utxo_map = {}
