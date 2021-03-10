@@ -2,8 +2,8 @@ name: "Release"
 
 on:
   push:
-    branches:
-      - master
+#    branches:
+#      - master
 
 env:
   ECR_REPOSITORY: electrumx
@@ -34,11 +34,11 @@ jobs:
         # Ignore the failure of a step and avoid terminating the job.
         continue-on-error: true
 
-      - name: Python Semantic Release
-        uses: relekang/python-semantic-release@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pypi_token: false
+#      - name: Python Semantic Release
+#        uses: relekang/python-semantic-release@master
+#        with:
+#          github_token: ${{ secrets.GITHUB_TOKEN }}
+#          pypi_token: false
 
       - name: Pull docker docker image (for layers that we dont have)
         continue-on-error: true
