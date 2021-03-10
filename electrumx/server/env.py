@@ -93,7 +93,7 @@ class Env(EnvBase):
             self.ssl_certfile = self.required('SSL_CERTFILE')
             self.ssl_keyfile = self.required('SSL_KEYFILE')
 
-            ssl_tls_protocol = self.required('SSL_TLS_PROTOCOL')
+            ssl_tls_protocol = self.default('SSL_TLS_PROTOCOL', 'PROTOCOL_TLS').strip()
             if ssl_protocol == 'PROTOCOL_TLSv1':
                 self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1
             elif ssl_protocol == 'PROTOCOL_TLSv1_1':
