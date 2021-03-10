@@ -258,7 +258,7 @@ class PeerManager:
                 self.logger.info(f'{peer_text} {e}')
             except CancelledError:
                 # A send_request was cancelled
-                self.logger.error('peer dropped verification connection')
+                self.logger.error(f'{peer_text} dropped verification connection')
                 peer.mark_bad()
                 break
 
@@ -348,7 +348,7 @@ class PeerManager:
                                        (session, peer))
 
         # Propagate failed task exception
-        g.result()
+        g.results    # pylint:disable=W0104
 
         # Process reported peers if remote peer is good
         peers = peers_task.result()
