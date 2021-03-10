@@ -9,7 +9,6 @@
 
 
 import re
-import ssl
 from ipaddress import IPv4Address, IPv6Address
 
 from aiorpcx import Service, ServicePart
@@ -92,18 +91,6 @@ class Env(EnvBase):
         if {service.protocol for service in self.services}.intersection(self.SSL_PROTOCOLS):
             self.ssl_certfile = self.required('SSL_CERTFILE')
             self.ssl_keyfile = self.required('SSL_KEYFILE')
-
-            ssl_tls_protocol = self.default('SSL_TLS_PROTOCOL', 'PROTOCOL_TLS').strip()
-            if ssl_tls_protocol == 'PROTOCOL_TLSv1':
-                self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1
-            elif ssl_tls_protocol == 'PROTOCOL_TLSv1_1':
-                self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1_1
-            elif ssl_tls_protocol == 'PROTOCOL_TLSv1_2':
-                self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1_2
-            else:
-                # Selects the highest protocol version that both the client and server support. Despite the name,
-                # this option can select both “SSL” and “TLS” protocols.
-                self.ssl_tls_protocol = ssl.PROTOCOL_TLS
         self.report_services = self.services_to_report()
 
     def sane_max_sessions(self):
