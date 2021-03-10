@@ -94,11 +94,11 @@ class Env(EnvBase):
             self.ssl_keyfile = self.required('SSL_KEYFILE')
 
             ssl_tls_protocol = self.default('SSL_TLS_PROTOCOL', 'PROTOCOL_TLS').strip()
-            if ssl_protocol == 'PROTOCOL_TLSv1':
+            if ssl_tls_protocol == 'PROTOCOL_TLSv1':
                 self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1
-            elif ssl_protocol == 'PROTOCOL_TLSv1_1':
+            elif ssl_tls_protocol == 'PROTOCOL_TLSv1_1':
                 self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1_1
-            elif ssl_protocol == 'PROTOCOL_TLSv1_2':
+            elif ssl_tls_protocol == 'PROTOCOL_TLSv1_2':
                 self.ssl_tls_protocol = ssl.PROTOCOL_TLSv1_2
             else:
                 # Selects the highest protocol version that both the client and server support. Despite the name,
