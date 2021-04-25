@@ -621,11 +621,13 @@ class SessionManager:
                 await group.spawn(self._manage_servers())
         finally:
             # Close servers then sessions
+            self.logger.info('stopping servers')
             await self._stop_servers(self.servers.keys())
+            self.logger.info('closing connections...')
             async with TaskGroup() as group:
                 for session in list(self.sessions):
                     await group.spawn(session.close(force_after=1))
-            await sleep(0.05)
+            self.logger.info('connections closed')
 
     def extra_cost(self, session):
         # Note there is no guarantee that session is still in self.sessions.  Example traceback:
