@@ -136,3 +136,5 @@ class Controller(ServerBase):
                 await group.spawn(session_mgr.serve(notifications, mempool_event))
                 await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
                 await group.spawn(wait_for_catchup())
+
+            raise group.exception

@@ -609,7 +609,7 @@ class BlockProcessor:
     async def _process_blocks(self):
         '''Loop forever processing blocks as they arrive.'''
         async def process_event():
-            '''Perform any pending reorg, the process prefetched blocks.'''
+            '''Perform a pending reorg or process prefetched blocks.'''
             if self.reorg_count is not None:
                 await self._reorg_chain(self.reorg_count)
                 self.reorg_count = None
@@ -665,6 +665,7 @@ class BlockProcessor:
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_blocks())
+            raise group.exception
         # Don't flush for arbitrary exceptions as they might be a cause or consequence of
         # corrupted data
         except CancelledError:
