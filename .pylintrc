@@ -219,6 +219,7 @@ disable=blacklisted-name,
         deprecated-sys-function,
         exception-escape,
         comprehension-escape,
+        consider-using-with,
         logging-fstring-interpolation,  # W1203
         protected-access,   # W0212
         pointless-string-statement,   # W0105
