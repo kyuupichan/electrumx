@@ -256,10 +256,6 @@ class PeerManager:
                                   f'({e.code})')
             except (OSError, SOCKSError, ConnectionError, TaskTimeout) as e:
                 self.logger.info(f'{peer_text} {e}')
-            except CancelledError:
-                # A send_request was cancelled
-                self.logger.error(f'{peer_text} dropped verification connection')
-                raise
 
         if is_good:
             # Monotonic time would be better, but last_good and last_try are
