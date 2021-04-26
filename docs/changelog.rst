@@ -3,6 +3,15 @@
 ===========
 
 
+Version 1.18.1 (26 Apr 2021)
+============================
+
+* Fix unclean and stalled shutdowns
+* Cleanup lock handling
+* Process blocks one at a time
+* Remove dead code
+
+
 Version 1.17.0 (04 Feb 2021)
 ============================
 
