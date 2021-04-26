@@ -259,8 +259,7 @@ class PeerManager:
             except CancelledError:
                 # A send_request was cancelled
                 self.logger.error(f'{peer_text} dropped verification connection')
-                peer.mark_bad()
-                break
+                raise
 
         if is_good:
             # Monotonic time would be better, but last_good and last_try are
