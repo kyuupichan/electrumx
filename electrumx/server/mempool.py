@@ -174,24 +174,28 @@ class MemPool(object):
         # Touched accumulates between calls to on_mempool and each
         # call transfers ownership
         touched = set()
-        while True:
-            height = self.api.cached_height()
-            hex_hashes = await self.api.mempool_hashes()
-            if height != await self.api.height():
-                continue
-            hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
-            try:
-                await self._process_mempool(hashes, touched, height)
-            except DBSyncError:
-                # The UTXO DB is not at the same height as the
-                # mempool; wait and try again
-                self.logger.debug('waiting for DB to sync')
-            else:
-                synchronized_event.set()
-                synchronized_event.clear()
-                await self.api.on_mempool(touched, height)
-                touched = set()
-            await sleep(self.refresh_secs)
+        try:
+            while True:
+                height = self.api.cached_height()
+                hex_hashes = await self.api.mempool_hashes()
+                if height != await self.api.height():
+                    continue
+                hashes = set(hex_str_to_hash(hh) for hh in hex_hashes)
+                try:
+                    await self._process_mempool(hashes, touched, height)
+                except DBSyncError:
+                    # The UTXO DB is not at the same height as the
+                    # mempool; wait and try again
+                    self.logger.debug('waiting for DB to sync')
+                else:
+                    synchronized_event.set()
+                    synchronized_event.clear()
+                    await self.api.on_mempool(touched, height)
+                    touched = set()
+                await sleep(self.refresh_secs)
+        except BaseException:
+            self.logger.exception('_refresh_hashes error')
+            raise
 
     async def _process_mempool(self, all_hashes, touched, mempool_height):
         # Re-sync with the new set of hashes
