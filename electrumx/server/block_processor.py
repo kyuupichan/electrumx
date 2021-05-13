@@ -665,7 +665,10 @@ class BlockProcessor:
             async with TaskGroup() as group:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_blocks())
-            raise group.exception
+
+                async for task in group:
+                    if not task.cancelled():
+                        task.result()
         # Don't flush for arbitrary exceptions as they might be a cause or consequence of
         # corrupted data
         except CancelledError:

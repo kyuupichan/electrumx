@@ -612,21 +612,17 @@ class SessionManager:
             await self._start_external_servers()
             # Peer discovery should start after the external servers
             # because we connect to ourself
-            try:
-                async with self._task_group as group:
-                    await group.spawn(self.peer_mgr.discover_peers())
-                    await group.spawn(self._clear_stale_sessions())
-                    await group.spawn(self._handle_chain_reorgs())
-                    await group.spawn(self._recalc_concurrency())
-                    await group.spawn(self._log_sessions())
-                    await group.spawn(self._manage_servers())
-            except BaseException:
-                self.logger.exception('serving taskgroup exited with exception')
-                raise
-            self.logger.info(f'serving taskgroup exited normally with {len(group.exceptions)} '
-                             f'exceptions caught')
-            for exc in group.exceptions:
-                self.logger.info(f'type {type(exc)}: {exc}')
+            async with self._task_group as group:
+                await group.spawn(self.peer_mgr.discover_peers())
+                await group.spawn(self._clear_stale_sessions())
+                await group.spawn(self._handle_chain_reorgs())
+                await group.spawn(self._recalc_concurrency())
+                await group.spawn(self._log_sessions())
+                await group.spawn(self._manage_servers())
+
+                async for task in group:
+                    if not task.cancelled():
+                        task.result()
         finally:
             # Close servers then sessions
             self.logger.info('stopping servers')

@@ -342,6 +342,10 @@ class PeerManager:
             peers_task = await g.spawn(self._send_peers_subscribe
                                        (session, peer))
 
+            async for task in group:
+                if not task.cancelled():
+                    task.result()
+
         # Propagate failed task exception
         g.results    # pylint:disable=W0104
 
