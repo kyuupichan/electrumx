@@ -619,6 +619,8 @@ class SessionManager:
                 await group.spawn(self._recalc_concurrency())
                 await group.spawn(self._log_sessions())
                 await group.spawn(self._manage_servers())
+
+            group.result    # pylint:disable=W0104
         finally:
             # Close servers then sessions
             self.logger.info('stopping servers')

@@ -17,7 +17,7 @@ from collections import defaultdict, Counter
 
 from aiorpcx import (connect_rs, RPCSession, SOCKSProxy, Notification, handler_invocation,
                      SOCKSError, TaskTimeout, TaskGroup, Event,
-                     sleep, ignore_after, CancelledError, RPCError, ProtocolError)
+                     sleep, ignore_after, RPCError, ProtocolError)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger
@@ -343,7 +343,7 @@ class PeerManager:
                                        (session, peer))
 
         # Propagate failed task exception
-        g.results    # pylint:disable=W0104
+        g.result    # pylint:disable=W0104
 
         # Process reported peers if remote peer is good
         peers = peers_task.result()
@@ -429,6 +429,8 @@ class PeerManager:
         async with self.group as group:
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
+
+        group.result    # pylint:disable=W0104
 
     def info(self):
         '''The number of peers.'''

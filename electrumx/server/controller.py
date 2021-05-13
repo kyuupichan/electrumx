@@ -137,4 +137,4 @@ class Controller(ServerBase):
                 await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
                 await group.spawn(wait_for_catchup())
 
-            raise group.exception
+            group.result    # pylint:disable=W0104
