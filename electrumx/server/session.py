@@ -20,7 +20,7 @@ from ipaddress import IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws, NewlineFramer,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
@@ -858,6 +858,9 @@ class SessionBase(RPCSession):
 
     async def notify(self, touched, height_changed):
         pass
+
+    def default_framer(self):
+        return NewlineFramer(max_size=self.env.max_recv)
 
     def remote_address_string(self, *, for_log=True):
         '''Returns the peer's IP address and port as a human-readable
