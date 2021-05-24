@@ -20,7 +20,7 @@ from ipaddress import IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws, timeout_after,
     TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
 )
 import pylru
@@ -139,7 +139,6 @@ class SessionManager:
         self._merkle_hits = 0
         self.notified_height = None
         self.hsub_results = None
-        self._task_group = TaskGroup()
         self._sslc = None
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = Event()
@@ -240,8 +239,9 @@ class SessionManager:
         if sessions:
             session_ids = ', '.join(str(session.session_id) for session in sessions)
             self.logger.info(f'{reason} session ids {session_ids}')
-            for session in sessions:
-                await self._task_group.spawn(session.close(force_after=force_after))
+            async with TaskGroup() as group:
+                for session in sessions:
+                    await group.spawn(session.close(force_after=force_after))
 
     async def _clear_stale_sessions(self):
         '''Cut off sessions that haven't done anything for 10 minutes.'''
@@ -612,7 +612,7 @@ class SessionManager:
             await self._start_external_servers()
             # Peer discovery should start after the external servers
             # because we connect to ourself
-            async with self._task_group as group:
+            async with TaskGroup() as group:
                 await group.spawn(self.peer_mgr.discover_peers())
                 await group.spawn(self._clear_stale_sessions())
                 await group.spawn(self._handle_chain_reorgs())
@@ -773,8 +773,9 @@ class SessionManager:
             for hashX in set(cache).intersection(touched):
                 del cache[hashX]
 
-        for session in self.sessions:
-            await self._task_group.spawn(session.notify, touched, height_changed)
+        async with TaskGroup() as group:
+            for session in self.sessions:
+                await group.spawn(session.notify, touched, height_changed)
 
     def _ip_addr_group_name(self, session):
         host = session.remote_address().host
@@ -982,7 +983,8 @@ class ElectrumX(SessionBase):
     async def notify(self, touched, height_changed):
         '''Wrap _notify_inner; websockets raises exceptions for unclear reasons.'''
         try:
-            await self._notify_inner(touched, height_changed)
+            async with timeout_after(30):
+                await self._notify_inner(touched, height_changed)
         except Exception:   # pylint:disable=W0703
             self.logger.exception('unexpected exception notifying client')
 
