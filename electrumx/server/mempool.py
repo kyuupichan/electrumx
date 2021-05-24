@@ -291,7 +291,9 @@ class MemPool(object):
             await group.spawn(self._refresh_hashes(synchronized_event))
             await group.spawn(self._logging(synchronized_event))
 
-        group.result    # pylint:disable=W0104
+            async for task in group:
+                if not task.cancelled():
+                    task.result()
 
     async def balance_delta(self, hashX):
         '''Return the unconfirmed amount in the mempool for hashX.

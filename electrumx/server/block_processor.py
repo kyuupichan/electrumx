@@ -666,7 +666,9 @@ class BlockProcessor:
                 await group.spawn(self.prefetcher.main_loop(self.height))
                 await group.spawn(self._process_blocks())
 
-            group.result    # pylint:disable=W0104
+                async for task in group:
+                    if not task.cancelled():
+                        task.result()
         # Don't flush for arbitrary exceptions as they might be a cause or consequence of
         # corrupted data
         except CancelledError:
