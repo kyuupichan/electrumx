@@ -2,6 +2,14 @@
 
 <!--next-version-placeholder-->
 
+## v0.3.0 (2021-06-01)
+### Feature
+* **ssl:** Enable customize tls protocol ([`cdcf493`](https://github.com/electric-cash/electrumx/commit/cdcf4931b2b21dc274f2ffa4c309e8917768c8a6))
+
+### Fix
+* **release:** Revert pipeline changes ([`3ea9577`](https://github.com/electric-cash/electrumx/commit/3ea9577ef580470794ae52cf6a5cbdc9a5844faf))
+* **ssl:** Fix wrong variable name ([`be54787`](https://github.com/electric-cash/electrumx/commit/be54787bfeb529d7f58d22bff9d7c30a3f09420f))
+
 ## v0.2.1 (2021-01-26)
 ### Fix
 * **ci:** Add new ECR registry ([`e891f2b`](https://github.com/electric-cash/electrumx/commit/e891f2bcaf42ddfafacb7de303b497937d684ea3))
