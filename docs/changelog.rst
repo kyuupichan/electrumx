@@ -3,6 +3,14 @@
 ===========
 
 
+Version 1.19.0 (11 Jun 2021)
+============================
+
+* disconnect excessive resource usage sessions faster (SomberNight)
+* better handling of task groups to reduce memory usage and report errors properly
+* add MAX_RECV environment variable defaulting to 5 million bytes
+
+
 Version 1.18.1 (26 Apr 2021)
 ============================
 
