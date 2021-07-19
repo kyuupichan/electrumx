@@ -30,8 +30,8 @@ import electrumx
 from electrumx.lib.merkle import MerkleCache
 from electrumx.lib.text import sessions_lines
 import electrumx.lib.util as util
-from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
-                                HASHX_LEN, Base58Error)
+from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, Base58Error,
+    double_sha256)
 from electrumx.server.daemon import DaemonError
 from electrumx.server.peers import PeerManager
 
@@ -643,7 +643,7 @@ class SessionManager:
             return 0
         return sum((group.cost() - session.cost) * group.weight for group in groups)
 
-    async def _merkle_branch(self, height, tx_hashes, tx_pos):
+    async def _merkle_branch(self, height, tx_hashes, tx_pos, return_root=False):
         tx_hash_count = len(tx_hashes)
         cost = tx_hash_count
 
@@ -660,11 +660,13 @@ class SessionManager:
                 merkle_cache = MerkleCache(self.db.merkle, tx_hashes_func)
                 self._merkle_cache[height] = merkle_cache
                 await merkle_cache.initialize(len(tx_hashes))
-            branch, _root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos)
+            branch, root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos)
         else:
-            branch, _root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
+            branch, root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
 
         branch = [hash_to_hex_str(hash) for hash in branch]
+        if return_root:
+            return branch, root, cost / 2500
         return branch, cost / 2500
 
     async def merkle_branch_for_tx_hash(self, height, tx_hash):
@@ -678,6 +680,82 @@ class SessionManager:
             ) from None
         branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, tx_pos, tx_hashes_cost + merkle_cost
+
+    async def tsc_merkle_proof_for_tx_hash(self, height, tx_hash, txid_or_tx='txid',
+            target_type='block_hash'):
+        '''Return a pair (tsc_proof, cost) where tsc_proof is a dictionary with fields:
+            index - the position of the transaction
+            txOrId - either "txid" or "tx"
+            target - either "block_hash", "block_header" or "merkle_root"
+            nodes - the nodes in the merkle branch excluding the "target"'''
+
+        def replace_dup_hashes_with_asterix(branch):
+            # replace duplicate hashes with "*"
+            duplicate_hashes = [x for i, x in enumerate(branch) if x in branch[:i]]
+            asterix_indices = []
+            if duplicate_hashes:
+                for dup in duplicate_hashes:
+                    first_index = tsc_format_branch.index(dup)
+                    second_index = first_index + 1
+                    assert branch[first_index] == branch[second_index]
+                    asterix_indices.append(second_index)
+            for i in asterix_indices:
+                branch[i] = "*"
+            return branch
+
+        async def get_target(target_type):
+            try:
+                raw_header = await self.raw_header(height)
+                root_from_header = raw_header[36:36 + 32]
+                if target_type == "block_header":
+                    target = raw_header
+                elif target_type == "merkle_root":
+                    target = root_from_header
+                else:  # target == block hash
+                    target = double_sha256(raw_header)
+            except ValueError:
+                raise RPCError(BAD_REQUEST,
+                    f'block header at height {height:,d} not found') from None
+            return hash_to_hex_str(target), root_from_header
+
+        def get_tx_position(tx_hash):
+            try:
+                tx_pos = tx_hashes.index(tx_hash)
+            except ValueError:
+                raise RPCError(BAD_REQUEST,
+                    f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}') from None
+            return tx_pos
+
+        async def get_txid_or_tx_field(tx_hash):
+            txid = hash_to_hex_str(tx_hash)
+            if txid_or_tx == "tx":
+                rawtx = await self.daemon_request('getrawtransaction', txid, False)
+                txid_or_tx_field = rawtx
+            else:
+                txid_or_tx_field = txid
+            return txid_or_tx_field
+
+        tsc_proof = {}
+        tx_hashes, tx_hashes_cost = await self.tx_hashes_at_blockheight(height)
+        tx_pos = get_tx_position(tx_hash)
+        branch, root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos,
+            return_root=True)
+
+        target, root_from_header = await get_target(target_type)
+        # sanity check
+        if root != root_from_header:
+            raise RPCError(BAD_REQUEST,
+                f'db error. Merkle root from cached block header does not match the derived merkle '
+                f'root') from None
+
+        txid_or_tx_field = await get_txid_or_tx_field(tx_hash)
+
+        tsc_format_branch = replace_dup_hashes_with_asterix(branch)
+        tsc_proof['index'] = tx_pos
+        tsc_proof['txid_or_tx'] = txid_or_tx_field
+        tsc_proof['target'] = target
+        tsc_proof['nodes'] = tsc_format_branch
+        return tsc_proof, tx_hashes_cost + merkle_cost
 
     async def merkle_branch_for_tx_pos(self, height, tx_pos):
         '''Return a triple (branch, tx_hash_hex, cost).'''
@@ -1375,6 +1453,32 @@ class ElectrumX(SessionBase):
 
         return {"block_height": height, "merkle": branch, "pos": tx_pos}
 
+    async def transaction_tsc_merkle(self, tx_hash, height, txid_or_tx='txid',
+            target_type='block_hash'):
+        '''Return the TSC merkle proof in JSON format to a confirmed transaction given its hash.
+        See: https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/.
+
+        tx_hash: the transaction hash as a hexadecimal string
+        include_tx: whether to include the full raw transaction in the response or txid.
+        target: options include: ('merkle_root', 'block_header', 'block_hash', 'None')
+        '''
+        tx_hash = assert_tx_hash(tx_hash)
+        height = non_negative_integer(height)
+
+        tsc_proof, cost = await self.session_mgr.tsc_merkle_proof_for_tx_hash(
+            height, tx_hash, txid_or_tx, target_type)
+        self.bump_cost(cost)
+
+        return {
+            "index": tsc_proof['index'],
+            "txOrId": tsc_proof['txid_or_tx'],
+            "target": tsc_proof['target'],
+            "nodes": tsc_proof['nodes'],  # "*" is used to represent duplicated hashes
+            "targetType": target_type,
+            "proofType": "branch",  # "tree" option is not supported by ElectrumX
+            "composite": False  # composite option is not supported by ElectrumX
+        }
+
     async def transaction_id_from_pos(self, height, tx_pos, merkle=False):
         '''Return the txid and optionally a merkle proof, given
         a block height and position in the block.
@@ -1421,6 +1525,7 @@ class ElectrumX(SessionBase):
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
+            'blockchain.transaction.get_tsc_merkle': self.transaction_tsc_merkle,
             'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
             'mempool.get_fee_histogram': self.compact_fee_histogram,
             'server.add_peer': self.add_peer,
