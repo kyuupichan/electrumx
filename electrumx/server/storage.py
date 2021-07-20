@@ -10,7 +10,7 @@
 import os
 from functools import partial
 
-import electrumx.lib.util as util
+from electrumx.lib import util
 
 
 def db_class(name):

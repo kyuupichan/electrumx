@@ -1,6 +1,6 @@
 import time
 
-import electrumx.lib.util as util
+from electrumx.lib import util
 
 
 def sessions_lines(data):
