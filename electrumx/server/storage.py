@@ -10,11 +10,15 @@
 import os
 from functools import partial
 
+import pytest
 from electrumx.lib import util
 
 
 def db_class(name):
     '''Returns a DB engine class.'''
+    if name == "skip":
+        raise pytest.skip()
+
     for db_class_ in util.subclasses(Storage):
         if db_class_.__name__.lower() == name.lower():
             db_class_.import_module()
