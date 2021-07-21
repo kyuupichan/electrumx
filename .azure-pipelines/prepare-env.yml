@@ -27,3 +27,22 @@ steps:
   enabled: true
   continueOnError: false
   failOnStderr: false
+
+# Install plyvel depending on platform
+- bash: |
+    python -m pip install plyvel
+  condition: eq( variables['Agent.OS'], 'Linux' )
+  displayName: Install plyvel on Linux
+  enabled: true
+  continueOnError: false
+  failOnStderr: false
+- bash: |
+    brew tap bagonyi/homebrew-formulae git@github.com:bagonyi/homebrew-formulae.git
+    brew extract --version=1.22 leveldb bagonyi/formulae
+    brew install leveldb@1.22
+    pip install plyvel --no-cache-dir
+  condition: eq( variables['Agent.OS'], 'Darwin' )
+  displayName: Install plyvel on MacOS
+  enabled: true
+  continueOnError: false
+  failOnStderr: false

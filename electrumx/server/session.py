@@ -643,7 +643,7 @@ class SessionManager:
             return 0
         return sum((group.cost() - session.cost) * group.weight for group in groups)
 
-    async def _merkle_branch(self, height, tx_hashes, tx_pos, return_root=False):
+    async def _merkle_branch(self, height, tx_hashes, tx_pos, tsc_format=False):
         tx_hash_count = len(tx_hashes)
         cost = tx_hash_count
 
@@ -660,14 +660,22 @@ class SessionManager:
                 merkle_cache = MerkleCache(self.db.merkle, tx_hashes_func)
                 self._merkle_cache[height] = merkle_cache
                 await merkle_cache.initialize(len(tx_hashes))
-            branch, root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos)
+            branch, root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos,
+                                                              tsc_format=tsc_format)
         else:
-            branch, root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
+            branch, root = self.db.merkle.branch_and_root(tx_hashes, tx_pos,
+                                                          tsc_format=tsc_format)
 
-        branch = [hash_to_hex_str(hash) for hash in branch]
-        if return_root:
-            return branch, root, cost / 2500
-        return branch, cost / 2500
+        if tsc_format:
+            def converter(_hash):
+                if _hash == b"*":
+                    return _hash.decode()
+                else:
+                    return hash_to_hex_str(_hash)
+            branch = [converter(hash) for hash in branch]
+        else:
+            branch = [hash_to_hex_str(hash) for hash in branch]
+        return branch, root, cost / 2500
 
     async def merkle_branch_for_tx_hash(self, height, tx_hash):
         '''Return a triple (branch, tx_pos, cost).'''
@@ -678,7 +686,7 @@ class SessionManager:
             raise RPCError(
                 BAD_REQUEST, f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}'
             ) from None
-        branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
+        branch, _root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, tx_pos, tx_hashes_cost + merkle_cost
 
     async def tsc_merkle_proof_for_tx_hash(self, height, tx_hash, txid_or_tx='txid',
@@ -689,34 +697,20 @@ class SessionManager:
             target - either "block_hash", "block_header" or "merkle_root"
             nodes - the nodes in the merkle branch excluding the "target"'''
 
-        def replace_dup_hashes_with_asterix(branch):
-            # replace duplicate hashes with "*"
-            duplicate_hashes = [x for i, x in enumerate(branch) if x in branch[:i]]
-            asterix_indices = []
-            if duplicate_hashes:
-                for dup in duplicate_hashes:
-                    first_index = tsc_format_branch.index(dup)
-                    second_index = first_index + 1
-                    assert branch[first_index] == branch[second_index]
-                    asterix_indices.append(second_index)
-            for i in asterix_indices:
-                branch[i] = "*"
-            return branch
-
         async def get_target(target_type):
             try:
                 raw_header = await self.raw_header(height)
                 root_from_header = raw_header[36:36 + 32]
                 if target_type == "block_header":
-                    target = raw_header
+                    target = raw_header.hex()
                 elif target_type == "merkle_root":
-                    target = root_from_header
+                    target = hash_to_hex_str(root_from_header)
                 else:  # target == block hash
-                    target = double_sha256(raw_header)
+                    target = hash_to_hex_str(double_sha256(raw_header))
             except ValueError:
                 raise RPCError(BAD_REQUEST, f'block header at height {height:,d} not found') \
                     from None
-            return hash_to_hex_str(target), root_from_header
+            return target, root_from_header
 
         def get_tx_position(tx_hash):
             try:
@@ -739,7 +733,7 @@ class SessionManager:
         tx_hashes, tx_hashes_cost = await self.tx_hashes_at_blockheight(height)
         tx_pos = get_tx_position(tx_hash)
         branch, root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos,
-                                                              return_root=True)
+                                                              tsc_format=True)
 
         target, root_from_header = await get_target(target_type)
         # sanity check
@@ -749,11 +743,10 @@ class SessionManager:
 
         txid_or_tx_field = await get_txid_or_tx_field(tx_hash)
 
-        tsc_format_branch = replace_dup_hashes_with_asterix(branch)
         tsc_proof['index'] = tx_pos
         tsc_proof['txid_or_tx'] = txid_or_tx_field
         tsc_proof['target'] = target
-        tsc_proof['nodes'] = tsc_format_branch
+        tsc_proof['nodes'] = branch
         return tsc_proof, tx_hashes_cost + merkle_cost
 
     async def merkle_branch_for_tx_pos(self, height, tx_pos):
@@ -765,7 +758,7 @@ class SessionManager:
             raise RPCError(
                 BAD_REQUEST, f'no tx at position {tx_pos:,d} in block at height {height:,d}'
             ) from None
-        branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
+        branch, _root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, hash_to_hex_str(tx_hash), tx_hashes_cost + merkle_cost
 
     async def tx_hashes_at_blockheight(self, height):
