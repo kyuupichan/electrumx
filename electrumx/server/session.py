@@ -699,6 +699,7 @@ class SessionManager:
 
         async def get_target(target_type):
             try:
+                cost = 0.25
                 raw_header = await self.raw_header(height)
                 root_from_header = raw_header[36:36 + 32]
                 if target_type == "block_header":
@@ -710,7 +711,7 @@ class SessionManager:
             except ValueError:
                 raise RPCError(BAD_REQUEST, f'block header at height {height:,d} not found') \
                     from None
-            return target, root_from_header
+            return target, root_from_header, cost
 
         def get_tx_position(tx_hash):
             try:
@@ -724,10 +725,12 @@ class SessionManager:
             txid = hash_to_hex_str(tx_hash)
             if txid_or_tx == "tx":
                 rawtx = await self.daemon_request('getrawtransaction', txid, False)
+                cost = 1.0
                 txid_or_tx_field = rawtx
             else:
+                cost = 0.0
                 txid_or_tx_field = txid
-            return txid_or_tx_field
+            return txid_or_tx_field, cost
 
         tsc_proof = {}
         tx_hashes, tx_hashes_cost = await self.tx_hashes_at_blockheight(height)
@@ -735,19 +738,19 @@ class SessionManager:
         branch, root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos,
                                                               tsc_format=True)
 
-        target, root_from_header = await get_target(target_type)
+        target, root_from_header, header_cost = await get_target(target_type)
         # sanity check
         if root != root_from_header:
             raise RPCError(BAD_REQUEST, 'db error. Merkle root from cached block header does not '
                                         'match the derived merkle root') from None
 
-        txid_or_tx_field = await get_txid_or_tx_field(tx_hash)
+        txid_or_tx_field, tx_fetch_cost = await get_txid_or_tx_field(tx_hash)
 
         tsc_proof['index'] = tx_pos
         tsc_proof['txid_or_tx'] = txid_or_tx_field
         tsc_proof['target'] = target
         tsc_proof['nodes'] = branch
-        return tsc_proof, tx_hashes_cost + merkle_cost
+        return tsc_proof, tx_hashes_cost + merkle_cost + tx_fetch_cost + header_cost
 
     async def merkle_branch_for_tx_pos(self, height, tx_pos):
         '''Return a triple (branch, tx_hash_hex, cost).'''
