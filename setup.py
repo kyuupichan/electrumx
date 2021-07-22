@@ -1,7 +1,7 @@
 import setuptools
 import electrumx
 
-version = electrumx.version.split(' ')[-1]
+version = electrumx.version.rsplit(' ', maxsplit=1)[-1]
 
 with open('requirements.txt', 'r') as f:
     requirements = f.read().splitlines()

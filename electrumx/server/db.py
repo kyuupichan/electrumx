@@ -20,7 +20,7 @@ from glob import glob
 import attr
 from aiorpcx import run_in_thread, sleep
 
-import electrumx.lib.util as util
+from electrumx.lib import util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import (
