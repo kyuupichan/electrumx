@@ -178,7 +178,7 @@ class SessionManager:
             host = None if service.host == 'all_interfaces' else str(service.host)
             try:
                 self.servers[service] = await serve(session_factory, host,
-                                                    service.port, ssl=sslc)
+                                                    service.port, ssl=sslc, reuse_address=True)
             except OSError as e:    # don't suppress CancelledError
                 self.logger.error(f'{kind} server failed to listen on {service.address}: {e}')
             else:
