@@ -14,7 +14,7 @@ from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
 from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
-from electrumx.server.session import SessionManager
+from electrumx.server.session.session_manager import SessionManager
 
 
 class Notifications(object):
