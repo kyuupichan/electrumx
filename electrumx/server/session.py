@@ -1079,7 +1079,7 @@ class ElectrumX(SessionBase):
         return result
 
     async def get_balance(self, hashX):
-        utxos = await self.db.all_utxos(hashX)
+        utxos = await self.db.all_utxos(hashX) #TODO must include info about staking 
         confirmed = sum(utxo.value for utxo in utxos)
         unconfirmed = await self.mempool.balance_delta(hashX)
         self.bump_cost(1.0 + len(utxos) / 50)
@@ -1351,6 +1351,7 @@ class ElectrumX(SessionBase):
 
         self.bump_cost(1.0)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
+        #TODO if tx is staking add staking info 
 
     async def transaction_merkle(self, tx_hash, height):
         '''Return the merkle branch to a confirmed transaction given its hash
@@ -1405,6 +1406,9 @@ class ElectrumX(SessionBase):
             'blockchain.estimatefee': self.estimatefee,
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.relayfee': self.relayfee,
+            #TODO Add getstakinginfo
+            #TODO Add getstakeinfo
+            #TODO Add getstakesforaddress
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
             'blockchain.scripthash.get_history': self.scripthash_get_history,
             'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
