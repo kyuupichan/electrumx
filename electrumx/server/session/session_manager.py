@@ -25,7 +25,7 @@ import electrumx.lib.util as util
 from electrumx.lib.hash import (hash_to_hex_str, Base58Error)
 from electrumx.server.daemon import DaemonError
 
-from electrumx.server.session.session import SessionBase, SessionGroup, SessionReferences, BAD_REQUEST, DAEMON_ERROR, non_negative_integer
+from electrumx.server.session.session_base import SessionBase, SessionGroup, SessionReferences, non_negative_integer, BAD_REQUEST, DAEMON_ERROR
 
 class LocalRPC(SessionBase):
     '''A local TCP RPC server session.'''

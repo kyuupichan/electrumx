@@ -8,178 +8,16 @@
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
 import codecs
-import datetime
-import itertools
-from copy import deepcopy
 
-import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, handler_invocation, RPCError, Request, ReplyAndDisconnect
+     RPCError, ReplyAndDisconnect
 )
 
 import electrumx
 import electrumx.lib.util as util
-from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
-                                HASHX_LEN)
+from electrumx.lib.hash import (sha256, hash_to_hex_str)
 from electrumx.server.daemon import DaemonError
-
-
-BAD_REQUEST = 1
-DAEMON_ERROR = 2
-
-
-def scripthash_to_hashX(scripthash):
-    try:
-        bin_hash = hex_str_to_hash(scripthash)
-        if len(bin_hash) == 32:
-            return bin_hash[:HASHX_LEN]
-    except (ValueError, TypeError):
-        pass
-    raise RPCError(BAD_REQUEST, f'{scripthash} is not a valid script hash')
-
-
-def non_negative_integer(value):
-    '''Return param value it is or can be converted to a non-negative
-    integer, otherwise raise an RPCError.'''
-    try:
-        value = int(value)
-        if value >= 0:
-            return value
-    except (ValueError, TypeError):
-        pass
-    raise RPCError(BAD_REQUEST,
-                   f'{value} should be a non-negative integer')
-
-
-def assert_boolean(value):
-    '''Return param value it is boolean otherwise raise an RPCError.'''
-    if value in (False, True):
-        return value
-    raise RPCError(BAD_REQUEST, f'{value} should be a boolean value')
-
-
-def assert_tx_hash(value):
-    '''Raise an RPCError if the value is not a valid hexadecimal transaction hash.
-
-    If it is valid, return it as 32-byte binary hash.
-    '''
-    try:
-        raw_hash = hex_str_to_hash(value)
-        if len(raw_hash) == 32:
-            return raw_hash
-    except (ValueError, TypeError):
-        pass
-    raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
-
-
-@attr.s(slots=True)
-class SessionGroup:
-    name = attr.ib()
-    weight = attr.ib()
-    sessions = attr.ib()
-    retained_cost = attr.ib()
-
-    def session_cost(self):
-        return sum(session.cost for session in self.sessions)
-
-    def cost(self):
-        return self.retained_cost + self.session_cost()
-
-
-@attr.s(slots=True)
-class SessionReferences:
-    # All attributes are sets but groups is a list
-    sessions = attr.ib()
-    groups = attr.ib()
-    specials = attr.ib()    # Lower-case strings
-    unknown = attr.ib()     # Strings
-
-
-
-class SessionBase(RPCSession):
-    '''Base class of ElectrumX JSON sessions.
-
-    Each session runs its tasks in asynchronous parallelism with other
-    sessions.
-    '''
-
-    MAX_CHUNK_SIZE = 2016
-    session_counter = itertools.count()
-    log_new = False
-
-    def __init__(self, session_mgr, db, mempool, peer_mgr, kind, transport):
-        connection = JSONRPCConnection(JSONRPCAutoDetect)
-        super().__init__(transport, connection=connection)
-        self.session_mgr = session_mgr
-        self.db = db
-        self.mempool = mempool
-        self.peer_mgr = peer_mgr
-        self.kind = kind  # 'RPC', 'TCP' etc.
-        self.env = session_mgr.env
-        self.coin = self.env.coin
-        self.client = 'unknown'
-        self.anon_logs = self.env.anon_logs
-        self.txs_sent = 0
-        self.log_me = SessionBase.log_new
-        self.session_id = None
-        self.daemon_request = self.session_mgr.daemon_request
-        self.session_id = next(self.session_counter)
-        context = {'conn_id': f'{self.session_id}'}
-        logger = util.class_logger(__name__, self.__class__.__name__)
-        self.logger = util.ConnectionLogger(logger, context)
-        self.logger.info(f'{self.kind} {self.remote_address_string()}, '
-                         f'{self.session_mgr.session_count():,d} total')
-        self.recalc_concurrency()
-        self.session_mgr.add_session(self)
-
-    async def notify(self, touched, height_changed):
-        pass
-
-    def remote_address_string(self, *, for_log=True):
-        '''Returns the peer's IP address and port as a human-readable
-        string, respecting anon logs if the output is for a log.'''
-        if for_log and self.anon_logs:
-            return 'xx.xx.xx.xx:xx'
-        return str(self.remote_address())
-
-    def flags(self):
-        '''Status flags.'''
-        status = self.kind[0]
-        if self.is_closing():
-            status += 'C'
-        if self.log_me:
-            status += 'L'
-        status += str(self._incoming_concurrency.max_concurrent)
-        return status
-
-    async def connection_lost(self):
-        '''Handle client disconnection.'''
-        await super().connection_lost()
-        self.session_mgr.remove_session(self)
-        msg = ''
-        if self._incoming_concurrency.max_concurrent < self.initial_concurrent * 0.8:
-            msg += ' whilst throttled'
-        if self.send_size >= 1_000_000:
-            msg += f'.  Sent {self.send_size:,d} bytes in {self.send_count:,d} messages'
-        if msg:
-            msg = 'disconnected' + msg
-            self.logger.info(msg)
-
-    def sub_count(self):
-        return 0
-
-    async def handle_request(self, request):
-        '''Handle an incoming request.  ElectrumX doesn't receive
-        notifications from client sessions.
-        '''
-        if isinstance(request, Request):
-            handler = self.request_handlers.get(request.method)
-        else:
-            handler = None
-        method = 'invalid method' if handler is None else request.method
-        self.session_mgr._method_counts[method] += 1
-        coro = handler_invocation(handler, request)()
-        return await coro
+from electrumx.server.session.session_base import SessionBase, scripthash_to_hashX, non_negative_integer, BAD_REQUEST, DAEMON_ERROR, assert_tx_hash
 
 class ElectrumX(SessionBase):
     '''A TCP server that handles incoming Electrum connections.'''
@@ -197,6 +35,42 @@ class ElectrumX(SessionBase):
         self.set_request_handlers(self.PROTOCOL_MIN)
         self.is_peer = False
         self.cost = 5.0   # Connection cost
+
+    def set_request_handlers(self, ptuple):
+        self.protocol_tuple = ptuple
+
+        handlers = {
+            'blockchain.block.header': self.block_header,
+            'blockchain.block.headers': self.block_headers,
+            'blockchain.estimatefee': self.estimatefee,
+            'blockchain.headers.subscribe': self.headers_subscribe,
+            'blockchain.relayfee': self.relayfee,
+            #TODO Add getstakinginfo
+            #TODO Add getstakeinfo
+            #TODO Add getstakesforaddress
+            'blockchain.scripthash.get_balance': self.scripthash_get_balance,
+            'blockchain.scripthash.get_history': self.scripthash_get_history,
+            'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
+            'blockchain.scripthash.listunspent': self.scripthash_listunspent,
+            'blockchain.scripthash.subscribe': self.scripthash_subscribe,
+            'blockchain.transaction.broadcast': self.transaction_broadcast,
+            'blockchain.transaction.get': self.transaction_get,
+            'blockchain.transaction.get_merkle': self.transaction_merkle,
+            'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
+            'mempool.get_fee_histogram': self.compact_fee_histogram,
+            'server.add_peer': self.add_peer,
+            'server.banner': self.banner,
+            'server.donation_address': self.donation_address,
+            'server.features': self.server_features_async,
+            'server.peers.subscribe': self.peers_subscribe,
+            'server.ping': self.ping,
+            'server.version': self.server_version,
+        }
+
+        if ptuple >= (1, 4, 2):
+            handlers['blockchain.scripthash.unsubscribe'] = self.scripthash_unsubscribe
+
+        self.request_handlers = handlers
 
     @classmethod
     def protocol_min_max_strings(cls):
@@ -683,125 +557,3 @@ class ElectrumX(SessionBase):
     async def compact_fee_histogram(self):
         self.bump_cost(1.0)
         return await self.mempool.compact_fee_histogram()
-
-    def set_request_handlers(self, ptuple):
-        self.protocol_tuple = ptuple
-
-        handlers = {
-            'blockchain.block.header': self.block_header,
-            'blockchain.block.headers': self.block_headers,
-            'blockchain.estimatefee': self.estimatefee,
-            'blockchain.headers.subscribe': self.headers_subscribe,
-            'blockchain.relayfee': self.relayfee,
-            #TODO Add getstakinginfo
-            #TODO Add getstakeinfo
-            #TODO Add getstakesforaddress
-            'blockchain.scripthash.get_balance': self.scripthash_get_balance,
-            'blockchain.scripthash.get_history': self.scripthash_get_history,
-            'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
-            'blockchain.scripthash.listunspent': self.scripthash_listunspent,
-            'blockchain.scripthash.subscribe': self.scripthash_subscribe,
-            'blockchain.transaction.broadcast': self.transaction_broadcast,
-            'blockchain.transaction.get': self.transaction_get,
-            'blockchain.transaction.get_merkle': self.transaction_merkle,
-            'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
-            'mempool.get_fee_histogram': self.mempool.compact_fee_histogram,
-            'server.add_peer': self.add_peer,
-            'server.banner': self.banner,
-            'server.donation_address': self.donation_address,
-            'server.features': self.server_features_async,
-            'server.peers.subscribe': self.peers_subscribe,
-            'server.ping': self.ping,
-            'server.version': self.server_version,
-        }
-
-        if ptuple >= (1, 4, 2):
-            handlers['blockchain.scripthash.unsubscribe'] = self.scripthash_unsubscribe
-
-        self.request_handlers = handlers
-
-class AuxPoWElectrumX(ElectrumX):
-    async def block_header(self, height, cp_height=0):
-        result = await super().block_header(height, cp_height)
-
-        # Older protocol versions don't truncate AuxPoW
-        if self.protocol_tuple < (1, 4, 1):
-            return result
-
-        # Not covered by a checkpoint; return full AuxPoW data
-        if cp_height == 0:
-            return result
-
-        # Covered by a checkpoint; truncate AuxPoW data
-        result['header'] = self.truncate_auxpow(result['header'], height)
-        return result
-
-    async def block_headers(self, start_height, count, cp_height=0):
-        result = await super().block_headers(start_height, count, cp_height)
-
-        # Older protocol versions don't truncate AuxPoW
-        if self.protocol_tuple < (1, 4, 1):
-            return result
-
-        # Not covered by a checkpoint; return full AuxPoW data
-        if cp_height == 0:
-            return result
-
-        # Covered by a checkpoint; truncate AuxPoW data
-        result['hex'] = self.truncate_auxpow(result['hex'], start_height)
-        return result
-
-    def truncate_auxpow(self, headers_full_hex, start_height):
-        height = start_height
-        headers_full = util.hex_to_bytes(headers_full_hex)
-        cursor = 0
-        headers = bytearray()
-
-        while cursor < len(headers_full):
-            headers.extend(headers_full[cursor:cursor+self.coin.TRUNCATED_HEADER_SIZE])
-            cursor += self.db.dynamic_header_len(height)
-            height += 1
-
-        return headers.hex()
-
-
-class AuxPoWElectrumXElCash(AuxPoWElectrumX):
-    def set_request_handlers(self, ptuple):
-        super().set_request_handlers(ptuple)
-        self.request_handlers.update(
-            {
-                'blockchain.merged-mining.aux-pow-header': self.get_aux_pow_header,
-            }
-        )
-
-    async def get_aux_pow_header(self, height):
-        header = await super().block_header(height, cp_height=0)
-        aux_pow_header = bytes.fromhex(header)[self.coin.TRUNCATED_HEADER_SIZE:].hex()
-        return {
-            'aux_pow_header': aux_pow_header,
-        }
-
-    async def block_header(self, height, cp_height=0):
-        result = await super().block_header(height, cp_height)
-
-        if cp_height == 0:
-            header = result
-        else:
-            header = result['header']
-
-        header = self.truncate_auxpow(header, height)
-        if cp_height == 0:
-            return header
-        return {'header': header}
-
-    async def block_headers(self, start_height, count, cp_height=0):
-        result = await super().block_headers(start_height, count, cp_height)
-        # Covered by a checkpoint; truncate AuxPoW data
-        result['hex'] = self.truncate_auxpow(result['hex'], start_height)
-        return result
-
-    async def subscribe_headers_result(self):
-        results = deepcopy(self.session_mgr.hsub_results)
-        header = bytes.fromhex(results['hex'])
-        results['hex'] = header[:self.coin.TRUNCATED_HEADER_SIZE].hex()
-        return results
