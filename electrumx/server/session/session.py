@@ -46,18 +46,18 @@ class ElectrumX(SessionBase):
             'blockchain.headers.subscribe': self.headers_subscribe,
             'blockchain.relayfee': self.relayfee,
             'blockchain.staking.get_info': self.staking_get_info,
-            #TODO Add getstakeinfo
-            #TODO Add getstakesforaddress
-            #TODO ADD listunspent with json query for staking/non-staking tx
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
             'blockchain.scripthash.get_history': self.scripthash_get_history,
             'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
+            #TODO Add getstakesforaddress 'blockchain.scripthash.get_stakes': self.scripthash_get_stakes,
             'blockchain.scripthash.listunspent': self.scripthash_listunspent,
             'blockchain.scripthash.subscribe': self.scripthash_subscribe,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
             'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
+            'blockchain.transaction.get_stake_info': self.transaction_get_stake_info,
+            #TODO ADD listunspent with json query for staking/non-staking tx 'blockchain.transaction.get_query': self.transaction_get_query,
             'mempool.get_fee_histogram': self.compact_fee_histogram,
             'server.add_peer': self.add_peer,
             'server.banner': self.banner,
@@ -131,25 +131,8 @@ class ElectrumX(SessionBase):
 
     async def staking_get_info(self):
         '''The general information about staking and its parameters'''
-        #TODO Add getstakinginfo self.env async def server_version
-        self.bump_cost(1.0)
-
-        # hosts_dict = {}
-        # for service in self.env.report_services:
-        #     port_dict = hosts_dict.setdefault(str(service.host), {})
-        #     if service.protocol not in port_dict:
-        #         port_dict[f'{service.protocol}_port'] = service.port
-
-        # return {
-        #     'hosts': hosts_dict,
-        #     'pruning': None,
-        #     'server_version': electrumx.version,
-        #     'protocol_min': min_str,
-        #     'protocol_max': max_str,
-        #     'genesis_hash': env.coin.GENESIS_HASH,
-        #     'hash_function': 'sha256',
-        #     'services': [str(service) for service in env.report_services],
-        # }
+        self.bump_cost(0.5)
+        return await self.daemon_request('getstakinginfo')
 
     async def scripthash_subscribe(self, scripthash):
         '''Subscribe to a script hash.
@@ -172,6 +155,11 @@ class ElectrumX(SessionBase):
         '''Return the mempool transactions touching a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
+
+    async def scripthash_get_stakes(self, scripthash):
+        '''Return the stakes of a scripthash.'''
+        hashX = scripthash_to_hashX(scripthash)
+        raise Exception("TODO IMPLEMENTATION")
 
     async def scripthash_listunspent(self, scripthash):
         '''Return the list of UTXOs of a scripthash.'''
@@ -264,6 +252,9 @@ class ElectrumX(SessionBase):
                                f'no tx at position {tx_pos:,d} in block at height {height:,d}')
             self.bump_cost(cost)
             return hash_to_hex_str(tx_hash)
+
+    async def transaction_get_stake_info(self, txid):
+        return await self.daemon_request('getstakeinfo', txid)
 
     async def compact_fee_histogram(self):
         self.bump_cost(1.0)
