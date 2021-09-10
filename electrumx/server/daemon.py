@@ -306,11 +306,11 @@ class Daemon(object):
     async def broadcast_transaction(self, raw_tx):
         '''Broadcast a transaction to the network.'''
         #TODO uncomment when node is working
-        #return await self._send_single('sendrawtransaction', (raw_tx, ))
-        return [
-            "THISISID",
-            "THISISID2"
-        ]
+        return await self._send_single('sendrawtransaction', (raw_tx, ))
+        # return [
+        #     "THISISID",
+        #     "THISISID2"
+        # ]
 
     async def height(self):
         '''Query the daemon for its current height.'''
