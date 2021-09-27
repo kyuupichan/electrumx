@@ -131,7 +131,7 @@ class ElectrumX(SessionBase):
 
     async def staking_get_info(self):
         '''The general information about staking and its parameters'''
-        self.bump_cost(0.5)
+        self.bump_cost(0.2)
         return await self.daemon_request('getstakinginfo')
 
     async def stake_get_info(self, hex_hash):
@@ -149,7 +149,10 @@ class ElectrumX(SessionBase):
     async def scripthash_get_balance(self, scripthash):
         '''Return the confirmed and unconfirmed balance of a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.get_balance(hashX)
+        result = await self.get_balance(hashX)
+        #self.daemon_request('getstakinginfo')
+        result['stakingInfo'] = await self.staking_get_info()
+        return result
 
     async def scripthash_get_history(self, scripthash):
         '''Return the confirmed and unconfirmed history of a scripthash.'''
