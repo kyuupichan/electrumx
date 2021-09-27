@@ -49,7 +49,6 @@ class ElectrumX(SessionBase):
             'blockchain.scripthash.get_balance': self.scripthash_get_balance,
             'blockchain.scripthash.get_history': self.scripthash_get_history,
             'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
-            # TODO: Add getstakesforaddress 'blockchain.scripthash.get_stakes': self.scripthash_get_stakes,
             'blockchain.scripthash.listunspent': self.scripthash_listunspent,
             'blockchain.scripthash.subscribe': self.scripthash_subscribe,
             'blockchain.transaction.get_stake': self.stake_get_info,  # todo: handler name?
@@ -135,11 +134,10 @@ class ElectrumX(SessionBase):
         self.bump_cost(0.5)
         return await self.daemon_request('getstakinginfo')
 
-    async def stake_get_info(self):
+    async def stake_get_info(self, hex_hash):
         '''The general information about staking and its parameters'''
         self.bump_cost(0.5)
-        # TODO: ???
-        return await self.daemon_request('getstakeinfo')
+        return await self.daemon_request('getstakeinfo', hex_hash)
 
     async def scripthash_subscribe(self, scripthash):
         '''Subscribe to a script hash.
@@ -162,11 +160,6 @@ class ElectrumX(SessionBase):
         '''Return the mempool transactions touching a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
-
-    async def scripthash_get_stakes(self, scripthash):
-        '''Return the stakes of a scripthash.'''
-        hashX = scripthash_to_hashX(scripthash)
-        raise Exception("TODO IMPLEMENTATION")
 
     async def scripthash_listunspent(self, scripthash):
         '''Return the list of UTXOs of a scripthash.'''
@@ -499,7 +492,9 @@ class ElectrumX(SessionBase):
 
         return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
                  'tx_pos': utxo.tx_pos,
-                 'height': utxo.height, 'value': utxo.value}
+                 'height': utxo.height,
+                 'value': utxo.value,
+                 'is_staking': utxo.is_staking}
                 for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 

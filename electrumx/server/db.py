@@ -32,7 +32,7 @@ from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
 
-UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
+UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value is_staking")
 
 
 @attr.s(slots=True)
@@ -300,10 +300,10 @@ class DB(object):
         batch_put = batch.put
         for key, value in flush_data.adds.items():
             # suffix = tx_idx + tx_num
-            hashX = value[:-13]
-            suffix = key[-4:] + value[-13:-8]
+            hashX = value[:-15]
+            suffix = key[-4:] + value[-15:-10]
             batch_put(b'h' + key[:4] + suffix, hashX)
-            batch_put(b'u' + hashX + suffix, value[-8:])
+            batch_put(b'u' + hashX + suffix, value[-10:]) # value = value + is_staking
         flush_data.adds.clear()
 
         # New undo information
@@ -722,9 +722,10 @@ class DB(object):
             for db_key, db_value in self.utxo_db.iterator(prefix=prefix):
                 tx_pos, = unpack_le_uint32(db_key[-9:-5])
                 tx_num, = unpack_le_uint64(db_key[-5:] + bytes(3))
-                value, = unpack_le_uint64(db_value)
+                value, = unpack_le_uint64(db_value[:-2])
+                is_staking, = unpack_le_uint32(db_value[-2:]+b'\x00\x00')
                 tx_hash, height = self.fs_tx_hash(tx_num)
-                utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value))
+                utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value, is_staking))
             return utxos
 
         while True:
@@ -755,7 +756,7 @@ class DB(object):
                 # Find which entry, if any, the TX_HASH matches.
                 for db_key, hashX in self.utxo_db.iterator(prefix=prefix):
                     tx_num_packed = db_key[-5:]
-                    tx_num, = unpack_le_uint64(tx_num_packed + bytes(3))
+                    tx_num, = unpack_le_uint64(tx_num_packed + bytes(3)) # TODO: Check this shit
                     hash, _height = self.fs_tx_hash(tx_num)
                     if hash == tx_hash:
                         return hashX, idx_packed + tx_num_packed
@@ -777,7 +778,8 @@ class DB(object):
                     # This can happen if the DB was updated between
                     # getting the hashXs and getting the UTXOs
                     return None
-                value, = unpack_le_uint64(db_value)
+
+                value, = unpack_le_uint64(db_value[:-2])
                 return hashX, value
             return [lookup_utxo(*hashX_pair) for hashX_pair in hashX_pairs]
 

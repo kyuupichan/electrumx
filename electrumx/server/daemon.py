@@ -259,8 +259,15 @@ class Daemon(object):
     async def getrawtransaction(self, hex_hash, verbose=False):
         '''Return the serialized raw transaction with the given hash.'''
         # Cast to int because some coin daemons are old and require it
-        return await self._send_single('getrawtransaction',
+        tx = await self._send_single('getrawtransaction',
                                        (hex_hash, int(verbose)))
+        try:
+            if verbose:
+                tx["stakingInfo"] = await self.getstakeinfo(hex_hash)
+        except:
+            pass
+
+        return tx
 
     async def getrawtransactions(self, hex_hashes, replace_errs=True):
         '''Return the serialized raw transactions with the given hashes.
@@ -275,42 +282,16 @@ class Daemon(object):
     async def getstakinginfo(self):
         ''' Return information about staking in blockchain
         '''
-        #TODO uncomment when node is working
-        #return await self._send_single('getstakinginfo')
-        return {
-            "confirmed": "1.03873966",
-            "unconfirmed": "0.236844",
-            "staked": "0.536844"
-        }
+        return await self._send_single('getstakinginfo')
 
     async def getstakeinfo(self, hex_hash):
         ''' Return information about stake
         '''
-        #TODO uncomment when node is working
-        #return await self._send_single('getrawtransaction', (hex_hash))
-        return {
-            "deposit_height" : 13,          #(numeric) block height at which the stake was mined
-            "staking_period" : 661,         #(numeric) length of staking period (in number of blocks)
-            "staking_amount" : 1.0101,      #(numeric) staked amount
-            "accumulated_reward" : 5,       #(numeric) accumulated staking reward in satoshi
-            "fulfilled" : False,            #(bool) whether the stake period ended
-            "paid_out" : False,             #(bool) whether the staking UTXO was consumed into another transaction
-        }
-
-    async def gerstakeforaddress(self, address):
-        ''' Retrn stake for given address
-        '''
-        #TODO uncomment when node is working
-        #return await self._send_single('gerstakeforaddress', (address))
+        return await self._send_single('getstakeinfo', (hex_hash, ))
 
     async def broadcast_transaction(self, raw_tx):
         '''Broadcast a transaction to the network.'''
-        #TODO uncomment when node is working
         return await self._send_single('sendrawtransaction', (raw_tx, ))
-        # return [
-        #     "THISISID",
-        #     "THISISID2"
-        # ]
 
     async def height(self):
         '''Query the daemon for its current height.'''

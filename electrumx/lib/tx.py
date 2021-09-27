@@ -81,6 +81,7 @@ class TxInput(namedtuple("TxInput", "prev_hash prev_idx script sequence")):
 class TxOutput(namedtuple("TxOutput", "value pk_script")):
 
     def serialize(self):
+        # TODO: Add info about staking
         return b''.join((
             pack_le_int64(self.value),
             pack_varbytes(self.pk_script),
@@ -150,9 +151,9 @@ class Deserializer(object):
         return [read_output() for i in range(self._read_varint())]
 
     def _read_output(self):
-        return TxOutput(
+        return TxOutput( # TODO: Add read info about staking 
             self._read_le_int64(),  # value
-            self._read_varbytes(),  # pk_script
+            self._read_varbytes(),  # pk_script 
         )
 
     def _read_byte(self):

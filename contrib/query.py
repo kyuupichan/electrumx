@@ -84,7 +84,8 @@ async def query(args):
         for n, utxo in enumerate(utxos, start=1):
             print(f'UTXO #{n:,d}: tx_hash {hash_to_hex_str(utxo.tx_hash)} '
                   f'tx_pos {utxo.tx_pos:,d} height {utxo.height:,d} '
-                  f'value {utxo.value:,d}')
+                  f'value {utxo.value:,d}'
+                  f'is_staking {utxo.is_staking:,d}')
             if n == limit:
                 break
         if n is None:

@@ -107,7 +107,7 @@ class History(object):
 
         self.logger.info('deleted excess history entries')
 
-    def write_state(self, batch):
+    def write_state(self, batch): # TODO: ADD info about staking if needed
         '''Write state to the history DB.'''
         state = {
             'flush_count': self.flush_count,
@@ -125,9 +125,9 @@ class History(object):
         count = 0
         for tx_num, hashXs in enumerate(hashXs_by_tx, start=first_tx_num):
             tx_numb = pack_le_uint64(tx_num)[:5]
-            hashXs = set(hashXs)
+            hashXs = set(hashXs) # TODO: Check if it is as dumb as it looks
             for hashX in hashXs:
-                unflushed[hashX].extend(tx_numb)
+                unflushed[hashX].extend(tx_numb) # TODO: Check if it runs only ones
             count += len(hashXs)
         self.unflushed_count += count
 

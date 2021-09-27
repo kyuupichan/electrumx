@@ -434,7 +434,7 @@ class BlockProcessor(object):
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
-                append_hashX(cache_value[:-13])
+                append_hashX(cache_value[:-15])
 
             # Add the new UTXOs
             for idx, txout in enumerate(tx.outputs):
@@ -445,8 +445,9 @@ class BlockProcessor(object):
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
                 append_hashX(hashX)
+                self.logger.info(f'{txout}')
                 put_utxo(tx_hash + to_le_uint32(idx),
-                         hashX + tx_numb + to_le_uint64(txout.value))
+                         hashX + tx_numb + to_le_uint64(txout.value)+b'\x01\x00') # TODO: add staking info
 
             append_hashXs(hashXs)
             update_touched(hashXs)
@@ -502,7 +503,7 @@ class BlockProcessor(object):
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
         touched = self.touched
-        undo_entry_len = 13 + HASHX_LEN
+        undo_entry_len = 15 + HASHX_LEN
 
         for tx, tx_hash in reversed(txs):
             for idx, txout in enumerate(tx.outputs):
@@ -513,8 +514,9 @@ class BlockProcessor(object):
 
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
+
                 cache_value = spend_utxo(tx_hash, idx)
-                touched.add(cache_value[:-13])
+                touched.add(cache_value[:-15])
 
             # Restore the inputs
             for txin in reversed(tx.inputs):
@@ -522,8 +524,8 @@ class BlockProcessor(object):
                     continue
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
-                touched.add(undo_item[:-13])
+                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item) # TODO: Add staking info
+                touched.add(undo_item[:-15])
 
         assert n == 0
         self.tx_count -= len(txs)
@@ -615,13 +617,13 @@ class BlockProcessor(object):
 
             # Key: b'u' + address_hashX + tx_idx + tx_num
             # Value: the UTXO value as a 64-bit unsigned integer
-            udb_key = b'u' + hashX + hdb_key[-9:]
+            udb_key = b'u' + hashX + hdb_key[-9:]  # TODO: add missing staking info
             utxo_value_packed = self.db.utxo_db.get(udb_key)
             if utxo_value_packed:
                 # Remove both entries for this UTXO
                 self.db_deletes.append(hdb_key)
                 self.db_deletes.append(udb_key)
-                return hashX + tx_num_packed + utxo_value_packed
+                return hashX + tx_num_packed + utxo_value_packed # TODO: Refactor only last 15 bytes are used anyway
 
         raise ChainError('UTXO {} / {:,d} not found in "h" table'
                          .format(hash_to_hex_str(tx_hash), tx_idx))
