@@ -213,7 +213,7 @@ class ElectrumX(SessionBase):
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
         #TODO: if tx is staking add staking info
 
-    async def transaction_merkle(self, tx_hash, height):
+    async def transaction_merkle(self, tx_hash, height): # TODO: Test is this works wit staking and does not timeout
         '''Return the merkle branch to a confirmed transaction given its hash
         and height.
 
