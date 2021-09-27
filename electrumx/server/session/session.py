@@ -150,7 +150,6 @@ class ElectrumX(SessionBase):
         '''Return the confirmed and unconfirmed balance of a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
         result = await self.get_balance(hashX)
-        #self.daemon_request('getstakinginfo')
         result['stakingInfo'] = await self.staking_get_info()
         return result
 

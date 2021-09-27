@@ -11,6 +11,7 @@
 
 import asyncio
 import time
+import logging
 
 from aiorpcx import TaskGroup, run_in_thread, CancelledError
 
@@ -19,7 +20,7 @@ from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
 from electrumx.lib.util import (
-    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64
+    chunks, class_logger, pack_le_uint32, unpack_le_uint32, pack_le_uint64, unpack_le_uint64
 )
 from electrumx.server.db import FlushData
 
@@ -408,6 +409,17 @@ class BlockProcessor(object):
         self.tip = self.coin.header_hash(headers[-1])
 
     def advance_txs(self, txs, is_unspendable):
+
+        def generate_staking_bytes(is_staking):
+            if is_staking:
+                return b'\x01\x00'
+            else:
+                return b'\x00\x00'
+
+        def unpac_staking_utxo_index(pk_script):
+            staking_idx, = unpack_le_uint32(pk_script[-2:-1]+b'\x00\x00\x00')
+            return staking_idx
+
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
 
         # Use local vars for speed in the loops
@@ -422,6 +434,7 @@ class BlockProcessor(object):
         append_hashXs = hashXs_by_tx.append
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
+        STAKING_HEADER_LENGHT = 6
 
         for tx, tx_hash in txs:
             hashXs = []
@@ -437,17 +450,26 @@ class BlockProcessor(object):
                 append_hashX(cache_value[:-15])
 
             # Add the new UTXOs
+            staking_idx = -1
             for idx, txout in enumerate(tx.outputs):
                 # Ignore unspendable outputs
                 if is_unspendable(txout.pk_script):
+                    if len(txout.pk_script) == STAKING_HEADER_LENGHT:
+                        reversed_tx_hash = bytearray(tx_hash)
+                        reversed_tx_hash.reverse()
+                        if self.daemon.request_staking(reversed_tx_hash.hex()) is None:
+                            continue
+                        staking_idx = unpac_staking_utxo_index(txout.pk_script)
                     continue
 
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
                 append_hashX(hashX)
                 self.logger.info(f'{txout}')
+                staking_bytes = generate_staking_bytes(staking_idx == idx)
+                logging.error(staking_bytes)
                 put_utxo(tx_hash + to_le_uint32(idx),
-                         hashX + tx_numb + to_le_uint64(txout.value)+b'\x01\x00') # TODO: add staking info
+                         hashX + tx_numb + to_le_uint64(txout.value)+staking_bytes)
 
             append_hashXs(hashXs)
             update_touched(hashXs)

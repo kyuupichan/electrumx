@@ -29,6 +29,7 @@
 
 from collections import namedtuple
 from hashlib import blake2s
+import logging
 
 from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.script import OpCodes

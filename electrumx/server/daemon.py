@@ -14,6 +14,7 @@ import json
 import time
 from calendar import timegm
 from struct import pack
+import requests
 
 import aiohttp
 from aiorpcx import JSONRPC
@@ -68,6 +69,15 @@ class Daemon(object):
 
     def connector(self):
         return None
+
+    def request_staking(self, params_str):
+        method="getstakeinfo"
+        data = '{"jsonrpc": "1.0", "id": '+str(next(self.id_counter))+', "method": "'+method+'", "params": ["'+params_str+'"]}'
+
+        response = requests.post(self.current_url(), data=data)
+        if not response.status_code == 200:
+            return None
+        return response.json()['result']
 
     def set_url(self, url):
         '''Set the URLS to the given list, and switch to the first one.'''
