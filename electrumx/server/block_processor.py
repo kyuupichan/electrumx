@@ -11,7 +11,6 @@
 
 import asyncio
 import time
-import logging
 
 from aiorpcx import TaskGroup, run_in_thread, CancelledError
 
@@ -467,7 +466,6 @@ class BlockProcessor(object):
                 append_hashX(hashX)
                 self.logger.info(f'{txout}')
                 staking_bytes = generate_staking_bytes(staking_idx == idx)
-                logging.error(staking_bytes)
                 put_utxo(tx_hash + to_le_uint32(idx),
                          hashX + tx_numb + to_le_uint64(txout.value)+staking_bytes)
 
