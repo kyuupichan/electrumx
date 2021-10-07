@@ -22,7 +22,7 @@ import attr
 from aiorpcx import run_in_thread, sleep
 
 import electrumx.lib.util as util
-from electrumx.lib.hash import hash_to_hex_str
+from electrumx.lib.hash import hash_to_hex_str, TX_VALUE_LEN, IS_STAKE_FLAG_LEN, TX_NUMB_LEN
 from electrumx.lib.merkle import Merkle, MerkleCache
 from electrumx.lib.util import (
     formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint64, pack_le_uint32,
@@ -32,7 +32,7 @@ from electrumx.server.storage import db_class
 from electrumx.server.history import History
 
 
-UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value is_staking")
+UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value is_stake")
 
 
 @attr.s(slots=True)
@@ -300,10 +300,10 @@ class DB(object):
         batch_put = batch.put
         for key, value in flush_data.adds.items():
             # suffix = tx_idx + tx_num
-            hashX = value[:-15]
-            suffix = key[-4:] + value[-15:-10]
+            hashX = value[:-TX_NUMB_LEN-TX_VALUE_LEN-IS_STAKE_FLAG_LEN]
+            suffix = key[-4:] + value[-15:-TX_VALUE_LEN-IS_STAKE_FLAG_LEN]
             batch_put(b'h' + key[:4] + suffix, hashX)
-            batch_put(b'u' + hashX + suffix, value[-10:]) # value = value + is_staking
+            batch_put(b'u' + hashX + suffix, value[-TX_VALUE_LEN-IS_STAKE_FLAG_LEN:])
         flush_data.adds.clear()
 
         # New undo information
@@ -725,7 +725,7 @@ class DB(object):
                 value, = unpack_le_uint64(db_value[:-2])
                 is_staking, = unpack_le_uint32(db_value[-2:]+b'\x00\x00')
                 tx_hash, height = self.fs_tx_hash(tx_num)
-                utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value, is_staking))
+                utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value, is_stake))
             return utxos
 
         while True:
