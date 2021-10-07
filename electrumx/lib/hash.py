@@ -36,7 +36,9 @@ _sha512 = hashlib.sha512
 _new_hash = hashlib.new
 _new_hmac = hmac.new
 HASHX_LEN = 11
-
+TX_NUMB_LEN = 5
+TX_VALUE_LEN = 8
+IS_STAKE_FLAG_LEN = 2
 
 def sha256(x):
     '''Simple wrapper of hashlib sha256.'''

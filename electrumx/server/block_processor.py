@@ -17,7 +17,7 @@ from aiorpcx import TaskGroup, run_in_thread, CancelledError
 
 import electrumx
 from electrumx.server.daemon import DaemonError
-from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
+from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN, TX_NUMB_LEN, TX_VALUE_LEN, IS_STAKE_FLAG_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
 from electrumx.lib.util import (
     chunks, class_logger, pack_le_uint32, unpack_le_uint32, pack_le_uint64, unpack_le_uint64
@@ -410,8 +410,8 @@ class BlockProcessor(object):
 
     def advance_txs(self, txs, is_unspendable):
 
-        def generate_staking_bytes(is_staking):
-            if is_staking:
+        def generate_staking_bytes(is_stake):
+            if is_stake:
                 return b'\x01\x00'
             else:
                 return b'\x00\x00'
@@ -447,7 +447,7 @@ class BlockProcessor(object):
                     continue
                 cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
                 undo_info_append(cache_value)
-                append_hashX(cache_value[:-15])
+                append_hashX(cache_value[:-TX_NUMB_LEN-TX_VALUE_LEN-IS_STAKE_FLAG_LEN])
 
             # Add the new UTXOs
             staking_idx = -1
@@ -525,7 +525,7 @@ class BlockProcessor(object):
         spend_utxo = self.spend_utxo
         script_hashX = self.coin.hashX_from_script
         touched = self.touched
-        undo_entry_len = 15 + HASHX_LEN
+        undo_entry_len = TX_NUMB_LEN + TX_VALUE_LEN + IS_STAKE_FLAG_LEN + HASHX_LEN
 
         for tx, tx_hash in reversed(txs):
             for idx, txout in enumerate(tx.outputs):
@@ -538,7 +538,7 @@ class BlockProcessor(object):
                 hashX = script_hashX(txout.pk_script)
 
                 cache_value = spend_utxo(tx_hash, idx)
-                touched.add(cache_value[:-15])
+                touched.add(cache_value[:-TX_NUMB_LEN-TX_VALUE_LEN-IS_STAKE_FLAG_LEN])
 
             # Restore the inputs
             for txin in reversed(tx.inputs):
@@ -546,8 +546,8 @@ class BlockProcessor(object):
                     continue
                 n -= undo_entry_len
                 undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item) # TODO: Add staking info
-                touched.add(undo_item[:-15])
+                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
+                touched.add(undo_item[:-TX_NUMB_LEN-TX_VALUE_LEN-IS_STAKE_FLAG_LEN])
 
         assert n == 0
         self.tx_count -= len(txs)
