@@ -496,7 +496,7 @@ class ElectrumX(SessionBase):
                  'tx_pos': utxo.tx_pos,
                  'height': utxo.height,
                  'value': utxo.value,
-                 'is_staking': utxo.is_staking}
+                 'is_stake': utxo.is_stake}
                 for utxo in utxos
                 if (utxo.tx_hash, utxo.tx_pos) not in spends]
 

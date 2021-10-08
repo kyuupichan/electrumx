@@ -85,7 +85,7 @@ async def query(args):
             print(f'UTXO #{n:,d}: tx_hash {hash_to_hex_str(utxo.tx_hash)} '
                   f'tx_pos {utxo.tx_pos:,d} height {utxo.height:,d} '
                   f'value {utxo.value:,d}'
-                  f'is_staking {utxo.is_staking:,d}')
+                  f'is_stake {utxo.is_stake:,d}')
             if n == limit:
                 break
         if n is None:
