@@ -191,6 +191,7 @@ class BitcoinSV(Coin):
         'satoshi.vision.cash s',
         'sv.usebsv.com s t',
         'sv.satoshi.io s t',
+        'akiba.chainbow.io s t',
     ]
     GENESIS_ACTIVATION = 620_538
 
