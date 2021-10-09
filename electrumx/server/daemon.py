@@ -95,12 +95,22 @@ class Daemon(object):
             return True
         return False
 
-    async def _send_data(self, data):
+    async def _send_post(self, data):
         async with self.workqueue_semaphore:
             async with self.session.post(self.current_url(), data=data) as resp:
                 kind = resp.headers.get('Content-Type', None)
                 if kind == 'application/json':
                     return await resp.json()
+                text = await resp.text()
+                text = text.strip() or resp.reason
+                raise ServiceRefusedError(text)
+
+    async def _send_get(self, url):
+        async with self.workqueue_semaphore:
+            async with self.session.get(url) as resp:
+                kind = resp.headers.get('Content-Type', None)
+                if kind == 'application/octet-stream':
+                    return await resp.read()
                 text = await resp.text()
                 text = text.strip() or resp.reason
                 raise ServiceRefusedError(text)
@@ -121,13 +131,19 @@ class Daemon(object):
                 retry = 0
 
         on_good_message = None
+        data = None
         last_error_log = -1000   # Monotonic time starts at 0
-        data = json.dumps(payload)
         retry = self.init_retry
         while True:
             try:
-                result = await self._send_data(data)
-                result = processor(result)
+                # JSON RPC has a processor
+                if processor:
+                    if data is None:
+                        data = json.dumps(payload)
+                    result = await self._send_post(data)
+                    result = processor(result)
+                else:
+                    result = await self._send_get(payload)
                 if on_good_message:
                     self.logger.info(on_good_message)
                 return result
@@ -154,6 +170,10 @@ class Daemon(object):
 
             await asyncio.sleep(retry)
             retry = max(min(self.max_retry, retry * 2), self.init_retry)
+
+    async def _send_rest(self, url):
+        full_url = self.current_url() + url
+        return await self._send(full_url, None)
 
     async def _send_single(self, method, params=None):
         '''Send a single request to the daemon.'''
@@ -218,10 +238,8 @@ class Daemon(object):
 
     async def raw_blocks(self, hex_hashes):
         '''Return the raw binary blocks with the given hex hashes.'''
-        params_iterable = ((h, False) for h in hex_hashes)
-        blocks = await self._send_vector('getblock', params_iterable)
-        # Convert hex string to bytes
-        return [hex_to_bytes(block) for block in blocks]
+        return [await self._send_rest(f'rest/block/{hex_hash}.bin')
+                for hex_hash in hex_hashes]
 
     async def mempool_hashes(self):
         '''Update our record of the daemon's mempool hashes.'''
