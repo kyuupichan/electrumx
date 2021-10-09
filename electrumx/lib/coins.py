@@ -30,7 +30,6 @@ Anything coin-specific should go in this file and be subclassed where
 necessary for appropriate handling.
 '''
 
-from collections import namedtuple
 import re
 from decimal import Decimal
 from hashlib import sha256
@@ -39,13 +38,9 @@ from electrumx.lib import util
 from electrumx.lib.hash import Base58, double_sha256, hash_to_hex_str
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey
-import electrumx.lib.tx as lib_tx
 import electrumx.server.block_processor as block_proc
 from electrumx.server import daemon
 from electrumx.server.session import ElectrumX
-
-
-Block = namedtuple("Block", "raw header transactions")
 
 
 class CoinError(Exception):
@@ -63,7 +58,6 @@ class Coin:
     VALUE_PER_COIN = 100000000
     SESSIONCLS = ElectrumX
     DEFAULT_MAX_SEND = 1000000
-    DESERIALIZER = lib_tx.Deserializer
     DAEMON = daemon.Daemon
     BLOCK_PROCESSOR = block_proc.BlockProcessor
     P2PKH_VERBYTE = bytes.fromhex("00")
@@ -176,13 +170,6 @@ class Coin:
     def header_prevhash(cls, header):
         '''Given a header return previous hash'''
         return header[4:36]
-
-    @classmethod
-    def block(cls, raw_block):
-        '''Return a Block namedtuple given a raw block and its height.'''
-        header = raw_block[:80]
-        txs = cls.DESERIALIZER(raw_block, start=len(header)).read_tx_block()
-        return Block(raw_block, header, txs)
 
     @classmethod
     def decimal_value(cls, value):

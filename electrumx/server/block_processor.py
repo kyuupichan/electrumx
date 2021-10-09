@@ -12,6 +12,7 @@
 import asyncio
 import time
 from asyncio import sleep
+from collections import namedtuple
 
 from aiorpcx import TaskGroup, CancelledError
 
@@ -19,10 +20,21 @@ import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
+from electrumx.lib.tx import Deserializer
 from electrumx.lib.util import (
     class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64
 )
 from electrumx.server.db import FlushData
+
+
+Block = namedtuple("Block", "raw header transactions")
+
+
+def block_tuple(raw_block):
+    '''Return a Block namedtuple given a raw block and its height.'''
+    header = raw_block[:80]
+    txs = Deserializer(raw_block, start=len(header)).read_tx_block()
+    return Block(raw_block, header, txs)
 
 
 class Prefetcher:
@@ -344,7 +356,7 @@ class BlockProcessor:
         '''Process the list of raw blocks passed.  Detects and handles reorgs.'''
         start = time.monotonic()
         for raw_block in raw_blocks:
-            block = self.coin.block(raw_block)
+            block = block_tuple(raw_block)
             if self.coin.header_prevhash(block.header) != self.tip:
                 self.schedule_reorg(-1)
                 return
@@ -455,7 +467,7 @@ class BlockProcessor:
         coin = self.coin
 
         # Check and update self.tip
-        block = coin.block(raw_block)
+        block = block_tuple(raw_block)
         header_hash = coin.header_hash(block.header)
         if header_hash != self.tip:
             raise ChainError('backup block {} not tip {} at height {:,d}'

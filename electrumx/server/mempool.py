@@ -16,6 +16,7 @@ import attr
 from aiorpcx import TaskGroup, run_in_thread, sleep
 
 from electrumx.lib.hash import hash_to_hex_str, hex_str_to_hash
+from electrumx.lib.tx import Deserializer
 from electrumx.lib.util import class_logger, chunks
 from electrumx.server.db import UTXO
 
@@ -245,7 +246,7 @@ class MemPool(object):
 
         def deserialize_txs():    # This function is pure
             to_hashX = self.coin.hashX_from_script
-            deserializer = self.coin.DESERIALIZER
+            deserializer = Deserializer
 
             txs = {}
             for tx_hash, raw_tx in zip(hashes, raw_txs):
