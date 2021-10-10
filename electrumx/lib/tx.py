@@ -35,10 +35,23 @@ from electrumx.lib.hash import sha256, double_sha256, hash_to_hex_str
 from electrumx.lib.script import OpCodes
 from electrumx.lib.util import (
     unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
-    unpack_be_uint16_from,
-    unpack_le_uint32_from, unpack_le_uint64_from, pack_le_int32, pack_varint,
-    pack_le_uint32, pack_le_int64, pack_varbytes,
+    unpack_be_uint16_from, unpack_le_uint32_from, unpack_le_uint64_from,
+    pack_le_int32, pack_le_uint32, pack_le_int64, pack_varint, pack_varbytes,
+    unpack_le_uint16, unpack_le_uint32, unpack_le_uint64
 )
+
+def load_varint_from_buffer(buffer):
+        n, = unpack_le_uint16(buffer[0:1]+b'\x00')
+        if n < 253:
+            return n
+        elif n == 253:
+            result, = unpack_le_uint16(buffer)
+        elif n == 254:
+            result, = unpack_le_uint32(buffer)
+        else:
+            result, = unpack_le_uint64(buffer)
+
+        return result
 
 ZERO = bytes(32)
 MINUS_1 = 4294967295

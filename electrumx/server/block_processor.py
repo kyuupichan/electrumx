@@ -19,8 +19,9 @@ from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN, TX_NUMB_LEN, TX_VALUE_LEN, IS_STAKE_FLAG_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
 from electrumx.lib.util import (
-    chunks, class_logger, pack_le_uint32, unpack_le_uint32, pack_le_uint64, unpack_le_uint64
+    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64
 )
+from electrumx.lib.tx import load_varint_from_buffer
 from electrumx.server.db import FlushData
 
 
@@ -416,7 +417,7 @@ class BlockProcessor(object):
                 return b'\x00\x00'
 
         def unpac_staking_utxo_index(pk_script):
-            staking_idx, = unpack_le_uint32(pk_script[-2:-1]+b'\x00\x00\x00')
+            staking_idx = load_varint_from_buffer(pk_script[STAKING_HEADER_PREFIX_LENGTH-1:])
             return staking_idx
 
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
@@ -433,7 +434,15 @@ class BlockProcessor(object):
         append_hashXs = hashXs_by_tx.append
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
-        STAKING_HEADER_LENGHT = 6
+
+        STAKING_HEADER_PREFIX_LENGTH = 5
+        # one for every varint possible
+        STAKING_HEADER_LENGTHS = {
+            STAKING_HEADER_PREFIX_LENGTH+1,
+            STAKING_HEADER_PREFIX_LENGTH+3,
+            STAKING_HEADER_PREFIX_LENGTH+5,
+            STAKING_HEADER_PREFIX_LENGTH+9
+            }
 
         for tx, tx_hash in txs:
             hashXs = []
@@ -453,7 +462,7 @@ class BlockProcessor(object):
             for idx, txout in enumerate(tx.outputs):
                 # Ignore unspendable outputs
                 if is_unspendable(txout.pk_script):
-                    if len(txout.pk_script) == STAKING_HEADER_LENGHT:
+                    if len(txout.pk_script) in STAKING_HEADER_LENGTHS:
                         reversed_tx_hash = bytearray(tx_hash)
                         reversed_tx_hash.reverse()
                         if self.daemon.request_staking(reversed_tx_hash.hex()) is None:
@@ -466,8 +475,10 @@ class BlockProcessor(object):
                 append_hashX(hashX)
                 self.logger.info(f'{txout}')
                 staking_bytes = generate_staking_bytes(staking_idx == idx)
-                put_utxo(tx_hash + to_le_uint32(idx),
-                         hashX + tx_numb + to_le_uint64(txout.value)+staking_bytes)
+
+                utxo_key = tx_hash + to_le_uint32(idx)
+                utxo_data = hashX + tx_numb + to_le_uint64(txout.value)+staking_bytes
+                put_utxo(utxo_key, utxo_data)
 
             append_hashXs(hashXs)
             update_touched(hashXs)
