@@ -70,7 +70,7 @@ class Daemon(object):
     def connector(self):
         return None
 
-    def request_staking(self, params_str):
+    def request_stake(self, params_str):
         method="getstakeinfo"
         data = '{"jsonrpc": "1.0", "id": '+str(next(self.id_counter))+', "method": "'+method+'", "params": ["'+params_str+'"]}'
 

@@ -416,7 +416,7 @@ class BlockProcessor(object):
             else:
                 return b'\x00\x00'
 
-        def unpac_staking_utxo_index(pk_script):
+        def unpack_staking_utxo_index(pk_script):
             staking_idx = load_varint_from_buffer(pk_script[STAKING_HEADER_PREFIX_LENGTH-1:])
             return staking_idx
 
@@ -462,13 +462,19 @@ class BlockProcessor(object):
             for idx, txout in enumerate(tx.outputs):
                 # Ignore unspendable outputs
                 if is_unspendable(txout.pk_script):
-                    if len(txout.pk_script) in STAKING_HEADER_LENGTHS:
+                    if len(txout.pk_script) in STAKING_HEADER_LENGTHS \
+                    and txout.pk_script[2:4] == b'\x53\x44':
+                        staking_idx = unpack_staking_utxo_index(txout.pk_script)
+
                         reversed_tx_hash = bytearray(tx_hash)
                         reversed_tx_hash.reverse()
-                        if self.daemon.request_staking(reversed_tx_hash.hex()) is None:
-                            continue
-                        staking_idx = unpac_staking_utxo_index(txout.pk_script)
-                    continue
+
+                        if staking_idx > len(tx.outputs) \
+                        or staking_idx < 0 \
+                        or self.daemon.request_stake(reversed_tx_hash.hex()) is None:
+                            staking_idx = -1
+
+                        continue
 
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
