@@ -134,7 +134,7 @@ class ElectrumX(SessionBase):
         return await self.daemon_request('getstakinginfo')
 
     async def stake_get_info(self, hex_hash):
-        '''The general information about staking and its parameters'''
+        '''The verbose information about particular stake'''
         self.bump_cost(0.5)
         return await self.daemon_request('getstakeinfo', hex_hash)
 
