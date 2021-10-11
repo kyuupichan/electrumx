@@ -16,6 +16,7 @@ import time
 from bisect import bisect_right
 from collections import namedtuple
 from glob import glob
+from struct import error as struct_error
 
 import attr
 from aiorpcx import run_in_thread, sleep
@@ -23,9 +24,10 @@ from aiorpcx import run_in_thread, sleep
 from electrumx.lib import util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
+from electrumx.lib.tx import Deserializer
 from electrumx.lib.util import (
-    formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint32,
-    unpack_le_uint32, unpack_be_uint32, unpack_le_uint64
+    class_logger, formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint32,
+    unpack_le_uint32, unpack_be_uint32, unpack_le_uint64, open_file, open_truncate,
 )
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
@@ -45,6 +47,143 @@ class FlushData(object):
     adds = attr.ib()
     deletes = attr.ib()
     tip = attr.ib()
+
+
+class OnDiskBlock:
+
+    raw_block_prefix = 'meta/block'
+
+    def __init__(self, height):
+        self.logger = class_logger(__name__, self.__class__.__name__)
+        self.height = height
+        self.block_file = None
+        self.header = None
+
+    @classmethod
+    def raw_block_path(cls, height):
+        return f'{cls.raw_block_prefix}{height:d}'
+
+    def open_for_writing(self):
+        self.block_file = open_truncate(self.raw_block_path(self.height))
+
+    @classmethod
+    def delete_block_at_height(cls, del_height):
+        # FIXME: call this
+        try:
+            os.remove(cls.raw_block_path(del_height))
+        except FileNotFoundError:
+            pass
+
+
+class StreamedBlock(OnDiskBlock):
+
+    def __init__(self, height, write_block, raw):
+        super().__init__(height)
+        self.write_block = write_block
+        self.raw = raw
+        self.deserializer = Deserializer(raw, 0)
+
+    async def __aenter__(self):
+        if self.write_block:
+            self.open_for_writing()
+            self.block_file.write(self.raw)
+        self.header = self.deserializer._read_nbytes(80)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        if self.block_file:
+            self.block_file.close()
+
+    async def iter_txs(self):
+        # Asynchronous generator of (tx, tx_hash) pairs
+        tx_count = self.deserializer._read_varint()
+        read = self.deserializer.read_tx_and_hash
+        for _n in range(tx_count):
+            yield read()
+
+
+class ReversedBlock(OnDiskBlock):
+
+    chunk_size = 25_000_000
+
+    def __init__(self, hex_hash, height):
+        super().__init__(height)
+        self.hex_hash = hex_hash
+
+    def open_for_reading(self):
+        self.block_file = open_file(OnDiskBlock.raw_block_path(self.height))
+
+    async def __aenter__(self):
+        try:
+            self.open_for_reading()
+        except FileNotFoundError:
+            self.logger.error(f'block {self.hex_hash} height {self.height:,d} not found on disk')
+            raise
+#        if self.block_file is None:
+#            self.logger.info(f'writing block {self.hex_hash} height {self.height:,d} from daemon '
+#                             f'to disk')
+#            await self.write_block()
+#            self.open_for_reading()
+        self.header = self.block_file.read(80)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self.block_file.close()
+
+    async def read_chunk(self, prev_raw):
+        disk_chunk = await run_in_thread(self.block_file.read, self.chunk_size)
+        return Deserializer(prev_raw + disk_chunk)
+
+    async def chunk_offsets(self):
+        base_offset = self.block_file.tell()
+        deserializer = await self.read_chunk(b'')
+        tx_count = deserializer._read_varint()
+        self.logger.info(f'backing up block {self.hex_hash} height {self.height:,d} '
+                         f'tx_count {tx_count:,d} from disk')
+        offsets = [base_offset + deserializer.cursor]
+
+        while True:
+            count = 0
+            try:
+                while True:
+                    tx_offset = deserializer.cursor
+                    deserializer.read_tx()
+                    count += 1
+            except (AssertionError, IndexError, struct_error):
+                pass
+
+            if count:
+                offsets.append(base_offset + tx_offset)
+                base_offset += tx_offset
+            tx_count -= count
+            if tx_count == 0:
+                return offsets
+            deserializer = await self.read_chunk(deserializer.binary[tx_offset:])
+
+    async def iter_txs(self):
+        def read_chunk(start, size):
+            self.block_file.seek(start, os.SEEK_SET)
+            return self.block_file.read(size)
+
+        # Iterate the block transactions in reverse order.  As the block may be huge, we
+        # break it up into digestible chunks and do those in reverse order.  We need to
+        # iterate the transactions forwards first to find their boundaries.
+        offsets = await self.chunk_offsets()
+        for n in reversed(range(len(offsets) - 1)):
+            start = offsets[n]
+            size = offsets[n + 1] - start
+            raw = await run_in_thread(read_chunk, start, size)
+            if len(raw) != size:
+                raise RuntimeError(f'truncated block file for height {self.height:,d}')
+            deserializer = Deserializer(raw)
+            pairs = []
+            while deserializer.cursor < size:
+                cursor = deserializer.cursor
+                pair = deserializer.read_tx_and_hash()
+                tx_size = deserializer.cursor - cursor
+                pairs.append(pair)
+            for item in reversed(pairs):
+                yield item
 
 
 class DB(object):
@@ -459,29 +598,6 @@ class DB(object):
         for undo_info, height in undo_infos:
             batch_put(self.undo_key(height), b''.join(undo_info))
 
-    def raw_block_prefix(self):
-        return 'meta/block'
-
-    def raw_block_path(self, height):
-        return f'{self.raw_block_prefix()}{height:d}'
-
-    def read_raw_block(self, height):
-        '''Returns a raw block read from disk.  Raises FileNotFoundError
-        if the block isn't on-disk.'''
-        with util.open_file(self.raw_block_path(height)) as f:
-            return f.read(-1)
-
-    def write_raw_block(self, block, height):
-        '''Write a raw block to disk.'''
-        with util.open_truncate(self.raw_block_path(height)) as f:
-            f.write(block)
-        # Delete old blocks to prevent them accumulating
-        try:
-            del_height = self.min_undo_height(height) - 1
-            os.remove(self.raw_block_path(del_height))
-        except FileNotFoundError:
-            pass
-
     def clear_excess_undo_info(self):
         '''Clear excess undo info.  Only most recent N are kept.'''
         prefix = b'U'
@@ -500,7 +616,7 @@ class DB(object):
             self.logger.info(f'deleted {len(keys):,d} stale undo entries')
 
         # delete old block files
-        prefix = self.raw_block_prefix()
+        prefix = OnDiskBlock.raw_block_prefix
         paths = [path for path in glob(f'{prefix}[0-9]*')
                  if len(path) > len(prefix)
                  and int(path[len(prefix):]) < min_height]
