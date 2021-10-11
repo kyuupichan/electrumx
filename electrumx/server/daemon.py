@@ -71,7 +71,7 @@ class Daemon(object):
         return None
 
     def request_stake(self, params_str):
-        method="getstakeinfo"
+        method = "getstakeinfo"
         data = '{"jsonrpc": "1.0", "id": ' + str(next(self.id_counter)) + ', "method": "' + method + '", "params": ["' + params_str + '"]}'
 
         response = requests.post(self.current_url(), data=data)
@@ -294,10 +294,10 @@ class Daemon(object):
         '''
         return await self._send_single('getstakinginfo')
 
-    async def getstakeinfo(self, hex_hash):
+    async def getstakeinfo(self, stake_id_hex):
         ''' Return information about stake
         '''
-        return await self._send_single('getstakeinfo', (hex_hash, ))
+        return await self._send_single('getstakeinfo', (stake_id_hex, ))
 
     async def broadcast_transaction(self, raw_tx):
         '''Broadcast a transaction to the network.'''

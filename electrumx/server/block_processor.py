@@ -469,8 +469,8 @@ class BlockProcessor(object):
                         reversed_tx_hash = bytearray(tx_hash)
                         reversed_tx_hash.reverse()
 
-                        if staking_idx > len(tx.outputs) \
-                        or staking_idx < 0 \
+                        if staking_idx >= len(tx.outputs) \
+                        or staking_idx <= 0 \
                         or self.daemon.request_stake(reversed_tx_hash.hex()) is None:
                             staking_idx = -1
 
