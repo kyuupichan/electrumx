@@ -110,12 +110,20 @@ class Daemon(object):
         full_url = self.current_url() + url
         async with self.workqueue_semaphore:
             async with self.session.get(full_url) as resp:
-                kind = resp.headers.get('Content-Type', None)
-                if kind == 'application/octet-stream':
-                    return await resp.read()
-                text = await resp.text()
-                text = text.strip() or resp.reason
-                raise ServiceRefusedError(text)
+                reader = aiohttp.MultipartReader.from_response(resp)
+                parts = []
+                while True:
+                    part = await reader.next()
+                    if part is None:
+                        return b''.join(parts)
+                    kind = part.headers.get('Content-Type', None)
+                    if kind != 'application/octet-stream':
+                        text = await resp.text()
+                        text = text.strip() or resp.reason
+                        raise ServiceRefusedError(text)
+                    item = await part.read()
+                    self.logger.info('read part size {len(item):,d} bytes')
+                    parts.append(item)
 
     async def _send(self, func, *args):
         '''Send a payload to be converted to JSON.
