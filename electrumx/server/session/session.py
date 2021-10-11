@@ -51,12 +51,11 @@ class ElectrumX(SessionBase):
             'blockchain.scripthash.get_mempool': self.scripthash_get_mempool,
             'blockchain.scripthash.listunspent': self.scripthash_listunspent,
             'blockchain.scripthash.subscribe': self.scripthash_subscribe,
-            'blockchain.transaction.get_stake': self.stake_get_info,  # todo: handler name?
+            'blockchain.transaction.get_stake': self.stake_get_info,
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
             'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
-            'blockchain.transaction.get_stake_info': self.transaction_get_stake_info,
             # TODO: ADD listunspent with json query for staking/non-staking tx 'blockchain.transaction.get_query': self.transaction_get_query,
             'mempool.get_fee_histogram': self.compact_fee_histogram,
             'server.add_peer': self.add_peer,
@@ -254,9 +253,6 @@ class ElectrumX(SessionBase):
                                f'no tx at position {tx_pos:,d} in block at height {height:,d}')
             self.bump_cost(cost)
             return hash_to_hex_str(tx_hash)
-
-    async def transaction_get_stake_info(self, txid):
-        return await self.daemon_request('getstakeinfo', txid)
 
     async def compact_fee_histogram(self):
         self.bump_cost(1.0)
