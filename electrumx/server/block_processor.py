@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 # Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
@@ -10,138 +10,260 @@
 
 
 import asyncio
+import os
+import re
 import time
 from asyncio import sleep
+from struct import error as struct_error
 
-from aiorpcx import TaskGroup, CancelledError
+from aiorpcx import CancelledError, run_in_thread, spawn
 
 import electrumx
-from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
+from electrumx.lib.tx import Deserializer
 from electrumx.lib.util import (
-    class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64,
+    class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64, open_file,
 )
-from electrumx.server.db import FlushData, StreamedBlock, ReversedBlock
+from electrumx.server.db import FlushData
 
 
-class Prefetcher:
-    '''Prefetches blocks (in the forward direction only).'''
+logger = class_logger(__name__, 'BlockProcessor')
 
-    def __init__(self, daemon, coin, blocks_event):
-        self.logger = class_logger(__name__, self.__class__.__name__)
-        self.daemon = daemon
-        self.coin = coin
-        self.blocks_event = blocks_event
-        self.blocks = []
-        self.caught_up = False
-        # Access to fetched_height should be protected by the semaphore
-        self.fetched_height = None
-        self.semaphore = asyncio.Semaphore()
-        self.refill_event = asyncio.Event()
-        # The prefetched block cache size.  The min cache size has
-        # little effect on sync time.
-        self.cache_size = 0
-        self.min_cache_size = 10 * 1024 * 1024
-        # This makes the first fetch be 10 blocks
-        self.ave_size = self.min_cache_size // 10
-        self.polling_delay = 5
 
-    async def main_loop(self, bp_height):
-        '''Loop forever polling for more blocks.'''
-        await self.reset_height(bp_height)
+class OnDiskBlock:
+
+    path = 'meta/blocks'
+    del_regex = re.compile('([0-9a-f]{64}\\.tmp)$')
+    legacy_del_regex = re.compile('block[0-9]{1,7}$')
+    block_regex = re.compile('([0-9a-f]{64})-([0-9]{1,7})$')
+    chunk_size = 25_000_000
+    # On-disk blocks. hex_hash->(height, size) pair
+    blocks = {}
+    # Map from hex hash to prefetch task
+    tasks = {}
+
+    def __init__(self, hex_hash, height, size):
+        self.hex_hash = hex_hash
+        self.height = height
+        self.size = size
+        self.block_file = None
+        self.header = None
+
+    @classmethod
+    def filename(cls, hex_hash, height):
+        return os.path.join(cls.path, f'{hex_hash}-{height:d}')
+
+    async def __aenter__(self):
+        self.block_file = open_file(self.filename(self.hex_hash, self.height))
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self.block_file.close()
+
+    async def _read(self, size):
+        result = await run_in_thread(self.block_file.read, size)
+        if not result:
+            raise RuntimeError(f'truncated block file for block {self.hex_hash} '
+                               f'height {self.height:,d}')
+        return result
+
+    async def _read_at_pos(self, pos, size):
+        def read():
+            self.block_file.seek(pos, os.SEEK_SET)
+            result = self.block_file.read(size)
+            if len(result) != size:
+                raise RuntimeError(f'truncated block file for block {self.hex_hash} '
+                                   f'height {self.height:,d}')
+            return result
+
+        return await run_in_thread(read)
+
+    async def read_header(self):
+        self.header = await self._read(80)
+
+    async def iter_txs(self):
+        # Asynchronous generator of (tx, tx_hash) pairs
+        raw = await self._read(self.chunk_size)
+        deserializer = Deserializer(raw)
+        tx_count = deserializer._read_varint()
+
         while True:
+            read = deserializer.read_tx_and_hash
+            count = 0
             try:
-                # Sleep a while if there is nothing to prefetch
-                await self.refill_event.wait()
-                if not await self._prefetch_blocks():
-                    await sleep(self.polling_delay)
-            except DaemonError as e:
-                self.logger.info(f'ignoring daemon error: {e}')
-            except CancelledError as e:
-                self.logger.info(f'cancelled; prefetcher stopping {e}')
-                raise
-            except Exception:   # pylint:disable=W0703
-                self.logger.exception('ignoring unexpected exception')
+                while True:
+                    cursor = deserializer.cursor
+                    yield read()
+                    count += 1
+            except (AssertionError, IndexError, struct_error):
+                pass
 
-    def get_prefetched_blocks(self):
-        '''Called by block processor when it is processing queued blocks.'''
-        blocks = self.blocks
-        self.blocks = []
-        self.cache_size = 0
-        self.refill_event.set()
-        return blocks
+            tx_count -= count
+            if tx_count == 0:
+                return
+            raw = raw[cursor:] + await self._read(self.chunk_size)
+            deserializer = Deserializer(raw)
 
-    async def reset_height(self, height):
-        '''Reset to prefetch blocks from the block processor's height.
+    async def _chunk_offsets(self):
+        '''Iterate the transactions forwards to find their boundaries.'''
+        base_offset = self.block_file.tell()
+        assert base_offset == 80
+        raw = await self._read(self.chunk_size)
+        deserializer = Deserializer(raw)
+        tx_count = deserializer._read_varint()
+        logger.info(f'backing up block {self.hex_hash} height {self.height:,d} '
+                    f'tx_count {tx_count:,d}')
+        offsets = [base_offset + deserializer.cursor]
 
-        Used in blockchain reorganisations.  This coroutine can be
-        called asynchronously to the _prefetch_blocks coroutine so we
-        must synchronize with a semaphore.
-        '''
-        async with self.semaphore:
-            self.blocks.clear()
-            self.cache_size = 0
-            self.fetched_height = height
-            self.refill_event.set()
+        while True:
+            read = deserializer.read_tx
+            count = 0
+            try:
+                while True:
+                    cursor = deserializer.cursor
+                    read()
+                    count += 1
+            except (AssertionError, IndexError, struct_error):
+                pass
 
-        daemon_height = await self.daemon.height()
-        behind = daemon_height - height
-        if behind > 0:
-            self.logger.info('catching up to daemon height {:,d} '
-                             '({:,d} blocks behind)'
-                             .format(daemon_height, behind))
-        else:
-            self.logger.info('caught up to daemon height {:,d}'
-                             .format(daemon_height))
+            if count:
+                offsets.append(base_offset + cursor)
+                base_offset += cursor
+            tx_count -= count
+            if tx_count == 0:
+                return offsets
+            raw = raw[cursor:] + await self._read(self.chunk_size)
+            deserializer = Deserializer(raw)
 
-    async def _prefetch_blocks(self):
-        '''Prefetch some blocks and put them on the queue.
+    async def iter_txs_reversed(self):
+        # Iterate the block transactions in reverse order.  We need to iterate the
+        # transactions forwards first to find their boundaries.
+        offsets = await self._chunk_offsets()
+        for n in reversed(range(len(offsets) - 1)):
+            start = offsets[n]
+            size = offsets[n + 1] - start
+            deserializer = Deserializer(await self._read_at_pos(start, size))
+            pairs = []
+            while deserializer.cursor < size:
+                pairs.append(deserializer.read_tx_and_hash())
+            for item in reversed(pairs):
+                yield item
 
-        Repeats until the queue is full or caught up.
-        '''
-        daemon = self.daemon
-        daemon_height = await daemon.height()
-        async with self.semaphore:
-            while self.cache_size < self.min_cache_size:
-                first = self.fetched_height + 1
-                # Try and catch up all blocks but limit to room in cache.
-                cache_room = max(self.min_cache_size // self.ave_size, 1)
-                count = min(daemon_height - self.fetched_height, cache_room)
-                # Don't make too large a request
-                count = min(self.coin.max_fetch_blocks(first), max(count, 0))
-                if not count:
-                    self.caught_up = True
-                    return False
+    @classmethod
+    async def delete_stale(cls, items, log):
+        def delete(paths):
+            count = total_size = 0
+            for path, size in paths.items():
+                try:
+                    os.remove(path)
+                    count += 1
+                    total_size += size
+                except FileNotFoundError as e:
+                    logger.error(f'could not delete stale block file {path}: {e}')
+            return count, total_size
 
-                hex_hashes = await daemon.block_hex_hashes(first, count)
-                if self.caught_up:
-                    self.logger.info('new block height {:,d} hash {}'
-                                     .format(first + count-1, hex_hashes[-1]))
-                blocks = await daemon.raw_blocks(hex_hashes)
+        if not items:
+            return
+        paths = {}
+        for item in items:
+            if isinstance(item, os.DirEntry):
+                paths[item.path] = item.stat().st_size
+            else:
+                height, size = cls.blocks.pop(item)
+                paths[os.path.join(OnDiskBlock.path, f'{item}-{height:d}')] = size
 
-                assert count == len(blocks)
+        count, total_size = await run_in_thread(delete, paths)
+        if log:
+            logger.info(f'deleted {count:,d} stale block files, total size {total_size:,d} bytes')
 
-                # Special handling for genesis block
-                if first == 0:
-                    blocks[0] = self.coin.genesis_block(blocks[0])
-                    self.logger.info('verified genesis block with hash {}'
-                                     .format(hex_hashes[0]))
+    @classmethod
+    async def delete_blocks(cls, min_height, log):
+        blocks_to_delete = [hex_hash for hex_hash, (height, size) in cls.blocks.items()
+                            if height < min_height]
+        await cls.delete_stale(blocks_to_delete, log)
 
-                # Update our recent average block size estimate
-                size = sum(len(block) for block in blocks)
-                if count >= 10:
-                    self.ave_size = size // count
-                else:
-                    self.ave_size = (size + (10 - count) * self.ave_size) // 10
+    @classmethod
+    async def scan_files(cls):
+        def scan():
+            blocks = {}
+            to_delete = []
+            with os.scandir(cls.path) as it:
+                for dentry in it:
+                    if dentry.is_file():
+                        match = cls.block_regex.match(dentry.name)
+                        if match:
+                            hex_hash, height = match.groups()
+                            blocks[hex_hash] = (int(height), dentry.stat().st_size)
+                        elif cls.del_regex.match(dentry.name):
+                            to_delete.append(dentry)
+            return to_delete, blocks
 
-                self.blocks.extend(blocks)
-                self.cache_size += size
-                self.fetched_height += count
-                self.blocks_event.set()
+        def find_legacy_blocks():
+            with os.scandir('meta') as it:
+                return [dentry for dentry in it
+                        if dentry.is_file() and cls.legacy_del_regex.match(dentry.name)]
 
-        self.refill_event.clear()
-        return True
+        try:
+            # This only succeeds the first time with the new code
+            os.mkdir(cls.path)
+            logger.info(f'created block directory {cls.path}')
+            await cls.delete_stale(await run_in_thread(find_legacy_blocks), True)
+        except FileExistsError:
+            pass
+
+        logger.info(f'scanning block directory {cls.path}...')
+        to_delete, blocks = await run_in_thread(scan)
+        await cls.delete_stale(to_delete, True)
+        total_size = sum(pair[1] for pair in blocks.values())
+        logger.info(f'found {len(blocks)} block files, total size {total_size:,d} bytes')
+        cls.blocks = blocks
+
+    @classmethod
+    async def prefetch_many(cls, daemon, pairs, kind):
+        async def prefetch_one(hex_hash, height):
+            '''Read a block in chunks to a temporary file.  Rename the file only when done so
+            as not to have incomplete blocks considered complete.
+            '''
+            try:
+                filename = cls.filename(hex_hash, height)
+                tmp_filename = filename + '.tmp'
+                size = await daemon.get_block(hex_hash, tmp_filename)
+                await run_in_thread(os.rename, tmp_filename, filename)
+                cls.blocks[hex_hash] = (height, size)
+                if kind == 'new':
+                    logger.info(f'fetched new block height {height:,d} hash {hex_hash}')
+                elif kind == 'reorg':
+                    logger.info(f'fetched reorged block height {height:,d} hash {hex_hash}')
+            finally:
+                cls.tasks.pop(hex_hash)
+
+        # Pairs is a (height, hex_hash) iterable
+        for height, hex_hash in pairs:
+            if hex_hash not in cls.tasks and hex_hash not in cls.blocks:
+                cls.tasks[hex_hash] = await spawn(prefetch_one, hex_hash, height)
+
+    @classmethod
+    async def streamed_block(cls, hex_hash):
+        # Waits for a block to come in.
+        task = cls.tasks.get(hex_hash)
+        if task:
+            await task
+        item = cls.blocks.get(hex_hash)
+        if not item:
+            logger.error(f'block {hex_hash} missing on-disk')
+            return None
+        height, size = item
+        return cls(hex_hash, height, size)
+
+    @classmethod
+    async def stop_prefetching(cls):
+        logger.info('prefetcher stopping...')
+        while cls.tasks:
+            for task in cls.tasks.values():
+                await task
+                break
+        logger.info('prefetcher stopped')
 
 
 class ChainError(Exception):
@@ -149,41 +271,28 @@ class ChainError(Exception):
 
 
 class BlockProcessor:
-    '''Process blocks and update the DB state to match.
-
-    Employ a prefetcher to prefetch blocks in batches for processing.
-    Coordinate backing up in case of chain reorganisations.
+    '''Process blocks and update the DB state to match.  Prefetch blocks so they are
+    immediately available when the processor is ready for a new block.  Coordinate backing
+    up in case of chain reorganisations.
     '''
+
+    polling_delay = 5
 
     def __init__(self, env, db, daemon, notifications):
         self.env = env
         self.db = db
         self.daemon = daemon
         self.notifications = notifications
-
-        # Set when there is block processing to do, e.g. when new blocks come in, or a
-        # reorg is needed.
-        self.blocks_event = asyncio.Event()
-
-        # If the lock is successfully acquired, in-memory chain state
-        # is consistent with self.height
-        self.state_lock = asyncio.Lock()
-
-        # Signalled after backing up during a reorg
-        self.backed_up_event = asyncio.Event()
-
         self.coin = env.coin
-        self.prefetcher = Prefetcher(daemon, env.coin, self.blocks_event)
-        self.logger = class_logger(__name__, self.__class__.__name__)
 
-        # Meta
+        self.caught_up = False
         self.next_cache_check = 0
         self.touched = set()
+        # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
         self.height = -1
         self.tip = None
         self.tx_count = 0
-        self._caught_up_event = None
 
         # Caches of unflushed items.
         self.headers = []
@@ -194,50 +303,67 @@ class BlockProcessor:
         self.utxo_cache = {}
         self.db_deletes = []
 
-    async def run_with_lock(self, coro):
-        # Shielded so that cancellations from shutdown don't lose work.  Cancellation will
-        # cause fetch_and_process_blocks to block on the lock in flush(), the task completes,
-        # and then the data is flushed.  We also don't want user-signalled reorgs to happen
-        # in the middle of processing blocks; they need to wait.
-        async def run_locked():
-            async with self.state_lock:
-                return await coro
-        return await asyncio.shield(run_locked())
+        # Signalled after backing up during a reorg to flush session manager caches
+        self.backed_up_event = asyncio.Event()
 
-    def schedule_reorg(self, count):
-        '''A count >= 0 is a user-forced reorg; < 0 is a natural reorg.'''
-        self.reorg_count = count
-        self.blocks_event.set()
+    async def next_block_hashes(self, count=50):
+        daemon_height = await self.daemon.height()
 
-    async def _reorg_chain(self, count):
+        # Fetch remaining block hashes to a limit
+        first = self.height + 1
+        n = min(daemon_height - first + 1, count * 2)
+        if n:
+            hex_hashes = await self.daemon.block_hex_hashes(first, n)
+            kind = 'new' if self.caught_up else 'sync'
+            await OnDiskBlock.prefetch_many(self.daemon, enumerate(hex_hashes, start=first), kind)
+        else:
+            hex_hashes = []
+
+        # Remove stale blocks
+        await OnDiskBlock.delete_blocks(first - 5, self.caught_up)
+
+        return hex_hashes[:count], daemon_height
+
+    async def reorg_chain(self, count):
         '''Handle a chain reorganisation.
 
-        Count is the number of blocks to simulate a reorg, or None for
-        a real reorg.'''
+        Count is the number of blocks to simulate a reorg, or None for a real reorg.
+        This is passed in as self.reorg_count may change asynchronously.
+        '''
         if count < 0:
-            self.logger.info('chain reorg detected')
+            logger.info('chain reorg detected')
         else:
-            self.logger.info(f'faking a reorg of {count:,d} blocks')
+            logger.info(f'faking a reorg of {count:,d} blocks')
         await self.flush(True)
 
-        _start, height, hashes = await self._reorg_hashes(count)
-        hex_hashes = [hash_to_hex_str(block_hash) for block_hash in hashes]
+        start, hex_hashes = await self._reorg_hashes(count)
+        pairs = reversed(list(enumerate(hex_hashes, start=start)))
+        await OnDiskBlock.prefetch_many(self.daemon, pairs, 'reorg')
+
+        count = total_size = 0
         for hex_hash in reversed(hex_hashes):
-            async with ReversedBlock(hex_hash, height) as block:
-                await self._backup_block(block)
+            block = await OnDiskBlock.streamed_block(hex_hash)
+            if not block:
+                break
+            async with block as block:
+                await block.read_header()
+                if hex_hash != hash_to_hex_str(self.tip):
+                    logger.error(f'block {hex_hash} is not tip; cannot back up')
+                    break
+                await self.backup_block(block)
+                total_size += block.size
+                count += 1
+
             # self.touched can include other addresses which is harmless, but remove None.
             self.touched.discard(None)
             self.db.flush_backup(self.flush_data(), self.touched)
-            height -= 1
 
-        self.logger.info(f'backed up to height {self.height:,d}')
-
-        await self.prefetcher.reset_height(self.height)
+        logger.info(f'backed up to height {self.height:,d}')
         self.backed_up_event.set()
         self.backed_up_event.clear()
 
     async def _reorg_hashes(self, count):
-        '''Return a pair (start, last, hashes) of blocks to back up during a
+        '''Return a pair (start, hashes) of blocks to back up during a
         reorg.
 
         The hashes are returned in order of increasing height.  Start
@@ -245,11 +371,15 @@ class BlockProcessor:
         '''
         start, count = await self._calc_reorg_range(count)
         last = start + count - 1
-        s = '' if count == 1 else 's'
-        self.logger.info(f'chain was reorganised replacing {count:,d} '
-                         f'block{s} at heights {start:,d}-{last:,d}')
+        if count == 1:
+            logger.info(f'chain was reorganised replacing 1 block at height {start:,d}')
+        else:
+            logger.info(f'chain was reorganised replacing {count:,d} blocks at heights '
+                        f'{start:,d}-{last:,d}')
 
-        return start, last, await self.db.fs_block_hashes(start, count)
+        hashes = await self.db.fs_block_hashes(start, count)
+        hex_hashes = [hash_to_hex_str(block_hash) for block_hash in hashes]
+        return start, hex_hashes
 
     async def _calc_reorg_range(self, count):
         '''Calculate the reorg range'''
@@ -295,8 +425,7 @@ class BlockProcessor:
 
     # - Flushing
     def flush_data(self):
-        '''The data for a flush.  The lock must be taken.'''
-        assert self.state_lock.locked()
+        '''The data for a flush.'''
         return FlushData(self.height, self.tx_count, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip)
@@ -319,10 +448,8 @@ class BlockProcessor:
         utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
         hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
-        self.logger.info('our height: {:,d} daemon: {:,d} '
-                         'UTXOs {:,d}MB hist {:,d}MB'
-                         .format(self.height, self.daemon.cached_height(),
-                                 utxo_MB, hist_MB))
+        logger.info(f'our height: {self.height:,d} daemon: {self.daemon.cached_height():,d} '
+                    f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
 
         # Flush history if it takes up over 20% of cache memory.
         # Flush UTXOs once they take up 80% of cache memory.
@@ -331,43 +458,47 @@ class BlockProcessor:
             return utxo_MB >= cache_MB * 4 // 5
         return None
 
-    async def _advance_blocks(self, raw_blocks):
-        '''Process the list of raw blocks passed.  Detects and handles reorgs.'''
+    async def advance_blocks(self, hex_hashes):
+        '''Process the blocks passed.  Detects and handles reorgs.'''
         start = time.monotonic()
-        min_undo_height = self.db.min_undo_height(self.daemon.cached_height())
-        for raw_block in raw_blocks:
-            block_height = self.height + 1
-            write_block = block_height >= min_undo_height
-            async with StreamedBlock(block_height, write_block, raw_block) as block:
+        count = 0
+        total_size = 0
+        for hex_hash in hex_hashes:
+            # Stop if a reorg has been scheduled (below or asynchronously)
+            if self.reorg_count is not None:
+                break
+            block = await OnDiskBlock.streamed_block(hex_hash)
+            if not block:
+                break
+            async with block as block:
+                await block.read_header()
                 if self.coin.header_prevhash(block.header) != self.tip:
-                    self.schedule_reorg(-1)
-                    return
-                await self._advance_block(block)
-                await sleep(0)
+                    self.reorg_count = -1
+                else:
+                    await self.advance_block(block)
+                    total_size += block.size
+                    count += 1
         end = time.monotonic()
 
-        if not self.db.first_sync:
-            s = '' if len(raw_blocks) == 1 else 's'
-            blocks_size = sum(len(block) for block in raw_blocks) / 1_000_000
-            self.logger.info(f'processed {len(raw_blocks):,d} block{s} size {blocks_size:.2f} MB '
-                             f'in {end - start:.1f}s')
+        if count:
+            if not self.db.first_sync:
+                s = '' if count == 1 else 's'
+                logger.info(f'processed {count:,d} block{s} size {total_size:.2f} MB '
+                            f'in {end - start:.1f}s')
 
-        # If caught up, flush everything as client queries are performed on the DB,
-        # otherwise check at regular intervals.
-        if self.height == self.daemon.cached_height():
-            await self.flush(True)
-            await self._on_caught_up()
-        elif end > self.next_cache_check:
-            flush_arg = self.check_cache_size()
-            if flush_arg is not None:
-                await self.flush(flush_arg)
-
-        if self._caught_up_event.is_set():
-            await self.notifications.on_block(self.touched, self.height)
+            # Flush everything before notifying as client queries are performed on the DB
+            if self.caught_up:
+                await self.flush(True)
+                await self.notifications.on_block(self.touched, self.height)
+            elif end > self.next_cache_check:
+                self.next_cache_check = time.monotonic() + 30
+                flush_arg = self.check_cache_size()
+                if flush_arg is not None:
+                    await self.flush(flush_arg)
 
         self.touched = set()
 
-    async def _advance_block(self, block):
+    async def advance_block(self, block):
         '''Advance once block.  It is already verified they correctly connect onto our tip.'''
         is_unspendable = (is_unspendable_genesis if block.height >= self.coin.GENESIS_ACTIVATION
                           else is_unspendable_legacy)
@@ -423,28 +554,18 @@ class BlockProcessor:
         self.tx_count = tx_num
         self.db.tx_counts.append(tx_num)
 
-        if block.write_block:
+        if block.height >= self.db.min_undo_height(self.daemon.cached_height()):
             self.undo_infos.append((undo_info, block.height))
 
         self.height = block.height
         self.headers.append(block.header)
         self.tip = self.coin.header_hash(block.header)
 
-    async def _backup_block(self, block):
-        '''Backup the raw block and flush.
-
-        The blocks should be in order of decreasing height, starting at.  self.height.  A
-        flush is performed once the blocks are backed up.
-        '''
+    async def backup_block(self, block):
+        '''Backup the streamed block.'''
         self.db.assert_flushed(self.flush_data())
         assert block.height > 0
         genesis_activation = self.coin.GENESIS_ACTIVATION
-
-        # Check we're backing up at tip
-        hex_tip = hash_to_hex_str(self.tip)
-        if block.hex_hash != hex_tip:
-            raise ChainError(f'backup block {block.hex_hash} not tip {hex_tip} '
-                             f'at height {block.height:,d}')
 
         is_unspendable = (is_unspendable_genesis if self.height >= genesis_activation
                           else is_unspendable_legacy)
@@ -463,7 +584,7 @@ class BlockProcessor:
         undo_entry_len = 13 + HASHX_LEN
 
         count = 0
-        async for tx, tx_hash in block.iter_txs():
+        async for tx, tx_hash in block.iter_txs_reversed():
             for idx, txout in enumerate(tx.outputs):
                 # Spend the TX outputs.  Be careful with unspendable
                 # outputs - we didn't save those in the first place.
@@ -584,39 +705,15 @@ class BlockProcessor:
                 self.db_deletes.append(udb_key)
                 return hashX + tx_num_packed + utxo_value_packed
 
-        raise ChainError('UTXO {} / {:,d} not found in "h" table'
-                         .format(hash_to_hex_str(tx_hash), tx_idx))
+        raise ChainError(f'UTXO {hash_to_hex_str(tx_hash)} / {tx_idx:,d} not found in "h" table')
 
-    async def _process_blocks(self):
-        '''Loop forever processing blocks as they arrive.'''
-        async def process_event():
-            '''Perform a pending reorg or process prefetched blocks.'''
-            if self.reorg_count is not None:
-                await self._reorg_chain(self.reorg_count)
-                self.reorg_count = None
-                # Prefetcher block cache cleared so nothing to process
-            else:
-                blocks = self.prefetcher.get_prefetched_blocks()
-                await self._advance_blocks(blocks)
-
-        # This must be done to set state before the main loop
-        if self.height == self.daemon.cached_height():
-            await self._on_caught_up()
-
-        while True:
-            await self.blocks_event.wait()
-            self.blocks_event.clear()
-            await self.run_with_lock(process_event())
-
-    async def _on_caught_up(self):
-        if not self._caught_up_event.is_set():
-            self._caught_up_event.set()
-            self.logger.info(f'caught up to height {self.height}')
-            # Flush everything but with first_sync->False state.
-            first_sync = self.db.first_sync
-            self.db.first_sync = False
-            if first_sync:
-                self.logger.info(f'{electrumx.version} synced to height {self.height:,d}')
+    async def on_caught_up(self):
+        if not self.caught_up:
+            self.caught_up = True
+            if self.db.first_sync:
+                logger.info(f'{electrumx.version} synced to height {self.height:,d}')
+                self.db.first_sync = False
+            await self.flush(True)
             # Reopen for serving
             await self.db.open_for_serving()
 
@@ -640,29 +737,49 @@ class BlockProcessor:
         disk before exiting, as otherwise a significant amount of work
         could be lost.
         '''
-        self._caught_up_event = caught_up_event
         await self._first_open_dbs()
-        try:
-            async with TaskGroup() as group:
-                await group.spawn(self.prefetcher.main_loop(self.height))
-                await group.spawn(self._process_blocks())
+        await OnDiskBlock.scan_files()
 
-                async for task in group:
-                    if not task.cancelled():
-                        task.result()
+        try:
+            show_summary = True
+            while True:
+                hex_hashes, daemon_height = await self.next_block_hashes()
+                if show_summary:
+                    show_summary = False
+                    behind = daemon_height - self.height
+                    if behind > 0:
+                        logger.info(f'catching up to daemon height {daemon_height:,d} '
+                                    f'({behind:,d} blocks behind)')
+                    else:
+                        logger.info(f'caught up to daemon height {daemon_height:,d}')
+
+                if hex_hashes:
+                    # Shielded so that cancellations from shutdown don't lose work
+                    await asyncio.shield(self.advance_blocks(hex_hashes))
+                else:
+                    await self.on_caught_up()
+                    caught_up_event.set()
+                    await sleep(self.polling_delay)
+
+                if self.reorg_count is not None:
+                    await asyncio.shield(self.reorg_chain(self.reorg_count))
+                    self.reorg_count = None
+                    show_summary = True
+
         # Don't flush for arbitrary exceptions as they might be a cause or consequence of
         # corrupted data
         except CancelledError:
-            self.logger.info('flushing to DB for a clean shutdown...')
-            await self.run_with_lock(self.flush(True))
-            self.logger.info('flushed cleanly')
+            logger.info('flushing to DB for a clean shutdown...')
+            await asyncio.shield(self.flush(True))
+            await OnDiskBlock.stop_prefetching()
+            logger.info('flushed cleanly')
 
     def force_chain_reorg(self, count):
-        '''Force a reorg of the given number of blocks.
-
-        Returns True if a reorg is queued, false if not caught up.
+        '''Force a reorg of the given number of blocks.  Returns True if a reorg is queued.
+        During initial sync we don't store undo information so cannot fake a reorg until
+        caught up.
         '''
-        if self._caught_up_event.is_set():
-            self.schedule_reorg(count)
+        if self.caught_up:
+            self.reorg_count = count
             return True
         return False

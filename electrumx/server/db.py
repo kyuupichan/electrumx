@@ -9,25 +9,22 @@
 '''Interface to the blockchain database.'''
 
 
-import array
 import ast
 import os
 import time
+from array import array
 from bisect import bisect_right
 from collections import namedtuple
-from glob import glob
-from struct import error as struct_error
 
 import attr
-from aiorpcx import run_in_thread, sleep, Event
+from aiorpcx import run_in_thread, sleep
 
 from electrumx.lib import util
 from electrumx.lib.hash import hash_to_hex_str
 from electrumx.lib.merkle import Merkle, MerkleCache
-from electrumx.lib.tx import Deserializer
 from electrumx.lib.util import (
-    class_logger, formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint32,
-    unpack_le_uint32, unpack_be_uint32, unpack_le_uint64, open_file, open_truncate,
+    formatted_time, pack_be_uint16, pack_be_uint32, pack_le_uint32,
+    unpack_le_uint32, unpack_be_uint32, unpack_le_uint64,
 )
 from electrumx.server.storage import db_class
 from electrumx.server.history import History
@@ -47,238 +44,6 @@ class FlushData(object):
     adds = attr.ib()
     deletes = attr.ib()
     tip = attr.ib()
-
-
-class DiskBlocks:
-
-    path = 'meta/block'
-    del_regex = re.compile('([0-9]{1,6}|[0-9a-f]{64}\.tmp)$')
-    block_regex = re.compile('([0-9a-f]{64})-([0-9]{1,7})$')
-
-    def __init__(self, daemon):
-        # Map from hex hash to a (height, size) tuple
-        self.logger = class_logger(__name__, self.__class__.__name__)
-        self.blocks = {}
-        self.min_height = 0
-        self.pending_blocks = {}
-        self.daemon = daemon
-        self.deleted_event = Event()
-
-    def set_minimum_height(self, height):
-        self.min_height = height
-
-    def request_blocks(self, hex_hashes):
-        self.required_blocks.extend(hex_hashes)
-
-    def block_filename(self, hex_hash, height):
-        return os.path.join(self.path, f'{hex_hash}-{height:d}')
-
-    async def fetch_block(self, hex_hash, height):
-        '''Read a block in chunks to a temporary file.  Rename the file only when done so as not
-        to have incomplete blocks considered complete.
-        '''
-        filename = self.block_file(hex_hash, height)
-        tmp_filename = file_name + '.tmp'
-        await self.daemon.get_block(hex_hash, tmp_file_name)
-        os.rename(tmp_file_name, file_name)
-
-    async def fetch_blocks(self):
-        # Worker loop
-        pass
-
-    async def _delete_stale(self, items):
-        def delete(paths):
-            count = total_size = 0
-            for path, size in paths.items():
-                try:
-                    os.remove(path)
-                    count += 1
-                    total_size += size
-                except FileNotFoundError as e:
-                    self.logger.error(f'could not delete stale block file {path}: {e}')
-            return count, total_size
-
-        if not items:
-            return
-        paths = {}
-        for item in items:
-            if isinstance(item, DirEntry):
-                paths[item.path] = item.st_size
-            else:
-                height, size = self.blocks.pop(item)
-                paths[os.path.join(self.path, f'{item}-{height:d}')] = size
-
-        self.logger.info(f'deleting {len(paths):,d} stale block files...')
-        count, total_size = await run_in_thread(delete, paths)
-        self.logger.info(f'deleted {count:,d} block files, total size {total_size:,d} bytes')
-        self.deleted_event.set()
-
-    async def remove_stale_blocks_loop(self):
-        while True:
-            items = [hex_hash for hex_hash, (height, size) in self.blocks.items()
-                     if height < self.min_height]
-            await run_in_thread(self._delete_stale, items)
-            secs = 300 if len(self.blocks) > 200 else 3600
-            await sleep(secs)
-
-    async def scan_files(self):
-        def scan():
-            self.logger.info(f'scanning block directory {self.path}...')
-            blocks = {}
-            items = []
-            with os.scandir(self.path) as it:
-                for dentry in it:
-                    if dentry.is_file():
-                        match = self.block_regex.match(dentry.name)
-                        if match:
-                            hex_hash, height = match.groups()
-                            blocks[hex_hash] = (int(height), dentry.stat().st_size)
-                        elif self.del_regex.match(dentry.name):
-                            items.append(dentry)
-
-            self._delete_stale(items)
-            total_size = sum(pair[1] for pair in blocks.values())
-            self.logger.info(f'found {len(blocks)} block files, total size {total_size:,d} bytes')
-            return blocks
-
-         self.blocks = await run_in_thread(scan)
-
-
-class OnDiskBlock:
-
-    raw_block_prefix = 'meta/block'
-
-    def __init__(self, height):
-        self.logger = class_logger(__name__, self.__class__.__name__)
-        self.height = height
-        self.block_file = None
-        self.header = None
-
-    @classmethod
-    def raw_block_path(cls, height):
-        return f'{cls.raw_block_prefix}{height:d}'
-
-    def open_for_writing(self):
-        self.block_file = open_truncate(self.raw_block_path(self.height))
-
-    @classmethod
-    def delete_block_at_height(cls, del_height):
-        # FIXME: call this
-        try:
-            os.remove(cls.raw_block_path(del_height))
-        except FileNotFoundError:
-            pass
-
-
-class StreamedBlock(OnDiskBlock):
-
-    def __init__(self, height, write_block, raw):
-        super().__init__(height)
-        self.write_block = write_block
-        self.raw = raw
-        self.deserializer = Deserializer(raw, 0)
-
-    async def __aenter__(self):
-        if self.write_block:
-            self.open_for_writing()
-            self.block_file.write(self.raw)
-        self.header = self.deserializer._read_nbytes(80)
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        if self.block_file:
-            self.block_file.close()
-
-    async def iter_txs(self):
-        # Asynchronous generator of (tx, tx_hash) pairs
-        tx_count = self.deserializer._read_varint()
-        read = self.deserializer.read_tx_and_hash
-        for _n in range(tx_count):
-            yield read()
-
-
-class ReversedBlock(OnDiskBlock):
-
-    chunk_size = 25_000_000
-
-    def __init__(self, hex_hash, height):
-        super().__init__(height)
-        self.hex_hash = hex_hash
-
-    def open_for_reading(self):
-        self.block_file = open_file(OnDiskBlock.raw_block_path(self.height))
-
-    async def __aenter__(self):
-        try:
-            self.open_for_reading()
-        except FileNotFoundError:
-            self.logger.error(f'block {self.hex_hash} height {self.height:,d} not found on disk')
-            raise
-#        if self.block_file is None:
-#            self.logger.info(f'writing block {self.hex_hash} height {self.height:,d} from daemon '
-#                             f'to disk')
-#            await self.write_block()
-#            self.open_for_reading()
-        self.header = self.block_file.read(80)
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        self.block_file.close()
-
-    async def read_chunk(self, prev_raw):
-        disk_chunk = await run_in_thread(self.block_file.read, self.chunk_size)
-        return Deserializer(prev_raw + disk_chunk)
-
-    async def chunk_offsets(self):
-        base_offset = self.block_file.tell()
-        deserializer = await self.read_chunk(b'')
-        tx_count = deserializer._read_varint()
-        self.logger.info(f'backing up block {self.hex_hash} height {self.height:,d} '
-                         f'tx_count {tx_count:,d} from disk')
-        offsets = [base_offset + deserializer.cursor]
-
-        while True:
-            count = 0
-            try:
-                while True:
-                    tx_offset = deserializer.cursor
-                    deserializer.read_tx()
-                    count += 1
-            except (AssertionError, IndexError, struct_error):
-                pass
-
-            if count:
-                offsets.append(base_offset + tx_offset)
-                base_offset += tx_offset
-            tx_count -= count
-            if tx_count == 0:
-                return offsets
-            deserializer = await self.read_chunk(deserializer.binary[tx_offset:])
-
-    async def iter_txs(self):
-        def read_chunk(start, size):
-            self.block_file.seek(start, os.SEEK_SET)
-            return self.block_file.read(size)
-
-        # Iterate the block transactions in reverse order.  As the block may be huge, we
-        # break it up into digestible chunks and do those in reverse order.  We need to
-        # iterate the transactions forwards first to find their boundaries.
-        offsets = await self.chunk_offsets()
-        for n in reversed(range(len(offsets) - 1)):
-            start = offsets[n]
-            size = offsets[n + 1] - start
-            raw = await run_in_thread(read_chunk, start, size)
-            if len(raw) != size:
-                raise RuntimeError(f'truncated block file for height {self.height:,d}')
-            deserializer = Deserializer(raw)
-            pairs = []
-            while deserializer.cursor < size:
-                cursor = deserializer.cursor
-                pair = deserializer.read_tx_and_hash()
-                tx_size = deserializer.cursor - cursor
-                pairs.append(pair)
-            for item in reversed(pairs):
-                yield item
 
 
 class DB(object):
@@ -335,7 +100,7 @@ class DB(object):
         size = (self.db_height + 1) * 8
         tx_counts = self.tx_counts_file.read(0, size)
         assert len(tx_counts) == size
-        self.tx_counts = array.array('Q', tx_counts)
+        self.tx_counts = array('Q', tx_counts)
         if self.tx_counts:
             assert self.db_tx_count == self.tx_counts[-1]
         else:
@@ -710,19 +475,6 @@ class DB(object):
                     batch.delete(key)
             self.logger.info(f'deleted {len(keys):,d} stale undo entries')
 
-        # delete old block files
-        prefix = OnDiskBlock.raw_block_prefix
-        paths = [path for path in glob(f'{prefix}[0-9]*')
-                 if len(path) > len(prefix)
-                 and int(path[len(prefix):]) < min_height]
-        if paths:
-            for path in paths:
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    pass
-            self.logger.info(f'deleted {len(paths):,d} stale block files')
-
     # -- UTXO database
 
     def read_utxo_state(self):
@@ -856,8 +608,8 @@ class DB(object):
         size = (self.db_height + 1) * 8
         tx_counts = self.tx_counts_file.read(0, size)
         if len(tx_counts) == (self.db_height + 1) * 4:
-            tx_counts = array.array('I', tx_counts)
-            tx_counts = array.array('Q', tx_counts)
+            tx_counts = array('I', tx_counts)
+            tx_counts = array('Q', tx_counts)
             self.tx_counts_file.write(0, tx_counts.tobytes())
 
         self.db_version = max(self.DB_VERSIONS)

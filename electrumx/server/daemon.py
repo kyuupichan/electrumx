@@ -14,7 +14,7 @@ import json
 import time
 
 import aiohttp
-from aiorpcx import JSONRPC
+from aiorpcx import JSONRPC, run_in_thread
 
 from electrumx.lib.util import hex_to_bytes, open_truncate, class_logger
 
@@ -116,8 +116,10 @@ class Daemon(object):
                         text = await resp.text()
                         text = text.strip() or resp.reason
                         raise ServiceRefusedError(text)
+                    size = 0
                     async for part, _ in resp.content.iter_chunks():
-                        await run_in_thread(file.write, part)
+                        size += await run_in_thread(file.write, part)
+                    return size
 
     async def _send(self, func, *args):
         '''Send a payload to be converted to JSON.
