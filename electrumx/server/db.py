@@ -723,7 +723,7 @@ class DB(object):
                 tx_pos, = unpack_le_uint32(db_key[-9:-5])
                 tx_num, = unpack_le_uint64(db_key[-5:] + bytes(3))
                 value, = unpack_le_uint64(db_value[:-2])
-                is_staking, = unpack_le_uint32(db_value[-2:]+b'\x00\x00')
+                is_stake, = unpack_le_uint32(db_value[-2:]+b'\x00\x00')
                 tx_hash, height = self.fs_tx_hash(tx_num)
                 utxos_append(UTXO(tx_num, tx_pos, tx_hash, height, value, is_stake))
             return utxos
