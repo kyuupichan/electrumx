@@ -19,7 +19,7 @@ from glob import glob
 from struct import error as struct_error
 
 import attr
-from aiorpcx import run_in_thread, sleep
+from aiorpcx import run_in_thread, sleep, Event
 
 from electrumx.lib import util
 from electrumx.lib.hash import hash_to_hex_str
@@ -47,6 +47,101 @@ class FlushData(object):
     adds = attr.ib()
     deletes = attr.ib()
     tip = attr.ib()
+
+
+class DiskBlocks:
+
+    path = 'meta/block'
+    del_regex = re.compile('([0-9]{1,6}|[0-9a-f]{64}\.tmp)$')
+    block_regex = re.compile('([0-9a-f]{64})-([0-9]{1,7})$')
+
+    def __init__(self, daemon):
+        # Map from hex hash to a (height, size) tuple
+        self.logger = class_logger(__name__, self.__class__.__name__)
+        self.blocks = {}
+        self.min_height = 0
+        self.pending_blocks = {}
+        self.daemon = daemon
+        self.deleted_event = Event()
+
+    def set_minimum_height(self, height):
+        self.min_height = height
+
+    def request_blocks(self, hex_hashes):
+        self.required_blocks.extend(hex_hashes)
+
+    def block_filename(self, hex_hash, height):
+        return os.path.join(self.path, f'{hex_hash}-{height:d}')
+
+    async def fetch_block(self, hex_hash, height):
+        '''Read a block in chunks to a temporary file.  Rename the file only when done so as not
+        to have incomplete blocks considered complete.
+        '''
+        filename = self.block_file(hex_hash, height)
+        tmp_filename = file_name + '.tmp'
+        await self.daemon.get_block(hex_hash, tmp_file_name)
+        os.rename(tmp_file_name, file_name)
+
+    async def fetch_blocks(self):
+        # Worker loop
+        pass
+
+    async def _delete_stale(self, items):
+        def delete(paths):
+            count = total_size = 0
+            for path, size in paths.items():
+                try:
+                    os.remove(path)
+                    count += 1
+                    total_size += size
+                except FileNotFoundError as e:
+                    self.logger.error(f'could not delete stale block file {path}: {e}')
+            return count, total_size
+
+        if not items:
+            return
+        paths = {}
+        for item in items:
+            if isinstance(item, DirEntry):
+                paths[item.path] = item.st_size
+            else:
+                height, size = self.blocks.pop(item)
+                paths[os.path.join(self.path, f'{item}-{height:d}')] = size
+
+        self.logger.info(f'deleting {len(paths):,d} stale block files...')
+        count, total_size = await run_in_thread(delete, paths)
+        self.logger.info(f'deleted {count:,d} block files, total size {total_size:,d} bytes')
+        self.deleted_event.set()
+
+    async def remove_stale_blocks_loop(self):
+        while True:
+            items = [hex_hash for hex_hash, (height, size) in self.blocks.items()
+                     if height < self.min_height]
+            await run_in_thread(self._delete_stale, items)
+            secs = 300 if len(self.blocks) > 200 else 3600
+            await sleep(secs)
+
+    async def scan_files(self):
+        def scan():
+            self.logger.info(f'scanning block directory {self.path}...')
+            blocks = {}
+            items = []
+            with os.scandir(self.path) as it:
+                for dentry in it:
+                    if dentry.is_file():
+                        match = self.block_regex.match(dentry.name)
+                        if match:
+                            hex_hash, height = match.groups()
+                            blocks[hex_hash] = (int(height), dentry.stat().st_size)
+                        elif self.del_regex.match(dentry.name):
+                            items.append(dentry)
+
+            self._delete_stale(items)
+            total_size = sum(pair[1] for pair in blocks.values())
+            self.logger.info(f'found {len(blocks)} block files, total size {total_size:,d} bytes')
+            return blocks
+
+         self.blocks = await run_in_thread(scan)
 
 
 class OnDiskBlock:

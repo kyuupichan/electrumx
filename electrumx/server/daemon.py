@@ -16,7 +16,7 @@ import time
 import aiohttp
 from aiorpcx import JSONRPC
 
-from electrumx.lib.util import hex_to_bytes, class_logger
+from electrumx.lib.util import hex_to_bytes, open_truncate, class_logger
 
 
 class DaemonError(Exception):
@@ -106,24 +106,18 @@ class Daemon(object):
                 text = text.strip() or resp.reason
                 raise ServiceRefusedError(text)
 
-    async def _get(self, url):
-        full_url = self.current_url() + url
+    async def _get_to_file(self, rest_url, filename):
+        full_url = self.current_url() + rest_url
         async with self.workqueue_semaphore:
-            async with self.session.get(full_url) as resp:
-                reader = aiohttp.MultipartReader.from_response(resp)
-                parts = []
-                while True:
-                    part = await reader.next()
-                    if part is None:
-                        return b''.join(parts)
-                    kind = part.headers.get('Content-Type', None)
+            with open_truncate(filename) as file:
+                async with self.session.get(full_url) as resp:
+                    kind = resp.headers.get('Content-Type', None)
                     if kind != 'application/octet-stream':
                         text = await resp.text()
                         text = text.strip() or resp.reason
                         raise ServiceRefusedError(text)
-                    item = await part.read()
-                    self.logger.info('read part size {len(item):,d} bytes')
-                    parts.append(item)
+                    async for part, _ in resp.content.iter_chunks():
+                        await run_in_thread(file.write, part)
 
     async def _send(self, func, *args):
         '''Send a payload to be converted to JSON.
@@ -234,10 +228,9 @@ class Daemon(object):
         '''Return the deserialised block with the given hex hash.'''
         return await self._send_single('getblock', (hex_hash, True))
 
-    async def raw_blocks(self, hex_hashes):
-        '''Return the raw binary blocks with the given hex hashes.'''
-        return [await self._send(self._get, f'rest/block/{hex_hash}.bin')
-                for hex_hash in hex_hashes]
+    async def get_block(self, hex_hash, filename):
+        rest_url = f'rest/block/{hex_hash}.bin'
+        return await self._send(self._get_to_file, rest_url, filename)
 
     async def mempool_hashes(self):
         '''Update our record of the daemon's mempool hashes.'''
