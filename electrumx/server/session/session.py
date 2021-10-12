@@ -131,7 +131,16 @@ class ElectrumX(SessionBase):
     async def staking_get_info(self):
         '''The general information about staking and its parameters'''
         self.bump_cost(0.2)
-        return await self.daemon_request('getstakinginfo')
+        info = await self.daemon_request('getstakinginfo')
+
+        info["penalty"] = 0.03
+        info["interestInfo"] = {
+            "4320": 0.05,
+            "12960": 0.06,
+            "25920": 0.075
+        }
+
+        return info
 
     async def stake_get_info(self, hex_hash):
         '''The verbose information about particular stake'''
