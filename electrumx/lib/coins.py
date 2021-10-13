@@ -183,9 +183,9 @@ class Coin:
 
 class BitcoinSV(Coin):
     NAME = "BitcoinSV"
-    TX_COUNT = 267318795
-    TX_COUNT_HEIGHT = 557037
-    TX_PER_BLOCK = 400
+    TX_COUNT = 715_888_864
+    TX_COUNT_HEIGHT = 708_908
+    TX_PER_BLOCK = 1_500
     PEERS = [
         'electrumx.bitcoinsv.io s',
         'satoshi.vision.cash s',
@@ -205,9 +205,9 @@ class BitcoinTestnetMixin:
     GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
                     'aec3ced90fa3f408719526f8d77f4943')
     REORG_LIMIT = 8000
-    TX_COUNT = 12242438
-    TX_COUNT_HEIGHT = 1035428
-    TX_PER_BLOCK = 21
+    TX_COUNT = 29_511_748
+    TX_COUNT_HEIGHT = 1_453_945
+    TX_PER_BLOCK = 10
     RPC_PORT = 18332
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
 
