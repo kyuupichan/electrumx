@@ -286,13 +286,13 @@ class BlockProcessor:
         self.coin = env.coin
 
         self.caught_up = False
-        self.next_cache_check = 0
         self.touched = set()
         # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
         self.height = -1
         self.tip = None
         self.tx_count = 0
+        self.force_flush_arg = None
 
         # Caches of unflushed items.
         self.headers = []
@@ -320,7 +320,7 @@ class BlockProcessor:
             hex_hashes = []
 
         # Remove stale blocks
-        await OnDiskBlock.delete_blocks(first - 5, self.caught_up)
+        await OnDiskBlock.delete_blocks(first - 5, False)
 
         return hex_hashes[:count], daemon_height
 
@@ -431,41 +431,50 @@ class BlockProcessor:
                          self.db_deletes, self.tip)
 
     async def flush(self, flush_utxos):
+        self.force_flush_arg = None
         self.db.flush_dbs(self.flush_data(), flush_utxos, self.estimate_txs_remaining)
-        self.next_cache_check = time.monotonic() + 30
 
-    def check_cache_size(self):
-        '''Flush a cache if it gets too big.'''
-        # Good average estimates based on traversal of subobjects and
-        # requesting size from Python (see deep_getsizeof).
+    async def check_cache_size_loop(self):
+        '''Signal to flush caches if they get too big.'''
         one_MB = 1000*1000
-        utxo_cache_size = len(self.utxo_cache) * 205
-        db_deletes_size = len(self.db_deletes) * 57
-        hist_cache_size = self.db.history.unflushed_memsize()
-        # Roughly ntxs * 32 + nblocks * 42
-        tx_hash_size = ((self.tx_count - self.db.fs_tx_count) * 32
-                        + (self.height - self.db.fs_height) * 42)
-        utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
-        hist_MB = (hist_cache_size + tx_hash_size) // one_MB
-
-        logger.info(f'our height: {self.height:,d} daemon: {self.daemon.cached_height():,d} '
-                    f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
-
-        # Flush history if it takes up over 20% of cache memory.
-        # Flush UTXOs once they take up 80% of cache memory.
         cache_MB = self.env.cache_MB
-        if utxo_MB + hist_MB >= cache_MB or hist_MB >= cache_MB // 5:
-            return utxo_MB >= cache_MB * 4 // 5
-        return None
+        log_next = False
+        while True:
+            # Good average estimates based on traversal of subobjects and
+            # requesting size from Python (see deep_getsizeof).
+            utxo_cache_size = len(self.utxo_cache) * 205
+            db_deletes_size = len(self.db_deletes) * 57
+            hist_cache_size = self.db.history.unflushed_memsize()
+            # Roughly ntxs * 32 + nblocks * 42
+            tx_hash_size = ((self.tx_count - self.db.fs_tx_count) * 32
+                            + (self.height - self.db.fs_height) * 42)
+            utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
+            hist_MB = (hist_cache_size + tx_hash_size) // one_MB
+
+            if not hist_MB:
+                log_next = False
+            elif log_next:
+                logger.info(f'our height: {self.height:,d} '
+                            f'daemon: {self.daemon.cached_height():,d} '
+                            f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
+            else:
+                log_next = True
+
+            # Flush history if it takes up over 20% of cache memory.
+            # Flush UTXOs once they take up 80% of cache memory.
+            if utxo_MB + hist_MB >= cache_MB or hist_MB >= cache_MB // 5:
+                self.force_flush_arg = utxo_MB >= cache_MB * 4 // 5
+            await sleep(30)
 
     async def advance_blocks(self, hex_hashes):
         '''Process the blocks passed.  Detects and handles reorgs.'''
         start = time.monotonic()
         count = 0
         total_size = 0
+
         for hex_hash in hex_hashes:
-            # Stop if a reorg has been scheduled (below or asynchronously)
-            if self.reorg_count is not None:
+            # Stop if we must flush
+            if self.force_flush_arg is not None or self.reorg_count is not None:
                 break
             block = await OnDiskBlock.streamed_block(hex_hash)
             if not block:
@@ -480,23 +489,17 @@ class BlockProcessor:
                     count += 1
         end = time.monotonic()
 
-        if count:
-            if not self.db.first_sync:
-                s = '' if count == 1 else 's'
-                logger.info(f'processed {count:,d} block{s} size {total_size:.2f} MB '
-                            f'in {end - start:.1f}s')
+        if count and not self.db.first_sync:
+            s = '' if count == 1 else 's'
+            logger.info(f'processed {count:,d} block{s} size {total_size/1_000_000:.2f} MB '
+                        f'in {end - start:.1f}s')
 
-            # Flush everything before notifying as client queries are performed on the DB
-            if self.caught_up:
-                await self.flush(True)
-                await self.notifications.on_block(self.touched, self.height)
-            elif end > self.next_cache_check:
-                self.next_cache_check = time.monotonic() + 30
-                flush_arg = self.check_cache_size()
-                if flush_arg is not None:
-                    await self.flush(flush_arg)
+        # If we've not caught up we have no clients for the touched set
+        if not self.caught_up:
+            self.touched = set()
 
-        self.touched = set()
+        if self.force_flush_arg is not None:
+            await self.flush(self.force_flush_arg)
 
     async def advance_block(self, block):
         '''Advance once block.  It is already verified they correctly connect onto our tip.'''
@@ -708,12 +711,17 @@ class BlockProcessor:
         raise ChainError(f'UTXO {hash_to_hex_str(tx_hash)} / {tx_idx:,d} not found in "h" table')
 
     async def on_caught_up(self):
-        if not self.caught_up:
+        is_first_sync = self.db.first_sync
+        self.db.first_sync = False
+        await self.flush(True)
+        if self.caught_up:
+            # Flush everything before notifying as client queries are performed on the DB
+            await self.notifications.on_block(self.touched, self.height)
+            self.touched = set()
+        else:
             self.caught_up = True
-            if self.db.first_sync:
+            if is_first_sync:
                 logger.info(f'{electrumx.version} synced to height {self.height:,d}')
-                self.db.first_sync = False
-            await self.flush(True)
             # Reopen for serving
             await self.db.open_for_serving()
 

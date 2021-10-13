@@ -135,6 +135,7 @@ class Controller(ServerBase):
             async with TaskGroup() as group:
                 await group.spawn(session_mgr.serve(notifications, mempool_event))
                 await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
+                await group.spawn(bp.check_cache_size_loop())
                 await group.spawn(wait_for_catchup())
 
                 async for task in group:
