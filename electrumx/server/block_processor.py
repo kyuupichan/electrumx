@@ -51,7 +51,7 @@ class OnDiskBlock:
 
     @classmethod
     def filename(cls, hex_hash, height):
-        return os.path.join(cls.path, f'{hex_hash}-{height:d}')
+        return os.path.join(cls.path, f'{height:d}-{hex_hash}')
 
     async def __aenter__(self):
         self.block_file = open_file(self.filename(self.hex_hash, self.height))
@@ -170,7 +170,7 @@ class OnDiskBlock:
                 paths[item.path] = item.stat().st_size
             else:
                 height, size = cls.blocks.pop(item)
-                paths[os.path.join(OnDiskBlock.path, f'{item}-{height:d}')] = size
+                paths[cls.filename(item, height)] = size
 
         count, total_size = await run_in_thread(delete, paths)
         if log:
