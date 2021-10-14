@@ -296,6 +296,20 @@ class BlockProcessor:
         # Signalled after backing up during a reorg to flush session manager caches
         self.backed_up_event = asyncio.Event()
 
+        # When the lock is acquired, in-memory chain state is consistent with self.height.
+        # This is a requirement for safe flushing.
+        self.state_lock = asyncio.Lock()
+
+    async def run_with_lock(self, coro):
+        # Shielded so that cancellations from shutdown don't lose work.  Cancellation will
+        # cause fetch_and_process_blocks to block on the lock in flush(), the task completes,
+        # and then the data is flushed.  We also don't want user-signalled reorgs to happen
+        # in the middle of processing blocks; they need to wait.
+        async def run_locked():
+            async with self.state_lock:
+                return await coro
+        return await asyncio.shield(run_locked())
+
     async def next_block_hashes(self, count=30):
         daemon_height = await self.daemon.height()
 
@@ -753,15 +767,14 @@ class BlockProcessor:
                         logger.info(f'caught up to daemon height {daemon_height:,d}')
 
                 if hex_hashes:
-                    # Shielded so that cancellations from shutdown don't lose work
-                    await asyncio.shield(self.advance_blocks(hex_hashes))
+                    await self.run_with_lock(self.advance_blocks(hex_hashes))
                 else:
                     await self.on_caught_up()
                     caught_up_event.set()
                     await sleep(self.polling_delay)
 
                 if self.reorg_count is not None:
-                    await asyncio.shield(self.reorg_chain(self.reorg_count))
+                    await self.run_with_lock(self.reorg_chain(self.reorg_count))
                     self.reorg_count = None
                     show_summary = True
 
@@ -769,7 +782,7 @@ class BlockProcessor:
         # corrupted data
         except CancelledError:
             logger.info('flushing to DB for a clean shutdown...')
-            await asyncio.shield(self.flush(True))
+            await self.run_with_lock(self.flush(True))
             await OnDiskBlock.stop_prefetching()
             logger.info('flushed cleanly')
 
