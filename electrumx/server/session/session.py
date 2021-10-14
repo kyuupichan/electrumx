@@ -137,7 +137,8 @@ class ElectrumX(SessionBase):
         info["interestInfo"] = {
             "4320": 0.05,
             "12960": 0.06,
-            "25920": 0.075
+            "25920": 0.075,
+            "51840": 0.1
         }
 
         return info
