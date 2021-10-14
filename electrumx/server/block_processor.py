@@ -34,9 +34,8 @@ logger = class_logger(__name__, 'BlockProcessor')
 class OnDiskBlock:
 
     path = 'meta/blocks'
-    del_regex = re.compile('([0-9a-f]{64}\\.tmp)$')
     legacy_del_regex = re.compile('block[0-9]{1,7}$')
-    block_regex = re.compile('([0-9a-f]{64})-([0-9]{1,7})$')
+    block_regex = re.compile('([0-9]{1,7})-([0-9a-f]{64})$')
     chunk_size = 25_000_000
     # On-disk blocks. hex_hash->(height, size) pair
     blocks = {}
@@ -185,19 +184,16 @@ class OnDiskBlock:
 
     @classmethod
     async def scan_files(cls):
+        # Remove stale block files
         def scan():
-            blocks = {}
             to_delete = []
             with os.scandir(cls.path) as it:
                 for dentry in it:
                     if dentry.is_file():
                         match = cls.block_regex.match(dentry.name)
                         if match:
-                            hex_hash, height = match.groups()
-                            blocks[hex_hash] = (int(height), dentry.stat().st_size)
-                        elif cls.del_regex.match(dentry.name):
                             to_delete.append(dentry)
-            return to_delete, blocks
+            return to_delete
 
         def find_legacy_blocks():
             with os.scandir('meta') as it:
@@ -213,23 +209,17 @@ class OnDiskBlock:
             pass
 
         logger.info(f'scanning block directory {cls.path}...')
-        to_delete, blocks = await run_in_thread(scan)
+        to_delete = await run_in_thread(scan)
         await cls.delete_stale(to_delete, True)
-        total_size = sum(pair[1] for pair in blocks.values())
-        logger.info(f'found {len(blocks)} block files, total size {total_size:,d} bytes')
-        cls.blocks = blocks
 
     @classmethod
     async def prefetch_many(cls, daemon, pairs, kind):
         async def prefetch_one(hex_hash, height):
-            '''Read a block in chunks to a temporary file.  Rename the file only when done so
-            as not to have incomplete blocks considered complete.
-            '''
+            '''Read a block in chunks to a file.  As the files may not be complete they need
+            to be removed when the server starts up.'''
             try:
                 filename = cls.filename(hex_hash, height)
-                tmp_filename = filename + '.tmp'
-                size = await daemon.get_block(hex_hash, tmp_filename)
-                await run_in_thread(os.rename, tmp_filename, filename)
+                size = await daemon.get_block(hex_hash, filename)
                 cls.blocks[hex_hash] = (height, size)
                 if kind == 'new':
                     logger.info(f'fetched new block height {height:,d} hash {hex_hash}')
