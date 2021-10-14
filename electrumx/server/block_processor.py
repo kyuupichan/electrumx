@@ -86,10 +86,12 @@ class OnDiskBlock:
         raw = await self._read(self.chunk_size)
         deserializer = Deserializer(raw)
         tx_count = deserializer._read_varint()
+        logger.info(f'advancing block height {self.height} {self.hex_hash} '
+                    f'size {self.size / 1_000_000_000:.3f}GB tx_count: {tx_count:,d}')
 
+        count = 0
         while True:
             read = deserializer.read_tx_and_hash
-            count = 0
             try:
                 while True:
                     cursor = deserializer.cursor
@@ -98,8 +100,7 @@ class OnDiskBlock:
             except (AssertionError, IndexError, struct_error):
                 pass
 
-            tx_count -= count
-            if tx_count == 0:
+            if count == tx_count:
                 return
             raw = raw[cursor:] + await self._read(self.chunk_size)
             deserializer = Deserializer(raw)
