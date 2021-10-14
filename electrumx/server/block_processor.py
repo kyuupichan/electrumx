@@ -306,7 +306,7 @@ class BlockProcessor:
         # Signalled after backing up during a reorg to flush session manager caches
         self.backed_up_event = asyncio.Event()
 
-    async def next_block_hashes(self, count=50):
+    async def next_block_hashes(self, count=30):
         daemon_height = await self.daemon.height()
 
         # Fetch remaining block hashes to a limit
@@ -356,7 +356,7 @@ class BlockProcessor:
 
             # self.touched can include other addresses which is harmless, but remove None.
             self.touched.discard(None)
-            self.db.flush_backup(self.flush_data(), self.touched)
+            await run_in_thread(self.db.flush_backup, self.flush_data(), self.touched)
 
         logger.info(f'backed up to height {self.height:,d}')
         self.backed_up_event.set()
@@ -432,7 +432,8 @@ class BlockProcessor:
 
     async def flush(self, flush_utxos):
         self.force_flush_arg = None
-        self.db.flush_dbs(self.flush_data(), flush_utxos, self.estimate_txs_remaining)
+        await run_in_thread(self.db.flush_dbs, self.flush_data(), flush_utxos,
+                            self.estimate_txs_remaining)
 
     async def check_cache_size_loop(self):
         '''Signal to flush caches if they get too big.'''
