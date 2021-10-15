@@ -170,10 +170,10 @@ class ElectrumX(SessionBase):
         hashX = scripthash_to_hashX(scripthash)
         return await self.unconfirmed_history(hashX)
 
-    async def scripthash_listunspent(self, scripthash):
+    async def scripthash_listunspent(self, scripthash, stake_flag=None):
         '''Return the list of UTXOs of a scripthash.'''
         hashX = scripthash_to_hashX(scripthash)
-        return await self.hashX_listunspent(hashX)
+        return await self.hashX_listunspent(hashX, stake_flag)
 
     async def scripthash_unsubscribe(self, scripthash):
         '''Unsubscribe from a script hash.'''
@@ -487,7 +487,7 @@ class ElectrumX(SessionBase):
             self.unsubscribe_hashX(hashX)
             return None
 
-    async def hashX_listunspent(self, hashX):
+    async def hashX_listunspent(self, hashX, stake_flag=None):
         '''Return the list of UTXOs of a script hash, including mempool
         effects.'''
         utxos = await self.db.all_utxos(hashX)
@@ -497,12 +497,13 @@ class ElectrumX(SessionBase):
         spends = await self.mempool.potential_spends(hashX)
 
         return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
-                 'tx_pos': utxo.tx_pos,
-                 'height': utxo.height,
-                 'value': utxo.value,
-                 'is_stake': utxo.is_stake}
-                for utxo in utxos
-                if (utxo.tx_hash, utxo.tx_pos) not in spends]
+                    'tx_pos': utxo.tx_pos,
+                    'height': utxo.height,
+                    'value': utxo.value,
+                    'is_stake': utxo.is_stake}
+                    for utxo in utxos
+                    if (utxo.tx_hash, utxo.tx_pos) not in spends
+                    and (stake_flag is None or stake_flag == utxo.is_stake)]
 
     async def hashX_subscribe(self, hashX, alias):
         # Store the subscription only after address_status succeeds
