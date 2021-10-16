@@ -16,7 +16,7 @@ import time
 from asyncio import sleep
 from struct import error as struct_error
 
-from aiorpcx import CancelledError, run_in_thread, spawn
+from aiorpcx import CancelledError, run_in_thread, spawn, timeout_after
 
 import electrumx
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
@@ -220,7 +220,8 @@ class OnDiskBlock:
             to be removed when the server starts up.'''
             try:
                 filename = cls.filename(hex_hash, height)
-                size = await daemon.get_block(hex_hash, filename)
+                async with timeout_after(20):
+                    size = await daemon.get_block(hex_hash, filename)
                 cls.blocks[hex_hash] = (height, size)
                 if kind == 'new':
                     logger.info(f'fetched new block height {height:,d} hash {hex_hash}')
@@ -239,7 +240,10 @@ class OnDiskBlock:
         # Waits for a block to come in.
         task = cls.tasks.get(hex_hash)
         if task:
-            await task
+            try:
+                await task
+            except Exception as e:
+                logger.error(f'error prefetching {hex_hash}: {e}')
         item = cls.blocks.get(hex_hash)
         if not item:
             logger.error(f'block {hex_hash} missing on-disk')
@@ -249,11 +253,8 @@ class OnDiskBlock:
 
     @classmethod
     async def stop_prefetching(cls):
-        logger.info('prefetcher stopping...')
-        while cls.tasks:
-            for task in cls.tasks.values():
-                await task
-                break
+        for task in cls.tasks.values():
+            task.cancel()
         logger.info('prefetcher stopped')
 
 
@@ -490,7 +491,7 @@ class BlockProcessor:
                 if self.coin.header_prevhash(block.header) != self.tip:
                     self.reorg_count = -1
                 else:
-                    await self.advance_block(block)
+                    await self.run_with_lock(self.advance_block(block))
                     total_size += block.size
                     count += 1
         end = time.monotonic()
@@ -768,7 +769,7 @@ class BlockProcessor:
                         logger.info(f'caught up to daemon height {daemon_height:,d}')
 
                 if hex_hashes:
-                    await self.run_with_lock(self.advance_blocks(hex_hashes))
+                    await self.advance_blocks(hex_hashes)
                 else:
                     await self.on_caught_up()
                     caught_up_event.set()
@@ -783,8 +784,8 @@ class BlockProcessor:
         # corrupted data
         except CancelledError:
             logger.info('flushing to DB for a clean shutdown...')
-            await self.run_with_lock(self.flush(True))
             await OnDiskBlock.stop_prefetching()
+            await self.run_with_lock(self.flush(True))
             logger.info('flushed cleanly')
 
     def force_chain_reorg(self, count):
