@@ -41,6 +41,7 @@ class OnDiskBlock:
     blocks = {}
     # Map from hex hash to prefetch task
     tasks = {}
+    last_time = 0
 
     def __init__(self, hex_hash, height, size):
         self.hex_hash = hex_hash
@@ -83,8 +84,12 @@ class OnDiskBlock:
         raw = self._read(self.chunk_size)
         deserializer = Deserializer(raw)
         tx_count = deserializer._read_varint()
-        logger.info(f'advancing block height {self.height} {self.hex_hash} '
-                    f'size {self.size / 1_000_000_000:.3f}GB tx_count: {tx_count:,d}')
+
+        t = time.monotonic()
+        if t - OnDiskBlock.last_time > 1:
+            logger.info(f'advancing block height {self.height} {self.hex_hash} '
+                        f'size {self.size / 1_000_000_000:.3f}GB tx_count: {tx_count:,d}')
+        OnDiskBlock.last_time = t
 
         count = 0
         while True:
@@ -464,10 +469,6 @@ class BlockProcessor:
 
     async def advance_blocks(self, hex_hashes):
         '''Process the blocks passed.  Detects and handles reorgs.'''
-        start = time.monotonic()
-        count = 0
-        total_size = 0
-
         for hex_hash in hex_hashes:
             # Stop if we must flush
             if self.force_flush_arg is not None or self.reorg_count is not None:
@@ -476,14 +477,6 @@ class BlockProcessor:
             if not block:
                 break
             await self.run_with_lock(run_in_thread(self.advance_block, block))
-            total_size += block.size
-            count += 1
-        end = time.monotonic()
-
-        if count and not self.db.first_sync:
-            s = '' if count == 1 else 's'
-            logger.info(f'processed {count:,d} block{s} size {total_size/1_000_000:.2f} MB '
-                        f'in {end - start:.1f}s')
 
         # If we've not caught up we have no clients for the touched set
         if not self.caught_up:
