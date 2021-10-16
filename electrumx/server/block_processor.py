@@ -53,37 +53,34 @@ class OnDiskBlock:
     def filename(cls, hex_hash, height):
         return os.path.join(cls.path, f'{height:d}-{hex_hash}')
 
-    async def __aenter__(self):
+    def __enter__(self):
         self.block_file = open_file(self.filename(self.hex_hash, self.height))
         return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         self.block_file.close()
 
-    async def _read(self, size):
-        result = await run_in_thread(self.block_file.read, size)
+    def _read(self, size):
+        result = self.block_file.read(size)
         if not result:
             raise RuntimeError(f'truncated block file for block {self.hex_hash} '
                                f'height {self.height:,d}')
         return result
 
-    async def _read_at_pos(self, pos, size):
-        def read():
-            self.block_file.seek(pos, os.SEEK_SET)
-            result = self.block_file.read(size)
-            if len(result) != size:
-                raise RuntimeError(f'truncated block file for block {self.hex_hash} '
-                                   f'height {self.height:,d}')
-            return result
+    def _read_at_pos(self, pos, size):
+        self.block_file.seek(pos, os.SEEK_SET)
+        result = self.block_file.read(size)
+        if len(result) != size:
+            raise RuntimeError(f'truncated block file for block {self.hex_hash} '
+                               f'height {self.height:,d}')
+        return result
 
-        return await run_in_thread(read)
+    def read_header(self):
+        self.header = self._read(80)
 
-    async def read_header(self):
-        self.header = await self._read(80)
-
-    async def iter_txs(self):
+    def iter_txs(self):
         # Asynchronous generator of (tx, tx_hash) pairs
-        raw = await self._read(self.chunk_size)
+        raw = self._read(self.chunk_size)
         deserializer = Deserializer(raw)
         tx_count = deserializer._read_varint()
         logger.info(f'advancing block height {self.height} {self.hex_hash} '
@@ -102,14 +99,14 @@ class OnDiskBlock:
 
             if count == tx_count:
                 return
-            raw = raw[cursor:] + await self._read(self.chunk_size)
+            raw = raw[cursor:] + self._read(self.chunk_size)
             deserializer = Deserializer(raw)
 
-    async def _chunk_offsets(self):
+    def _chunk_offsets(self):
         '''Iterate the transactions forwards to find their boundaries.'''
         base_offset = self.block_file.tell()
         assert base_offset == 80
-        raw = await self._read(self.chunk_size)
+        raw = self._read(self.chunk_size)
         deserializer = Deserializer(raw)
         tx_count = deserializer._read_varint()
         logger.info(f'backing up block {self.hex_hash} height {self.height:,d} '
@@ -133,17 +130,17 @@ class OnDiskBlock:
             tx_count -= count
             if tx_count == 0:
                 return offsets
-            raw = raw[cursor:] + await self._read(self.chunk_size)
+            raw = raw[cursor:] + self._read(self.chunk_size)
             deserializer = Deserializer(raw)
 
-    async def iter_txs_reversed(self):
+    def iter_txs_reversed(self):
         # Iterate the block transactions in reverse order.  We need to iterate the
         # transactions forwards first to find their boundaries.
-        offsets = await self._chunk_offsets()
+        offsets = self._chunk_offsets()
         for n in reversed(range(len(offsets) - 1)):
             start = offsets[n]
             size = offsets[n + 1] - start
-            deserializer = Deserializer(await self._read_at_pos(start, size))
+            deserializer = Deserializer(self._read_at_pos(start, size))
             pairs = []
             while deserializer.cursor < size:
                 pairs.append(deserializer.read_tx_and_hash())
@@ -346,23 +343,14 @@ class BlockProcessor:
         pairs = reversed(list(enumerate(hex_hashes, start=start)))
         await OnDiskBlock.prefetch_many(self.daemon, pairs, 'reorg')
 
-        count = total_size = 0
         for hex_hash in reversed(hex_hashes):
+            if hex_hash != hash_to_hex_str(self.tip):
+                logger.error(f'block {hex_hash} is not tip; cannot back up')
+                return
             block = await OnDiskBlock.streamed_block(hex_hash)
             if not block:
                 break
-            async with block as block:
-                await block.read_header()
-                if hex_hash != hash_to_hex_str(self.tip):
-                    logger.error(f'block {hex_hash} is not tip; cannot back up')
-                    break
-                await self.backup_block(block)
-                total_size += block.size
-                count += 1
-
-            # self.touched can include other addresses which is harmless, but remove None.
-            self.touched.discard(None)
-            await run_in_thread(self.db.flush_backup, self.flush_data(), self.touched)
+            await self.run_with_lock(run_in_thread(self.backup_block, block))
 
         logger.info(f'backed up to height {self.height:,d}')
         self.backed_up_event.set()
@@ -486,14 +474,9 @@ class BlockProcessor:
             block = await OnDiskBlock.streamed_block(hex_hash)
             if not block:
                 break
-            async with block as block:
-                await block.read_header()
-                if self.coin.header_prevhash(block.header) != self.tip:
-                    self.reorg_count = -1
-                else:
-                    await self.run_with_lock(self.advance_block(block))
-                    total_size += block.size
-                    count += 1
+            await self.run_with_lock(run_in_thread(self.advance_block, block))
+            total_size += block.size
+            count += 1
         end = time.monotonic()
 
         if count and not self.db.first_sync:
@@ -508,10 +491,11 @@ class BlockProcessor:
         if self.force_flush_arg is not None:
             await self.flush(self.force_flush_arg)
 
-    async def advance_block(self, block):
+    def advance_block(self, block):
         '''Advance once block.  It is already verified they correctly connect onto our tip.'''
-        is_unspendable = (is_unspendable_genesis if block.height >= self.coin.GENESIS_ACTIVATION
-                          else is_unspendable_legacy)
+
+        is_unspendable = (is_unspendable_genesis if block.height >=
+                          self.coin.GENESIS_ACTIVATION else is_unspendable_legacy)
 
         # Use local vars for speed in the loops
         tx_hashes = []
@@ -528,35 +512,41 @@ class BlockProcessor:
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
 
-        async for tx, tx_hash in block.iter_txs():
-            hashXs = []
-            append_hashX = hashXs.append
-            tx_numb = to_le_uint64(tx_num)[:5]
+        with block as block:
+            block.read_header()
+            if self.coin.header_prevhash(block.header) != self.tip:
+                self.reorg_count = -1
+                return
 
-            # Spend the inputs
-            for txin in tx.inputs:
-                if txin.is_generation():
-                    continue
-                cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
-                undo_info_append(cache_value)
-                append_hashX(cache_value[:-13])
+            for tx, tx_hash in block.iter_txs():
+                hashXs = []
+                append_hashX = hashXs.append
+                tx_numb = to_le_uint64(tx_num)[:5]
 
-            # Add the new UTXOs
-            for idx, txout in enumerate(tx.outputs):
-                # Ignore unspendable outputs
-                if is_unspendable(txout.pk_script):
-                    continue
+                # Spend the inputs
+                for txin in tx.inputs:
+                    if txin.is_generation():
+                        continue
+                    cache_value = spend_utxo(txin.prev_hash, txin.prev_idx)
+                    undo_info_append(cache_value)
+                    append_hashX(cache_value[:-13])
 
-                # Get the hashX
-                hashX = script_hashX(txout.pk_script)
-                append_hashX(hashX)
-                put_utxo(tx_hash + to_le_uint32(idx),
-                         hashX + tx_numb + to_le_uint64(txout.value))
+                # Add the new UTXOs
+                for idx, txout in enumerate(tx.outputs):
+                    # Ignore unspendable outputs
+                    if is_unspendable(txout.pk_script):
+                        continue
 
-            append_hashXs(hashXs)
-            update_touched(hashXs)
-            append_tx_hash(tx_hash)
-            tx_num += 1
+                    # Get the hashX
+                    hashX = script_hashX(txout.pk_script)
+                    append_hashX(hashX)
+                    put_utxo(tx_hash + to_le_uint32(idx),
+                             hashX + tx_numb + to_le_uint64(txout.value))
+
+                append_hashXs(hashXs)
+                update_touched(hashXs)
+                append_tx_hash(tx_hash)
+                tx_num += 1
 
         self.tx_hashes.append(b''.join(tx_hashes))
         self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
@@ -571,7 +561,7 @@ class BlockProcessor:
         self.headers.append(block.header)
         self.tip = self.coin.header_hash(block.header)
 
-    async def backup_block(self, block):
+    def backup_block(self, block):
         '''Backup the streamed block.'''
         self.db.assert_flushed(self.flush_data())
         assert block.height > 0
@@ -594,31 +584,38 @@ class BlockProcessor:
         undo_entry_len = 13 + HASHX_LEN
 
         count = 0
-        async for tx, tx_hash in block.iter_txs_reversed():
-            for idx, txout in enumerate(tx.outputs):
-                # Spend the TX outputs.  Be careful with unspendable
-                # outputs - we didn't save those in the first place.
-                if is_unspendable(txout.pk_script):
-                    continue
 
-                cache_value = spend_utxo(tx_hash, idx)
-                touched_add(cache_value[:-13])
+        with block as block:
+            block.read_header()
+            for tx, tx_hash in block.iter_txs_reversed():
+                for idx, txout in enumerate(tx.outputs):
+                    # Spend the TX outputs.  Be careful with unspendable
+                    # outputs - we didn't save those in the first place.
+                    if is_unspendable(txout.pk_script):
+                        continue
 
-            # Restore the inputs
-            for txin in reversed(tx.inputs):
-                if txin.is_generation():
-                    continue
-                n -= undo_entry_len
-                undo_item = undo_info[n:n + undo_entry_len]
-                put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
-                touched_add(undo_item[:-13])
-            count += 1
+                    cache_value = spend_utxo(tx_hash, idx)
+                    touched_add(cache_value[:-13])
+
+                # Restore the inputs
+                for txin in reversed(tx.inputs):
+                    if txin.is_generation():
+                        continue
+                    n -= undo_entry_len
+                    undo_item = undo_info[n:n + undo_entry_len]
+                    put_utxo(txin.prev_hash + pack_le_uint32(txin.prev_idx), undo_item)
+                    touched_add(undo_item[:-13])
+                count += 1
 
         assert n == 0
         self.tx_count -= count
         self.tip = self.coin.header_prevhash(block.header)
         self.height -= 1
         self.db.tx_counts.pop()
+
+        # self.touched can include other addresses which is harmless, but remove None.
+        self.touched.discard(None)
+        self.db.flush_backup(self.flush_data(), self.touched)
 
     '''An in-memory UTXO cache, representing all changes to UTXO state
     since the last DB flush.
@@ -776,7 +773,7 @@ class BlockProcessor:
                     await sleep(self.polling_delay)
 
                 if self.reorg_count is not None:
-                    await self.run_with_lock(self.reorg_chain(self.reorg_count))
+                    await self.reorg_chain(self.reorg_count)
                     self.reorg_count = None
                     show_summary = True
 
