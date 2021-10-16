@@ -275,6 +275,7 @@ class BlockProcessor:
         self.coin = env.coin
 
         self.caught_up = False
+        self.ok = False
         self.touched = set()
         # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
@@ -512,6 +513,7 @@ class BlockProcessor:
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
 
+        self.ok = False
         with block as block:
             block.read_header()
             if self.coin.header_prevhash(block.header) != self.tip:
@@ -560,6 +562,7 @@ class BlockProcessor:
         self.height = block.height
         self.headers.append(block.header)
         self.tip = self.coin.header_hash(block.header)
+        self.ok = True
 
     def backup_block(self, block):
         '''Backup the streamed block.'''
@@ -780,10 +783,16 @@ class BlockProcessor:
         # Don't flush for arbitrary exceptions as they might be a cause or consequence of
         # corrupted data
         except CancelledError:
-            logger.info('flushing to DB for a clean shutdown...')
             await OnDiskBlock.stop_prefetching()
-            await self.run_with_lock(self.flush(True))
+            await self.run_with_lock(self.flush_if_safe())
+
+    async def flush_if_safe(self):
+        if self.ok:
+            logger.info('flushing to DB for a clean shutdown...')
+            await self.flush(True)
             logger.info('flushed cleanly')
+        else:
+            logger.warning('not flushing to DB as data in memory is incomplete')
 
     def force_chain_reorg(self, count):
         '''Force a reorg of the given number of blocks.  Returns True if a reorg is queued.
