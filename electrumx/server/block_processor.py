@@ -42,7 +42,8 @@ class OnDiskBlock:
     blocks = {}
     # Map from hex hash to prefetch task
     tasks = {}
-    last_time = 0
+    # If set it logs the next time a block is processed
+    daemon_height = None
 
     def __init__(self, hex_hash, height, size):
         self.hex_hash = hex_hash
@@ -57,6 +58,7 @@ class OnDiskBlock:
 
     def __enter__(self):
         self.block_file = open_file(self.filename(self.hex_hash, self.height))
+        self.header = self._read(80)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -77,9 +79,6 @@ class OnDiskBlock:
                                f'height {self.height:,d}')
         return result
 
-    def read_header(self):
-        self.header = self._read(80)
-
     def date_str(self):
         timestamp, = unpack_le_uint32(self.header[68:72])
         return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
@@ -90,12 +89,10 @@ class OnDiskBlock:
         deserializer = Deserializer(raw)
         tx_count = deserializer._read_varint()
 
-        t = time.monotonic()
-        if t - OnDiskBlock.last_time > 1:
-            logger.info(f'processing block height {self.height:,d} {self.date_str()} '
-                        f'{self.hex_hash} size {self.size / 1_000_000_000:.3f} GB '
-                        f'tx_count: {tx_count:,d}')
-        OnDiskBlock.last_time = t
+        if self.daemon_height:
+            logger.info(f'height {self.height:,d} of {self.daemon_height:,d} {self.hex_hash} '
+                        f'{self.date_str()} {self.size / 1_000_000_000:.3f}GB {tx_count:,d} txs ')
+            OnDiskBlock.daemon_height = None
 
         count = 0
         while True:
@@ -445,7 +442,6 @@ class BlockProcessor:
         '''Signal to flush caches if they get too big.'''
         one_MB = 1000*1000
         cache_MB = self.env.cache_MB
-        log_next = False
         while True:
             # Good average estimates based on traversal of subobjects and
             # requesting size from Python (see deep_getsizeof).
@@ -458,14 +454,9 @@ class BlockProcessor:
             utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
             hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
-            if not hist_MB:
-                log_next = False
-            elif log_next:
-                logger.info(f'our height: {self.height:,d} '
-                            f'daemon: {self.daemon.cached_height():,d} '
-                            f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
-            else:
-                log_next = True
+            OnDiskBlock.daemon_height = await self.daemon.height()
+            if hist_MB:
+                logger.info(f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
 
             # Flush history if it takes up over 20% of cache memory.
             # Flush UTXOs once they take up 80% of cache memory.
@@ -514,7 +505,6 @@ class BlockProcessor:
 
         self.ok = False
         with block as block:
-            block.read_header()
             if self.coin.header_prevhash(block.header) != self.tip:
                 self.reorg_count = -1
                 return
@@ -588,7 +578,6 @@ class BlockProcessor:
         count = 0
 
         with block as block:
-            block.read_header()
             for tx, tx_hash in block.iter_txs_reversed():
                 for idx, txout in enumerate(tx.outputs):
                     # Spend the TX outputs.  Be careful with unspendable
