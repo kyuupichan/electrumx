@@ -14,6 +14,7 @@ import os
 import re
 import time
 from asyncio import sleep
+from datetime import datetime
 from struct import error as struct_error
 
 from aiorpcx import CancelledError, run_in_thread, spawn, timeout_after
@@ -23,7 +24,7 @@ from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
 from electrumx.lib.tx import Deserializer
 from electrumx.lib.util import (
-    class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64, open_file,
+    class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64, open_file, unpack_le_uint32,
 )
 from electrumx.server.db import FlushData
 
@@ -79,6 +80,10 @@ class OnDiskBlock:
     def read_header(self):
         self.header = self._read(80)
 
+    def date_str(self):
+        timestamp, = unpack_le_uint32(self.header[68:72])
+        return datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
     def iter_txs(self):
         # Asynchronous generator of (tx, tx_hash) pairs
         raw = self._read(self.chunk_size)
@@ -87,8 +92,9 @@ class OnDiskBlock:
 
         t = time.monotonic()
         if t - OnDiskBlock.last_time > 1:
-            logger.info(f'advancing block height {self.height} {self.hex_hash} '
-                        f'size {self.size / 1_000_000_000:.3f}GB tx_count: {tx_count:,d}')
+            logger.info(f'processing block height {self.height:,d} {self.date_str()} '
+                        f'{self.hex_hash} size {self.size / 1_000_000_000:.3f} GB '
+                        f'tx_count: {tx_count:,d}')
         OnDiskBlock.last_time = t
 
         count = 0
