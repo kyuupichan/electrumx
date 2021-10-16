@@ -521,14 +521,6 @@ class SessionManager:
             except Base58Error:
                 pass
 
-            try:
-                script = coin.build_name_index_script(arg.encode("ascii"))
-                hashX = coin.name_hashX_from_script(script)
-                lines.append(f'Name: {arg}')
-                return hashX
-            except (AttributeError, UnicodeEncodeError):
-                pass
-
             return None
 
         for arg in items:

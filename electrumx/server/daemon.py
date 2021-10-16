@@ -226,10 +226,6 @@ class Daemon(object):
         params_iterable = ((h, ) for h in range(first, first + count))
         return await self._send_vector('getblockhash', params_iterable)
 
-    async def deserialised_block(self, hex_hash):
-        '''Return the deserialised block with the given hex hash.'''
-        return await self._send_single('getblock', (hex_hash, True))
-
     async def get_block(self, hex_hash, filename):
         rest_url = f'rest/block/{hex_hash}.bin'
         return await self._send(self._get_to_file, rest_url, filename)

@@ -242,14 +242,6 @@ async def test_mempool_hashes(daemon):
 
 
 @pytest.mark.asyncio
-async def test_deserialised_block(daemon):
-    block_hash = 'block_hash'
-    result = {'some': 'mess'}
-    daemon.session = ClientSessionGood(('getblock', [block_hash, True], result))
-    assert await daemon.deserialised_block(block_hash) == result
-
-
-@pytest.mark.asyncio
 async def test_getrawtransaction(daemon):
     hex_hash = 'deadbeef'
     simple = 'tx_in_hex'
