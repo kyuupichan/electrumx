@@ -12,6 +12,7 @@
 import asyncio
 import os
 import re
+import time
 from asyncio import sleep
 from datetime import datetime
 from struct import error as struct_error
@@ -287,6 +288,7 @@ class BlockProcessor:
         # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
         self.force_flush_arg = None
+        self.last_hashes = 0
 
         # State.  Initially taken from DB;
         self.state = None
@@ -317,10 +319,15 @@ class BlockProcessor:
                 return await coro
         return await asyncio.shield(run_locked())
 
-    async def next_block_hashes(self, count=30):
+    async def next_block_hashes(self):
+        # Return between 3 and 80 block hashes depending on speed
+        t = time.monotonic()
+        count = max(80 - int(t - self.last_hashes), 3)
+        self.last_hashes = t
+
         daemon_height = await self.daemon.height()
 
-        # Fetch remaining block hashes to a limit
+        # Prefetch double that to the end of chain
         first = self.state.height + 1
         n = min(daemon_height - first + 1, count * 2)
         if n:
@@ -733,7 +740,7 @@ class BlockProcessor:
         disk before exiting, as otherwise a significant amount of work
         could be lost.
         '''
-        self.state = OnDiskBlock.state = await self.db.open_for_sync().copy()
+        self.state = OnDiskBlock.state = (await self.db.open_for_sync()).copy()
         await OnDiskBlock.scan_files()
 
         try:
