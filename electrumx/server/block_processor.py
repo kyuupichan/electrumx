@@ -464,21 +464,22 @@ class BlockProcessor:
 
     async def advance_blocks(self, hex_hashes):
         '''Process the blocks passed.  Detects and handles reorgs.'''
+        async def advance_and_maybe_flush(block):
+            await run_in_thread(self.advance_block, block)
+            if self.force_flush_arg is not None:
+                await self.flush(self.force_flush_arg)
+
         for hex_hash in hex_hashes:
-            # Stop if we must flush
-            if self.force_flush_arg is not None or self.reorg_count is not None:
+            if self.reorg_count is not None:
                 break
             block = await OnDiskBlock.streamed_block(hex_hash)
             if not block:
                 break
-            await self.run_with_lock(run_in_thread(self.advance_block, block))
+            await self.run_with_lock(advance_and_maybe_flush(block))
 
         # If we've not caught up we have no clients for the touched set
         if not self.caught_up:
             self.touched = set()
-
-        if self.force_flush_arg is not None:
-            await self.flush(self.force_flush_arg)
 
     def advance_block(self, block):
         '''Advance once block.  It is already verified they correctly connect onto our tip.'''
