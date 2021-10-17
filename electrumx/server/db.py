@@ -198,13 +198,13 @@ class DB:
             return
 
         start_time = time.time()
-        flush_data.state.flush_count = self.history.flush_count
 
         # Flush to file system
         self.flush_fs(flush_data)
 
         # Then history
         self.flush_history()
+        flush_data.state.flush_count = self.history.flush_count
 
         # Flush state last as it reads the wall time.
         if flush_utxos:
