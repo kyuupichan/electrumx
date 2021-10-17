@@ -43,7 +43,7 @@ class OnDiskBlock:
     tasks = {}
     # If set it logs the next time a block is processed
     daemon_height = None
-    chain_size = 0
+    state = None
 
     def __init__(self, hex_hash, height, size):
         self.hex_hash = hex_hash
@@ -92,7 +92,7 @@ class OnDiskBlock:
         if self.daemon_height:
             logger.info(f'height {self.height:,d} of {self.daemon_height:,d} {self.hex_hash} '
                         f'{self.date_str()} {self.size / 1_000_000_000:.3f}GB {tx_count:,d} txs '
-                        f'chain {self.chain_size // 1_000_000_000:,d}GB')
+                        f'chain {self.state.chain_size // 1_000_000_000:,d}GB')
             OnDiskBlock.daemon_height = None
 
         count = 0
@@ -286,11 +286,10 @@ class BlockProcessor:
         self.touched = set()
         # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
-        self.height = -1
-        self.tip = None
-        self.tx_count = 0
-        self.chain_size = 0
         self.force_flush_arg = None
+
+        # State.  Initially taken from DB;
+        self.state = None
 
         # Caches of unflushed items.
         self.headers = []
@@ -304,7 +303,7 @@ class BlockProcessor:
         # Signalled after backing up during a reorg to flush session manager caches
         self.backed_up_event = asyncio.Event()
 
-        # When the lock is acquired, in-memory chain state is consistent with self.height.
+        # When the lock is acquired, in-memory chain state is consistent with state.height.
         # This is a requirement for safe flushing.
         self.state_lock = asyncio.Lock()
 
@@ -322,7 +321,7 @@ class BlockProcessor:
         daemon_height = await self.daemon.height()
 
         # Fetch remaining block hashes to a limit
-        first = self.height + 1
+        first = self.state.height + 1
         n = min(daemon_height - first + 1, count * 2)
         if n:
             hex_hashes = await self.daemon.block_hex_hashes(first, n)
@@ -353,7 +352,7 @@ class BlockProcessor:
         await OnDiskBlock.prefetch_many(self.daemon, pairs, 'reorg')
 
         for hex_hash in reversed(hex_hashes):
-            if hex_hash != hash_to_hex_str(self.tip):
+            if hex_hash != hash_to_hex_str(self.state.tip):
                 logger.error(f'block {hex_hash} is not tip; cannot back up')
                 return
             block = await OnDiskBlock.streamed_block(hex_hash)
@@ -361,7 +360,7 @@ class BlockProcessor:
                 break
             await self.run_with_lock(run_in_thread(self.backup_block, block))
 
-        logger.info(f'backed up to height {self.height:,d}')
+        logger.info(f'backed up to height {self.state.height:,d}')
         self.backed_up_event.set()
         self.backed_up_event.clear()
 
@@ -395,9 +394,10 @@ class BlockProcessor:
                     return n
             return len(hashes)
 
+        height = self.state.height
         if count < 0:
             # A real reorg
-            start = self.height - 1
+            start = height - 1
             count = 1
             while start > 0:
                 hashes = await self.db.fs_block_hashes(start, count)
@@ -410,27 +410,25 @@ class BlockProcessor:
                 count = min(count * 2, start)
                 start -= count
 
-            count = (self.height - start) + 1
+            count = (height - start) + 1
         else:
-            start = (self.height - count) + 1
+            start = (height - count) + 1
 
         return start, count
 
     # - Flushing
     def flush_data(self):
         '''The data for a flush.'''
-        return FlushData(self.height, self.tx_count, self.chain_size, self.headers,
-                         self.tx_hashes, self.undo_infos, self.utxo_cache,
-                         self.db_deletes, self.tip)
+        return FlushData(self.state, self.headers, self.tx_hashes, self.undo_infos,
+                         self.utxo_cache, self.db_deletes)
 
     async def flush(self, flush_utxos):
         self.force_flush_arg = None
         # Estimate size remaining
         daemon_height = self.daemon.cached_height()
-        tail_size = ((daemon_height - max(self.height, self.coin.CHAIN_SIZE_HEIGHT))
+        tail_size = ((daemon_height - max(self.state.height, self.coin.CHAIN_SIZE_HEIGHT))
                      * self.coin.AVG_BLOCK_SIZE)
-        size_remaining = max(self.coin.CHAIN_SIZE - self.chain_size, 0) + tail_size
-        logger.info(f'SIZES: {tail_size} {size_remaining}')
+        size_remaining = max(self.coin.CHAIN_SIZE - self.state.chain_size, 0) + tail_size
         await run_in_thread(self.db.flush_dbs, self.flush_data(), flush_utxos, size_remaining)
 
     async def check_cache_size_loop(self):
@@ -444,13 +442,12 @@ class BlockProcessor:
             db_deletes_size = len(self.db_deletes) * 57
             hist_cache_size = self.db.history.unflushed_memsize()
             # Roughly ntxs * 32 + nblocks * 42
-            tx_hash_size = ((self.tx_count - self.db.fs_tx_count) * 32
-                            + (self.height - self.db.fs_height) * 42)
+            tx_hash_size = ((self.state.tx_count - self.db.fs_tx_count) * 32
+                            + (self.state.height - self.db.fs_height) * 42)
             utxo_MB = (db_deletes_size + utxo_cache_size) // one_MB
             hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
             OnDiskBlock.daemon_height = await self.daemon.height()
-            OnDiskBlock.chain_size = self.chain_size
             if hist_MB:
                 logger.info(f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
 
@@ -486,9 +483,10 @@ class BlockProcessor:
                           self.coin.GENESIS_ACTIVATION else is_unspendable_legacy)
 
         # Use local vars for speed in the loops
+        state = self.state
         tx_hashes = []
         undo_info = []
-        tx_num = self.tx_count
+        tx_num = state.tx_count
         script_hashX = self.coin.hashX_from_script
         put_utxo = self.utxo_cache.__setitem__
         spend_utxo = self.spend_utxo
@@ -502,7 +500,7 @@ class BlockProcessor:
 
         self.ok = False
         with block as block:
-            if self.coin.header_prevhash(block.header) != self.tip:
+            if self.coin.header_prevhash(block.header) != self.state.tip:
                 self.reorg_count = -1
                 return
 
@@ -536,19 +534,19 @@ class BlockProcessor:
                 append_tx_hash(tx_hash)
                 tx_num += 1
 
+        # Do this first - it uses the prior state
         self.tx_hashes.append(b''.join(tx_hashes))
-        self.db.history.add_unflushed(hashXs_by_tx, self.tx_count)
-
-        self.tx_count = tx_num
+        self.db.history.add_unflushed(hashXs_by_tx, state.tx_count)
         self.db.tx_counts.append(tx_num)
-
         if block.height >= self.db.min_undo_height(self.daemon.cached_height()):
             self.undo_infos.append((undo_info, block.height))
-
-        self.height = block.height
         self.headers.append(block.header)
-        self.tip = self.coin.header_hash(block.header)
-        self.chain_size += block.size
+
+        # Update state
+        state.height = block.height
+        state.tip = self.coin.header_hash(block.header)
+        state.chain_size += block.size
+        state.tx_count = tx_num
         self.ok = True
 
     def backup_block(self, block):
@@ -557,7 +555,7 @@ class BlockProcessor:
         assert block.height > 0
         genesis_activation = self.coin.GENESIS_ACTIVATION
 
-        is_unspendable = (is_unspendable_genesis if self.height >= genesis_activation
+        is_unspendable = (is_unspendable_genesis if block.height >= genesis_activation
                           else is_unspendable_legacy)
 
         # Prevout values, in order down the block (coinbase first if present)
@@ -574,7 +572,6 @@ class BlockProcessor:
         undo_entry_len = 13 + HASHX_LEN
 
         count = 0
-
         with block as block:
             for tx, tx_hash in block.iter_txs_reversed():
                 for idx, txout in enumerate(tx.outputs):
@@ -597,12 +594,15 @@ class BlockProcessor:
                 count += 1
 
         assert n == 0
-        self.tx_count -= count
-        self.chain_size -= block.size
-        self.tip = self.coin.header_prevhash(block.header)
-        self.height -= 1
-        self.db.tx_counts.pop()
 
+        # Update state
+        state = self.state
+        state.height -= 1
+        state.tip = self.coin.header_prevhash(block.header)
+        state.chain_size -= block.size
+        state.tx_count -= count
+
+        self.db.tx_counts.pop()
         # self.touched can include other addresses which is harmless, but remove None.
         self.touched.discard(None)
         self.db.flush_backup(self.flush_data(), self.touched)
@@ -705,26 +705,19 @@ class BlockProcessor:
         raise ChainError(f'UTXO {hash_to_hex_str(tx_hash)} / {tx_idx:,d} not found in "h" table')
 
     async def on_caught_up(self):
-        is_first_sync = self.db.first_sync
-        self.db.first_sync = False
+        was_first_sync = self.state.first_sync
+        self.state.first_sync = False
         await self.flush(True)
         if self.caught_up:
             # Flush everything before notifying as client queries are performed on the DB
-            await self.notifications.on_block(self.touched, self.height)
+            await self.notifications.on_block(self.touched, self.state.height)
             self.touched = set()
         else:
             self.caught_up = True
-            if is_first_sync:
-                logger.info(f'{electrumx.version} synced to height {self.height:,d}')
+            if was_first_sync:
+                logger.info(f'{electrumx.version} synced to height {self.state.height:,d}')
             # Reopen for serving
             await self.db.open_for_serving()
-
-    async def _first_open_dbs(self):
-        await self.db.open_for_sync()
-        self.height = self.db.db_height
-        self.tip = self.db.db_tip
-        self.tx_count = self.db.db_tx_count
-        self.chain_size = self.db.db_chain_size
 
     # --- External API
 
@@ -740,7 +733,7 @@ class BlockProcessor:
         disk before exiting, as otherwise a significant amount of work
         could be lost.
         '''
-        await self._first_open_dbs()
+        self.state = OnDiskBlock.state = await self.db.open_for_sync().copy()
         await OnDiskBlock.scan_files()
 
         try:
@@ -749,7 +742,7 @@ class BlockProcessor:
                 hex_hashes, daemon_height = await self.next_block_hashes()
                 if show_summary:
                     show_summary = False
-                    behind = daemon_height - self.height
+                    behind = daemon_height - self.state.height
                     if behind > 0:
                         logger.info(f'catching up to daemon height {daemon_height:,d} '
                                     f'({behind:,d} blocks behind)')

@@ -107,7 +107,7 @@ class Controller(ServerBase):
 
             # Set notifications up to implement the MemPoolAPI
             def get_db_height():
-                return db.db_height
+                return db.state.height
             notifications.height = daemon.height
             notifications.db_height = get_db_height
             notifications.cached_height = daemon.cached_height
