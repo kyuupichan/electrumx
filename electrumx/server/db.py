@@ -37,6 +37,7 @@ UTXO = namedtuple("UTXO", "tx_num tx_pos tx_hash height value")
 class FlushData(object):
     height = attr.ib()
     tx_count = attr.ib()
+    chain_size = attr.ib()
     headers = attr.ib()
     block_tx_hashes = attr.ib()
     # The following are flushed to the UTXO DB if undo_infos is not None
@@ -74,6 +75,7 @@ class DB:
         self.fs_tx_count = 0
         self.db_height = -1
         self.db_tx_count = 0
+        self.db_chain_size = 0
         self.db_tip = None
         self.tx_counts = None
         self.last_flush = time.time()
@@ -180,7 +182,7 @@ class DB:
         assert not flush_data.undo_infos
         self.history.assert_flushed()
 
-    def flush_dbs(self, flush_data, flush_utxos, estimate_txs_remaining):
+    def flush_dbs(self, flush_data, flush_utxos, size_remaining):
         '''Flush out cached state.  History is always flushed; UTXOs are
         flushed if flush_utxos.'''
         if flush_data.height == self.db_height:
@@ -190,6 +192,8 @@ class DB:
         start_time = time.time()
         prior_flush = self.last_flush
         tx_delta = flush_data.tx_count - self.last_flush_tx_count
+        size_delta = flush_data.chain_size - self.db_chain_size
+        self.db_chain_size = flush_data.chain_size
 
         # Flush to file system
         self.flush_fs(flush_data)
@@ -210,16 +214,18 @@ class DB:
         elapsed = self.last_flush - start_time
         self.logger.info(f'flush #{self.history.flush_count:,d} took '
                          f'{elapsed:.1f}s.  Height {flush_data.height:,d} '
-                         f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d})')
+                         f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d}) '
+                         f'size: {flush_data.chain_size:,d} ({size_delta:+,d})')
 
         # Catch-up stats
         if self.utxo_db.for_sync:
             flush_interval = self.last_flush - prior_flush
-            tx_per_sec_gen = int(flush_data.tx_count / self.wall_time)
-            tx_per_sec_last = 1 + int(tx_delta / flush_interval)
-            eta = estimate_txs_remaining() / tx_per_sec_last
-            self.logger.info(f'tx/sec since genesis: {tx_per_sec_gen:,d}, '
-                             f'since last flush: {tx_per_sec_last:,d}')
+
+            size_per_sec_gen = flush_data.chain_size / self.wall_time
+            size_per_sec_last = size_delta / (flush_interval + 0.01)
+            eta = size_remaining / (size_per_sec_last + 0.01) * 1.1
+            self.logger.info(f'MB/sec since genesis: {size_per_sec_gen / 1_000_000:.2f}, '
+                             f'since last flush: {size_per_sec_last / 1_000_000:.2f}')
             self.logger.info(f'sync time: {formatted_time(self.wall_time)}  '
                              f'ETA: {formatted_time(eta)}')
 
@@ -325,6 +331,8 @@ class DB:
 
         start_time = time.time()
         tx_delta = flush_data.tx_count - self.last_flush_tx_count
+        size_delta = flush_data.chain_size - self.db_chain_size
+        self.db_chain_size = flush_data.chain_size
 
         self.backup_fs(flush_data.height, flush_data.tx_count)
         self.history.backup(touched, flush_data.tx_count)
@@ -336,7 +344,8 @@ class DB:
         elapsed = self.last_flush - start_time
         self.logger.info(f'backup flush #{self.history.flush_count:,d} took '
                          f'{elapsed:.1f}s.  Height {flush_data.height:,d} '
-                         f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d})')
+                         f'txs: {flush_data.tx_count:,d} ({tx_delta:+,d}) '
+                         f'size: {flush_data.chain_size:,d} ({size_delta:+,d})')
 
     def backup_fs(self, height, tx_count):
         '''Back up during a reorg.  This just updates our pointers.'''
@@ -409,8 +418,8 @@ class DB:
     async def fs_block_hashes(self, height, count):
         headers_concat, headers_count = await self.read_headers(height, count)
         if headers_count != count:
-            raise self.DBError('only got {:,d} headers starting at {:,d}, not '
-                               '{:,d}'.format(headers_count, height, count))
+            raise self.DBError(f'only got {headers_count:,d} headers starting at {height:,d}, '
+                               f'not {count:,d}')
         offset = 0
         hlen = 80
         headers = []
@@ -482,6 +491,7 @@ class DB:
         if not state:
             self.db_height = -1
             self.db_tx_count = 0
+            self.db_chain_size = 0
             self.db_tip = b'\0' * 32
             self.db_version = max(self.DB_VERSIONS)
             self.utxo_flush_count = 0
@@ -493,19 +503,18 @@ class DB:
                 raise self.DBError('failed reading state from DB')
             self.db_version = state['db_version']
             if self.db_version not in self.DB_VERSIONS:
-                raise self.DBError('your UTXO DB version is {} but this '
-                                   'software only handles versions {}'
-                                   .format(self.db_version, self.DB_VERSIONS))
+                raise self.DBError(f'your UTXO DB version is {self.db_version} but this '
+                                   f'software only handles versions {self.DB_VERSIONS}')
             # backwards compat
             genesis_hash = state['genesis']
             if isinstance(genesis_hash, bytes):
                 genesis_hash = genesis_hash.decode()
             if genesis_hash != self.coin.GENESIS_HASH:
-                raise self.DBError('DB genesis hash {} does not match coin {}'
-                                   .format(genesis_hash,
-                                           self.coin.GENESIS_HASH))
+                raise self.DBError(f'DB genesis hash {genesis_hash} does not match '
+                                   f'coin {self.coin.GENESIS_HASH}')
             self.db_height = state['height']
             self.db_tx_count = state['tx_count']
+            self.db_chain_size = state.get('chain_size', 0)
             self.db_tip = state['tip']
             self.utxo_flush_count = state['utxo_flush_count']
             self.wall_time = state['wall_time']
@@ -517,20 +526,21 @@ class DB:
         self.last_flush_tx_count = self.fs_tx_count
 
         # Log some stats
-        self.logger.info('UTXO DB version: {:d}'.format(self.db_version))
+        self.logger.info(f'UTXO DB version: {self.db_version:d}')
         if self.db_version != max(self.DB_VERSIONS):
             raise self.DBError('unrecognised UTXO DB version')
 
-        self.logger.info('coin: {}'.format(self.coin.NAME))
-        self.logger.info('network: {}'.format(self.coin.NET))
-        self.logger.info('height: {:,d}'.format(self.db_height))
-        self.logger.info('tip: {}'.format(hash_to_hex_str(self.db_tip)))
-        self.logger.info('tx count: {:,d}'.format(self.db_tx_count))
+        self.logger.info(f'coin: {self.coin.NAME}')
+        self.logger.info(f'network: {self.coin.NET}')
+        self.logger.info(f'height: {self.db_height:,d}')
+        self.logger.info(f'tip: {hash_to_hex_str(self.db_tip)}')
+        self.logger.info(f'tx count: {self.db_tx_count:,d}')
+        self.logger.info(f'chain size: {self.db_chain_size // 1_000_000_000} GB '
+                         f'({self.db_chain_size:,d} bytes)')
         if self.utxo_db.for_sync:
             self.logger.info(f'flushing DB cache at {self.env.cache_MB:,d} MB')
         if self.first_sync:
-            self.logger.info('sync time so far: {}'
-                             .format(util.formatted_time(self.wall_time)))
+            self.logger.info(f'sync time so far: {util.formatted_time(self.wall_time)}')
 
     def write_utxo_state(self, batch):
         '''Write (UTXO) state to the batch.'''
@@ -538,6 +548,7 @@ class DB:
             'genesis': self.coin.GENESIS_HASH,
             'height': self.db_height,
             'tx_count': self.db_tx_count,
+            'chain_size': self.db_chain_size,
             'tip': self.db_tip,
             'utxo_flush_count': self.utxo_flush_count,
             'wall_time': self.wall_time,

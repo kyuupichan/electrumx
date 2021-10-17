@@ -12,7 +12,6 @@
 import asyncio
 import os
 import re
-import time
 from asyncio import sleep
 from datetime import datetime
 from struct import error as struct_error
@@ -44,6 +43,7 @@ class OnDiskBlock:
     tasks = {}
     # If set it logs the next time a block is processed
     daemon_height = None
+    chain_size = 0
 
     def __init__(self, hex_hash, height, size):
         self.hex_hash = hex_hash
@@ -91,7 +91,8 @@ class OnDiskBlock:
 
         if self.daemon_height:
             logger.info(f'height {self.height:,d} of {self.daemon_height:,d} {self.hex_hash} '
-                        f'{self.date_str()} {self.size / 1_000_000_000:.3f}GB {tx_count:,d} txs ')
+                        f'{self.date_str()} {self.size / 1_000_000_000:.3f}GB {tx_count:,d} txs '
+                        f'chain {self.chain_size // 1_000_000_000:,d}GB')
             OnDiskBlock.daemon_height = None
 
         count = 0
@@ -288,6 +289,7 @@ class BlockProcessor:
         self.height = -1
         self.tip = None
         self.tx_count = 0
+        self.chain_size = 0
         self.force_flush_arg = None
 
         # Caches of unflushed items.
@@ -414,27 +416,22 @@ class BlockProcessor:
 
         return start, count
 
-    def estimate_txs_remaining(self):
-        # Try to estimate how many txs there are to go
-        daemon_height = self.daemon.cached_height()
-        coin = self.coin
-        tail_count = daemon_height - max(self.height, coin.TX_COUNT_HEIGHT)
-        # Damp the initial enthusiasm
-        realism = max(2.0 - 0.9 * self.height / coin.TX_COUNT_HEIGHT, 1.0)
-        return (tail_count * coin.TX_PER_BLOCK +
-                max(coin.TX_COUNT - self.tx_count, 0)) * realism
-
     # - Flushing
     def flush_data(self):
         '''The data for a flush.'''
-        return FlushData(self.height, self.tx_count, self.headers,
+        return FlushData(self.height, self.tx_count, self.chain_size, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip)
 
     async def flush(self, flush_utxos):
         self.force_flush_arg = None
-        await run_in_thread(self.db.flush_dbs, self.flush_data(), flush_utxos,
-                            self.estimate_txs_remaining)
+        # Estimate size remaining
+        daemon_height = self.daemon.cached_height()
+        tail_size = ((daemon_height - max(self.height, self.coin.CHAIN_SIZE_HEIGHT))
+                     * self.coin.AVG_BLOCK_SIZE)
+        size_remaining = max(self.coin.CHAIN_SIZE - self.chain_size, 0) + tail_size
+        logger.info(f'SIZES: {tail_size} {size_remaining}')
+        await run_in_thread(self.db.flush_dbs, self.flush_data(), flush_utxos, size_remaining)
 
     async def check_cache_size_loop(self):
         '''Signal to flush caches if they get too big.'''
@@ -453,6 +450,7 @@ class BlockProcessor:
             hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
             OnDiskBlock.daemon_height = await self.daemon.height()
+            OnDiskBlock.chain_size = self.chain_size
             if hist_MB:
                 logger.info(f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
 
@@ -550,6 +548,7 @@ class BlockProcessor:
         self.height = block.height
         self.headers.append(block.header)
         self.tip = self.coin.header_hash(block.header)
+        self.chain_size += block.size
         self.ok = True
 
     def backup_block(self, block):
@@ -599,6 +598,7 @@ class BlockProcessor:
 
         assert n == 0
         self.tx_count -= count
+        self.chain_size -= block.size
         self.tip = self.coin.header_prevhash(block.header)
         self.height -= 1
         self.db.tx_counts.pop()
@@ -724,6 +724,7 @@ class BlockProcessor:
         self.height = self.db.db_height
         self.tip = self.db.db_tip
         self.tx_count = self.db.db_tx_count
+        self.chain_size = self.db.db_chain_size
 
     # --- External API
 

@@ -75,7 +75,7 @@ class Coin:
         '''Return a coin class given name and network.
 
         Raise an exception if unrecognised.'''
-        req_attrs = ['TX_COUNT', 'TX_COUNT_HEIGHT', 'TX_PER_BLOCK']
+        req_attrs = ['CHAIN_SIZE', 'CHAIN_SIZE_HEIGHT', 'AVG_BLOCK_SIZE']
         for coin in util.subclasses(Coin):
             if (coin.NAME.lower() == name.lower() and
                     coin.NET.lower() == net.lower()):
@@ -101,12 +101,6 @@ class Coin:
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'http://' + url
         return url + '/'
-
-    @classmethod
-    def max_fetch_blocks(cls, height):
-        if height < 130000:
-            return 1000
-        return 100
 
     @classmethod
     def genesis_block(cls, block):
@@ -183,9 +177,9 @@ class Coin:
 
 class BitcoinSV(Coin):
     NAME = "BitcoinSV"
-    TX_COUNT = 715_888_864
-    TX_COUNT_HEIGHT = 708_908
-    TX_PER_BLOCK = 1_500
+    CHAIN_SIZE = 1_584_880_000_000
+    CHAIN_SIZE_HEIGHT = 709_461
+    AVG_BLOCK_SIZE = 150_000_000
     PEERS = [
         'electrumx.bitcoinsv.io s',
         'satoshi.vision.cash s',
@@ -205,9 +199,10 @@ class BitcoinTestnetMixin:
     GENESIS_HASH = ('000000000933ea01ad0ee984209779ba'
                     'aec3ced90fa3f408719526f8d77f4943')
     REORG_LIMIT = 8000
-    TX_COUNT = 29_511_748
-    TX_COUNT_HEIGHT = 1_453_945
-    TX_PER_BLOCK = 10
+    CHAIN_SIZE = 20_000_000_000
+    CHAIN_SIZE_HEIGHT = 1_454_000
+    AVG_BLOCK_SIZE = 10_000
+
     RPC_PORT = 18332
     PEER_DEFAULT_PORTS = {'t': '51001', 's': '51002'}
 
@@ -226,16 +221,10 @@ class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     PEERS = [
         'stn-server.electrumsv.io t51001 s51002',
     ]
-    TX_COUNT = 2015
-    TX_COUNT_HEIGHT = 5711
-    TX_PER_BLOCK = 5000
+    CHAIN_SIZE = 20_000
+    CHAIN_SIZE_HEIGHT = 100
+    AVG_BLOCK_SIZE = 2_000_000_000
     GENESIS_ACTIVATION = 14_896
-
-    @classmethod
-    def max_fetch_blocks(cls, height):
-        if height <= 10:
-            return 100
-        return 3
 
 
 class BitcoinSVRegtest(BitcoinSVTestnet):
@@ -243,8 +232,9 @@ class BitcoinSVRegtest(BitcoinSVTestnet):
     GENESIS_HASH = ('0f9188f13cb7b2c71f2a335e3a4fc328'
                     'bf5beb436012afca590b1a11466e2206')
     PEERS = []
-    TX_COUNT = 1
-    TX_COUNT_HEIGHT = 1
+    CHAIN_SIZE = 20_000
+    CHAIN_SIZE_HEIGHT = 100
+    AVG_BLOCK_SIZE = 1_000_000
     GENESIS_ACTIVATION = 10_000
 
 
