@@ -233,7 +233,7 @@ class DB:
         if self.utxo_db.for_sync:
             size_per_sec_gen = flush_data.state.chain_size / (flush_data.state.sync_time + 0.01)
             size_per_sec_last = size_delta / (flush_interval + 0.01)
-            eta = size_remaining / (size_per_sec_last + 0.01) * 1.1
+            eta = size_remaining / (size_per_sec_last + 0.01)
             self.logger.info(f'MB/sec since genesis: {size_per_sec_gen / 1_000_000:.2f}, '
                              f'since last flush: {size_per_sec_last / 1_000_000:.2f}')
             self.logger.info(f'sync time: {formatted_time(flush_data.state.sync_time)}  '

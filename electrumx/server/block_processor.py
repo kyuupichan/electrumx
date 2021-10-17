@@ -448,7 +448,7 @@ class BlockProcessor:
             hist_MB = (hist_cache_size + tx_hash_size) // one_MB
 
             OnDiskBlock.daemon_height = await self.daemon.height()
-            if hist_MB:
+            if hist_cache_size:
                 logger.info(f'UTXOs {utxo_MB:,d}MB hist {hist_MB:,d}MB')
 
             # Flush history if it takes up over 20% of cache memory.
