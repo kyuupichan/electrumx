@@ -14,7 +14,7 @@ import json
 import time
 
 import aiohttp
-from aiorpcx import JSONRPC, run_in_thread
+from aiorpcx import run_in_thread
 
 from electrumx.lib.util import hex_to_bytes, open_truncate, class_logger
 
@@ -203,23 +203,6 @@ class Daemon(object):
         if payload:
             return await self._send(self._post_json, payload, processor)
         return []
-
-    async def _is_rpc_available(self, method):
-        '''Return whether given RPC method is available in the daemon.
-
-        Results are cached and the daemon will generally not be queried with
-        the same method more than once.'''
-        available = self.available_rpcs.get(method)
-        if available is None:
-            available = True
-            try:
-                await self._send_single(method)
-            except DaemonError as e:
-                err = e.args[0]
-                error_code = err.get("code")   # pylint:disable=E1101
-                available = error_code != JSONRPC.METHOD_NOT_FOUND
-            self.available_rpcs[method] = available
-        return available
 
     async def block_hex_hashes(self, first, count):
         '''Return the hex hashes of count block starting at height first.'''
