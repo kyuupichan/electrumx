@@ -97,7 +97,7 @@ class Deserializer(object):
 
     def __init__(self, binary, start=0):
         assert isinstance(binary, bytes)
-        self.binary = binary
+        self.binary = memoryview(binary)
         self.binary_length = len(binary)
         self.cursor = start
 
