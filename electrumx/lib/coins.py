@@ -174,6 +174,12 @@ class Coin:
         '''
         return Decimal(value) / cls.VALUE_PER_COIN
 
+    @classmethod
+    def prefetch_limit(cls, height):
+        if height <= 650_000:
+            return 100
+        return 10
+
 
 class BitcoinSV(Coin):
     NAME = "BitcoinSV"
@@ -225,6 +231,10 @@ class BitcoinSVScalingTestnet(BitcoinSVTestnet):
     CHAIN_SIZE_HEIGHT = 100
     AVG_BLOCK_SIZE = 2_000_000_000
     GENESIS_ACTIVATION = 14_896
+
+    @classmethod
+    def prefetch_limit(cls, height):
+        return 8
 
 
 class BitcoinSVRegtest(BitcoinSVTestnet):

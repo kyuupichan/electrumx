@@ -12,7 +12,6 @@
 import asyncio
 import os
 import re
-import time
 from asyncio import sleep
 from datetime import datetime
 from struct import error as struct_error
@@ -288,7 +287,6 @@ class BlockProcessor:
         # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
         self.force_flush_arg = None
-        self.last_hashes = 0
 
         # State.  Initially taken from DB;
         self.state = None
@@ -320,18 +318,12 @@ class BlockProcessor:
         return await asyncio.shield(run_locked())
 
     async def next_block_hashes(self):
-        # Return between 3 and 80 block hashes depending on speed
-        t = time.monotonic()
-        count = max(80 - int(t - self.last_hashes), 3)
-        self.last_hashes = t
-
         daemon_height = await self.daemon.height()
 
-        # Prefetch double that to the end of chain
         first = self.state.height + 1
-        n = min(daemon_height - first + 1, count * 2)
-        if n:
-            hex_hashes = await self.daemon.block_hex_hashes(first, n)
+        count = min(daemon_height - first + 1, self.coin.prefetch_limit(first))
+        if count:
+            hex_hashes = await self.daemon.block_hex_hashes(first, count)
             kind = 'new' if self.caught_up else 'sync'
             await OnDiskBlock.prefetch_many(self.daemon, enumerate(hex_hashes, start=first), kind)
         else:
@@ -340,7 +332,8 @@ class BlockProcessor:
         # Remove stale blocks
         await OnDiskBlock.delete_blocks(first - 5, False)
 
-        return hex_hashes[:count], daemon_height
+        # Return half the prefetch
+        return hex_hashes[:(count + 1) // 2], daemon_height
 
     async def reorg_chain(self, count):
         '''Handle a chain reorganisation.

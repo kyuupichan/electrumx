@@ -38,7 +38,7 @@ class Daemon(object):
     WARMING_UP = -28
     id_counter = itertools.count()
 
-    def __init__(self, coin, url, *, max_workqueue=10, init_retry=0.25, max_retry=4.0):
+    def __init__(self, coin, url, *, init_retry=0.25, max_retry=4.0):
         self.coin = coin
         self.logger = class_logger(__name__, self.__class__.__name__)
         self.url_index = None
@@ -46,7 +46,8 @@ class Daemon(object):
         self.set_url(url)
         # Limit concurrent RPC calls to this number.
         # See DEFAULT_HTTP_WORKQUEUE in bitcoind, which is typically 16
-        self.workqueue_semaphore = asyncio.Semaphore(value=max_workqueue)
+        self.workqueue_semaphore = asyncio.Semaphore(value=10)
+        self.block_semaphore = asyncio.Semaphore(value=6)
         self.init_retry = init_retry
         self.max_retry = max_retry
         self._height = None
@@ -108,7 +109,7 @@ class Daemon(object):
 
     async def _get_to_file(self, rest_url, filename):
         full_url = self.current_url() + rest_url
-        async with self.workqueue_semaphore:
+        async with self.block_semaphore:
             with open_truncate(filename) as file:
                 async with self.session.get(full_url) as resp:
                     kind = resp.headers.get('Content-Type', None)
