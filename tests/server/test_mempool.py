@@ -195,7 +195,7 @@ class API(MemPoolAPI):
         for tx_hash, tx in self.txs.items():
             for n, output in enumerate(tx.outputs):
                 hashX = coin.hashX_from_script(output.pk_script)
-                utxos[hashX].append((-1, n, tx_hash, 0, output.value, 0))
+                utxos[hashX].append((-1, n, tx_hash, 0, output.value, 2))
         return utxos
 
     async def height(self):
