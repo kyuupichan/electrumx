@@ -183,8 +183,8 @@ class Coin:
 
 class BitcoinSV(Coin):
     NAME = "BitcoinSV"
-    CHAIN_SIZE = 1_584_880_000_000
-    CHAIN_SIZE_HEIGHT = 709_461
+    CHAIN_SIZE = 1_623_944_264_227
+    CHAIN_SIZE_HEIGHT = 709_728
     AVG_BLOCK_SIZE = 150_000_000
     PEERS = [
         'electrumx.bitcoinsv.io s',
