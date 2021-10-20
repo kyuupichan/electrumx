@@ -35,10 +35,9 @@ from decimal import Decimal
 from hashlib import sha256
 
 from electrumx.lib import util
-from electrumx.lib.hash import Base58, double_sha256, hash_to_hex_str
+from electrumx.lib.hash import Base58, double_sha256
 from electrumx.lib.hash import HASHX_LEN
 from electrumx.lib.script import ScriptPubKey
-from electrumx.server import daemon
 from electrumx.server.session import ElectrumX
 
 
