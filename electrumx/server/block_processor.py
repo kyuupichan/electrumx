@@ -282,7 +282,7 @@ class BlockProcessor:
         self.coin = env.coin
 
         self.caught_up = False
-        self.ok = False
+        self.ok = True
         self.touched = set()
         # A count >= 0 is a user-forced reorg; < 0 is a natural reorg
         self.reorg_count = None
@@ -498,12 +498,12 @@ class BlockProcessor:
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
 
-        self.ok = False
         with block as block:
             if self.coin.header_prevhash(block.header) != self.state.tip:
                 self.reorg_count = -1
                 return
 
+            self.ok = False
             for tx, tx_hash in block.iter_txs():
                 hashXs = []
                 append_hashX = hashXs.append
@@ -573,6 +573,7 @@ class BlockProcessor:
 
         count = 0
         with block as block:
+            self.ok = False
             for tx, tx_hash in block.iter_txs_reversed():
                 for idx, txout in enumerate(tx.outputs):
                     # Spend the TX outputs.  Be careful with unspendable
@@ -606,6 +607,7 @@ class BlockProcessor:
         # self.touched can include other addresses which is harmless, but remove None.
         self.touched.discard(None)
         self.db.flush_backup(self.flush_data(), self.touched)
+        self.ok = True
 
     '''An in-memory UTXO cache, representing all changes to UTXO state
     since the last DB flush.
