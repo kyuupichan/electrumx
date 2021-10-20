@@ -10,8 +10,10 @@ from asyncio import Event
 from aiorpcx import _version as aiorpcx_version, TaskGroup
 
 import electrumx
+import electrumx.server.block_processor as block_proc
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
+from electrumx.server.daemon import Daemon
 from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
@@ -98,12 +100,10 @@ class Controller(ServerBase):
         self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
         notifications = Notifications()
-        Daemon = env.coin.DAEMON
-        BlockProcessor = env.coin.BLOCK_PROCESSOR
 
         async with Daemon(env.coin, env.daemon_url) as daemon:
             db = DB(env)
-            bp = BlockProcessor(env, db, daemon, notifications)
+            bp = block_proc.BlockProcessor(env, db, daemon, notifications)
 
             # Set notifications up to implement the MemPoolAPI
             def get_db_height():
