@@ -544,6 +544,14 @@ class ElectricCash(AuxPowElCashMixin, Coin):
     TX_PER_BLOCK = 8000
     RPC_PORT = 8332
 
+    STAKING_PENALTY = 0.03
+    STAKING_INTRESET_INFO = {
+        "4320": 0.05,
+        "12960": 0.06,
+        "25920": 0.075,
+        "51840": 0.1
+    }
+
 
 class ElectricCashTestnet(ElectricCash):
     SHORTNAME = "ELCASHT"
@@ -556,6 +564,12 @@ class ElectricCashTestnet(ElectricCash):
     P2SH_VERBYTE = [bytes.fromhex("5C")]  # e
     WIF_BYTE = bytes.fromhex("EF")
 
+    STAKING_INTEREST_INFO = {
+        "12": 50.0,
+        "36": 60.0,
+        "72": 75.0,
+        "144": 100.0
+    }
 
 class ElectricCashRegTest(ElectricCashTestnet):
     SHORTNAME = "ELCASHRT"

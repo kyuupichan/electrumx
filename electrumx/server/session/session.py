@@ -133,13 +133,8 @@ class ElectrumX(SessionBase):
         self.bump_cost(0.2)
         info = await self.daemon_request('getstakinginfo')
 
-        info["penalty"] = 0.03
-        info["interestInfo"] = {
-            "4320": 0.05,
-            "12960": 0.06,
-            "25920": 0.075,
-            "51840": 0.1
-        }
+        info["penalty"] = self.env.coin.STAKING_PENALTY
+        info["interestInfo"] = self.env.coin.STAKING_INTEREST_INFO
 
         return info
 
