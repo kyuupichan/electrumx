@@ -6,7 +6,7 @@ jobs:
 - template: run-tests.yml
   parameters:
     name: Py38_Ubuntu
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-20.04'
     pythonVersion: '3.8'
 - template: run-tests.yml
   parameters:
@@ -16,7 +16,7 @@ jobs:
 - template: run-tests.yml
   parameters:
     name: Py39_Ubuntu
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-20.04'
     pythonVersion: '3.9'
 - template: run-tests.yml
   parameters:
