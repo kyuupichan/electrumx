@@ -2,6 +2,25 @@
  ChangeLog
 ===========
 
+.. note:: you **must** add the following line to your bitcoin.conf file::
+
+      rest=1
+
+   I strongly recommend also adding::
+
+      rpcservertimeout=120
+
+   If you see messages in your logs about truncated messages whilst syncing, you may need to
+   increase the timeout (in seconds) further.
+
+Version 1.20.0 (21 Oct 2021)
+============================
+
+* get blocks via the REST API from bitcoind, and process them incrementally and in a separate
+  thread
+* support for TSC merkle proofs (AustEcon)
+* sockets tweak (rt1212121)
+
 
 Version 1.19.0 (11 Jun 2021)
 ============================
