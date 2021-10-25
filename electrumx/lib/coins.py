@@ -545,7 +545,7 @@ class ElectricCash(AuxPowElCashMixin, Coin):
     RPC_PORT = 8332
 
     STAKING_PENALTY = 0.03
-    STAKING_INTRESET_INFO = {
+    STAKING_INTEREST_INFO = {
         "4320": 0.05,
         "12960": 0.06,
         "25920": 0.075,

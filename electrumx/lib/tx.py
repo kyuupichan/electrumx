@@ -40,19 +40,6 @@ from electrumx.lib.util import (
     unpack_le_uint16, unpack_le_uint32, unpack_le_uint64
 )
 
-def load_varint_from_buffer(buffer):
-        n, = unpack_le_uint16(buffer[0:1]+b'\x00')
-        if n < 253:
-            return n
-        elif n == 253:
-            result, = unpack_le_uint16(buffer)
-        elif n == 254:
-            result, = unpack_le_uint32(buffer)
-        else:
-            result, = unpack_le_uint64(buffer)
-
-        return result
-
 ZERO = bytes(32)
 MINUS_1 = 4294967295
 

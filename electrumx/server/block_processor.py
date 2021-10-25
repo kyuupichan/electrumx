@@ -18,12 +18,13 @@ import electrumx
 from electrumx.server.daemon import DaemonError
 from electrumx.lib.hash import hash_to_hex_str, HASHX_LEN, TX_NUMB_LEN, TX_VALUE_LEN, IS_STAKE_FLAG_LEN
 from electrumx.lib.script import is_unspendable_legacy, is_unspendable_genesis
-from electrumx.lib.util import (
-    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64
-)
-from electrumx.lib.tx import load_varint_from_buffer
-from electrumx.server.db import FlushData
 
+from electrumx.lib.util import (
+    chunks, class_logger, pack_le_uint32, pack_le_uint64, unpack_le_uint64, unpack_varint
+)
+
+from electrumx.server.db import FlushData
+from electrumx.lib.staking import validate_stake
 
 class Prefetcher(object):
     '''Prefetches blocks (in the forward direction only).'''
@@ -416,10 +417,6 @@ class BlockProcessor(object):
             else:
                 return b'\x00\x00'
 
-        def unpack_staking_utxo_index(pk_script):
-            staking_idx = load_varint_from_buffer(pk_script[STAKING_HEADER_PREFIX_LENGTH-1:])
-            return staking_idx
-
         self.tx_hashes.append(b''.join(tx_hash for tx, tx_hash in txs))
 
         # Use local vars for speed in the loops
@@ -434,15 +431,6 @@ class BlockProcessor(object):
         append_hashXs = hashXs_by_tx.append
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
-
-        STAKING_HEADER_PREFIX_LENGTH = 5
-        # one for every varint possible
-        STAKING_HEADER_LENGTHS = {
-            STAKING_HEADER_PREFIX_LENGTH+1,
-            STAKING_HEADER_PREFIX_LENGTH+3,
-            STAKING_HEADER_PREFIX_LENGTH+5,
-            STAKING_HEADER_PREFIX_LENGTH+9
-            }
 
         for tx, tx_hash in txs:
             hashXs = []
@@ -462,19 +450,8 @@ class BlockProcessor(object):
             for idx, txout in enumerate(tx.outputs):
                 # Ignore unspendable outputs
                 if is_unspendable(txout.pk_script):
-                    if len(txout.pk_script) in STAKING_HEADER_LENGTHS \
-                    and txout.pk_script[2:4] == b'\x53\x44':
-                        staking_idx = unpack_staking_utxo_index(txout.pk_script)
-
-                        reversed_tx_hash = bytearray(tx_hash)
-                        reversed_tx_hash.reverse()
-
-                        if staking_idx >= len(tx.outputs) \
-                        or staking_idx <= 0 \
-                        or self.daemon.request_stake(reversed_tx_hash.hex()) is None:
-                            staking_idx = -1
-
-                        continue
+                    staking_idx = validate_stake(txout.pk_script, tx.outputs, self.env)
+                    continue
 
                 # Get the hashX
                 hashX = script_hashX(txout.pk_script)
