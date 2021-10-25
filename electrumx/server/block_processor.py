@@ -426,9 +426,9 @@ class BlockProcessor:
         self.force_flush_arg = None
         # Estimate size remaining
         daemon_height = self.daemon.cached_height()
-        tail_size = ((daemon_height - max(self.state.height, self.coin.CHAIN_SIZE_HEIGHT))
-                     * self.coin.AVG_BLOCK_SIZE)
-        size_remaining = max(self.coin.CHAIN_SIZE - self.state.chain_size, 0) + tail_size
+        tail_blocks = max(0, (daemon_height - max(self.state.height, self.coin.CHAIN_SIZE_HEIGHT)))
+        size_remaining = (max(self.coin.CHAIN_SIZE - self.state.chain_size, 0) +
+                          tail_blocks * self.coin.AVG_BLOCK_SIZE)
         await run_in_thread(self.db.flush_dbs, self.flush_data(), flush_utxos, size_remaining)
 
     async def check_cache_size_loop(self):
