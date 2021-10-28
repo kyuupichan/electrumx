@@ -361,7 +361,7 @@ class PeerManager:
         result = await session.send_request(message)
         assert_good(message, result, dict)
 
-        our_height = self.db.db_height
+        our_height = self.db.state.height
         their_height = result.get('height')
         if not isinstance(their_height, int):
             raise BadPeerError(f'invalid height {their_height}')
@@ -431,7 +431,9 @@ class PeerManager:
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
 
-        group.result    # pylint:disable=W0104
+            async for task in group:
+                if not task.cancelled():
+                    task.result()
 
     def info(self):
         '''The number of peers.'''
