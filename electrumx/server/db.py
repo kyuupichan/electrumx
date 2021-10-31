@@ -1,10 +1,9 @@
-# Copyright (c) 2016-2020, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 # Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Interface to the blockchain database.'''
 

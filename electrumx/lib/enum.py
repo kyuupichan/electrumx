@@ -1,9 +1,8 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''An enum-like type with reverse lookup.
 

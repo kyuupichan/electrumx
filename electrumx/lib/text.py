@@ -1,3 +1,10 @@
+# Copyright (c) 2018-2021, Neil Booth
+#
+# All rights reserved.
+#
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
+
+
 import time
 
 from electrumx.lib import util

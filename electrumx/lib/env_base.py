@@ -1,9 +1,8 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2017-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Class for server environment configuration and defaults.'''
 
