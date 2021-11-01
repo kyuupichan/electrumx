@@ -1053,7 +1053,7 @@ class ElectrumX(SessionBase):
         try:
             async with timeout_after(30):
                 await self._notify_inner(touched, height_changed)
-        except Exception:   # pylint:disable=W0703
+        except Exception:
             self.logger.exception('unexpected exception notifying client')
 
     async def _notify_inner(self, touched, height_changed):
@@ -1401,7 +1401,7 @@ class ElectrumX(SessionBase):
             hex_hash = await self.session_mgr.broadcast_transaction(raw_tx)
         except DaemonError as e:
             error, = e.args
-            message = error['message']   # pylint:disable=E1126
+            message = error['message']
             self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
                            f'network rules.\n\n{message}\n[{raw_tx}]') from None

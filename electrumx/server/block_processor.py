@@ -428,13 +428,13 @@ class BlockProcessor:
         # Estimate size remaining
         daemon_height = self.daemon.cached_height()
         tail_blocks = max(0, (daemon_height - max(self.state.height, self.coin.CHAIN_SIZE_HEIGHT)))
-        size_remaining = (max(self.coin.CHAIN_SIZE - self.state.chain_size, 0) +
-                          tail_blocks * self.coin.AVG_BLOCK_SIZE)
+        size_remaining = (max(self.coin.CHAIN_SIZE - self.state.chain_size, 0)
+                          + tail_blocks * self.coin.AVG_BLOCK_SIZE)
         await run_in_thread(self.db.flush_dbs, self.flush_data(), flush_utxos, size_remaining)
 
     async def check_cache_size_loop(self):
         '''Signal to flush caches if they get too big.'''
-        one_MB = 1000*1000
+        one_MB = 1_000_000
         cache_MB = self.env.cache_MB
         OnDiskBlock.daemon = self.daemon
         while True:
@@ -481,8 +481,8 @@ class BlockProcessor:
     def advance_block(self, block):
         '''Advance once block.  It is already verified they correctly connect onto our tip.'''
 
-        is_unspendable = (is_unspendable_genesis if block.height >=
-                          self.coin.GENESIS_ACTIVATION else is_unspendable_legacy)
+        is_unspendable = (is_unspendable_genesis if block.height >= self.coin.GENESIS_ACTIVATION
+                          else is_unspendable_legacy)
 
         # Use local vars for speed in the loops
         state = self.state

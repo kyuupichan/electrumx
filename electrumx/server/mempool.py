@@ -159,8 +159,8 @@ class MemPool(object):
             tx.in_pairs = tuple(in_pairs)
             # Avoid negative fees if dealing with generation-like transactions
             # because some in_parts would be missing
-            tx.fee = max(0, (sum(v for _, v in tx.in_pairs) -
-                             sum(v for _, v in tx.out_pairs)))
+            tx.fee = max(0, (sum(v for _, v in tx.in_pairs)
+                             - sum(v for _, v in tx.out_pairs)))
             txs[tx_hash] = tx
 
             for hashX, _value in itertools.chain(tx.in_pairs, tx.out_pairs):

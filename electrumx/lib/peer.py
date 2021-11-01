@@ -167,7 +167,7 @@ class Peer(object):
         if ip_addr.version == 4:
             return str(ip_addr)
         elif ip_addr.version == 6:
-            slash64 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128-64)
+            slash64 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128 - 64)
             return str(slash64)
         return ''
 
@@ -181,10 +181,10 @@ class Peer(object):
             return ''
         ip_addr = ip_address(self.ip_addr)
         if ip_addr.version == 4:
-            slash16 = IPv4Network(self.ip_addr).supernet(prefixlen_diff=32-16)
+            slash16 = IPv4Network(self.ip_addr).supernet(prefixlen_diff=32 - 16)
             return str(slash16)
         elif ip_addr.version == 6:
-            slash56 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128-56)
+            slash56 = IPv6Network(self.ip_addr).supernet(prefixlen_diff=128 - 56)
             return str(slash56)
         return ''
 

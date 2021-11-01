@@ -14,7 +14,7 @@ steps:
     python -m pip install pytest
     python -m pip install pytest-asyncio
     python -m pip install Sphinx
-    python -m pip install pylint
+    python -m pip install flake8
   displayName: Prepare general environment
   condition: |
     and(

@@ -61,7 +61,7 @@ class Merkle(object):
                 hashes.append(hashes[-1])
 
                 # Asterix used in place of "duplicated" hashes in TSC format (derivable by client)
-                is_last_node_in_level = (index ^ 1 == len(hashes)-1)
+                is_last_node_in_level = (index ^ 1 == len(hashes) - 1)
                 if tsc_format and is_last_node_in_level:
                     branch.append(b"*")
                 else:

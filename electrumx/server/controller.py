@@ -31,8 +31,6 @@ class Notifications(object):
     # block is done.  This object handles that logic by deferring
     # notifications appropriately.
 
-    # pylint:disable=E0202
-
     def __init__(self):
         self._touched_mp = {}
         self._touched_bp = {}
@@ -73,8 +71,6 @@ class Notifications(object):
         self._touched_bp[height] = touched
         self._highest_block = height
         await self._maybe_notify()
-
-# pylint:disable=W0201
 
 
 class Controller(ServerBase):

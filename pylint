@@ -1,1 +1,0 @@
-pylint --rcfile=.pylintrc electrumx/server/*.py electrumx/lib/*.py *.py

@@ -405,7 +405,7 @@ class DB:
         num_txs_in_block = self.tx_counts[block_height] - first_tx_num
         tx_hashes = self.hashes_file.read(first_tx_num * 32, num_txs_in_block * 32)
         assert num_txs_in_block == len(tx_hashes) // 32
-        return [tx_hashes[idx * 32: (idx+1) * 32] for idx in range(num_txs_in_block)]
+        return [tx_hashes[idx * 32: (idx + 1) * 32] for idx in range(num_txs_in_block)]
 
     async def tx_hashes_at_blockheight(self, block_height):
         return await run_in_thread(self.fs_tx_hashes_at_blockheight, block_height)

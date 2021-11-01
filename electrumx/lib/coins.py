@@ -54,8 +54,7 @@ class Coin:
         Raise an exception if unrecognised.'''
         req_attrs = ['CHAIN_SIZE', 'CHAIN_SIZE_HEIGHT', 'AVG_BLOCK_SIZE']
         for coin in util.subclasses(Coin):
-            if (coin.NAME.lower() == name.lower() and
-                    coin.NET.lower() == net.lower()):
+            if coin.NAME.lower() == name.lower() and coin.NET.lower() == net.lower():
                 coin_req_attrs = req_attrs.copy()
                 missing = [attr for attr in coin_req_attrs
                            if not hasattr(coin, attr)]

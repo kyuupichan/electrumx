@@ -158,8 +158,8 @@ class Env(EnvBase):
                 raise ServiceError(f'bad protocol for REPORT_SERVICES: {service.protocol}')
             if isinstance(service.host, (IPv4Address, IPv6Address)):
                 ip_addr = service.host
-                if (ip_addr.is_multicast or ip_addr.is_unspecified or
-                        (ip_addr.is_private and self.peer_announce)):
+                if (ip_addr.is_multicast or ip_addr.is_unspecified
+                        or (ip_addr.is_private and self.peer_announce)):
                     raise ServiceError(f'bad IP address for REPORT_SERVICES: {ip_addr}')
             elif service.host.lower() == 'localhost':
                 raise ServiceError(f'bad host for REPORT_SERVICES: {service.host}')

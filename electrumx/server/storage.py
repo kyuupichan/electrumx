@@ -67,15 +67,13 @@ class Storage(object):
         '''
         raise NotImplementedError
 
-# pylint:disable=W0223
-
 
 class LevelDB(Storage):
     '''LevelDB database engine.'''
 
     @classmethod
     def import_module(cls):
-        import plyvel    # pylint:disable=E0401
+        import plyvel
         cls.module = plyvel
 
     def open(self, name, create):
@@ -91,9 +89,6 @@ class LevelDB(Storage):
                                    sync=True)
 
 
-# pylint:disable=E1101
-
-
 class RocksDB(Storage):
     '''RocksDB database engine.'''
 
@@ -103,7 +98,7 @@ class RocksDB(Storage):
 
     @classmethod
     def import_module(cls):
-        import rocksdb    # pylint:disable=E0401
+        import rocksdb
         cls.module = rocksdb
 
     def open(self, name, create):
