@@ -87,7 +87,7 @@ class OnDiskBlock:
         # Asynchronous generator of (tx, tx_hash) pairs
         raw = self._read(self.chunk_size)
         deserializer = Deserializer(raw)
-        tx_count = deserializer._read_varint()
+        tx_count = deserializer.read_varint()
 
         if self.log_block:
             logger.info(f'height {self.height:,d} of {self.daemon.cached_height():,d} '
@@ -118,7 +118,7 @@ class OnDiskBlock:
         assert base_offset == 80
         raw = self._read(self.chunk_size)
         deserializer = Deserializer(raw)
-        tx_count = deserializer._read_varint()
+        tx_count = deserializer.read_varint()
         logger.info(f'backing up block {self.hex_hash} height {self.height:,d} '
                     f'tx_count {tx_count:,d}')
         offsets = [base_offset + deserializer.cursor]

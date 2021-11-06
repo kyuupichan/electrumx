@@ -192,8 +192,8 @@ def test_pack_varint():
 
     for n in tests:
         data = util.pack_varint(n)
-        deser = tx.Deserializer(data)
-        assert deser._read_varint() == n
+        value, size = tx.read_varint(data, 0)
+        assert value == n and size == len(data)
 
     import struct
     with pytest.raises(struct.error):
@@ -214,5 +214,5 @@ def test_pack_varbytes():
 
     for test in tests:
         data = util.pack_varbytes(test)
-        deser = tx.Deserializer(data)
-        assert deser._read_varbytes() == test
+        value, size = tx.read_varbytes(data, 0)
+        assert value == test and size == len(data)

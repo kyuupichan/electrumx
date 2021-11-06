@@ -65,30 +65,20 @@ class TxOutput(namedtuple("TxOutput", "value pk_script")):
         ))
 
 
-class Deserializer(object):
-    '''Deserializes blocks into transactions.
+class Deserializer:
+    '''Deserializes transactions.
 
-    External entry points are read_tx(), read_tx_and_hash(),
-    read_tx_and_vsize() and read_block().
-
-    This code is performance sensitive as it is executed 100s of
-    millions of times during sync.
+    This code is highly optimised and very performance sensitive.
     '''
 
-    def __init__(self, binary, start=0):
-        assert isinstance(binary, bytes)
-        self.binary = memoryview(binary)
-        self.binary_length = len(binary)
+    def __init__(self, buf, start=0):
+        self.view = memoryview(buf)
         self.cursor = start
 
     def read_tx(self):
         '''Return a deserialized transaction.'''
-        return Tx(
-            self._read_le_int32(),  # version
-            self._read_inputs(),    # inputs
-            self._read_outputs(),   # outputs
-            self._read_le_uint32()  # locktime
-        )
+        tx, self.cursor = read_tx(self.view, self.cursor)
+        return tx
 
     def read_tx_and_hash(self):
         '''Return a (deserialized TX, tx_hash) pair.
@@ -97,91 +87,95 @@ class Deserializer(object):
         we process it in the natural serialized order.
         '''
         start = self.cursor
-        return self.read_tx(), double_sha256(self.binary[start:self.cursor])
+        tx, end = read_tx(self.view, self.cursor)
+        self.cursor = end
+        return tx, double_sha256(self.view[start:end])
 
-    def read_tx_and_vsize(self):
-        '''Return a (deserialized TX, vsize) pair.'''
-        return self.read_tx(), self.binary_length
+    def read_varint(self):
+        value, self.cursor = read_varint(self.view, self.cursor)
+        return value
 
-    def read_tx_block(self):
-        '''Returns a list of (deserialized_tx, tx_hash) pairs.'''
-        read = self.read_tx_and_hash
-        # Some coins have excess data beyond the end of the transactions
-        return [read() for _ in range(self._read_varint())]
 
-    def _read_inputs(self):
-        read_input = self._read_input
-        return [read_input() for i in range(self._read_varint())]
+def read_varint(buf, cursor):
+    n = buf[cursor]
+    cursor += 1
+    if n < 253:
+        return n, cursor
+    if n == 253:
+        return read_le_uint16(buf, cursor)
+    if n == 254:
+        return read_le_uint32(buf, cursor)
+    return read_le_uint64(buf, cursor)
 
-    def _read_input(self):
-        return TxInput(
-            self._read_nbytes(32),   # prev_hash
-            self._read_le_uint32(),  # prev_idx
-            self._read_varbytes(),   # script
-            self._read_le_uint32()   # sequence
-        )
 
-    def _read_outputs(self):
-        read_output = self._read_output
-        return [read_output() for i in range(self._read_varint())]
+def read_varbytes(buf, cursor):
+    size, cursor = read_varint(buf, cursor)
+    end = cursor + size
+    return buf[cursor: end], end
 
-    def _read_output(self):
-        return TxOutput(
-            self._read_le_int64(),  # value
-            self._read_varbytes(),  # pk_script
-        )
 
-    def _read_byte(self):
-        cursor = self.cursor
-        self.cursor += 1
-        return self.binary[cursor]
+def read_le_uint16(buf, cursor):
+    result, = unpack_le_uint16_from(buf, cursor)
+    return result, cursor + 2
 
-    def _read_nbytes(self, n):
-        cursor = self.cursor
-        self.cursor = end = cursor + n
-        assert self.binary_length >= end
-        return self.binary[cursor:end]
 
-    def _read_varbytes(self):
-        return self._read_nbytes(self._read_varint())
+def read_le_uint32(buf, cursor):
+    result, = unpack_le_uint32_from(buf, cursor)
+    return result, cursor + 4
 
-    def _read_varint(self):
-        n = self.binary[self.cursor]
-        self.cursor += 1
-        if n < 253:
-            return n
-        if n == 253:
-            return self._read_le_uint16()
-        if n == 254:
-            return self._read_le_uint32()
-        return self._read_le_uint64()
 
-    def _read_le_int32(self):
-        result, = unpack_le_int32_from(self.binary, self.cursor)
-        self.cursor += 4
-        return result
+def read_le_uint64(buf, cursor):
+    result, = unpack_le_uint64_from(buf, cursor)
+    return result, cursor + 8
 
-    def _read_le_int64(self):
-        result, = unpack_le_int64_from(self.binary, self.cursor)
-        self.cursor += 8
-        return result
 
-    def _read_le_uint16(self):
-        result, = unpack_le_uint16_from(self.binary, self.cursor)
-        self.cursor += 2
-        return result
+def read_le_int32(buf, cursor):
+    result, = unpack_le_int32_from(buf, cursor)
+    return result, cursor + 4
 
-    def _read_be_uint16(self):
-        result, = unpack_be_uint16_from(self.binary, self.cursor)
-        self.cursor += 2
-        return result
 
-    def _read_le_uint32(self):
-        result, = unpack_le_uint32_from(self.binary, self.cursor)
-        self.cursor += 4
-        return result
+def read_le_int64(buf, cursor):
+    result, = unpack_le_int64_from(buf, cursor)
+    return result, cursor + 8
 
-    def _read_le_uint64(self):
-        result, = unpack_le_uint64_from(self.binary, self.cursor)
-        self.cursor += 8
-        return result
+
+def read_input(buf, cursor):
+    start = cursor
+    cursor += 32
+    prev_hash = buf[start: cursor]
+    prev_idx, cursor = read_le_uint32(buf, cursor)
+    script, cursor = read_varbytes(buf, cursor)
+    sequence, cursor = read_le_uint32(buf, cursor)
+
+    return TxInput(prev_hash, prev_idx, script, sequence), cursor
+
+
+def read_output(buf, cursor):
+    value, cursor = read_le_int64(buf, cursor)
+    pk_script, cursor = read_varbytes(buf, cursor)
+    return TxOutput(value, pk_script), cursor
+
+
+def read_many(buf, cursor, reader):
+    count, cursor = read_varint(buf, cursor)
+
+    items = []
+    append = items.append
+    for _ in range(count):
+        item, cursor = reader(buf, cursor)
+        append(item)
+
+    return items, cursor
+
+
+def read_tx(buf, cursor):
+    '''Deserialize a transaction from a buffer.  Return a (tx, cursor) pair.
+
+    If the buffer does not hold the whole transaction, raises struct.error or IndexError.
+    '''
+    version, cursor = read_le_int32(buf, cursor)
+    inputs, cursor = read_many(buf, cursor, read_input)
+    outputs, cursor = read_many(buf, cursor, read_output)
+    locktime, cursor = read_le_uint32(buf, cursor)
+
+    return Tx(version, inputs, outputs, locktime), cursor
