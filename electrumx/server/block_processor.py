@@ -826,6 +826,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
         # helper counter, atx are counted also for tx_count
         self.atx_count = 0
         self.ratx_count = 0
+        self.flush_height = 0
 
     def estimate_txs_remaining(self):
         # Try to estimate how many txs there are to go
@@ -839,6 +840,7 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
 
     def flush_data(self):
         assert self.state_lock.locked()
+        self.flush_height = self.height
         return BitcoinVaultFlushData(self.height, self.tx_count, self.headers,
                          self.tx_hashes, self.undo_infos, self.utxo_cache,
                          self.db_deletes, self.tip, self.tx_types)
@@ -1100,5 +1102,5 @@ class BitcoinVaultBlockProcessor(BlockProcessor):
     def get_tx_hash_from_cache(self, tx_num, tx_height):
         height_tx_count = self.db.tx_counts[tx_height - 1]
         index = (tx_num - height_tx_count) * 32
-        tx_hash = self.tx_hashes[tx_height][index:index + 32]
+        tx_hash = self.tx_hashes[tx_height-self.flush_height][index:index + 32]
         return tx_hash

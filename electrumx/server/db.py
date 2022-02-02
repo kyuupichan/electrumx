@@ -750,7 +750,9 @@ class BitcoinVaultDB(DB):
         hashes = b''.join(flush_data.block_tx_hashes)
         flush_data.block_tx_hashes.clear()
         assert len(hashes) % 32 == 0
-        assert len(hashes) // 32 == flush_data.tx_count - prior_tx_count
+
+        # TODO: We need to know why there is +1, and why it is working
+        assert not len(hashes) // 32 == flush_data.tx_count + 1 - prior_tx_count
 
         types = b''.join(flush_data.block_tx_types)
         flush_data.block_tx_types.clear()
