@@ -499,6 +499,7 @@ class BlockProcessor:
         append_tx_hash = tx_hashes.append
         to_le_uint32 = pack_le_uint32
         to_le_uint64 = pack_le_uint64
+        utxo_count_delta = 0
 
         with block as block:
             if self.coin.header_prevhash(block.header) != self.state.tip:
@@ -515,6 +516,7 @@ class BlockProcessor:
                 for txin in tx.inputs:
                     if txin.is_generation():
                         continue
+                    utxo_count_delta -= 1
                     cache_value = spend_utxo(bytes(txin.prev_hash), txin.prev_idx)
                     undo_info_append(cache_value)
                     append_hashX(cache_value[:-13])
@@ -524,6 +526,7 @@ class BlockProcessor:
                     # Ignore unspendable outputs
                     if is_unspendable(txout.pk_script):
                         continue
+                    utxo_count_delta += 1
 
                     # Get the hashX
                     hashX = script_hashX(txout.pk_script)
@@ -548,6 +551,7 @@ class BlockProcessor:
         state.height = block.height
         state.tip = self.coin.header_hash(block.header)
         state.chain_size += block.size
+        state.utxo_count += utxo_count_delta
         state.tx_count = tx_num
         self.ok = True
 
@@ -574,6 +578,7 @@ class BlockProcessor:
         undo_entry_len = 13 + HASHX_LEN
 
         count = 0
+        utxo_count_delta = 0
         with block as block:
             self.ok = False
             for tx, tx_hash in block.iter_txs_reversed():
@@ -583,6 +588,7 @@ class BlockProcessor:
                     if is_unspendable(txout.pk_script):
                         continue
 
+                    utxo_count_delta -= 1
                     cache_value = spend_utxo(tx_hash, idx)
                     touched_add(cache_value[:-13])
 
@@ -590,6 +596,7 @@ class BlockProcessor:
                 for txin in reversed(tx.inputs):
                     if txin.is_generation():
                         continue
+                    utxo_count_delta += 1
                     n -= undo_entry_len
                     undo_item = undo_info[n:n + undo_entry_len]
                     put_utxo(bytes(txin.prev_hash) + pack_le_uint32(txin.prev_idx), undo_item)
@@ -603,6 +610,7 @@ class BlockProcessor:
         state.height -= 1
         state.tip = self.coin.header_prevhash(block.header)
         state.chain_size -= block.size
+        state.utxo_count += utxo_count_delta
         state.tx_count -= count
 
         self.db.tx_counts.pop()

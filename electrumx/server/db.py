@@ -55,6 +55,7 @@ class ChainState:
     flush_time = attr.ib()    # Time of flush
     first_sync = attr.ib()
     db_version = attr.ib()
+    utxo_count = attr.ib()
 
     def copy(self):
         return copy.copy(self)
@@ -189,6 +190,18 @@ class DB:
         assert not flush_data.undo_infos
         self.history.assert_flushed()
 
+    def log_flush_stats(self, prefix, flush_data, elapsed):
+        tx_delta = flush_data.state.tx_count - self.last_flush_state.tx_count
+        size_delta = flush_data.state.chain_size - self.last_flush_state.chain_size
+        utxo_count_delta = flush_data.state.utxo_count - self.last_flush_state.utxo_count
+
+        self.logger.info(f'{prefix} #{self.history.flush_count:,d} took {elapsed:.1f}s.  '
+                         f'Height {flush_data.state.height:,d} '
+                         f'txs: {flush_data.state.tx_count:,d} ({tx_delta:+,d}) '
+                         f'utxos: {flush_data.state.utxo_count:,d} ({utxo_count_delta:+,d}) '
+                         f'size: {flush_data.state.chain_size:,d} ({size_delta:+,d})')
+        return size_delta
+
     def flush_dbs(self, flush_data, flush_utxos, size_remaining):
         '''Flush out cached state.  History is always flushed; UTXOs are
         flushed if flush_utxos.'''
@@ -220,13 +233,7 @@ class DB:
             self.state = flush_data.state.copy()
             self.write_utxo_state(self.utxo_db)
 
-        tx_delta = flush_data.state.tx_count - self.last_flush_state.tx_count
-        size_delta = flush_data.state.chain_size - self.last_flush_state.chain_size
-
-        self.logger.info(f'flush #{self.history.flush_count:,d} took {elapsed:.1f}s.  '
-                         f'Height {flush_data.state.height:,d} '
-                         f'txs: {flush_data.state.tx_count:,d} ({tx_delta:+,d}) '
-                         f'size: {flush_data.state.chain_size:,d} ({size_delta:+,d})')
+        size_delta = self.log_flush_stats('flush', flush_data, elapsed)
 
         # Catch-up stats
         if self.utxo_db.for_sync:
@@ -332,14 +339,7 @@ class DB:
         self.history.backup(touched, flush_data.state.tx_count)
         self.flush_utxo_db(flush_data)
 
-        elapsed = time.time() - start_time
-        tx_delta = flush_data.state.tx_count - self.last_flush_state.tx_count
-        size_delta = flush_data.state.chain_size - self.last_flush_state.chain_size
-
-        self.logger.info(f'backup flush #{self.history.flush_count:,d} took '
-                         f'{elapsed:.1f}s.  Height {flush_data.state.height:,d} '
-                         f'txs: {flush_data.state.tx_count:,d} ({tx_delta:+,d}) '
-                         f'size: {flush_data.state.chain_size:,d} ({size_delta:+,d})')
+        self.log_flush_stats('backup flush', flush_data, time.time() - start_time)
 
         self.last_flush_state = flush_data.state.copy()
 
@@ -482,12 +482,19 @@ class DB:
     # -- UTXO database
 
     def read_utxo_state(self):
+        def count_utxos():
+            count = 0
+            for db_key, db_value in self.utxo_db.iterator(prefix=b'u'):
+                count += 1
+            return count
+
         now = time.time()
         state = self.utxo_db.get(b'state')
         if not state:
             state = ChainState(height=-1, tx_count=0, chain_size=0, tip=bytes(32),
                                flush_count=0, sync_time=0, flush_time=now,
-                               first_sync=True, db_version=max(self.DB_VERSIONS))
+                               first_sync=True, db_version=max(self.DB_VERSIONS),
+                               utxo_count=0)
         else:
             state = ast.literal_eval(state.decode())
             if not isinstance(state, dict):
@@ -506,13 +513,19 @@ class DB:
                 flush_time=now,
                 first_sync=state['first_sync'],
                 db_version=state['db_version'],
+                utxo_count=state.get('utxo_count', -1),
             )
 
         self.state = state
-        self.last_flush_state = state.copy()
         if state.db_version not in self.DB_VERSIONS:
             raise self.DBError(f'your UTXO DB version is {state.db_version} but this '
                                f'software only handles versions {self.DB_VERSIONS}')
+
+        if self.state.utxo_count == -1:
+            self.logger.info('counting UTXOs, please wait...')
+            self.state.utxo_count = count_utxos()
+
+        self.last_flush_state = state.copy()
 
         # These are as we flush data to disk ahead of DB state
         self.fs_height = state.height
@@ -525,6 +538,7 @@ class DB:
         self.logger.info(f'height: {state.height:,d}')
         self.logger.info(f'tip: {hash_to_hex_str(state.tip)}')
         self.logger.info(f'tx count: {state.tx_count:,d}')
+        self.logger.info(f'utxo count: {state.utxo_count:,d}')
         self.logger.info(f'chain size: {state.chain_size // 1_000_000_000} GB '
                          f'({state.chain_size:,d} bytes)')
         if self.utxo_db.for_sync:
@@ -544,6 +558,7 @@ class DB:
             'wall_time': self.state.sync_time,
             'first_sync': self.state.first_sync,
             'db_version': self.state.db_version,
+            'utxo_count': self.state.utxo_count,
         }
         batch.put(b'state', repr(state).encode())
 
