@@ -733,7 +733,7 @@ class BlockProcessor:
 
     # --- External API
 
-    async def fetch_and_process_blocks(self, caught_up_event):
+    async def fetch_and_process_blocks(self, caught_up_event, shutdown_event):
         '''Fetch, process and index blocks from the daemon.
 
         Sets caught_up_event when first caught up.  Flushes to disk
@@ -748,36 +748,39 @@ class BlockProcessor:
         self.state = OnDiskBlock.state = (await self.db.open_for_sync()).copy()
         await OnDiskBlock.scan_files()
 
-        try:
-            show_summary = True
-            while True:
-                hex_hashes, daemon_height = await self.next_block_hashes()
-                if show_summary:
-                    show_summary = False
-                    behind = daemon_height - self.state.height
-                    if behind > 0:
-                        logger.info(f'catching up to daemon height {daemon_height:,d} '
-                                    f'({behind:,d} blocks behind)')
+        while True:
+            try:
+                show_summary = True
+                while True:
+                    hex_hashes, daemon_height = await self.next_block_hashes()
+                    if show_summary:
+                        show_summary = False
+                        behind = daemon_height - self.state.height
+                        if behind > 0:
+                            logger.info(f'catching up to daemon height {daemon_height:,d} '
+                                        f'({behind:,d} blocks behind)')
+                        else:
+                            logger.info(f'caught up to daemon height {daemon_height:,d}')
+
+                    if hex_hashes:
+                        await self.advance_blocks(hex_hashes)
                     else:
-                        logger.info(f'caught up to daemon height {daemon_height:,d}')
+                        await self.on_caught_up()
+                        caught_up_event.set()
+                        await sleep(self.polling_delay)
 
-                if hex_hashes:
-                    await self.advance_blocks(hex_hashes)
-                else:
-                    await self.on_caught_up()
-                    caught_up_event.set()
-                    await sleep(self.polling_delay)
-
-                if self.reorg_count is not None:
-                    await self.reorg_chain(self.reorg_count)
-                    self.reorg_count = None
-                    show_summary = True
-
-        # Don't flush for arbitrary exceptions as they might be a cause or consequence of
-        # corrupted data
-        except CancelledError:
-            await OnDiskBlock.stop_prefetching()
-            await self.run_with_lock(self.flush_if_safe())
+                    if self.reorg_count is not None:
+                        await self.reorg_chain(self.reorg_count)
+                        self.reorg_count = None
+                        show_summary = True
+                # Don't flush for arbitrary exceptions as they might be a cause or
+                # consequence of corrupted data
+            except CancelledError:
+                if shutdown_event.is_set():
+                    await OnDiskBlock.stop_prefetching()
+                    await self.run_with_lock(self.flush_if_safe())
+                    return
+                logging.exception('ignoring unexpected cancellation')
 
     async def flush_if_safe(self):
         if self.ok:
