@@ -780,7 +780,7 @@ class BlockProcessor:
                     await OnDiskBlock.stop_prefetching()
                     await self.run_with_lock(self.flush_if_safe())
                     return
-                logging.exception('ignoring unexpected cancellation')
+                logger.exception('ignoring unexpected cancellation')
 
     async def flush_if_safe(self):
         if self.ok:
