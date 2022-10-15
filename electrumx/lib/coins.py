@@ -145,15 +145,14 @@ class Coin:
 
 class BitcoinSV(Coin):
     NAME = "BitcoinSV"
-    CHAIN_SIZE = 1_623_944_264_227
-    CHAIN_SIZE_HEIGHT = 709_728
-    AVG_BLOCK_SIZE = 150_000_000
+    CHAIN_SIZE = 7_809_061_081_045
+    CHAIN_SIZE_HEIGHT = 761_539
+    AVG_BLOCK_SIZE = 800_000_000
     PEERS = [
-        'electrumx.bitcoinsv.io s',
         'satoshi.vision.cash s',
         'sv.usebsv.com s t',
         'sv.satoshi.io s t',
-        'akiba.chainbow.io s t',
+        'sv2.satoshi.io s t',
     ]
     GENESIS_ACTIVATION = 620_538
 
