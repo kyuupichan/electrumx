@@ -112,6 +112,12 @@ class MemPool(object):
 
     async def _logging(self, synchronized_event):
         '''Print regular logs of mempool stats.'''
+        def fmt_amt(amount):
+            whole, frac = divmod(amount, 100_000_000)
+            frac = f'{frac:08}'.rstrip('0') or '0'
+            frac = f'{frac:8}'
+            return f'{whole:,d}.{frac} BSV'
+
         self.logger.info('beginning processing of daemon mempool.  '
                          'This can take some time...')
         start = time.monotonic()
@@ -119,8 +125,11 @@ class MemPool(object):
         elapsed = time.monotonic() - start
         self.logger.info(f'synced in {elapsed:.2f}s')
         while True:
-            mempool_size = sum(tx.size for tx in self.txs.values()) / 1_000_000
-            self.logger.info(f'{len(self.txs):,d} txs {mempool_size:.2f} MB '
+            mempool_size = sum(tx.size for tx in self.txs.values())
+            fees = sum(tx.fee for tx in self.txs.values())
+            sats_byte = fees / mempool_size
+            self.logger.info(f'{len(self.txs):,d} txs {mempool_size / 1_000_000:.2f} MB '
+                             f'fees {fmt_amt(fees)} ({sats_byte:.3f} sats/b) '
                              f'touching {len(self.hashXs):,d} addresses')
             await sleep(self.log_status_secs)
             await synchronized_event.wait()
