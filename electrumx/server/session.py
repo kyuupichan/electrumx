@@ -83,6 +83,16 @@ def assert_tx_hash(value):
     raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
 
 
+def assert_raw_bytes(value):
+    '''Raise an RPCError if the value is not valid raw bytes (in hex).'''
+    try:
+        return bytes.fromhex(value)
+    except (ValueError, TypeError):
+        pass
+    raise RPCError(BAD_REQUEST, f'argument should be hex-encoded bytes')
+
+
+
 @attr.s(slots=True)
 class SessionGroup:
     name = attr.ib()
@@ -1398,6 +1408,7 @@ class ElectrumX(SessionBase):
         '''Broadcast a raw transaction to the network.
 
         raw_tx: the raw transaction as a hexadecimal string'''
+        assert_raw_bytes(raw_tx)
         self.bump_cost(0.25 + len(raw_tx) / 5000)
         # This returns errors as JSON RPC errors, as is natural
         try:
