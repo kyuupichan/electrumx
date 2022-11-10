@@ -127,7 +127,7 @@ class MemPool(object):
         while True:
             mempool_size = sum(tx.size for tx in self.txs.values())
             fees = sum(tx.fee for tx in self.txs.values())
-            sats_byte = fees / mempool_size
+            sats_byte = fees / (mempool_size or 1)
             self.logger.info(f'{len(self.txs):,d} txs {mempool_size / 1_000_000:.2f} MB '
                              f'fees {fmt_amt(fees)} ({sats_byte:.3f} sats/b) '
                              f'touching {len(self.hashXs):,d} addresses')
