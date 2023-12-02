@@ -1,0 +1,48 @@
+parameters:
+  onlyPullRequests: false
+
+steps:
+- script: |
+    python -m pip install aiohttp
+    python -m pip install aiorpcX
+    python -m pip install attrs
+    python -m pip install pylru
+    python -m pip install uvloop
+    python -m pip install pycodestyle
+    python -m pip install coveralls
+    python -m pip install coverage
+    python -m pip install pytest
+    python -m pip install pytest-asyncio
+    python -m pip install Sphinx
+    python -m pip install flake8
+  displayName: Prepare general environment
+  condition: |
+    and(
+      succeeded(),
+      or(
+        eq(variables['Build.Reason'], 'PullRequest'),
+        eq(${{ parameters.onlyPullRequests }}, false)
+      )
+    )
+  enabled: true
+  continueOnError: false
+  failOnStderr: false
+
+# Install plyvel depending on platform
+- bash: |
+    python -m pip install plyvel
+  condition: eq( variables['Agent.OS'], 'Linux' )
+  displayName: Install plyvel on Linux
+  enabled: true
+  continueOnError: false
+  failOnStderr: false
+- bash: |
+    brew tap bagonyi/homebrew-formulae git@github.com:bagonyi/homebrew-formulae.git
+    brew extract --version=1.22 leveldb bagonyi/formulae
+    brew install leveldb@1.22
+    pip install plyvel --no-cache-dir
+  condition: eq( variables['Agent.OS'], 'Darwin' )
+  displayName: Install plyvel on MacOS
+  enabled: true
+  continueOnError: false
+  failOnStderr: false

@@ -1,13 +1,17 @@
 import setuptools
-version = '1.15.0'
+import electrumx
+
+version = electrumx.version.rsplit(' ', maxsplit=1)[-1]
+
+with open('requirements.txt', 'r') as f:
+    requirements = f.read().splitlines()
 
 setuptools.setup(
     name='electrumX',
     version=version,
     scripts=['electrumx_server', 'electrumx_rpc', 'electrumx_compact_history'],
-    python_requires='>=3.7',
-    install_requires=['aiorpcX[ws]>=0.18.3,<0.19', 'attrs',
-                      'plyvel', 'pylru', 'aiohttp>=3.3'],
+    python_requires='>=3.8',
+    install_requires=requirements,
     extras_require={
         'rocksdb': ['python-rocksdb>=0.6.9'],
         'uvloop': ['uvloop>=0.14'],

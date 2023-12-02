@@ -1,24 +1,24 @@
+# Copyright (c) 2016-2021, Neil Booth
 # Copyright (c) 2016-2017, the ElectrumX authors
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Backend database abstraction.'''
 
 import os
 from functools import partial
 
-import electrumx.lib.util as util
+from electrumx.lib import util
 
 
 def db_class(name):
     '''Returns a DB engine class.'''
-    for db_class in util.subclasses(Storage):
-        if db_class.__name__.lower() == name.lower():
-            db_class.import_module()
-            return db_class
+    for db_class_ in util.subclasses(Storage):
+        if db_class_.__name__.lower() == name.lower():
+            db_class_.import_module()
+            return db_class_
     raise RuntimeError('unrecognised DB engine "{}"'.format(name))
 
 
@@ -91,6 +91,10 @@ class LevelDB(Storage):
 
 class RocksDB(Storage):
     '''RocksDB database engine.'''
+
+    def __init__(self, *args):
+        self.db = None
+        super().__init__(*args)
 
     @classmethod
     def import_module(cls):

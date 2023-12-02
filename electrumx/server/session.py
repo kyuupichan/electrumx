@@ -1,9 +1,8 @@
-# Copyright (c) 2016-2018, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Classes for local RPC server and remote client TCP/SSL servers.'''
 
@@ -20,17 +19,18 @@ from ipaddress import IPv4Address, IPv6Address
 
 import attr
 from aiorpcx import (
-    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws,
-    TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect
+    RPCSession, JSONRPCAutoDetect, JSONRPCConnection, serve_rs, serve_ws, NewlineFramer,
+    TaskGroup, handler_invocation, RPCError, Request, sleep, Event, ReplyAndDisconnect,
+    TaskTimeout, timeout_after
 )
 import pylru
 
 import electrumx
 from electrumx.lib.merkle import MerkleCache
 from electrumx.lib.text import sessions_lines
-import electrumx.lib.util as util
-from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash,
-                                HASHX_LEN, Base58Error)
+from electrumx.lib import util
+from electrumx.lib.hash import (sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, Base58Error,
+                                double_sha256)
 from electrumx.server.daemon import DaemonError
 from electrumx.server.peers import PeerManager
 
@@ -83,6 +83,16 @@ def assert_tx_hash(value):
     raise RPCError(BAD_REQUEST, f'{value} should be a transaction hash')
 
 
+def assert_raw_bytes(value):
+    '''Raise an RPCError if the value is not valid raw bytes (in hex).'''
+    try:
+        return bytes.fromhex(value)
+    except (ValueError, TypeError):
+        pass
+    raise RPCError(BAD_REQUEST, f'argument should be hex-encoded bytes')
+
+
+
 @attr.s(slots=True)
 class SessionGroup:
     name = attr.ib()
@@ -123,6 +133,7 @@ class SessionManager:
         self.sessions = {}          # session->iterable of its SessionGroups
         self.session_groups = {}    # group name->SessionGroup instance
         self.txs_sent = 0
+        # Would use monotonic time, but aiorpcx sessions use Unix time:
         self.start_time = time.time()
         self._method_counts = defaultdict(int)
         self._reorg_count = 0
@@ -138,7 +149,6 @@ class SessionManager:
         self._merkle_hits = 0
         self.notified_height = None
         self.hsub_results = None
-        self._task_group = TaskGroup()
         self._sslc = None
         # Event triggered when electrumx is listening for incoming requests.
         self.server_listening = Event()
@@ -147,7 +157,7 @@ class SessionManager:
         # Set up the RPC request handlers
         cmds = ('add_peer daemon_url disconnect getinfo groups log peers '
                 'query reorg sessions stop'.split())
-        LocalRPC.request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
+        self.rpc_request_handlers = {cmd: getattr(self, 'rpc_' + cmd)
                                      for cmd in cmds}
 
     def _ssl_context(self):
@@ -177,7 +187,7 @@ class SessionManager:
             host = None if service.host == 'all_interfaces' else str(service.host)
             try:
                 self.servers[service] = await serve(session_factory, host,
-                                                    service.port, ssl=sslc)
+                                                    service.port, ssl=sslc, reuse_address=True)
             except OSError as e:    # don't suppress CancelledError
                 self.logger.error(f'{kind} server failed to listen on {service.address}: {e}')
             else:
@@ -239,8 +249,9 @@ class SessionManager:
         if sessions:
             session_ids = ', '.join(str(session.session_id) for session in sessions)
             self.logger.info(f'{reason} session ids {session_ids}')
-            for session in sessions:
-                await self._task_group.spawn(session.close(force_after=force_after))
+            async with TaskGroup() as group:
+                for session in sessions:
+                    await group.spawn(session.close(force_after=force_after))
 
     async def _clear_stale_sessions(self):
         '''Cut off sessions that haven't done anything for 10 minutes.'''
@@ -256,7 +267,7 @@ class SessionManager:
         '''Clear caches on chain reorgs.'''
         while True:
             await self.bp.backed_up_event.wait()
-            self.logger.info(f'reorg signalled; clearing tx_hashes and merkle caches')
+            self.logger.info('reorg signalled; clearing tx_hashes and merkle caches')
             self._reorg_count += 1
             self._tx_hashes_cache.clear()
             self._merkle_cache.clear()
@@ -295,7 +306,7 @@ class SessionManager:
             'coin': self.env.coin.__name__,
             'daemon': self.daemon.logged_url(),
             'daemon height': self.daemon.cached_height(),
-            'db height': self.db.db_height,
+            'db height': self.db.state.height,
             'db_flush_count': self.db.history.flush_count,
             'groups': len(self.session_groups),
             'history cache': cache_fmt.format(
@@ -364,7 +375,7 @@ class SessionManager:
         and record that as notified_height.
         '''
         # Paranoia: a reorg could race and leave db_height lower
-        height = min(height, self.db.db_height)
+        height = min(height, self.db.state.height)
         raw = await self.raw_header(height)
         self.hsub_results = {'hex': raw.hex(), 'height': height}
         self.notified_height = height
@@ -478,7 +489,7 @@ class SessionManager:
         try:
             self.daemon.set_url(daemon_url)
         except Exception as e:
-            raise RPCError(BAD_REQUEST, f'an error occured: {e!r}')
+            raise RPCError(BAD_REQUEST, f'an error occured: {e!r}') from None
         return f'now using daemon at {self.daemon.logged_url()}'
 
     async def rpc_stop(self):
@@ -517,14 +528,6 @@ class SessionManager:
                 lines.append(f'Address: {arg}')
                 return hashX
             except Base58Error:
-                pass
-
-            try:
-                script = coin.build_name_index_script(arg.encode("ascii"))
-                hashX = coin.name_hashX_from_script(script)
-                lines.append(f'Name: {arg}')
-                return hashX
-            except (AttributeError, UnicodeEncodeError):
                 pass
 
             return None
@@ -607,23 +610,30 @@ class SessionManager:
             for service in self.env.report_services:
                 self.logger.info(f'advertising service {service}')
             # Start notifications; initialize hsub_results
-            await notifications.start(self.db.db_height, self._notify_sessions)
+            await notifications.start(self.db.state.height, self._notify_sessions)
             await self._start_external_servers()
             # Peer discovery should start after the external servers
             # because we connect to ourself
-            async with self._task_group as group:
+            async with TaskGroup() as group:
                 await group.spawn(self.peer_mgr.discover_peers())
                 await group.spawn(self._clear_stale_sessions())
                 await group.spawn(self._handle_chain_reorgs())
                 await group.spawn(self._recalc_concurrency())
                 await group.spawn(self._log_sessions())
                 await group.spawn(self._manage_servers())
+
+                async for task in group:
+                    if not task.cancelled():
+                        task.result()
         finally:
             # Close servers then sessions
+            self.logger.info('stopping servers')
             await self._stop_servers(self.servers.keys())
+            self.logger.info('closing connections...')
             async with TaskGroup() as group:
                 for session in list(self.sessions):
                     await group.spawn(session.close(force_after=1))
+            self.logger.info('connections closed')
 
     def extra_cost(self, session):
         # Note there is no guarantee that session is still in self.sessions.  Example traceback:
@@ -634,7 +644,7 @@ class SessionManager:
             return 0
         return sum((group.cost() - session.cost) * group.weight for group in groups)
 
-    async def _merkle_branch(self, height, tx_hashes, tx_pos):
+    async def _merkle_branch(self, height, tx_hashes, tx_pos, tsc_format=False):
         tx_hash_count = len(tx_hashes)
         cost = tx_hash_count
 
@@ -651,12 +661,22 @@ class SessionManager:
                 merkle_cache = MerkleCache(self.db.merkle, tx_hashes_func)
                 self._merkle_cache[height] = merkle_cache
                 await merkle_cache.initialize(len(tx_hashes))
-            branch, _root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos)
+            branch, root = await merkle_cache.branch_and_root(tx_hash_count, tx_pos,
+                                                              tsc_format=tsc_format)
         else:
-            branch, _root = self.db.merkle.branch_and_root(tx_hashes, tx_pos)
+            branch, root = self.db.merkle.branch_and_root(tx_hashes, tx_pos,
+                                                          tsc_format=tsc_format)
 
-        branch = [hash_to_hex_str(hash) for hash in branch]
-        return branch, cost / 2500
+        if tsc_format:
+            def converter(_hash):
+                if _hash == b"*":
+                    return _hash.decode()
+                else:
+                    return hash_to_hex_str(_hash)
+            branch = [converter(hash) for hash in branch]
+        else:
+            branch = [hash_to_hex_str(hash) for hash in branch]
+        return branch, root, cost / 2500
 
     async def merkle_branch_for_tx_hash(self, height, tx_hash):
         '''Return a triple (branch, tx_pos, cost).'''
@@ -664,10 +684,74 @@ class SessionManager:
         try:
             tx_pos = tx_hashes.index(tx_hash)
         except ValueError:
-            raise RPCError(BAD_REQUEST,
-                           f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}')
-        branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
+            raise RPCError(
+                BAD_REQUEST, f'tx {hash_to_hex_str(tx_hash)} not in block at height {height:,d}'
+            ) from None
+        branch, _root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, tx_pos, tx_hashes_cost + merkle_cost
+
+    async def tsc_merkle_proof_for_tx_hash(self, height, tx_hash, txid_or_tx='txid',
+                                           target_type='block_hash'):
+        '''Return a pair (tsc_proof, cost) where tsc_proof is a dictionary with fields:
+            index - the position of the transaction
+            txOrId - either "txid" or "tx"
+            target - either "block_hash", "block_header" or "merkle_root"
+            nodes - the nodes in the merkle branch excluding the "target"'''
+
+        async def get_target(target_type):
+            try:
+                cost = 0.25
+                raw_header = await self.raw_header(height)
+                root_from_header = raw_header[36:36 + 32]
+                if target_type == "block_header":
+                    target = raw_header.hex()
+                elif target_type == "merkle_root":
+                    target = hash_to_hex_str(root_from_header)
+                else:  # target == block hash
+                    target = hash_to_hex_str(double_sha256(raw_header))
+            except ValueError:
+                raise RPCError(BAD_REQUEST, f'block header at height {height:,d} not found') \
+                    from None
+            return target, root_from_header, cost
+
+        def get_tx_position(tx_hash):
+            try:
+                tx_pos = tx_hashes.index(tx_hash)
+            except ValueError:
+                raise RPCError(BAD_REQUEST, f'tx {hash_to_hex_str(tx_hash)} not in block at height '
+                                            f'{height:,d}') from None
+            return tx_pos
+
+        async def get_txid_or_tx_field(tx_hash):
+            txid = hash_to_hex_str(tx_hash)
+            if txid_or_tx == "tx":
+                rawtx = await self.daemon_request('getrawtransaction', txid, False)
+                cost = 1.0
+                txid_or_tx_field = rawtx
+            else:
+                cost = 0.0
+                txid_or_tx_field = txid
+            return txid_or_tx_field, cost
+
+        tsc_proof = {}
+        tx_hashes, tx_hashes_cost = await self.tx_hashes_at_blockheight(height)
+        tx_pos = get_tx_position(tx_hash)
+        branch, root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos,
+                                                              tsc_format=True)
+
+        target, root_from_header, header_cost = await get_target(target_type)
+        # sanity check
+        if root != root_from_header:
+            raise RPCError(BAD_REQUEST, 'db error. Merkle root from cached block header does not '
+                                        'match the derived merkle root') from None
+
+        txid_or_tx_field, tx_fetch_cost = await get_txid_or_tx_field(tx_hash)
+
+        tsc_proof['index'] = tx_pos
+        tsc_proof['txid_or_tx'] = txid_or_tx_field
+        tsc_proof['target'] = target
+        tsc_proof['nodes'] = branch
+        return tsc_proof, tx_hashes_cost + merkle_cost + tx_fetch_cost + header_cost
 
     async def merkle_branch_for_tx_pos(self, height, tx_pos):
         '''Return a triple (branch, tx_hash_hex, cost).'''
@@ -675,9 +759,10 @@ class SessionManager:
         try:
             tx_hash = tx_hashes[tx_pos]
         except IndexError:
-            raise RPCError(BAD_REQUEST,
-                           f'no tx at position {tx_pos:,d} in block at height {height:,d}')
-        branch, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
+            raise RPCError(
+                BAD_REQUEST, f'no tx at position {tx_pos:,d} in block at height {height:,d}'
+            ) from None
+        branch, _root, merkle_cost = await self._merkle_branch(height, tx_hashes, tx_pos)
         return branch, hash_to_hex_str(tx_hash), tx_hashes_cost + merkle_cost
 
     async def tx_hashes_at_blockheight(self, height):
@@ -698,7 +783,7 @@ class SessionManager:
             try:
                 tx_hashes = await self.db.tx_hashes_at_blockheight(height)
             except self.db.DBError as e:
-                raise RPCError(BAD_REQUEST, f'db error: {e!r}')
+                raise RPCError(BAD_REQUEST, f'db error: {e!r}') from None
             if reorg_count == self._reorg_count:
                 break
 
@@ -746,7 +831,7 @@ class SessionManager:
             result = await self.db.limited_history(hashX, limit=limit)
             cost += 0.1 + len(result) * 0.001
             if len(result) >= limit:
-                result = RPCError(BAD_REQUEST, f'history too large', cost=cost)
+                result = RPCError(BAD_REQUEST, 'history too large', cost=cost)
             self._history_cache[hashX] = result
 
         if isinstance(result, Exception):
@@ -763,21 +848,28 @@ class SessionManager:
             for hashX in set(cache).intersection(touched):
                 del cache[hashX]
 
-        for session in self.sessions:
-            await self._task_group.spawn(session.notify, touched, height_changed)
+        async with TaskGroup() as group:
+            for session in self.sessions:
+                await group.spawn(session.notify, touched, height_changed)
 
     def _ip_addr_group_name(self, session):
         host = session.remote_address().host
         if isinstance(host, IPv4Address):
-            return '.'.join(str(host).split('.')[:3])
+            if host.is_private:  # exempt private addresses
+                return None
+            return '.'.join(str(host).split('.')[:3])  # /24
         if isinstance(host, IPv6Address):
-            return ':'.join(host.exploded.split(':')[:3])
+            if host.is_private:
+                return None
+            return ':'.join(host.exploded.split(':')[:3])  # /48
         return 'unknown_addr'
 
     def _timeslice_name(self, session):
         return f't{int(session.start_time - self.start_time) // 300}'
 
     def _session_group(self, name, weight):
+        if name is None:
+            return None
         group = self.session_groups.get(name)
         if not group:
             group = SessionGroup(name, weight, set(), 0)
@@ -791,6 +883,7 @@ class SessionManager:
             self._session_group(self._timeslice_name(session), 0.03),
             self._session_group(self._ip_addr_group_name(session), 1.0),
         )
+        groups = [group for group in groups if group is not None]
         self.sessions[session] = groups
         for group in groups:
             group.sessions.add(session)
@@ -837,11 +930,15 @@ class SessionBase(RPCSession):
         self.logger = util.ConnectionLogger(logger, context)
         self.logger.info(f'{self.kind} {self.remote_address_string()}, '
                          f'{self.session_mgr.session_count():,d} total')
-        self.recalc_concurrency()
         self.session_mgr.add_session(self)
+        self.recalc_concurrency()  # must be called after session_mgr.add_session
+        self.request_handlers = {}
 
     async def notify(self, touched, height_changed):
         pass
+
+    def default_framer(self):
+        return NewlineFramer(max_size=self.env.max_recv)
 
     def remote_address_string(self, *, for_log=True):
         '''Returns the peer's IP address and port as a human-readable
@@ -948,6 +1045,12 @@ class ElectrumX(SessionBase):
     def extra_cost(self):
         return self.session_mgr.extra_cost(self)
 
+    def on_disconnect_due_to_excessive_session_cost(self):
+        ip_addr = self.remote_address().host
+        groups = self.session_mgr.sessions[self]
+        group_names = [group.name for group in groups]
+        self.logger.info(f"closing session over res usage. ip: {ip_addr}. groups: {group_names}")
+
     def sub_count(self):
         return len(self.hashX_subs)
 
@@ -956,6 +1059,17 @@ class ElectrumX(SessionBase):
         return self.hashX_subs.pop(hashX, None)
 
     async def notify(self, touched, height_changed):
+        '''Wrap _notify_inner; websockets raises exceptions for unclear reasons.'''
+        try:
+            async with timeout_after(30):
+                await self._notify_inner(touched, height_changed)
+        except TaskTimeout:
+            self.logger.warning('timeout notifying client, closing...')
+            await self.close(force_after=1.0)
+        except Exception:
+            self.logger.exception('unexpected exception notifying client')
+
+    async def _notify_inner(self, touched, height_changed):
         '''Notify the client about changes to touched addresses (from mempool
         updates or new blocks) and height.
         '''
@@ -1133,7 +1247,7 @@ class ElectrumX(SessionBase):
         return self.unsubscribe_hashX(hashX) is not None
 
     async def _merkle_proof(self, cp_height, height):
-        max_height = self.db.db_height
+        max_height = self.db.state.height
         if not height <= cp_height <= max_height:
             raise RPCError(BAD_REQUEST,
                            f'require header height {height:,d} <= '
@@ -1238,7 +1352,7 @@ class ElectrumX(SessionBase):
         self.bump_cost(1.0)
         return 0.000001
 
-    async def estimatefee(self, number):
+    async def estimatefee(self, _number):
         '''The estimated transaction fee per kilobyte to be paid for a
         transaction to be included within a certain number of blocks.
 
@@ -1263,7 +1377,7 @@ class ElectrumX(SessionBase):
         '''
         self.bump_cost(0.5)
         if self.sv_seen:
-            raise RPCError(BAD_REQUEST, f'server.version already sent')
+            raise RPCError(BAD_REQUEST, 'server.version already sent')
         self.sv_seen = True
 
         if client_name:
@@ -1294,6 +1408,7 @@ class ElectrumX(SessionBase):
         '''Broadcast a raw transaction to the network.
 
         raw_tx: the raw transaction as a hexadecimal string'''
+        assert_raw_bytes(raw_tx)
         self.bump_cost(0.25 + len(raw_tx) / 5000)
         # This returns errors as JSON RPC errors, as is natural
         try:
@@ -1303,17 +1418,9 @@ class ElectrumX(SessionBase):
             message = error['message']
             self.logger.info(f'error sending transaction: {message}')
             raise RPCError(BAD_REQUEST, 'the transaction was rejected by '
-                           f'network rules.\n\n{message}\n[{raw_tx}]')
+                           f'network rules.\n\n{message}\n[{raw_tx}]') from None
         else:
             self.txs_sent += 1
-            client_ver = util.protocol_tuple(self.client)
-            if client_ver != (0, ):
-                msg = self.coin.warn_old_client_on_tx_broadcast(client_ver)
-                if msg:
-                    self.logger.info(f'sent tx: {hex_hash}. and warned user to upgrade their '
-                                     f'client from {self.client}')
-                    return msg
-
             self.logger.info(f'sent tx: {hex_hash}')
             return hex_hash
 
@@ -1325,7 +1432,7 @@ class ElectrumX(SessionBase):
         '''
         assert_tx_hash(tx_hash)
         if verbose not in (True, False):
-            raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
+            raise RPCError(BAD_REQUEST, '"verbose" must be a boolean')
 
         self.bump_cost(1.0)
         return await self.daemon_request('getrawtransaction', tx_hash, verbose)
@@ -1346,6 +1453,32 @@ class ElectrumX(SessionBase):
 
         return {"block_height": height, "merkle": branch, "pos": tx_pos}
 
+    async def transaction_tsc_merkle(self, tx_hash, height, txid_or_tx='txid',
+                                     target_type='block_hash'):
+        '''Return the TSC merkle proof in JSON format to a confirmed transaction given its hash.
+        See: https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/.
+
+        tx_hash: the transaction hash as a hexadecimal string
+        include_tx: whether to include the full raw transaction in the response or txid.
+        target: options include: ('merkle_root', 'block_header', 'block_hash', 'None')
+        '''
+        tx_hash = assert_tx_hash(tx_hash)
+        height = non_negative_integer(height)
+
+        tsc_proof, cost = await self.session_mgr.tsc_merkle_proof_for_tx_hash(
+            height, tx_hash, txid_or_tx, target_type)
+        self.bump_cost(cost)
+
+        return {
+            "index": tsc_proof['index'],
+            "txOrId": tsc_proof['txid_or_tx'],
+            "target": tsc_proof['target'],
+            "nodes": tsc_proof['nodes'],  # "*" is used to represent duplicated hashes
+            "targetType": target_type,
+            "proofType": "branch",  # "tree" option is not supported by ElectrumX
+            "composite": False  # composite option is not supported by ElectrumX
+        }
+
     async def transaction_id_from_pos(self, height, tx_pos, merkle=False):
         '''Return the txid and optionally a merkle proof, given
         a block height and position in the block.
@@ -1353,7 +1486,7 @@ class ElectrumX(SessionBase):
         tx_pos = non_negative_integer(tx_pos)
         height = non_negative_integer(height)
         if merkle not in (True, False):
-            raise RPCError(BAD_REQUEST, f'"merkle" must be a boolean')
+            raise RPCError(BAD_REQUEST, '"merkle" must be a boolean')
 
         if merkle:
             branch, tx_hash, cost = await self.session_mgr.merkle_branch_for_tx_pos(
@@ -1365,8 +1498,9 @@ class ElectrumX(SessionBase):
             try:
                 tx_hash = tx_hashes[tx_pos]
             except IndexError:
-                raise RPCError(BAD_REQUEST,
-                               f'no tx at position {tx_pos:,d} in block at height {height:,d}')
+                raise RPCError(
+                    BAD_REQUEST, f'no tx at position {tx_pos:,d} in block at height {height:,d}'
+                ) from None
             self.bump_cost(cost)
             return hash_to_hex_str(tx_hash)
 
@@ -1391,6 +1525,7 @@ class ElectrumX(SessionBase):
             'blockchain.transaction.broadcast': self.transaction_broadcast,
             'blockchain.transaction.get': self.transaction_get,
             'blockchain.transaction.get_merkle': self.transaction_merkle,
+            'blockchain.transaction.get_tsc_merkle': self.transaction_tsc_merkle,
             'blockchain.transaction.id_from_pos': self.transaction_id_from_pos,
             'mempool.get_fee_histogram': self.compact_fee_histogram,
             'server.add_peer': self.add_peer,
@@ -1415,6 +1550,7 @@ class LocalRPC(SessionBase):
         super().__init__(*args, **kwargs)
         self.client = 'RPC'
         self.connection.max_response_size = 0
+        self.request_handlers = self.session_mgr.rpc_request_handlers
 
     def protocol_version_string(self):
         return 'RPC'

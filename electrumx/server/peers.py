@@ -1,25 +1,22 @@
-# Copyright (c) 2017-2018, Neil Booth
+# Copyright (c) 2017-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Peer management.'''
 
 import asyncio
 from ipaddress import IPv4Address, IPv6Address
-import json
 import random
 import socket
 import ssl
 import time
 from collections import defaultdict, Counter
 
-import aiohttp
 from aiorpcx import (connect_rs, RPCSession, SOCKSProxy, Notification, handler_invocation,
-                     SOCKSError, RPCError, TaskTimeout, TaskGroup, Event,
-                     sleep, ignore_after)
+                     SOCKSError, TaskTimeout, TaskGroup, Event,
+                     sleep, ignore_after, RPCError, ProtocolError)
 
 from electrumx.lib.peer import Peer
 from electrumx.lib.util import class_logger
@@ -45,8 +42,8 @@ class PeerSession(RPCSession):
 
     async def handle_request(self, request):
         # We subscribe so might be unlucky enough to get a notification...
-        if (isinstance(request, Notification) and
-                request.method == 'blockchain.headers.subscribe'):
+        if (isinstance(request, Notification)
+                and request.method == 'blockchain.headers.subscribe'):
             pass
         else:
             await handler_invocation(None, request)   # Raises
@@ -135,8 +132,8 @@ class PeerManager:
     def _get_recent_good_peers(self):
         cutoff = time.time() - STALE_SECS
         recent = [peer for peer in self.peers
-                  if peer.last_good > cutoff and
-                  not peer.bad and peer.is_public]
+                  if peer.last_good > cutoff
+                  and not peer.bad and peer.is_public]
         return recent
 
     async def _detect_proxy(self):
@@ -175,6 +172,11 @@ class PeerManager:
                     for match in matches:
                         if match.check_ports(peer):
                             self.logger.info(f'ports changed for {peer}')
+                            # Retry connecting to the peer. First we will try the existing
+                            # ports and then try the new ports. Note that check_ports above
+                            # had a side_effect to temporarily store the new ports.
+                            # If we manage to connect, we will call 'server.features',
+                            # and the ports for this peer will be updated to the return values.
                             match.retry_event.set()
             else:
                 match_set.add(peer)
@@ -248,13 +250,15 @@ class PeerManager:
                 self.logger.error(f'{peer_text} marking bad: ({e})')
                 peer.mark_bad()
                 break
-            except RPCError as e:
+            except (RPCError, ProtocolError) as e:
                 self.logger.error(f'{peer_text} RPC error: {e.message} '
                                   f'({e.code})')
             except (OSError, SOCKSError, ConnectionError, TaskTimeout) as e:
                 self.logger.info(f'{peer_text} {e}')
 
         if is_good:
+            # Monotonic time would be better, but last_good and last_try are
+            # exported to admin RPC client.
             now = time.time()
             elapsed = now - peer.last_try
             self.logger.info(f'{peer_text} verified in {elapsed:.1f}s')
@@ -321,6 +325,7 @@ class PeerManager:
         # server.version goes first
         message = 'server.version'
         result = await session.send_request(message, self.server_version_args)
+
         assert_good(message, result, list)
 
         # Protocol version 1.1 returns a pair with the version first
@@ -335,6 +340,10 @@ class PeerManager:
             await g.spawn(self._send_server_features(session, peer))
             peers_task = await g.spawn(self._send_peers_subscribe
                                        (session, peer))
+
+            async for task in g:
+                if not task.cancelled():
+                    task.result()
 
         # Process reported peers if remote peer is good
         peers = peers_task.result()
@@ -351,7 +360,7 @@ class PeerManager:
         result = await session.send_request(message)
         assert_good(message, result, dict)
 
-        our_height = self.db.db_height
+        our_height = self.db.state.height
         their_height = result.get('height')
         if not isinstance(their_height, int):
             raise BadPeerError(f'invalid height {their_height}')
@@ -396,7 +405,7 @@ class PeerManager:
             return [Peer.from_real_name(real_name, str(peer))
                     for real_name in real_names]
         except Exception:
-            raise BadPeerError('bad server.peers.subscribe response')
+            raise BadPeerError('bad server.peers.subscribe response') from None
 
     #
     # External interface
@@ -416,10 +425,14 @@ class PeerManager:
         self.logger.info(f'announce ourself: {self.env.peer_announce}')
         self.logger.info(f'my clearnet self: {self._my_clearnet_peer()}')
         self.logger.info(f'force use of proxy: {self.env.force_proxy}')
-        self.logger.info(f'beginning peer discovery...')
+        self.logger.info('beginning peer discovery...')
         async with self.group as group:
             await group.spawn(self._detect_proxy())
             await group.spawn(self._import_peers())
+
+            async for task in group:
+                if not task.cancelled():
+                    task.result()
 
     def info(self):
         '''The number of peers.'''
@@ -435,7 +448,7 @@ class PeerManager:
 
     async def add_localRPC_peer(self, real_name):
         '''Add a peer passed by the admin over LocalRPC.'''
-        await self._note_peers([Peer.from_real_name(real_name, 'RPC')])
+        await self._note_peers([Peer.from_real_name(real_name, 'RPC')], check_ports=True)
 
     async def on_add_peer(self, features, source_addr):
         '''Add a peer (but only if the peer resolves to the source).'''

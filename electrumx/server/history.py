@@ -1,10 +1,9 @@
-# Copyright (c) 2016-2018, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 # Copyright (c) 2017, the ElectrumX authors
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''History by script hash (address).'''
 
@@ -13,9 +12,8 @@ import ast
 import bisect
 import time
 from collections import defaultdict
-from functools import partial
 
-import electrumx.lib.util as util
+from electrumx.lib import util
 from electrumx.lib.util import (
     pack_be_uint16, pack_le_uint64, unpack_be_uint16_from, unpack_le_uint64,
 )
@@ -138,7 +136,7 @@ class History(object):
         assert not self.unflushed
 
     def flush(self):
-        start_time = time.time()
+        start_time = time.monotonic()
         self.flush_count += 1
         flush_id = pack_be_uint16(self.flush_count)
         unflushed = self.unflushed
@@ -154,7 +152,7 @@ class History(object):
         self.unflushed_count = 0
 
         if self.db.for_sync:
-            elapsed = time.time() - start_time
+            elapsed = time.monotonic() - start_time
             self.logger.info(f'flushed history in {elapsed:.1f}s '
                              f'for {count:,d} addrs')
 
@@ -264,6 +262,7 @@ class History(object):
         # compacted.
         write_size = 0
         keys_to_delete.update(hist_map)
+        n = 0   # In case of no loops
         for n, chunk in enumerate(util.chunks(full_hist, max_row_size)):
             key = hashX + pack_be_uint16(n)
             if hist_map.get(key) == chunk:
@@ -364,12 +363,12 @@ class History(object):
                 self.write_state(batch)
             return count
 
-        last = time.time()
+        last = time.monotonic()
         count = 0
 
         for cursor in range(self.upgrade_cursor + 1, 65536):
             count += upgrade_cursor(cursor)
-            now = time.time()
+            now = time.monotonic()
             if now > last + 10:
                 last = now
                 self.logger.info(f'DB 3 of 3: {count:,d} entries updated, '

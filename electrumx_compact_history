@@ -50,7 +50,7 @@ async def compact_history():
     db = DB(env)
     await db.open_for_compacting()
 
-    assert not db.first_sync
+    assert not db.state.first_sync
     history = db.history
     # Continue where we left off, if interrupted
     if history.comp_cursor == -1:

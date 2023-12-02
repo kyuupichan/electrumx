@@ -1,9 +1,8 @@
-# Copyright (c) 2017, Neil Booth
+# Copyright (c) 2017-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Base class of servers'''
 
@@ -35,7 +34,7 @@ class ServerBase:
                                         'SSL error in data received|'
                                         'socket.send() raised exception')
     SUPPRESS_TASK_REGEX = re.compile('accept_connection2')
-    PYTHON_MIN_VERSION = (3, 6)
+    PYTHON_MIN_VERSION = (3, 8)
 
     def __init__(self, env):
         '''Save the environment, perform basic sanity checks, and set the
@@ -111,7 +110,7 @@ class ServerBase:
         loop.set_exception_handler(self.on_exception)
 
         # Start serving and wait for shutdown, log receipt of the event
-        server_task = await spawn(serve, report_crash=False)
+        server_task = await spawn(serve, daemon=True)
         try:
             await shutdown_event.wait()
         except KeyboardInterrupt:

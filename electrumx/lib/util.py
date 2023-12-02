@@ -1,28 +1,8 @@
-# Copyright (c) 2016-2017, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 #
 # All rights reserved.
 #
-# The MIT License (MIT)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Miscellaneous utility classes and functions.'''
 
@@ -31,7 +11,6 @@ import array
 import inspect
 from ipaddress import ip_address
 import logging
-import re
 import sys
 from collections.abc import Container, Mapping
 from struct import Struct
@@ -76,8 +55,8 @@ class cachedproperty(object):
     def __init__(self, f):
         self.f = f
 
-    def __get__(self, obj, type):
-        obj = obj or type
+    def __get__(self, obj, type_):
+        obj = obj or type_
         value = self.f(obj)
         setattr(obj, self.f.__name__, value)
         return value
@@ -139,8 +118,8 @@ def deep_getsizeof(obj):
 def subclasses(base_class, strict=True):
     '''Return a list of subclasses of base_class in its module.'''
     def select(obj):
-        return (inspect.isclass(obj) and issubclass(obj, base_class) and
-                (not strict or obj != base_class))
+        return (inspect.isclass(obj) and issubclass(obj, base_class)
+                and (not strict or obj != base_class))
 
     pairs = inspect.getmembers(sys.modules[base_class.__module__], select)
     return [pair[1] for pair in pairs]

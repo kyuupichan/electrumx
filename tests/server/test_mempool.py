@@ -6,19 +6,18 @@ from functools import partial
 from random import randrange, choice, seed
 
 import pytest
-from aiorpcx import Event, TaskGroup, sleep, spawn, ignore_after
+from aiorpcx import Event, TaskGroup, sleep, ignore_after
 
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.lib.coins import Bitcoin
-from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash, hash_to_hex_str
+from electrumx.lib.hash import HASHX_LEN, hex_str_to_hash, hash_to_hex_str, double_sha256
 from electrumx.lib.tx import Tx, TxInput, TxOutput
 from electrumx.lib.util import make_logger
 
 
 coin = Bitcoin
-tx_hash_fn = coin.DESERIALIZER.TX_HASH_FN
 # Change seed daily
-seed(datetime.date.today().toordinal)
+seed(datetime.date.today().toordinal())
 
 
 def random_tx(hash160s, utxos):
@@ -52,7 +51,7 @@ def random_tx(hash160s, utxos):
 
     tx = Tx(2, inputs, outputs, 0)
     tx_bytes = tx.serialize()
-    tx_hash = tx_hash_fn(tx_bytes)
+    tx_hash = double_sha256(tx_bytes)
     for n, output in enumerate(tx.outputs):
         utxos[(tx_hash, n)] = (coin.hashX_from_script(output.pk_script),
                                output.value)
@@ -473,7 +472,7 @@ async def test_notifications(caplog):
         api.txs = {hash: txs[hash] for hash in second_hashes}
         # Delay the DB update
         assert not in_caplog(caplog, 'waiting for DB to sync')
-        async with ignore_after(mempool.refresh_secs * 2):
+        async with ignore_after(max(mempool.refresh_secs * 2, 0.5)):
             await event.wait()
         assert in_caplog(caplog, 'waiting for DB to sync')
         assert len(api.on_mempool_calls) == 2

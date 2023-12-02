@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 from electrumx.server.controller import Notifications

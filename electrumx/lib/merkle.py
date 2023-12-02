@@ -1,28 +1,8 @@
-# Copyright (c) 2018, Neil Booth
+# Copyright (c) 2018-2021, Neil Booth
 #
 # All rights reserved.
 #
-# The MIT License (MIT)
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Merkle trees, branches, proofs and roots.'''
 
@@ -55,7 +35,7 @@ class Merkle(object):
             raise ValueError('hash_count must be at least 1')
         return ceil(log(hash_count, 2))
 
-    def branch_and_root(self, hashes, index, length=None):
+    def branch_and_root(self, hashes, index, length=None, tsc_format=False):
         '''Return a (merkle branch, merkle_root) pair given hashes, and the
         index of one of those hashes.
         '''
@@ -79,7 +59,15 @@ class Merkle(object):
         for _ in range(length):
             if len(hashes) & 1:
                 hashes.append(hashes[-1])
-            branch.append(hashes[index ^ 1])
+
+                # Asterix used in place of "duplicated" hashes in TSC format (derivable by client)
+                is_last_node_in_level = (index ^ 1 == len(hashes) - 1)
+                if tsc_format and is_last_node_in_level:
+                    branch.append(b"*")
+                else:
+                    branch.append(hashes[index ^ 1])
+            else:
+                branch.append(hashes[index ^ 1])
             index >>= 1
             hashes = [hash_func(hashes[n] + hashes[n + 1])
                       for n in range(0, len(hashes), 2)]
@@ -91,7 +79,7 @@ class Merkle(object):
         _branch, root = self.branch_and_root(hashes, 0, length)
         return root
 
-    def root_from_proof(self, hash, branch, index):
+    def root_from_proof(self, hash_, branch, index):
         '''Return the merkle root given a hash, a merkle branch to it, and
         its index in the hashes array.
 
@@ -107,13 +95,13 @@ class Merkle(object):
         hash_func = self.hash_func
         for elt in branch:
             if index & 1:
-                hash = hash_func(elt + hash)
+                hash_ = hash_func(elt + hash_)
             else:
-                hash = hash_func(hash + elt)
+                hash_ = hash_func(hash_ + elt)
             index >>= 1
         if index:
             raise ValueError('index out of range for branch')
-        return hash
+        return hash_
 
     def level(self, hashes, depth_higher):
         '''Return a level of the merkle tree of hashes the given depth
@@ -124,7 +112,7 @@ class Merkle(object):
                 for n in range(0, len(hashes), size)]
 
     def branch_and_root_from_level(self, level, leaf_hashes, index,
-                                   depth_higher):
+                                   depth_higher, tsc_format=False):
         '''Return a (merkle branch, merkle_root) pair when a merkle-tree has a
         level cached.
 
@@ -148,9 +136,9 @@ class Merkle(object):
             raise TypeError("leaf_hashes must be a list")
         leaf_index = (index >> depth_higher) << depth_higher
         leaf_branch, leaf_root = self.branch_and_root(
-            leaf_hashes, index - leaf_index, depth_higher)
+            leaf_hashes, index - leaf_index, depth_higher, tsc_format=tsc_format)
         index >>= depth_higher
-        level_branch, root = self.branch_and_root(level, index)
+        level_branch, root = self.branch_and_root(level, index, tsc_format=tsc_format)
         # Check last so that we know index is in-range
         if leaf_root != level[index]:
             raise ValueError('leaf hashes inconsistent with level')
@@ -229,7 +217,7 @@ class MerkleCache(object):
         self.length = length
         self.level[length >> self.depth_higher:] = []
 
-    async def branch_and_root(self, length, index):
+    async def branch_and_root(self, length, index, tsc_format=False):
         '''Return a merkle branch and root.  Length is the number of
         hashes used to calculate the merkle root, index is the position
         of the hash to calculate the branch of.
@@ -249,7 +237,7 @@ class MerkleCache(object):
         count = min(self._segment_length(), length - leaf_start)
         leaf_hashes = await self.source_func(leaf_start, count)
         if length < self._segment_length():
-            return self.merkle.branch_and_root(leaf_hashes, index)
+            return self.merkle.branch_and_root(leaf_hashes, index, tsc_format=tsc_format)
         level = await self._level_for(length)
         return self.merkle.branch_and_root_from_level(
-            level, leaf_hashes, index, self.depth_higher)
+            level, leaf_hashes, index, self.depth_higher, tsc_format=tsc_format)

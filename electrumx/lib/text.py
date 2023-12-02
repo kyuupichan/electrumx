@@ -1,6 +1,13 @@
+# Copyright (c) 2018-2021, Neil Booth
+#
+# All rights reserved.
+#
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
+
+
 import time
 
-import electrumx.lib.util as util
+from electrumx.lib import util
 
 
 def sessions_lines(data):

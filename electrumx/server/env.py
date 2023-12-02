@@ -1,9 +1,8 @@
-# Copyright (c) 2016, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 '''Class for handling environment configuration and defaults.'''
 
@@ -75,6 +74,7 @@ class Env(EnvBase):
         # Server limits to help prevent DoS
 
         self.max_send = self.integer('MAX_SEND', self.coin.DEFAULT_MAX_SEND)
+        self.max_recv = self.integer('MAX_RECV', 5_000_000)
         self.max_sessions = self.sane_max_sessions()
         self.cost_soft_limit = self.integer('COST_SOFT_LIMIT', 1000)
         self.cost_hard_limit = self.integer('COST_HARD_LIMIT', 10000)
@@ -158,8 +158,8 @@ class Env(EnvBase):
                 raise ServiceError(f'bad protocol for REPORT_SERVICES: {service.protocol}')
             if isinstance(service.host, (IPv4Address, IPv6Address)):
                 ip_addr = service.host
-                if (ip_addr.is_multicast or ip_addr.is_unspecified or
-                        (ip_addr.is_private and self.peer_announce)):
+                if (ip_addr.is_multicast or ip_addr.is_unspecified
+                        or (ip_addr.is_private and self.peer_announce)):
                     raise ServiceError(f'bad IP address for REPORT_SERVICES: {ip_addr}')
             elif service.host.lower() == 'localhost':
                 raise ServiceError(f'bad host for REPORT_SERVICES: {service.host}')

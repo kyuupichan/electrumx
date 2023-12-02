@@ -273,15 +273,15 @@ Return the confirmed and unconfirmed balances of a :ref:`script hash
 **Result**
 
   A dictionary with keys `confirmed` and `unconfirmed`.  The value of
-  each is the appropriate balance in coin units as a string.
+  each is the appropriate balance in minimum coin units (satoshis).
 
 **Result Example**
 
 ::
 
   {
-    "confirmed": "1.03873966",
-    "unconfirmed": "0.236844"
+    "confirmed": 103873966,
+    "unconfirmed": 23684400
   }
 
 blockchain.scripthash.get_history
@@ -673,6 +673,90 @@ and height.
     "block_height": 450538,
     "pos": 710
   }
+
+
+blockchain.transaction.get_tsc_merkle
+=====================================
+
+Return the TSC Bitcoin Association merkle proof in standardised format for a confirmed
+transaction given its hash and height. Additional options include: txid_or_tx and target_type.
+
+See: https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format/
+
+**Signature**
+
+  .. function:: blockchain.transaction.get_tsc_merkle(tx_hash, height, txid_or_tx="txid", target_type="block_hash")
+
+  *tx_hash*
+
+    The transaction hash as a hexadecimal string.
+
+  *height*
+
+    The height at which it was confirmed, an integer.
+
+  *txid_or_tx*
+
+    Takes two possible values: "txid" or "tx".
+    Selects whether to return the transaction hash or the full transaction as a hexadecimal string.
+
+  *target_type*
+
+    Takes three possible values: "block_hash", "block_header", "merkle_root"
+    The selected target is returned as a hexidecimal string in the response.
+
+
+**Result**
+
+  A dictionary with the following keys:
+
+  * *composite*
+
+    Included for completeness. Whether or not this is a composite merkle proof (for two or more
+    transactions). ElectrumX does not support composite proofs at this time (always False).
+
+  * *index*
+
+    The 0-based position index of the transaction in the block.
+
+  * *nodes*
+
+    The list of hash pairs making up the merkle branch. "Duplicate" hashes (see TSC merkle proof
+    format spec.) are replaced with asterixes as they can be derived by the client.
+
+  * *proofType*
+
+    Included for completeness. Specifies the proof type as either 'branch' or 'tree' type.
+    ElectrumX only supports 'branch' proof types.
+
+  * *target*
+
+    Either the block_hash, block_header or merkle_root as a hexidecimal string.
+
+  * *targetType*
+
+    Takes three possible values: "block_hash", "block_header", "merkle_root"
+
+  * *txOrId*
+
+    Either a 32 byte tx hash or a full transaction as a hexidecimal string.
+
+**Result Example**
+
+::
+
+    {
+        'composite': False,
+        'index': 4,
+        'nodes': [
+            '*',
+            '*',
+            '80c0100bc080eb0d2e205dc687056dc13c2079d0959c70cad8856fea88c74aba'],
+        'proofType': 'branch',
+        'target': '29442cb6e2ee547fcf5200dfb1b4018f4fc5ce5a220bb5ec3729a686885692fc',
+        'targetType': 'block_hash',
+        'txOrId': 'ed5a81e439e1cd9139ddb81da80bfa7cfc31e323aea544ca92a9ee1d84b9fb2f'
+    }
 
 blockchain.transaction.id_from_pos
 ==================================

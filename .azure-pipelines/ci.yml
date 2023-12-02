@@ -1,0 +1,25 @@
+pr:
+  - master
+  - releases/*
+
+jobs:
+- template: run-tests.yml
+  parameters:
+    name: Py38_Ubuntu
+    vmImage: 'ubuntu-20.04'
+    pythonVersion: '3.8'
+- template: run-tests.yml
+  parameters:
+    name: Py38_Mac
+    vmImage: 'macOS-10.14'
+    pythonVersion: '3.8'
+- template: run-tests.yml
+  parameters:
+    name: Py39_Ubuntu
+    vmImage: 'ubuntu-20.04'
+    pythonVersion: '3.9'
+- template: run-tests.yml
+  parameters:
+    name: Py39_Mac
+    vmImage: 'macOS-10.14'
+    pythonVersion: '3.9'

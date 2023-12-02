@@ -13,19 +13,8 @@ def test_sha256():
     with pytest.raises(TypeError):
         lib_hash.sha256('sha256')
 
-def ripemd160(x):
-    assert lib_hash.ripemd160(b'ripemd160') == b'\x903\x91\xa1\xc0I\x9e\xc8\xdf\xb5\x1aSK\xa5VW\xf9|W\xd5'
-    with pytest.raises(TypeError):
-        lib_hash.ripemd160('ripemd160')
-
 def test_double_sha256():
     assert lib_hash.double_sha256(b'double_sha256') == b'ksn\x8e\xb7\xb9\x0f\xf6\xd9\xad\x88\xd9#\xa1\xbcU(j1Bx\xce\xd5;s\xectL\xe7\xc5\xb4\x00'
-
-def test_hmac_sha512():
-    assert lib_hash.hmac_sha512(b'key', b'message') == b"\xe4w8M|\xa2)\xdd\x14&\xe6Kc\xeb\xf2\xd3n\xbdm~f\x9ag5BNr\xeal\x01\xd3\xf8\xb5n\xb3\x9c6\xd8#/T'\x99\x9b\x8d\x1a?\x9c\xd1\x12\x8f\xc6\x9fMu\xb44!h\x10\xfa6~\x98"
-
-def test_hash160():
-    assert lib_hash.hash160(b'hash_160') == b'\xb3\x96\x94\xfc\x978R\xa7)XqY\xbb\xdc\xeb\xac\xa7%\xb8$'
 
 def test_hash_to_hex_str():
     assert lib_hash.hash_to_hex_str(b'hash_to_str') == '7274735f6f745f68736168'

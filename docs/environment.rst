@@ -299,6 +299,10 @@ raise them.
   SSL listening sockets are closed until the session count drops
   naturally to 95% of the limit.  Defaults to 1,000.
 
+.. envvar:: MAX_RECV
+
+  The maximum size of an incoming message in bytes, the default is 5,000,000 bytes.
+
 .. envvar:: MAX_SEND
 
   The maximum size of a response message to send over the wire, in

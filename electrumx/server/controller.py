@@ -1,17 +1,18 @@
-# Copyright (c) 2016-2018, Neil Booth
+# Copyright (c) 2016-2021, Neil Booth
 #
 # All rights reserved.
 #
-# See the file "LICENCE" for information about the copyright
-# and warranty status of this software.
+# This file is licensed under the Open BSV License version 3, see LICENCE for details.
 
 from asyncio import Event
 
 from aiorpcx import _version as aiorpcx_version, TaskGroup
 
 import electrumx
+import electrumx.server.block_processor as block_proc
 from electrumx.lib.server_base import ServerBase
 from electrumx.lib.util import version_string
+from electrumx.server.daemon import Daemon
 from electrumx.server.db import DB
 from electrumx.server.mempool import MemPool, MemPoolAPI
 from electrumx.server.session import SessionManager
@@ -82,8 +83,8 @@ class Controller(ServerBase):
         '''Start the RPC server and wait for the mempool to synchronize.  Then
         start serving external clients.
         '''
-        if not (0, 18, 1) <= aiorpcx_version < (0, 19):
-            raise RuntimeError('aiorpcX version 0.18.x is required')
+        if not (0, 22) <= aiorpcx_version < (0, 23):
+            raise RuntimeError('aiorpcX version 0.22.x is required')
 
         env = self.env
         min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
@@ -94,16 +95,14 @@ class Controller(ServerBase):
         self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
 
         notifications = Notifications()
-        Daemon = env.coin.DAEMON
-        BlockProcessor = env.coin.BLOCK_PROCESSOR
 
         async with Daemon(env.coin, env.daemon_url) as daemon:
             db = DB(env)
-            bp = BlockProcessor(env, db, daemon, notifications)
+            bp = block_proc.BlockProcessor(env, db, daemon, notifications)
 
             # Set notifications up to implement the MemPoolAPI
             def get_db_height():
-                return db.db_height
+                return db.state.height
             notifications.height = daemon.height
             notifications.db_height = get_db_height
             notifications.cached_height = daemon.cached_height
@@ -130,5 +129,10 @@ class Controller(ServerBase):
 
             async with TaskGroup() as group:
                 await group.spawn(session_mgr.serve(notifications, mempool_event))
-                await group.spawn(bp.fetch_and_process_blocks(caught_up_event))
+                await group.spawn(bp.fetch_and_process_blocks(caught_up_event, shutdown_event))
+                await group.spawn(bp.check_cache_size_loop())
                 await group.spawn(wait_for_catchup())
+
+                async for task in group:
+                    if not task.cancelled():
+                        task.result()

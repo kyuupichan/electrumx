@@ -22,7 +22,7 @@ urls = ['http://rpc_user:rpc_pass@127.0.0.1:8332/',
 
 @pytest.fixture
 def daemon():
-    return coin.DAEMON(Bitcoin, ','.join(urls))
+    return Daemon(Bitcoin, ','.join(urls))
 
 
 class ResponseBase(object):
@@ -242,14 +242,6 @@ async def test_mempool_hashes(daemon):
 
 
 @pytest.mark.asyncio
-async def test_deserialised_block(daemon):
-    block_hash = 'block_hash'
-    result = {'some': 'mess'}
-    daemon.session = ClientSessionGood(('getblock', [block_hash, True], result))
-    assert await daemon.deserialised_block(block_hash) == result
-
-
-@pytest.mark.asyncio
 async def test_getrawtransaction(daemon):
     hex_hash = 'deadbeef'
     simple = 'tx_in_hex'
@@ -283,18 +275,6 @@ async def test_block_hex_hashes(daemon):
                                         [[n] for n in range(first, first + count)],
                                         hashes))
     assert await daemon.block_hex_hashes(first, count) == hashes
-
-
-@pytest.mark.asyncio
-async def test_raw_blocks(daemon):
-    count = 3
-    hex_hashes = [f'hex_hash{n}' for n in range(count)]
-    args_list = [[hex_hash, False] for hex_hash in hex_hashes]
-    iterable = (hex_hash for hex_hash in hex_hashes)
-    blocks = ["00", "019a", "02fe"]
-    blocks_raw = [bytes.fromhex(block) for block in blocks]
-    daemon.session = ClientSessionGood(('getblock', args_list, blocks))
-    assert await daemon.raw_blocks(iterable) == blocks_raw
 
 
 @pytest.mark.asyncio
