@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "service.fullname" . }}
+  labels:
+    {{- include "service.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.config.service.tcpPort }}
+      targetPort: {{ .Values.config.service.tcpPort }}
+      protocol: TCP
+      name: tcp
+  selector:
+    {{- include "service.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "service.fullname" . }}-rpc
+  labels:
+    {{- include "service.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.config.service.rpcPort }}
+      targetPort: {{ .Values.config.service.rpcPort }}
+      protocol: TCP
+      name: rpc
+  selector:
+    {{- include "service.selectorLabels" . | nindent 4 }}

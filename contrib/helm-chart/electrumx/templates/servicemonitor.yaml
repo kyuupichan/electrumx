@@ -1,0 +1,21 @@
+{{- if .Values.servicemonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/instance: {{ include "service.name" . }}
+    release: prometheus-operator
+    team: infrastructure
+  name: {{ include "service.name" . }}-sm
+  namespace: monitoring
+spec:
+  endpoints:
+  - path: metrics
+    port: metrics
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ include "service.name" . }}
+      app.kubernetes.io/name: {{ include "service.name" . }}
+{{- end }}

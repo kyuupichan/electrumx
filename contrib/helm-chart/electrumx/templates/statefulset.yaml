@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "service.fullname" . }}
+  labels:
+    {{- include "service.labels" . | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  revisionHistoryLimit: 2
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  serviceName: {{ include "service.fullname" . }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "service.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: volume-mount-hack
+        image: busybox
+        command: ["sh", "-c", "chown -R 999:999 /var/lib/electrumx"]
+        volumeMounts:
+        - name: electrumx-data
+          mountPath: /var/lib/electrumx
+      {{- if .Values.compacting.enabled }}
+      - name: compacting-hack
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        command: ["/usr/local/bin/electrumx_compact_history"]
+        volumeMounts:
+        - name: electrumx-data
+          mountPath: /var/lib/electrumx
+        envFrom:
+          - secretRef:
+              name: {{ include "service.fullname" . }}-secrets
+          - configMapRef: 
+              name: {{ include "service.fullname" . }}-configmap
+      {{- end }}          
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+          - name: ssl-key
+            mountPath: "/etc/electrumx.key"
+            subPath: "electrumx.key"
+            readOnly: true
+          - name: ssl-cert
+            mountPath: "/etc/electrumx.cert"     
+            subPath: "electrumx.cert"       
+            readOnly: true
+          - name: electrumx-data
+            mountPath: /var/lib/electrumx         
+          envFrom:
+            - secretRef:
+                name: {{ include "service.fullname" . }}-secrets
+            - configMapRef: 
+                name: {{ include "service.fullname" . }}-configmap
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.config.service.rpcPort }}
+            - name: tcp
+              containerPort: {{ .Values.config.service.tcpPort }}              
+          # livenessProbe:
+          #   exec:
+          #     command:
+          #     - electrum getinfo
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 5
+          # readinessProbe:
+          #   exec:
+          #     command:
+          #     - electrum getinfo
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: ssl-key
+          secret:
+            secretName: electrumx-ssl-certs-secrets
+            items:
+            - key: SSL_KEY
+              path: ./electrumx.key
+        - name: ssl-cert
+          secret:
+            secretName: electrumx-ssl-certs-secrets
+            items:
+            - key: SSL_CERT  
+              path: ./electrumx.cert          
+        {{- if .Values.config.persistence.enabled }}    
+        - name: electrumx-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.config.persistence.existingClaim | default (include "service.fullname" .) }}
+        {{- end }}

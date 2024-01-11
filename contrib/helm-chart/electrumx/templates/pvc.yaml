@@ -1,0 +1,19 @@
+{{- if .Values.config.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "service.fullname" . }}
+  labels:
+  {{- include "service.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.config.persistence.storageClassName }}
+  storageClassName: {{ .Values.config.persistence.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.config.persistence.size }}
+{{- end }}
