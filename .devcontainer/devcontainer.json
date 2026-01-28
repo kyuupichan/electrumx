@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://liquid.network/liquid.js"></script>
+    <script>
+      const init = async () => {
+        
+        const { transactions }  = liquidJS();
+
+        const txid = '801c8cccdfb1cac41f97d290e00e3e608753bb5b8fbc5ba39f3ab6feef13dd4a';
+        const txMerkleProof = await transactions.getTxMerkleProof({ txid });
+
+        document.getElementById("result").textContent = JSON.stringify(txMerkleProof, undefined, 2);
+        
+      };
+      init();
+    </script>
+  </head>
+  <body>
+    <pre id="result"></pre>
+  </body>
+</html>
